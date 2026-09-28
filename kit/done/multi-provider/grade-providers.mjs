@@ -67,7 +67,10 @@ const trackerSource = read('src/main/tracker.js');
 const mainSource = read('src/main/main.js');
 const htmlSource = read('src/renderer/index.html');
 const utilSource = read('src/renderer/util.js');
-const appSource = read('src/renderer/app.js');
+// 2026-09-27 kit 13: app.js split into app-*.js modules; grep the whole app layer.
+const appSource = fs.readdirSync(path.join(root, 'src', 'renderer'))
+  .filter((f) => /^app.*\.js$/.test(f)).sort()
+  .map((f) => read(`src/renderer/${f}`)).join('\n');
 const universeSource = read('src/renderer/scene-universe.js');
 const systemSource = read('src/renderer/scene-system.js');
 const planetSource = read('src/renderer/scene-planet.js');

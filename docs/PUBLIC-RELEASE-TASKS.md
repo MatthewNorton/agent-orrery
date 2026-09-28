@@ -134,28 +134,28 @@ free.
 
 None of these block release. Each is a kit-sized job.
 
-- [ ] **5.1 Split `src/renderer/app.js` (3499 lines).** Natural seams:
+- [x] **5.1 Split `src/renderer/app.js` (3499 lines).** Natural seams:
       command rail, playback/timeline, attention + notifications, project
       directory/search, view orchestration. Target ≤ 600 lines per file, plain
       `<script>` load order, `window.AUR` namespace. Gate: `node kit/grade.mjs`
       three consecutive green runs (it is the flaky one). ~4–6 h.
-- [ ] **5.2 One shared path classifier.** Four copies exist and already
+- [x] **5.2 One shared path classifier.** Four copies exist and already
       disagree on UNC roots: `terminal-launcher.js:160`,
       `agent-launcher.js:324`, `provider-adapters.js` (`isLocalProjectPath`),
       `tracker.js` (`relativeInside`) / `replay-source.js` (`safeRelative`).
       Export `classifyPath` / `isCanonicalPath` / `isInsidePath` from
       `provider-adapters.js` and delete the copies. ~2 h.
-- [ ] **5.3 Replace scene-dispose polling.** `src/renderer/app.js:640`
+- [-] **5.3 Replace scene-dispose polling.** `src/renderer/app.js:640`
       polls every 50 ms for up to 4 s holding two scenes live. Use the BRDF
       texture's `onLoadObservable.addOnce` (or `scene.executeWhenReady`) with
-      a single fallback timeout. ~1 h.
+      a single fallback timeout. ~1 h. Withdrawn 2026-09-28: Babylon exposes no decode-complete signal; poll kept and documented (kit 13).
 - [ ] **5.4 Mapped network drives on Windows** (unverified).
       `src/main/main.js:491` re-checks `isLocalProjectPath` after
       `realpathSync.native`, which resolves `Z:\` to UNC, so Open Terminal
       reports NOT_FOUND for a project the map shows as existing. Drop the
       post-realpath check; the pre-realpath one is the protective one. ~30 min
       plus a mapped-drive test machine.
-- [ ] **5.5 POSIX `codex` shims** (unverified). `src/main/agent-launcher.js:118`
+- [x] **5.5 POSIX `codex` shims** (unverified). `src/main/agent-launcher.js:118`
       spawns any regular executable named `codex` (pnpm/volta shims), which
       the comments say never happens. Decide whether that is acceptable and
       fix either the code or the comment. ~30 min.

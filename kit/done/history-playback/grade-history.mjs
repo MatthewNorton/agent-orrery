@@ -93,7 +93,10 @@ for (const [rel, expected] of frozen) {
 
 const mainSource = read('src/main/main.js');
 const preloadSource = read('src/preload.js');
-const appSource = read('src/renderer/app.js');
+// 2026-09-27 kit 13: app.js split into app-*.js modules; grep the whole app layer.
+const appSource = fs.readdirSync(path.join(root, 'src', 'renderer'))
+  .filter((f) => /^app.*\.js$/.test(f)).sort()
+  .map((f) => read(`src/renderer/${f}`)).join('\n');
 const htmlSource = read('src/renderer/index.html');
 const styleSource = read('src/renderer/style.css');
 const utilSource = read('src/renderer/util.js');
