@@ -30,4 +30,8 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      # Frozen-file pins in the two hash-pinning kit gates must match the tree, so a PR
+      # that edits a frozen file turns red here with the file named, instead of failing
+      # a local gate run later.
+      - run: node kit/repin.mjs --check
       - run: npm test

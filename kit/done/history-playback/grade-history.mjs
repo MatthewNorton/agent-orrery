@@ -82,13 +82,24 @@ const frozen = new Map([
   ['src/renderer/scene-planet.js', '7c6bd48e4c90183b01b382e5fb4d7ed7e7ede3f14b88f0d8813fb0ea716575b3'],
   ['src/renderer/galaxy-layout.js', '3b6456404bea666a2b7d6e0db5b5c57190b3a67b7c383786beb4d8fb7e76ea39'],
   ['src/renderer/polish-math.js', '2d8c154844aa89aeb3d666a8be1e1583cae45f42ce2d8f6ca75c5c17e02385ef'],
-  ['package.json', 'a5ce483c35445819e69e89e0818f355a638563926e8c5754df540f4c2769fc3d'],
-  ['package-lock.json', '6d01a454183894b555883d6707e71e32c5c5710fd67941213f8a62c7c93ea7e1'],
 ]);
 for (const [rel, expected] of frozen) {
   const file = path.join(root, rel);
   if (!fs.existsSync(file)) fail('H0', `frozen file missing: ${rel}`);
   else if (sha256(file) !== expected) fail('H0', `frozen file changed: ${rel}`);
+}
+// 2026-09-28: package.json and package-lock.json are no longer fingerprinted. Dependabot
+// changes them routinely, and the rule this gate protects is "no new dependencies", so
+// the dependency NAMES are pinned instead: version bumps pass, an added package fails.
+// package-lock.json needs no pin of its own: `npm ci` refuses a lockfile that disagrees
+// with package.json.
+const FROZEN_DEPENDENCY_NAMES = ['babylonjs', 'babylonjs-gui', 'babylonjs-loaders', 'electron'];
+{
+  const pkg = JSON.parse(read('package.json') || '{}');
+  const names = Object.keys(pkg.dependencies || {}).concat(Object.keys(pkg.devDependencies || {})).sort();
+  if (names.join(',') !== FROZEN_DEPENDENCY_NAMES.join(',')) {
+    fail('H0', `dependency set changed: expected [${FROZEN_DEPENDENCY_NAMES.join(', ')}], found [${names.join(', ')}]`);
+  }
 }
 
 const mainSource = read('src/main/main.js');
