@@ -123,7 +123,7 @@ else {
   if (failures === before) ok('T4', 'one path classifier in path-safety.js; launchers import it');
 }
 
-// ---- T5: scene dispose waits on the load observable (task D) ----
+// ---- T5: scene dispose is a documented, bounded isReady() poll (task D; §2.6 reversed) ----
 if (!reached('D')) skip('T5', 'D');
 else {
   const before = failures;
@@ -132,11 +132,12 @@ else {
   if (!disposeMatch) fail('T5', 'disposeSettled not found in the app layer');
   else {
     const body = disposeMatch[0];
-    if (!/onLoadObservable/.test(body)) fail('T5', 'disposeSettled does not use onLoadObservable');
-    if (/setTimeout\(tick,\s*50\)/.test(body) || /waited\s*\+=\s*50/.test(body)) fail('T5', 'disposeSettled still polls every 50 ms');
-    if (!/4000/.test(body)) fail('T5', 'disposeSettled lacks the 4 s fallback');
+    if (!/isReady/.test(body)) fail('T5', 'disposeSettled does not poll isReady()');
+    if (!/4000/.test(body)) fail('T5', 'disposeSettled lacks the 4 s bound');
+    if (!/Kit 13/.test(body)) fail('T5', 'disposeSettled lacks the Kit 13 design comment');
+    if (/onLoadObservable\.addOnce/.test(body)) fail('T5', 'disposeSettled uses onLoadObservable.addOnce (fires before the BRDF decode)');
   }
-  if (failures === before) ok('T5', 'disposeSettled is observable-driven with a single 4 s fallback');
+  if (failures === before) ok('T5', 'disposeSettled is a documented, bounded isReady() poll');
 }
 
 // ---- T6: pins current (task A; always checked because A is the first task) ----

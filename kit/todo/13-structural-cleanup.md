@@ -21,7 +21,7 @@ with every gate green after every commit:
 | 0 | **Kill switch**: extract ONE module (agent focus) from `app.js` using the module mechanism in §2 | ~1 h |
 | B | Extract the remaining modules until every renderer file is ≤ 600 lines | ~3–4 h |
 | C | One shared path classifier `src/main/path-safety.js`; launchers use it | ~1.5 h |
-| D | Scene dispose waits on the BRDF texture's load observable, not a 50 ms poll | ~30 min |
+| D | Document why scene dispose polls isReady() (original design withdrawn, see §2.6) | ~15 min |
 | E | Truthful comment on POSIX `codex` shims in `agent-launcher.js` (no behaviour change) | ~10 min |
 | F | Gate maintenance, docs, archive the kit | ~30 min |
 
@@ -160,13 +160,7 @@ the UNC and `//host/share` rejections and a Windows-vs-POSIX `isInsidePath` mism
 
 ### 2.6 Scene dispose (task D)
 
-In `disposeSettled(view)` (currently `app.js` ≈ line 631): keep the synchronous path
-exactly as is (`settled()` true → `view.dispose()` immediately). For the pending case,
-replace the 50 ms `setTimeout` chain with: `detachControl()` as today, then
-`pending.onLoadObservable.addOnce(finish)` **and** one fallback `setTimeout(finish, 4000)`;
-`finish` is idempotent (a `done` flag) and clears the fallback timer. If
-`pending.onLoadObservable` is missing, fall back to the timer alone. Net effect: disposal
-happens the moment the BRDF decode completes, never later than 4 s, never twice.
+**Decision reversed 2026-09-28 during execution.** Babylon 9.28 has no observable for BRDF decode completion: `onLoadObservable` fires when the RGBD image loads, before `RGBDTextureTools.ExpandRGBDTexture` runs its asynchronous decode, and a late `addOnce` never fires (runtime probe in `EXECUTOR-REPORT.md`). Implementing the original design would have reintroduced the dispose-during-decode crash. The existing bounded `isReady()` poll is therefore correct and stays; task D only documents why. Gate T5 checks the documented design.
 
 ### 2.7 Launcher comment (task E)
 

@@ -145,10 +145,10 @@ None of these block release. Each is a kit-sized job.
       `tracker.js` (`relativeInside`) / `replay-source.js` (`safeRelative`).
       Export `classifyPath` / `isCanonicalPath` / `isInsidePath` from
       `provider-adapters.js` and delete the copies. ~2 h.
-- [ ] **5.3 Replace scene-dispose polling.** `src/renderer/app.js:640`
+- [-] **5.3 Replace scene-dispose polling.** `src/renderer/app.js:640`
       polls every 50 ms for up to 4 s holding two scenes live. Use the BRDF
       texture's `onLoadObservable.addOnce` (or `scene.executeWhenReady`) with
-      a single fallback timeout. ~1 h.
+      a single fallback timeout. ~1 h. Withdrawn 2026-09-28: Babylon exposes no decode-complete signal; poll kept and documented (kit 13).
 - [ ] **5.4 Mapped network drives on Windows** (unverified).
       `src/main/main.js:491` re-checks `isLocalProjectPath` after
       `realpathSync.native`, which resolves `Z:\` to UNC, so Open Terminal
