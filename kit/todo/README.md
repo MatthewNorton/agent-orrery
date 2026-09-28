@@ -6,6 +6,7 @@
 |---|---|---|
 | 09 | `09-ship-assets-gen.md` — locally generated hulls (ComfyUI image-to-3D) | stub — Kit 08's manifest contract has landed; ready to distill |
 | 12 | `12-standalone-installer.md` — packaged exe/installer independent of the checkout | parked — wanted later, not yet; don't distill until matt asks |
+| 13 | `13-structural-cleanup.md` — split `app.js` into `AUR.app` modules, one path classifier, observable-driven scene dispose | **ready for Codex** — distilled 2026-09-27; gate `grade-structure.mjs` beside it; executor prompt in §7 |
 
 Feed a ready kit to an executor via `kit/EXECUTOR-HANDOFF.md` with its
 CONTRACT.md path.

@@ -47,6 +47,7 @@ kit/
 | 10 Project tasks | **DONE** — PASS 2026-07-22; archived in `done/project-tasks/` | `node kit/done/project-tasks/grade-tasks.mjs` |
 | 11 Project search | **DONE** — PASS 2026-07-22; archived in `done/project-search/` | `node kit/done/project-search/grade-search.mjs` |
 | 12 Standalone installer | **PARKED** — wanted later, not yet; see `todo/12-standalone-installer.md` | none yet |
+| 13 Structural cleanup | **READY** — distilled 2026-09-27 for Codex; contract `todo/13-structural-cleanup.md` (Phase 5 of `docs/PUBLIC-RELEASE-TASKS.md`) | `node kit/todo/grade-structure.mjs --full` (fails cleanly until built) |
 
 ## How the app works (context for any executor)
 
