@@ -113,7 +113,7 @@ function resolveCodexExecutable({ platform, arch = process.arch, env, fsImpl = f
   const executableName = platform === 'win32' ? 'codex.exe' : 'codex';
 
   const directories = pathValue.split(flavor.delimiter)
-    .map((entry) => entry.trim())
+    .map((entry) => stripTrailingSeparator(entry.trim(), platform))
     .filter((entry) => entry.length > 0 && isCanonicalPathFor(entry, platform));
 
   if (!validFilesystem(fsImpl)) throw launchError('UNAVAILABLE');
@@ -322,6 +322,14 @@ function supportedPlatform(platform) {
 
 function flavorForPlatform(platform) {
   return platform === 'win32' ? path.win32 : path.posix;
+}
+
+// PATH entries are often written with a trailing separator (`C:\Users\x\AppData\Roaming\npm\`).
+// Drop exactly one before the canonical-path check; roots (`C:\`, `/`) are left untouched.
+function stripTrailingSeparator(entry, platform) {
+  const trailing = platform === 'win32' ? /[\\/]$/ : /\/$/;
+  const root = platform === 'win32' ? /^[A-Za-z]:[\\/]$/ : /^\/$/;
+  return trailing.test(entry) && !root.test(entry) ? entry.slice(0, -1) : entry;
 }
 
 function isCodexExecutablePath(value) {
