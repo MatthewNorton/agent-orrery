@@ -3,6 +3,10 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
+const {
+  validPathString,
+  isAbsolutePosixPath,
+} = require('./path-safety');
 
 const ALIAS_SEGMENTS = Object.freeze(['Microsoft', 'WindowsApps', 'wt.exe']);
 // macOS: the fixed system launcher opens the stock Terminal app at a directory.
@@ -147,19 +151,9 @@ function ownCwd(request) {
   return descriptor && Object.hasOwn(descriptor, 'value') ? descriptor.value : null;
 }
 
-function validPathString(value) {
-  return typeof value === 'string' && value.length > 0 && value.length <= 32767 &&
-    !value.includes('\0');
-}
-
 function isAbsoluteWindowsPath(value) {
   return validPathString(value) && path.win32.isAbsolute(value) &&
     path.win32.normalize(value) === value;
-}
-
-function isAbsolutePosixPath(value) {
-  return validPathString(value) && value.startsWith('/') &&
-    path.posix.normalize(value) === value;
 }
 
 function isFixedAliasPath(value) {
