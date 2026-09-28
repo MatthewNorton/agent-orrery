@@ -288,11 +288,6 @@
     if (name === 'universe') A.refreshProjectSearchFromStore();
   }
 
-  // Babylon decodes the lazily created PBR BRDF lookup (any GLB hull triggers it)
-  // through a post-process whose compile callback dereferences the owning scene.
-  // Disposing the scene while that decode is still pending throws inside Babylon,
-  // which fast --shots view switches reproduce. Detach input at once, then dispose
-  // as soon as the lookup is ready or after a bounded wait.
   function disposeSettled(view) {
     const scene = view.scene;
     const finish = () => { try { view.dispose(); } catch (e) { /* ignore */ } };
@@ -300,6 +295,11 @@
     const settled = () => !pending || typeof pending.isReady !== 'function' || pending.isReady();
     if (settled()) return finish();
     try { if (typeof scene.detachControl === 'function') scene.detachControl(); } catch (e) { /* ignore */ }
+    // Kit 13 (2026-09-28): keep this bounded poll. Babylon 9.28's onLoadObservable fires
+    // when the RGBD image loads, BEFORE the async BRDF decode; the internal texture's
+    // isReady() is the only completion signal, and an addOnce registered after the load
+    // event never fires. Disposing during the decode throws inside Babylon (fast --shots
+    // view switches reproduce it). Poll: 50 ms steps, 4 s bound, then dispose regardless.
     let waited = 0;
     const tick = () => {
       if (settled() || waited >= 4000) return finish();
