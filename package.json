@@ -11,7 +11,8 @@
     "ships:generate:flagship": "node scripts/generate-vanta-seraph.mjs",
     "ships:generate:fleet": "node scripts/generate-fleet-ships.mjs",
     "status:lab": "electron scripts/project-vcs-status-lab.js",
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "postinstall": "install-electron"
   },
   "author": "matt",
   "license": "MIT",
