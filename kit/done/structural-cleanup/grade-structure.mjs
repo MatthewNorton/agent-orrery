@@ -3,7 +3,8 @@
 // Fails cleanly until the kit is built. `--full` additionally runs every archived
 // gate and the renderer gate three times. Exit 0 only when everything passes.
 //
-// Usage: node kit/todo/grade-structure.mjs [--stage A|0|B|C|D|all] [--full]
+// Usage: node kit/done/structural-cleanup/grade-structure.mjs [--stage A|0|B|C|D|all] [--full]
+// (run from kit/todo/grade-structure.mjs while the kit was executing)
 //
 // --stage names the last task of the contract that is expected to be complete.
 // Checks that belong to later tasks are reported as SKIP instead of FAIL, so every
