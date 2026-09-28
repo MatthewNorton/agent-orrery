@@ -1,0 +1,187 @@
+{
+  "status": "PASS",
+  "errors": [],
+  "blend": {
+    "objects": 308,
+    "mesh_objects": 302,
+    "triangles": 16532,
+    "materials": 6,
+    "bounds": {
+      "min_m": [
+        -215.538177,
+        -476.632446,
+        -88.0
+      ],
+      "max_m": [
+        215.538177,
+        416.5,
+        151.552002
+      ],
+      "dimensions_mm": [
+        431076.355,
+        893132.446,
+        239552.002
+      ]
+    },
+    "film_transparent": true,
+    "world_background_strength": 0.0,
+    "forbidden_meshes": [],
+    "missing_external_images": []
+  },
+  "renders": [
+    {
+      "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-atlas-cruiser\\qa\\aur-atlas-cruiser_front_three_quarter.png",
+      "size": [
+        1536,
+        1536
+      ],
+      "channels": 4,
+      "corner_alpha": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "transparent_fraction": 0.883149,
+      "pass": true
+    },
+    {
+      "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-atlas-cruiser\\qa\\aur-atlas-cruiser_rear_three_quarter.png",
+      "size": [
+        1536,
+        1536
+      ],
+      "channels": 4,
+      "corner_alpha": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "transparent_fraction": 0.888373,
+      "pass": true
+    },
+    {
+      "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-atlas-cruiser\\qa\\aur-atlas-cruiser_side_profile.png",
+      "size": [
+        1536,
+        1536
+      ],
+      "channels": 4,
+      "corner_alpha": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "transparent_fraction": 0.906143,
+      "pass": true
+    },
+    {
+      "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-atlas-cruiser\\qa\\aur-atlas-cruiser_top_or_underside.png",
+      "size": [
+        1536,
+        1536
+      ],
+      "channels": 4,
+      "corner_alpha": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "transparent_fraction": 0.786104,
+      "pass": true
+    }
+  ],
+  "quality_manifest": {
+    "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-atlas-cruiser\\asset_quality_manifest.json",
+    "status": "PASS",
+    "errors": [],
+    "reference_files": [
+      {
+        "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-atlas-cruiser\\references\\aur-atlas-cruiser-turnaround.png",
+        "exists": true
+      },
+      {
+        "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-atlas-cruiser\\references\\aur-atlas-cruiser-front-reference.png",
+        "exists": true
+      },
+      {
+        "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-atlas-cruiser\\references\\aur-atlas-cruiser-model-locked-front-reference.png",
+        "exists": true
+      }
+    ],
+    "required_parts": 7,
+    "audited_views": [
+      "front_three_quarter",
+      "rear_three_quarter",
+      "side_profile",
+      "top_or_underside"
+    ],
+    "objective_visual_score": 83.54,
+    "comparison_regions": 3,
+    "scene_subsystems": 0,
+    "real_time_design": {
+      "required": true,
+      "status": "PASS",
+      "audit": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-atlas-cruiser\\qa\\aur-atlas-cruiser_realtime_audit.json",
+      "budgets": {
+        "glb_bytes": 16000000,
+        "mesh_nodes": 470,
+        "estimated_draw_calls": 470,
+        "materials": 8,
+        "textures": 18,
+        "rendered_triangles": 400000,
+        "embedded_image_bytes": 3200000
+      },
+      "measured": {
+        "glb_bytes": 3664352,
+        "mesh_nodes": 302,
+        "estimated_draw_calls": 302,
+        "materials": 6,
+        "textures": 14,
+        "rendered_triangles": 68508,
+        "embedded_image_bytes": 13632
+      },
+      "checks": [
+        "detail_hierarchy",
+        "instancing_and_batching",
+        "multi_angle_readability",
+        "runtime_performance",
+        "squint_readability",
+        "texel_density_consistency",
+        "value_and_palette_separation"
+      ]
+    }
+  },
+  "glb": {
+    "objects": 304,
+    "mesh_objects": 302,
+    "triangles": 68508,
+    "materials": 6,
+    "bounds": {
+      "min_m": [
+        -215.538177,
+        -476.632446,
+        -88.0
+      ],
+      "max_m": [
+        215.538177,
+        416.5,
+        151.552002
+      ],
+      "dimensions_mm": [
+        431076.355,
+        893132.446,
+        239552.002
+      ]
+    },
+    "forbidden_meshes": [],
+    "cameras": [],
+    "lights": [],
+    "actions": 0,
+    "animated_objects": [],
+    "missing_required_objects": []
+  }
+}

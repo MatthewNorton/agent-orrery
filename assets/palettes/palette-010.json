@@ -1,0 +1,11 @@
+{
+  "name": "Ioravex",
+  "descriptor": "radiant teal frontier",
+  "colors": [
+    "#102F3A",
+    "#21A0A0",
+    "#F6AE2D"
+  ],
+  "loreSentence": "Ioravex gathers independent journeys into a bright network of shared discoveries and dependable shelter.",
+  "kind": "system"
+}

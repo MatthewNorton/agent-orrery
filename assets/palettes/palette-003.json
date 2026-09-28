@@ -1,0 +1,11 @@
+{
+  "name": "Pyralune",
+  "descriptor": "graceful violet explorer",
+  "colors": [
+    "#352B59",
+    "#8A70D6",
+    "#B9F5D8"
+  ],
+  "loreSentence": "Pyralune maps gentle passages through uncertainty, leaving clear beacons for every traveler behind it.",
+  "kind": "ship"
+}

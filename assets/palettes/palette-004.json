@@ -1,0 +1,11 @@
+{
+  "name": "Quellivane",
+  "descriptor": "sleek cobalt outrider",
+  "colors": [
+    "#183B66",
+    "#65C7D0",
+    "#FFC857"
+  ],
+  "loreSentence": "Built for long horizons, Quellivane carries patient crews toward questions no chart has answered.",
+  "kind": "ship"
+}

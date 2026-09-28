@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "asset_id": "aur-atlas-cruiser",
+  "display_name": "AUR Atlas Cruiser",
+  "class": "fleet command cruiser",
+  "crew_capacity": 920,
+  "dimensions_m": {
+    "x": 420.0,
+    "y": 850.0,
+    "z": 160.0
+  },
+  "axis_convention": {
+    "forward": "+Y",
+    "up": "+Z"
+  },
+  "authorship": "Original procedural mesh authored from scratch; no third-party geometry.",
+  "design_language": {
+    "primary": "graphite layered armor",
+    "secondary": "cool ivory structural ribs",
+    "mechanical": "gunmetal machinery",
+    "accents": "cyan and amber emissive systems"
+  },
+  "outputs": {
+    "blend": "aur-atlas-cruiser.blend",
+    "glb": "aur-atlas-cruiser.glb",
+    "fbx": "aur-atlas-cruiser.fbx"
+  },
+  "qa_renders": {
+    "front_three_quarter": "qa/aur-atlas-cruiser_front_three_quarter.png",
+    "rear_three_quarter": "qa/aur-atlas-cruiser_rear_three_quarter.png",
+    "side_profile": "qa/aur-atlas-cruiser_side_profile.png",
+    "top_or_underside": "qa/aur-atlas-cruiser_top_or_underside.png"
+  },
+  "metrics": {
+    "mesh_nodes": 302,
+    "rendered_triangles": 68508,
+    "materials": 6,
+    "estimated_draw_calls": 302,
+    "textures": 8,
+    "glb_bytes": 3664352,
+    "embedded_image_bytes": 15008
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "Noverith",
+  "descriptor": "rugged ember courier",
+  "colors": [
+    "#3A2A3F",
+    "#C45A3D",
+    "#F4D35E"
+  ],
+  "loreSentence": "Noverith turns every difficult crossing into a promise that supplies and stories will arrive.",
+  "kind": "ship"
+}

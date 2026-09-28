@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Project VCS Status Lab</title>
+  <link rel="stylesheet" href="project-vcs-status.css" />
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: system-ui, 'Segoe UI', sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      min-width: 320px;
+      min-height: 100vh;
+      margin: 0;
+      color: #dce4f3;
+      background:
+        radial-gradient(circle at 52% 43%, rgba(75, 156, 170, 0.22), transparent 24%),
+        radial-gradient(circle at 64% 53%, rgba(166, 97, 57, 0.2), transparent 38%),
+        #040a0f;
+    }
+    body::before {
+      position: fixed;
+      inset: 0;
+      opacity: 0.55;
+      pointer-events: none;
+      background-image:
+        radial-gradient(circle, rgba(255,255,255,0.8) 0 1px, transparent 1.2px),
+        radial-gradient(circle, rgba(135,184,255,0.55) 0 1px, transparent 1.2px);
+      background-position: 9px 8px, 31px 27px;
+      background-size: 47px 47px, 71px 71px;
+      content: '';
+    }
+    button, input { font: inherit; }
+    .lab-topbar {
+      position: relative;
+      z-index: 4;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      min-height: 60px;
+      padding: 0 20px;
+      background: rgba(5, 9, 16, 0.9);
+      border-bottom: 1px solid rgba(120, 140, 190, 0.15);
+    }
+    .lab-brand {
+      min-width: max-content;
+      color: #f0f3fa;
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: 2.2px;
+    }
+    .lab-badge {
+      padding: 5px 10px;
+      color: #c7b7ff;
+      background: rgba(81, 53, 166, 0.25);
+      border: 1px solid rgba(137, 104, 236, 0.38);
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+    }
+    .lab-controls {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      min-width: 0;
+      margin-left: auto;
+    }
+    .lab-search {
+      width: min(250px, 31vw);
+      height: 35px;
+      padding: 0 11px;
+      color: #edf1f9;
+      background: rgba(18, 26, 43, 0.8);
+      border: 1px solid rgba(120, 140, 190, 0.3);
+      border-radius: 9px;
+      outline: 0;
+    }
+    .lab-search:focus {
+      border-color: #7795ff;
+      box-shadow: 0 0 0 2px rgba(108, 140, 255, 0.18);
+    }
+    .lab-filter {
+      min-height: 31px;
+      padding: 0 10px;
+      color: #8996ad;
+      background: rgba(18, 26, 43, 0.74);
+      border: 1px solid rgba(120, 140, 190, 0.22);
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.7px;
+      white-space: nowrap;
+    }
+    .lab-filter[aria-pressed='true'] {
+      color: #dbe4ff;
+      background: rgba(108, 140, 255, 0.18);
+      border-color: rgba(125, 151, 255, 0.5);
+    }
+    .lab-main {
+      position: relative;
+      z-index: 2;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 300px;
+      gap: 18px;
+      min-height: calc(100vh - 60px);
+      padding: 20px;
+    }
+    .lab-starfield {
+      position: relative;
+      min-height: 560px;
+    }
+    .lab-system {
+      position: absolute;
+      width: 175px;
+      height: 112px;
+      color: #e5eaf5;
+      background: transparent;
+      border: 0;
+      cursor: pointer;
+      transition: opacity 160ms ease, transform 160ms ease;
+    }
+    .lab-system:hover,
+    .lab-system[aria-pressed='true'] {
+      transform: scale(1.04);
+    }
+    .lab-system[hidden] { display: none; }
+    .lab-system-one { top: 8%; left: 8%; }
+    .lab-system-two { top: 12%; right: 8%; }
+    .lab-system-three { top: 43%; left: 35%; }
+    .lab-system-four { right: 4%; bottom: 5%; }
+    .lab-system-five { bottom: 2%; left: 5%; }
+    .lab-orbit {
+      position: absolute;
+      top: 56%;
+      left: 50%;
+      width: 140px;
+      height: 62px;
+      transform: translate(-50%, -50%);
+      border: 1px solid rgba(141, 167, 227, 0.34);
+      border-radius: 50%;
+    }
+    .lab-orbit::before,
+    .lab-orbit::after {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      border: 1px solid rgba(141, 167, 227, 0.25);
+      border-radius: 50%;
+      content: '';
+    }
+    .lab-orbit::before { width: 98px; height: 42px; }
+    .lab-orbit::after { width: 58px; height: 24px; }
+    .lab-sun {
+      position: absolute;
+      top: 56%;
+      left: 50%;
+      z-index: 2;
+      width: 15px;
+      height: 15px;
+      transform: translate(-50%, -50%);
+      background: #ffd27d;
+      border-radius: 50%;
+      box-shadow: 0 0 15px rgba(255, 180, 84, 0.82);
+    }
+    .lab-system:nth-child(2) .lab-sun { background: #9db8ff; box-shadow: 0 0 15px rgba(157,184,255,.8); }
+    .lab-system:nth-child(3) .lab-sun { background: #ff7a59; box-shadow: 0 0 15px rgba(255,122,89,.8); }
+    .lab-system:nth-child(4) .lab-sun { background: #dfe6ff; box-shadow: 0 0 15px rgba(223,230,255,.8); }
+    .lab-label {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      width: max-content;
+      max-width: 190px;
+      transform: translateX(-50%);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.4px;
+      text-shadow: 0 1px 4px #02050a;
+    }
+    .lab-label-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .lab-system-markers { display: inline-flex; }
+    .lab-system[aria-pressed='true'] .lab-orbit {
+      border-color: rgba(114, 223, 187, 0.78);
+      box-shadow: 0 0 16px rgba(52, 211, 153, 0.18);
+    }
+    .lab-empty {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      color: #8c98ad;
+      font-size: 12px;
+    }
+    .lab-empty[hidden] { display: none; }
+    .lab-panel {
+      align-self: start;
+      padding: 17px;
+      background: rgba(9, 14, 24, 0.94);
+      border: 1px solid rgba(120, 140, 190, 0.18);
+      border-radius: 10px;
+      box-shadow: 0 16px 45px rgba(0, 0, 0, 0.42);
+      backdrop-filter: blur(8px);
+    }
+    .lab-panel-project {
+      overflow: hidden;
+      margin: 0 0 4px;
+      color: #f0f2f9;
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .lab-panel-path {
+      overflow: hidden;
+      margin: 0 0 16px;
+      color: #758096;
+      font-size: 10px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    @media (max-width: 780px) {
+      .lab-topbar { flex-wrap: wrap; padding-block: 11px; }
+      .lab-controls { flex: 1 1 100%; order: 2; }
+      .lab-search { flex: 1 1 auto; width: auto; }
+      .lab-main { grid-template-columns: 1fr; }
+      .lab-starfield { min-height: 480px; }
+      .lab-panel { width: 100%; }
+    }
+    @media (max-width: 480px) {
+      .lab-badge { display: none; }
+      .lab-controls { display: grid; grid-template-columns: repeat(3, 1fr); }
+      .lab-search { grid-column: 1 / -1; width: 100%; }
+      .lab-filter { padding-inline: 5px; }
+      .lab-starfield { min-height: 590px; }
+      .lab-system-one { top: 2%; left: 0; }
+      .lab-system-two { top: 22%; right: 0; }
+      .lab-system-three { top: 43%; left: 0; }
+      .lab-system-four { right: 0; bottom: 12%; }
+      .lab-system-five { bottom: 0; left: 0; }
+    }
+  </style>
+</head>
+<body>
+  <header class="lab-topbar">
+    <span class="lab-brand">AGENT UNIVERSE</span>
+    <span class="lab-badge">PROJECT STATUS LAB</span>
+    <div class="lab-controls">
+      <input class="lab-search" id="lab-search" type="search" placeholder="Search projects or repositories…" aria-label="Search projects or repositories" />
+      <button class="lab-filter" type="button" data-filter="all" aria-pressed="true">ALL</button>
+      <button class="lab-filter" type="button" data-filter="github" aria-pressed="false">ON GITHUB</button>
+      <button class="lab-filter" type="button" data-filter="local" aria-pressed="false">LOCAL ONLY</button>
+    </div>
+  </header>
+
+  <main class="lab-main">
+    <section class="lab-starfield" id="lab-starfield" aria-label="Projects">
+      <p class="lab-empty" id="lab-empty" hidden>No projects match this filter.</p>
+    </section>
+    <aside class="lab-panel" aria-label="Selected project status">
+      <h1 class="lab-panel-project" id="lab-selected-name"></h1>
+      <p class="lab-panel-path" id="lab-selected-path"></p>
+      <div id="lab-details"></div>
+    </aside>
+  </main>
+
+  <script src="project-vcs-status.js"></script>
+  <script>
+    'use strict';
+
+    (function initializeLab() {
+      const statusUi = window.AUR.ProjectVcsStatus;
+      const projects = [
+        {
+          id: 'agent-universe-lite', name: 'agent-universe-lite',
+          path: 'C:\\dev\\worktrees\\76d3\\agent-universe-lite',
+          git: { branch: 'feat/github-project-status', dirty: true, changedFiles: 4 },
+          github: {
+            url: 'https://github.com/example/agent-universe-lite.git',
+            openPullRequests: 2, state: 'ready',
+          },
+        },
+        {
+          id: 'nebula-dashboard', name: 'nebula-dashboard',
+          path: 'C:\\dev\\nebula-dashboard',
+          git: { branch: 'main', dirty: false, changedFiles: 0 },
+          github: { url: 'git@github.com:example/nebula-dashboard.git', openPullRequests: 0 },
+        },
+        {
+          id: 'lyra-skill-test-5', name: 'lyra-skill-test-5',
+          path: 'C:\\dev\\lyra-skill-test-5',
+          git: { branch: 'main', dirty: true, changedFiles: 1 },
+          github: null,
+        },
+        {
+          id: 'portfolio-site', name: 'portfolio-site',
+          path: 'C:\\dev\\portfolio-site',
+          git: { branch: 'feat/portfolio-refresh', dirty: false, changedFiles: 0 },
+          github: { url: 'https://github.com/example/portfolio-site', state: 'loading' },
+        },
+        {
+          id: 'lyra-skill-test-6', name: 'lyra-skill-test-6',
+          path: 'C:\\dev\\lyra-skill-test-6',
+          git: { branch: 'main', dirty: false, changedFiles: 0 },
+          github: null,
+        },
+      ];
+      const positions = ['one', 'two', 'three', 'four', 'five'];
+      const starfield = document.getElementById('lab-starfield');
+      const empty = document.getElementById('lab-empty');
+      const search = document.getElementById('lab-search');
+      const filterButtons = Array.from(document.querySelectorAll('.lab-filter'));
+      const projectButtons = new Map();
+      let filter = statusUi.FILTERS.ALL;
+      let selected = projects[0];
+
+      function selectProject(project) {
+        selected = project;
+        document.getElementById('lab-selected-name').textContent = `PROJECT: ${project.name}`;
+        document.getElementById('lab-selected-path').textContent = project.path;
+        statusUi.renderDetails(document.getElementById('lab-details'), project);
+        for (const [id, button] of projectButtons) {
+          button.setAttribute('aria-pressed', String(id === project.id));
+        }
+      }
+
+      projects.forEach((project, index) => {
+        const button = document.createElement('button');
+        button.className = `lab-system lab-system-${positions[index]}`;
+        button.type = 'button';
+        button.dataset.projectId = project.id;
+        button.setAttribute('aria-pressed', 'false');
+        button.setAttribute('aria-label', `Select ${project.name}`);
+        const label = document.createElement('span');
+        label.className = 'lab-label';
+        const name = document.createElement('span');
+        name.className = 'lab-label-name';
+        name.textContent = `PROJECT: ${project.name}`;
+        label.appendChild(name);
+        const markerHost = document.createElement('span');
+        markerHost.className = 'lab-system-markers';
+        statusUi.renderMarkers(markerHost, project);
+        label.appendChild(markerHost);
+        const orbit = document.createElement('span');
+        orbit.className = 'lab-orbit';
+        const sun = document.createElement('span');
+        sun.className = 'lab-sun';
+        button.append(label, orbit, sun);
+        button.addEventListener('click', () => selectProject(project));
+        projectButtons.set(project.id, button);
+        starfield.appendChild(button);
+      });
+
+      function updateFilter() {
+        const visible = statusUi.filterProjects(projects, { filter, query: search.value });
+        const visibleIds = new Set(visible.map((project) => project.id));
+        for (const [id, button] of projectButtons) button.hidden = !visibleIds.has(id);
+        empty.hidden = visible.length !== 0;
+        if (visible.length && !visibleIds.has(selected.id)) selectProject(visible[0]);
+      }
+
+      filterButtons.forEach((button) => {
+        button.addEventListener('click', () => {
+          filter = button.dataset.filter;
+          filterButtons.forEach((candidate) => {
+            candidate.setAttribute('aria-pressed', String(candidate === button));
+          });
+          updateFilter();
+        });
+      });
+      search.addEventListener('input', updateFilter);
+      selectProject(selected);
+      updateFilter();
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "asset_id": "aur-wisp-drone",
+  "display_name": "AUR Wisp Drone",
+  "class": "autonomous reconnaissance drone",
+  "crew_capacity": 0,
+  "dimensions_m": {
+    "x": 2.4,
+    "y": 1.8,
+    "z": 0.72
+  },
+  "axis_convention": {
+    "forward": "+Y",
+    "up": "+Z"
+  },
+  "authorship": "Original procedural mesh authored from scratch; no third-party geometry.",
+  "design_language": {
+    "primary": "graphite layered armor",
+    "secondary": "cool ivory structural ribs",
+    "mechanical": "gunmetal machinery",
+    "accents": "cyan and amber emissive systems"
+  },
+  "outputs": {
+    "blend": "aur-wisp-drone.blend",
+    "glb": "aur-wisp-drone.glb",
+    "fbx": "aur-wisp-drone.fbx"
+  },
+  "qa_renders": {
+    "front_three_quarter": "qa/aur-wisp-drone_front_three_quarter.png",
+    "rear_three_quarter": "qa/aur-wisp-drone_rear_three_quarter.png",
+    "side_profile": "qa/aur-wisp-drone_side_profile.png",
+    "top_or_underside": "qa/aur-wisp-drone_top_or_underside.png"
+  },
+  "metrics": {
+    "mesh_nodes": 148,
+    "rendered_triangles": 31472,
+    "materials": 6,
+    "estimated_draw_calls": 148,
+    "textures": 8,
+    "glb_bytes": 1836396,
+    "embedded_image_bytes": 15008
+  }
+}

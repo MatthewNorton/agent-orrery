@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "providerFamilies": {
+    "claude": "aur-shared-fleet",
+    "codex": "aur-shared-fleet"
+  },
+  "nonModelProviders": ["signal"],
+  "nonModelKinds": ["drone"],
+  "hulls": [
+    {
+      "id": "aur-halcyon-dart",
+      "file": "aur-halcyon-dart.glb",
+      "family": "aur-shared-fleet",
+      "role": "main-s",
+      "correction": { "rotateY": 0, "scale": 0.58, "offset": [0, 0, 0] },
+      "source": "Agent Universe original shared fleet design",
+      "license": "CC0"
+    },
+    {
+      "id": "aur-kiteglass-runner",
+      "file": "aur-kiteglass-runner.glb",
+      "family": "aur-shared-fleet",
+      "role": "main-s",
+      "correction": { "rotateY": 0, "scale": 0.58, "offset": [0, 0, 0] },
+      "source": "Agent Universe original shared fleet design",
+      "license": "CC0"
+    },
+    {
+      "id": "aur-meridian-talon",
+      "file": "aur-meridian-talon.glb",
+      "family": "aur-shared-fleet",
+      "role": "main-m",
+      "correction": { "rotateY": 0, "scale": 0.53, "offset": [0, 0, 0] },
+      "source": "Agent Universe original shared fleet design",
+      "license": "CC0"
+    },
+    {
+      "id": "aur-cinder-relay",
+      "file": "aur-cinder-relay.glb",
+      "family": "aur-shared-fleet",
+      "role": "main-m",
+      "correction": { "rotateY": 0, "scale": 0.52, "offset": [0, 0, 0] },
+      "source": "Agent Universe original shared fleet design",
+      "license": "CC0"
+    },
+    {
+      "id": "aur-vanta-seraph",
+      "file": "aur-vanta-seraph.glb",
+      "family": "aur-shared-fleet",
+      "role": "main-l",
+      "correction": { "rotateY": 0, "scale": 0.58, "offset": [0, 0, -0.2] },
+      "source": "Agent Universe original flagship design",
+      "license": "CC0"
+    },
+    {
+      "id": "aur-crown-warden",
+      "file": "aur-crown-warden.glb",
+      "family": "aur-shared-fleet",
+      "role": "main-l",
+      "correction": { "rotateY": 0, "scale": 0.46, "offset": [0, 0, 0] },
+      "source": "Agent Universe original shared fleet design",
+      "license": "CC0"
+    },
+    {
+      "id": "aur-aster-kite",
+      "file": "aur-aster-kite.glb",
+      "family": "aur-original",
+      "role": "main-m",
+      "correction": { "rotateY": 0, "scale": 0.55, "offset": [0, 0, -0.3] },
+      "source": "Agent Universe original procedural design",
+      "license": "CC0"
+    }
+  ]
+}

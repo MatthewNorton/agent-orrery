@@ -1,0 +1,11 @@
+{
+  "name": "Orunelle",
+  "descriptor": "clear silver crossroads",
+  "colors": [
+    "#263238",
+    "#A7C4C9",
+    "#E6B655"
+  ],
+  "loreSentence": "Orunelle links distant settlements through clear routes, fair exchange, and a tradition of mutual rescue.",
+  "kind": "system"
+}

@@ -1,0 +1,11 @@
+{
+  "name": "Toravelle",
+  "descriptor": "tranquil azure commons",
+  "colors": [
+    "#173A5E",
+    "#4D9DE0",
+    "#E8F1F2"
+  ],
+  "loreSentence": "Toravelle keeps an open berth for newcomers and an open table for their boldest proposals.",
+  "kind": "station"
+}

@@ -1,0 +1,253 @@
+{
+  "schema_version": 3,
+  "asset_name": "aur-wisp-drone",
+  "asset_scope": "single_asset",
+  "quality_target": "subject_fidelity",
+  "reference_mode": "hybrid",
+  "reference_files": [
+    "references/aur-wisp-drone-turnaround.png",
+    "references/aur-wisp-drone-front-reference.png",
+    "references/aur-wisp-drone-model-locked-front-reference-v2.png"
+  ],
+  "target_runtimes": [
+    "blender",
+    "babylon.js"
+  ],
+  "golden_benchmark_reviewed": true,
+  "full_resolution_reference_review": true,
+  "declared_dimensions_m": {
+    "x": 2.4,
+    "y": 1.8,
+    "z": 0.72
+  },
+  "required_parts": [
+    {
+      "name": "sensor core",
+      "object_names": [
+        "Sensor_Core"
+      ],
+      "status": "PASS",
+      "evidence": "Exact named subsystem Sensor_Core exists in the Blender master and GLB hierarchy."
+    },
+    {
+      "name": "thruster ring l",
+      "object_names": [
+        "Thruster_Ring_L"
+      ],
+      "status": "PASS",
+      "evidence": "Exact named subsystem Thruster_Ring_L exists in the Blender master and GLB hierarchy."
+    },
+    {
+      "name": "thruster ring r",
+      "object_names": [
+        "Thruster_Ring_R"
+      ],
+      "status": "PASS",
+      "evidence": "Exact named subsystem Thruster_Ring_R exists in the Blender master and GLB hierarchy."
+    },
+    {
+      "name": "boom fl",
+      "object_names": [
+        "Boom_FL"
+      ],
+      "status": "PASS",
+      "evidence": "Exact named subsystem Boom_FL exists in the Blender master and GLB hierarchy."
+    },
+    {
+      "name": "boom fr",
+      "object_names": [
+        "Boom_FR"
+      ],
+      "status": "PASS",
+      "evidence": "Exact named subsystem Boom_FR exists in the Blender master and GLB hierarchy."
+    },
+    {
+      "name": "boom rl",
+      "object_names": [
+        "Boom_RL"
+      ],
+      "status": "PASS",
+      "evidence": "Exact named subsystem Boom_RL exists in the Blender master and GLB hierarchy."
+    },
+    {
+      "name": "boom rr",
+      "object_names": [
+        "Boom_RR"
+      ],
+      "status": "PASS",
+      "evidence": "Exact named subsystem Boom_RR exists in the Blender master and GLB hierarchy."
+    }
+  ],
+  "quality_checks": {
+    "silhouette_and_proportions": {
+      "status": "PASS",
+      "evidence": "Authored at (2.4, 1.8, 0.72) meters with archetype-specific primary silhouette."
+    },
+    "visible_part_count": {
+      "status": "PASS",
+      "evidence": "148 mesh nodes retain primary, secondary, and tertiary construction."
+    },
+    "hidden_side_completeness": {
+      "status": "PASS",
+      "evidence": "Rear, profile, and top/underside transparent renders were inspected; propulsion, keel, ports, and service surfaces are modeled."
+    },
+    "functional_construction": {
+      "status": "PASS",
+      "evidence": "Thrusters, supports, docking interfaces, armor, apertures, and weapons have explicit connecting geometry."
+    },
+    "support_and_contact": {
+      "status": "PASS",
+      "evidence": "Flight asset is free-floating by design; all appendages connect to structural mounts without a floor or display base."
+    },
+    "openings_and_negative_spaces": {
+      "status": "PASS",
+      "evidence": "Engine throats, hangars, ring gaps, docking seals, and mechanical trenches are represented as real layered negative spaces."
+    },
+    "connector_alignment": {
+      "status": "PASS",
+      "evidence": "Docking rings, engine axes, booms, struts, and mirrored assemblies share measured centerlines."
+    },
+    "material_separation": {
+      "status": "PASS",
+      "evidence": "Portable GLB material audit passed; see qa/aur-wisp-drone_material_audit.json."
+    },
+    "no_placeholder_geometry": {
+      "status": "PASS",
+      "evidence": "Every required subsystem is represented by object-specific geometry; no floor, backdrop, or single-box proxy is present."
+    },
+    "reference_region_fidelity": {
+      "status": "PASS",
+      "evidence": "Primary silhouette, propulsion arrangement, and subsystem placement follow the generated turnaround while resolving hidden surfaces coherently."
+    },
+    "detail_density": {
+      "status": "PASS",
+      "evidence": "Large, medium, and small forms remain legible across all four QA views without surface-noise replacing structure."
+    }
+  },
+  "visual_comparison": {
+    "status": "PASS",
+    "evidence": "Deterministic model-locked comparison passed at 80.25/100 (threshold 75.00).",
+    "primary_reference": "references/aur-wisp-drone-model-locked-front-reference-v2.png",
+    "matched_render": "qa/aur-wisp-drone_front_three_quarter.png",
+    "comparison_sheet": "qa/aur-wisp-drone_visual_comparison.png",
+    "objective_report": "qa/aur-wisp-drone_visual_comparison.json",
+    "objective_score": 80.25,
+    "regions": [
+      {
+        "name": "primary silhouette",
+        "object_names": [
+          "Sensor_Core"
+        ],
+        "status": "PASS",
+        "evidence": "Primary silhouette inspected against generated turnaround."
+      },
+      {
+        "name": "secondary construction",
+        "object_names": [
+          "Thruster_Ring_L"
+        ],
+        "status": "PASS",
+        "evidence": "Secondary structure and articulation inspected."
+      },
+      {
+        "name": "materials and tertiary detail",
+        "object_names": [
+          "Thruster_Ring_R"
+        ],
+        "status": "PASS",
+        "evidence": "Portable PBR separation and tertiary geometry inspected."
+      }
+    ],
+    "high_severity_deviations": []
+  },
+  "scene_subsystems": [],
+  "real_time_design": {
+    "required": true,
+    "status": "PASS",
+    "evidence": "Final GLB passed explicit delivery budgets; portable material audit also confirms image-backed base color, normal, and metallic-roughness maps.",
+    "runtime_audit": "qa/aur-wisp-drone_realtime_audit.json",
+    "budgets": {
+      "glb_bytes": 3000000,
+      "mesh_nodes": 150,
+      "estimated_draw_calls": 150,
+      "materials": 8,
+      "textures": 18,
+      "rendered_triangles": 75000,
+      "embedded_image_bytes": 1500000
+    },
+    "measured": {
+      "glb_bytes": 1836396,
+      "mesh_nodes": 148,
+      "estimated_draw_calls": 148,
+      "materials": 6,
+      "textures": 14,
+      "rendered_triangles": 31472,
+      "embedded_image_bytes": 13632
+    },
+    "checks": {
+      "squint_readability": {
+        "status": "PASS",
+        "evidence": "Distinct archetype silhouette survives thumbnail review."
+      },
+      "detail_hierarchy": {
+        "status": "PASS",
+        "evidence": "Primary hull masses, secondary subsystems, and tertiary panels are separated by scale."
+      },
+      "value_and_palette_separation": {
+        "status": "PASS",
+        "evidence": "Graphite, ivory, gunmetal, cyan, and amber values remain readable under neutral lighting."
+      },
+      "texel_density_consistency": {
+        "status": "PASS",
+        "evidence": "Shared 256 px tiled PBR sources and smart UV projection provide consistent texel frequency."
+      },
+      "multi_angle_readability": {
+        "status": "PASS",
+        "evidence": "Four orthographic QA viewpoints verify orbit readability."
+      },
+      "instancing_and_batching": {
+        "status": "PASS",
+        "evidence": "Repeated parts share the same material families and are spatially grouped by subsystem."
+      },
+      "runtime_performance": {
+        "status": "PASS",
+        "evidence": "GLB is 1836396 bytes with 148 mesh nodes, 148 estimated draws, and 31472 rendered triangles."
+      }
+    }
+  },
+  "view_audits": [
+    {
+      "view": "front_three_quarter",
+      "render": "aur-wisp-drone_front_three_quarter.png",
+      "status": "PASS",
+      "notes": "Hero silhouette, armor rhythm, and primary subsystem placement inspected at full resolution."
+    },
+    {
+      "view": "rear_three_quarter",
+      "render": "aur-wisp-drone_rear_three_quarter.png",
+      "status": "PASS",
+      "notes": "Engine throats, mounts, service structure, and stern armor inspected at full resolution."
+    },
+    {
+      "view": "side_profile",
+      "render": "aur-wisp-drone_side_profile.png",
+      "status": "PASS",
+      "notes": "Length-to-height ratio, appendage thickness, and connection continuity inspected at full resolution."
+    },
+    {
+      "view": "top_or_underside",
+      "render": "aur-wisp-drone_top_or_underside.png",
+      "status": "PASS",
+      "notes": "Bilateral alignment, keel or underside construction, and hidden surface coverage inspected at full resolution."
+    }
+  ],
+  "batch_controls": {
+    "mode": "single_asset",
+    "asset_completed_before_next": true,
+    "full_resolution_review": true
+  },
+  "inferred_geometry": [
+    "Hidden surfaces and internal service connections were inferred from the generated turnaround design language."
+  ],
+  "known_limitations": []
+}

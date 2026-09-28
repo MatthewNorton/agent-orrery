@@ -1,0 +1,48 @@
+{
+  "status": "PASS",
+  "glb": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-helix-destroyer\\aur-helix-destroyer.glb",
+  "profile": "report-only",
+  "budgets": {
+    "glb_bytes": 12000000,
+    "mesh_nodes": 380,
+    "estimated_draw_calls": 380,
+    "materials": 8,
+    "textures": 18,
+    "rendered_triangles": 300000,
+    "embedded_image_bytes": 2800000
+  },
+  "metrics": {
+    "glb_bytes": 3001744,
+    "nodes": 228,
+    "mesh_nodes": 227,
+    "mesh_definitions": 227,
+    "unique_mesh_references": 227,
+    "unique_primitives": 227,
+    "estimated_draw_calls": 227,
+    "materials": 6,
+    "textures": 14,
+    "images": 7,
+    "embedded_image_bytes": 13632,
+    "external_images": 0,
+    "unique_triangles": 48636,
+    "rendered_triangles": 48636,
+    "gpu_instancing_nodes": 0,
+    "repeated_mesh_definitions": 0,
+    "exact_duplicate_mesh_groups": 23,
+    "exact_duplicate_mesh_definitions": 123,
+    "instance_candidate_nodes": 123,
+    "potential_draw_call_savings": 100,
+    "extensions_used": [
+      "KHR_materials_emissive_strength"
+    ],
+    "extensions_required": [],
+    "repeated_mesh_references": {}
+  },
+  "requirements": {
+    "instancing_when_repeated": false,
+    "instancing_threshold": 25,
+    "meshopt": false,
+    "ktx2": false
+  },
+  "errors": []
+}

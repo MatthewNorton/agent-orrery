@@ -1,0 +1,11 @@
+{
+  "name": "Velmoryn",
+  "descriptor": "quiet amber expanse",
+  "colors": [
+    "#2C2638",
+    "#D08C32",
+    "#F2D492"
+  ],
+  "loreSentence": "Velmoryn rewards patient explorers with calm passages, generous worlds, and room for communities to flourish.",
+  "kind": "system"
+}

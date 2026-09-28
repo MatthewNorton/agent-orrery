@@ -1,0 +1,48 @@
+{
+  "status": "PASS",
+  "glb": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-atlas-cruiser\\aur-atlas-cruiser.glb",
+  "profile": "report-only",
+  "budgets": {
+    "glb_bytes": 16000000,
+    "mesh_nodes": 470,
+    "estimated_draw_calls": 470,
+    "materials": 8,
+    "textures": 18,
+    "rendered_triangles": 400000,
+    "embedded_image_bytes": 3200000
+  },
+  "metrics": {
+    "glb_bytes": 3664352,
+    "nodes": 304,
+    "mesh_nodes": 302,
+    "mesh_definitions": 302,
+    "unique_mesh_references": 302,
+    "unique_primitives": 302,
+    "estimated_draw_calls": 302,
+    "materials": 6,
+    "textures": 14,
+    "images": 7,
+    "embedded_image_bytes": 13632,
+    "external_images": 0,
+    "unique_triangles": 68508,
+    "rendered_triangles": 68508,
+    "gpu_instancing_nodes": 0,
+    "repeated_mesh_definitions": 0,
+    "exact_duplicate_mesh_groups": 25,
+    "exact_duplicate_mesh_definitions": 166,
+    "instance_candidate_nodes": 166,
+    "potential_draw_call_savings": 141,
+    "extensions_used": [
+      "KHR_materials_emissive_strength"
+    ],
+    "extensions_required": [],
+    "repeated_mesh_references": {}
+  },
+  "requirements": {
+    "instancing_when_repeated": false,
+    "instancing_threshold": 25,
+    "meshopt": false,
+    "ktx2": false
+  },
+  "errors": []
+}

@@ -1,0 +1,14 @@
+{
+  "silhouette_iou": 0.9361,
+  "edge_similarity": 0.9583,
+  "grayscale_similarity": 0.7095,
+  "detail_density_similarity": 0.6472,
+  "objective_score": 77.23,
+  "schema_version": 1,
+  "reference": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-wayfarer-shuttle\\references\\aur-wayfarer-shuttle-model-locked-front-reference.png",
+  "render": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-wayfarer-shuttle\\qa\\aur-wayfarer-shuttle_front_three_quarter.png",
+  "comparison_sheet": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-wayfarer-shuttle\\qa\\aur-wayfarer-shuttle_visual_comparison.png",
+  "threshold": 75.0,
+  "passed_threshold": true,
+  "warning": "Objective score is a rejection tripwire and never overrides visible human-audit failures."
+}

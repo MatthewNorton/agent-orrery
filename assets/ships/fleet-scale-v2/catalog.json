@@ -1,0 +1,200 @@
+{
+  "schemaVersion": 1,
+  "fleetId": "aur-fleet-scale-v2",
+  "version": "2.0.0",
+  "units": "meters",
+  "axisConvention": {
+    "forward": "+Y",
+    "up": "+Z"
+  },
+  "targetRuntimes": [
+    "Blender",
+    "glTF 2.0",
+    "Babylon.js",
+    "Three.js"
+  ],
+  "license": "CC0-1.0",
+  "authorship": "Original procedural geometry created from scratch; no third-party model geometry.",
+  "assets": [
+    {
+      "id": "aur-wisp-drone",
+      "displayName": "AUR Wisp Drone",
+      "class": "autonomous reconnaissance drone",
+      "crewCapacity": 0,
+      "dimensionsMeters": [
+        2.4,
+        1.8,
+        0.72
+      ],
+      "blend": "aur-wisp-drone/aur-wisp-drone.blend",
+      "glb": "aur-wisp-drone/aur-wisp-drone.glb",
+      "fbx": "aur-wisp-drone/aur-wisp-drone.fbx",
+      "buildSpec": "aur-wisp-drone/build_spec.json",
+      "qualityManifest": "aur-wisp-drone/asset_quality_manifest.json",
+      "heroRender": "aur-wisp-drone/qa/aur-wisp-drone_front_three_quarter.png",
+      "reference": "aur-wisp-drone/references/aur-wisp-drone-model-locked-front-reference-v2.png",
+      "visualScore": 80.25,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "aur-lance-interceptor",
+      "displayName": "AUR Lance Interceptor",
+      "class": "single-seat interceptor",
+      "crewCapacity": 1,
+      "dimensionsMeters": [
+        9.0,
+        14.0,
+        3.0
+      ],
+      "blend": "aur-lance-interceptor/aur-lance-interceptor.blend",
+      "glb": "aur-lance-interceptor/aur-lance-interceptor.glb",
+      "fbx": "aur-lance-interceptor/aur-lance-interceptor.fbx",
+      "buildSpec": "aur-lance-interceptor/build_spec.json",
+      "qualityManifest": "aur-lance-interceptor/asset_quality_manifest.json",
+      "heroRender": "aur-lance-interceptor/qa/aur-lance-interceptor_front_three_quarter.png",
+      "reference": "aur-lance-interceptor/references/aur-lance-interceptor-model-locked-front-reference-v2.png",
+      "visualScore": 77.61,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "aur-wayfarer-shuttle",
+      "displayName": "AUR Wayfarer Shuttle",
+      "class": "crew and cargo shuttle",
+      "crewCapacity": 8,
+      "dimensionsMeters": [
+        24.0,
+        35.0,
+        8.5
+      ],
+      "blend": "aur-wayfarer-shuttle/aur-wayfarer-shuttle.blend",
+      "glb": "aur-wayfarer-shuttle/aur-wayfarer-shuttle.glb",
+      "fbx": "aur-wayfarer-shuttle/aur-wayfarer-shuttle.fbx",
+      "buildSpec": "aur-wayfarer-shuttle/build_spec.json",
+      "qualityManifest": "aur-wayfarer-shuttle/asset_quality_manifest.json",
+      "heroRender": "aur-wayfarer-shuttle/qa/aur-wayfarer-shuttle_front_three_quarter.png",
+      "reference": "aur-wayfarer-shuttle/references/aur-wayfarer-shuttle-model-locked-front-reference.png",
+      "visualScore": 77.23,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "aur-bastion-corvette",
+      "displayName": "AUR Bastion Corvette",
+      "class": "armored patrol corvette",
+      "crewCapacity": 28,
+      "dimensionsMeters": [
+        46.0,
+        90.0,
+        18.0
+      ],
+      "blend": "aur-bastion-corvette/aur-bastion-corvette.blend",
+      "glb": "aur-bastion-corvette/aur-bastion-corvette.glb",
+      "fbx": "aur-bastion-corvette/aur-bastion-corvette.fbx",
+      "buildSpec": "aur-bastion-corvette/build_spec.json",
+      "qualityManifest": "aur-bastion-corvette/asset_quality_manifest.json",
+      "heroRender": "aur-bastion-corvette/qa/aur-bastion-corvette_front_three_quarter.png",
+      "reference": "aur-bastion-corvette/references/aur-bastion-corvette-model-locked-front-reference.png",
+      "visualScore": 81.17,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "aur-vigil-frigate",
+      "displayName": "AUR Vigil Frigate",
+      "class": "long-keel escort frigate",
+      "crewCapacity": 96,
+      "dimensionsMeters": [
+        92.0,
+        220.0,
+        38.0
+      ],
+      "blend": "aur-vigil-frigate/aur-vigil-frigate.blend",
+      "glb": "aur-vigil-frigate/aur-vigil-frigate.glb",
+      "fbx": "aur-vigil-frigate/aur-vigil-frigate.fbx",
+      "buildSpec": "aur-vigil-frigate/build_spec.json",
+      "qualityManifest": "aur-vigil-frigate/asset_quality_manifest.json",
+      "heroRender": "aur-vigil-frigate/qa/aur-vigil-frigate_front_three_quarter.png",
+      "reference": "aur-vigil-frigate/references/aur-vigil-frigate-model-locked-front-reference.png",
+      "visualScore": 77.42,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "aur-helix-destroyer",
+      "displayName": "AUR Helix Destroyer",
+      "class": "spinal-rail heavy destroyer",
+      "crewCapacity": 260,
+      "dimensionsMeters": [
+        180.0,
+        450.0,
+        72.0
+      ],
+      "blend": "aur-helix-destroyer/aur-helix-destroyer.blend",
+      "glb": "aur-helix-destroyer/aur-helix-destroyer.glb",
+      "fbx": "aur-helix-destroyer/aur-helix-destroyer.fbx",
+      "buildSpec": "aur-helix-destroyer/build_spec.json",
+      "qualityManifest": "aur-helix-destroyer/asset_quality_manifest.json",
+      "heroRender": "aur-helix-destroyer/qa/aur-helix-destroyer_front_three_quarter.png",
+      "reference": "aur-helix-destroyer/references/aur-helix-destroyer-model-locked-front-reference.png",
+      "visualScore": 75.62,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "aur-atlas-cruiser",
+      "displayName": "AUR Atlas Cruiser",
+      "class": "fleet command cruiser",
+      "crewCapacity": 920,
+      "dimensionsMeters": [
+        420.0,
+        850.0,
+        160.0
+      ],
+      "blend": "aur-atlas-cruiser/aur-atlas-cruiser.blend",
+      "glb": "aur-atlas-cruiser/aur-atlas-cruiser.glb",
+      "fbx": "aur-atlas-cruiser/aur-atlas-cruiser.fbx",
+      "buildSpec": "aur-atlas-cruiser/build_spec.json",
+      "qualityManifest": "aur-atlas-cruiser/asset_quality_manifest.json",
+      "heroRender": "aur-atlas-cruiser/qa/aur-atlas-cruiser_front_three_quarter.png",
+      "reference": "aur-atlas-cruiser/references/aur-atlas-cruiser-model-locked-front-reference.png",
+      "visualScore": 83.54,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "aur-ark-carrier",
+      "displayName": "AUR Ark Carrier",
+      "class": "trident fleet carrier",
+      "crewCapacity": 3400,
+      "dimensionsMeters": [
+        780.0,
+        1600.0,
+        240.0
+      ],
+      "blend": "aur-ark-carrier/aur-ark-carrier.blend",
+      "glb": "aur-ark-carrier/aur-ark-carrier.glb",
+      "fbx": "aur-ark-carrier/aur-ark-carrier.fbx",
+      "buildSpec": "aur-ark-carrier/build_spec.json",
+      "qualityManifest": "aur-ark-carrier/asset_quality_manifest.json",
+      "heroRender": "aur-ark-carrier/qa/aur-ark-carrier_front_three_quarter.png",
+      "reference": "aur-ark-carrier/references/aur-ark-carrier-model-locked-front-reference.png",
+      "visualScore": 80.4,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "aur-citadel-station",
+      "displayName": "AUR Citadel Station",
+      "class": "modular orbital station",
+      "crewCapacity": 180000,
+      "dimensionsMeters": [
+        5000.0,
+        5000.0,
+        2600.0
+      ],
+      "blend": "aur-citadel-station/aur-citadel-station.blend",
+      "glb": "aur-citadel-station/aur-citadel-station.glb",
+      "fbx": "aur-citadel-station/aur-citadel-station.fbx",
+      "buildSpec": "aur-citadel-station/build_spec.json",
+      "qualityManifest": "aur-citadel-station/asset_quality_manifest.json",
+      "heroRender": "aur-citadel-station/qa/aur-citadel-station_front_three_quarter.png",
+      "reference": "aur-citadel-station/references/aur-citadel-station-model-locked-front-reference.png",
+      "visualScore": 79.23,
+      "license": "CC0-1.0"
+    }
+  ]
+}

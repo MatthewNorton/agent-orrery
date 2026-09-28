@@ -1,0 +1,11 @@
+{
+  "name": "Mendryx",
+  "descriptor": "sturdy crimson foundry",
+  "colors": [
+    "#4B2432",
+    "#B6465F",
+    "#F5C26B"
+  ],
+  "loreSentence": "Mendryx transforms salvaged fragments into reliable vessels, proving useful futures can begin with remnants.",
+  "kind": "station"
+}

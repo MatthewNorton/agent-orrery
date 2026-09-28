@@ -1,0 +1,1103 @@
+{
+  "schemaVersion": 1,
+  "libraryVersion": 61,
+  "assets": [
+    {
+      "id": "palette-001",
+      "file": "palette-001.json",
+      "type": "palette",
+      "tags": [
+        "astrivelle",
+        "ship"
+      ],
+      "seedHints": {
+        "kind": "ship"
+      },
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "ship-astrivelle.json",
+        "importedAt": "2026-07-10T20:42:51.795Z",
+        "sourceId": "ship-astrivelle"
+      }
+    },
+    {
+      "id": "palette-002",
+      "file": "palette-002.json",
+      "type": "palette",
+      "tags": [
+        "noverith",
+        "ship"
+      ],
+      "seedHints": {
+        "kind": "ship"
+      },
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "ship-noverith.json",
+        "importedAt": "2026-07-10T20:42:51.904Z",
+        "sourceId": "ship-noverith"
+      }
+    },
+    {
+      "id": "palette-003",
+      "file": "palette-003.json",
+      "type": "palette",
+      "tags": [
+        "pyralune",
+        "ship"
+      ],
+      "seedHints": {
+        "kind": "ship"
+      },
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "ship-pyralune.json",
+        "importedAt": "2026-07-10T20:42:52.006Z",
+        "sourceId": "ship-pyralune"
+      }
+    },
+    {
+      "id": "palette-004",
+      "file": "palette-004.json",
+      "type": "palette",
+      "tags": [
+        "quellivane",
+        "ship"
+      ],
+      "seedHints": {
+        "kind": "ship"
+      },
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "ship-quellivane.json",
+        "importedAt": "2026-07-10T20:42:52.112Z",
+        "sourceId": "ship-quellivane"
+      }
+    },
+    {
+      "id": "palette-005",
+      "file": "palette-005.json",
+      "type": "palette",
+      "tags": [
+        "cadrivox",
+        "station"
+      ],
+      "seedHints": {
+        "kind": "station"
+      },
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "station-cadrivox.json",
+        "importedAt": "2026-07-10T20:42:52.222Z",
+        "sourceId": "station-cadrivox"
+      }
+    },
+    {
+      "id": "palette-006",
+      "file": "palette-006.json",
+      "type": "palette",
+      "tags": [
+        "halyndra",
+        "station"
+      ],
+      "seedHints": {
+        "kind": "station"
+      },
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "station-halyndra.json",
+        "importedAt": "2026-07-10T20:42:52.321Z",
+        "sourceId": "station-halyndra"
+      }
+    },
+    {
+      "id": "palette-007",
+      "file": "palette-007.json",
+      "type": "palette",
+      "tags": [
+        "mendryx",
+        "station"
+      ],
+      "seedHints": {
+        "kind": "station"
+      },
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "station-mendryx.json",
+        "importedAt": "2026-07-10T20:42:52.421Z",
+        "sourceId": "station-mendryx"
+      }
+    },
+    {
+      "id": "palette-008",
+      "file": "palette-008.json",
+      "type": "palette",
+      "tags": [
+        "toravelle",
+        "station"
+      ],
+      "seedHints": {
+        "kind": "station"
+      },
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "station-toravelle.json",
+        "importedAt": "2026-07-10T20:42:52.559Z",
+        "sourceId": "station-toravelle"
+      }
+    },
+    {
+      "id": "palette-009",
+      "file": "palette-009.json",
+      "type": "palette",
+      "tags": [
+        "calystrix",
+        "system"
+      ],
+      "seedHints": {
+        "kind": "system"
+      },
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "system-calystrix.json",
+        "importedAt": "2026-07-10T20:42:52.668Z",
+        "sourceId": "system-calystrix"
+      }
+    },
+    {
+      "id": "palette-010",
+      "file": "palette-010.json",
+      "type": "palette",
+      "tags": [
+        "ioravex",
+        "system"
+      ],
+      "seedHints": {
+        "kind": "system"
+      },
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "system-ioravex.json",
+        "importedAt": "2026-07-10T20:42:52.772Z",
+        "sourceId": "system-ioravex"
+      }
+    },
+    {
+      "id": "palette-011",
+      "file": "palette-011.json",
+      "type": "palette",
+      "tags": [
+        "orunelle",
+        "system"
+      ],
+      "seedHints": {
+        "kind": "system"
+      },
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "system-orunelle.json",
+        "importedAt": "2026-07-10T20:42:52.879Z",
+        "sourceId": "system-orunelle"
+      }
+    },
+    {
+      "id": "palette-012",
+      "file": "palette-012.json",
+      "type": "palette",
+      "tags": [
+        "velmoryn",
+        "system"
+      ],
+      "seedHints": {
+        "kind": "system"
+      },
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "system-velmoryn.json",
+        "importedAt": "2026-07-10T20:42:52.983Z",
+        "sourceId": "system-velmoryn"
+      }
+    },
+    {
+      "id": "planet-001",
+      "file": "planet-001.png",
+      "type": "planet",
+      "tags": [
+        "barren cratered rock"
+      ],
+      "seedHints": {
+        "variant": "barren cratered rock"
+      },
+      "hash": "0101001001110010001011000100110010001100110011001001001110010001",
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "planet-001.png",
+        "importedAt": "2026-07-10T20:58:43.588Z",
+        "sourceId": "planet-001"
+      }
+    },
+    {
+      "id": "planet-002",
+      "file": "planet-002.png",
+      "type": "planet",
+      "tags": [
+        "barren cratered rock"
+      ],
+      "seedHints": {
+        "variant": "barren cratered rock"
+      },
+      "hash": "0001001100010011001100010011001100100110001010101011000110110010",
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "planet-002.png",
+        "importedAt": "2026-07-10T21:01:23.686Z",
+        "sourceId": "planet-002"
+      }
+    },
+    {
+      "id": "planet-003",
+      "file": "planet-003.png",
+      "type": "planet",
+      "tags": [
+        "ice sheets with deep fissures"
+      ],
+      "seedHints": {
+        "variant": "ice sheets with deep fissures"
+      },
+      "hash": "1100110001011000000101011001110110010110001100100110001111000110",
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "planet-003.png",
+        "importedAt": "2026-07-10T21:02:41.305Z",
+        "sourceId": "planet-003"
+      }
+    },
+    {
+      "id": "planet-004",
+      "file": "planet-004.png",
+      "type": "planet",
+      "tags": [
+        "ice sheets with deep fissures"
+      ],
+      "seedHints": {
+        "variant": "ice sheets with deep fissures"
+      },
+      "hash": "0010010000100100001011001001100001100110001010010010110101001000",
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "planet-004.png",
+        "importedAt": "2026-07-10T21:04:07.744Z",
+        "sourceId": "planet-004"
+      }
+    },
+    {
+      "id": "skybox-001",
+      "file": "skybox-001.png",
+      "type": "skybox",
+      "tags": [
+        "teal and ember nebula"
+      ],
+      "seedHints": {
+        "variant": "teal and ember nebula"
+      },
+      "hash": "0111010100110011110100111101001110111000001111000011110000111100",
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "skybox-001.png",
+        "importedAt": "2026-07-10T21:05:07.720Z",
+        "sourceId": "skybox-001"
+      }
+    },
+    {
+      "id": "planet-005",
+      "file": "planet-005.png",
+      "type": "planet",
+      "tags": [
+        "lava veins through black basalt"
+      ],
+      "seedHints": {
+        "variant": "lava veins through black basalt"
+      },
+      "hash": "0110001001001011000101010010110010001101011010100110011010101010",
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "planet-005.png",
+        "importedAt": "2026-07-10T21:05:24.633Z",
+        "sourceId": "planet-005"
+      }
+    },
+    {
+      "id": "planet-006",
+      "file": "planet-006.png",
+      "type": "planet",
+      "tags": [
+        "lava veins through black basalt"
+      ],
+      "seedHints": {
+        "variant": "lava veins through black basalt"
+      },
+      "hash": "1100100000101101100110000110000100110011101010000110101011011010",
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "planet-006.png",
+        "importedAt": "2026-07-10T21:06:45.419Z",
+        "sourceId": "planet-006"
+      }
+    },
+    {
+      "id": "planet-007",
+      "file": "planet-007.png",
+      "type": "planet",
+      "tags": [
+        "banded ocean world currents"
+      ],
+      "seedHints": {
+        "variant": "banded ocean world currents"
+      },
+      "hash": "0000011001110000000001110110000000001111001111001000010100110001",
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "planet-007.png",
+        "importedAt": "2026-07-10T21:08:56.335Z",
+        "sourceId": "planet-007"
+      }
+    },
+    {
+      "id": "planet-008",
+      "file": "planet-008.png",
+      "type": "planet",
+      "tags": [
+        "banded ocean world currents"
+      ],
+      "seedHints": {
+        "variant": "banded ocean world currents"
+      },
+      "hash": "1001101100101011011001110001100011011100100110101001100111011010",
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "planet-008.png",
+        "importedAt": "2026-07-10T21:09:59.182Z",
+        "sourceId": "planet-008"
+      }
+    },
+    {
+      "id": "planet-009",
+      "file": "planet-009.png",
+      "type": "planet",
+      "tags": [
+        "gas giant cloud swirls"
+      ],
+      "seedHints": {
+        "variant": "gas giant cloud swirls"
+      },
+      "hash": "0001110100011001100001001110001100010011010100110111100100100100",
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "planet-009.png",
+        "importedAt": "2026-07-10T21:11:45.714Z",
+        "sourceId": "planet-009"
+      }
+    },
+    {
+      "id": "planet-010",
+      "file": "planet-010.png",
+      "type": "planet",
+      "tags": [
+        "gas giant cloud swirls"
+      ],
+      "seedHints": {
+        "variant": "gas giant cloud swirls"
+      },
+      "hash": "0000000011000011011101000011010111000100101001100001001111001100",
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "planet-010.png",
+        "importedAt": "2026-07-10T21:13:21.505Z",
+        "sourceId": "planet-010"
+      }
+    },
+    {
+      "id": "planet-011",
+      "file": "planet-011.png",
+      "type": "planet",
+      "tags": [
+        "rust-red dune fields"
+      ],
+      "seedHints": {
+        "variant": "rust-red dune fields"
+      },
+      "hash": "1001100010011001100001011100011101101011001101000011011010100100",
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "planet-011.png",
+        "importedAt": "2026-07-10T21:16:15.602Z",
+        "sourceId": "planet-011"
+      }
+    },
+    {
+      "id": "skybox-002",
+      "file": "skybox-002.png",
+      "type": "skybox",
+      "tags": [
+        "violet and gold dust lanes"
+      ],
+      "seedHints": {
+        "variant": "violet and gold dust lanes"
+      },
+      "hash": "0011001110100011110010011101010010100110111010000011110000111101",
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "skybox-002.png",
+        "importedAt": "2026-07-10T21:19:28.386Z",
+        "sourceId": "skybox-002"
+      }
+    },
+    {
+      "id": "skybox-003",
+      "file": "skybox-003.png",
+      "type": "skybox",
+      "tags": [
+        "crimson and slate storm clouds"
+      ],
+      "seedHints": {
+        "variant": "crimson and slate storm clouds"
+      },
+      "hash": "1000110011010100110101101010011000110100101101000110000011000100",
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "skybox-003.png",
+        "importedAt": "2026-07-10T21:20:22.130Z",
+        "sourceId": "skybox-003"
+      }
+    },
+    {
+      "id": "planet-012",
+      "file": "planet-012.png",
+      "type": "planet",
+      "tags": [
+        "rust-red dune fields"
+      ],
+      "seedHints": {
+        "variant": "rust-red dune fields"
+      },
+      "hash": "0010010100010101110101101101101001010110110101000011010111011010",
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "planet-012.png",
+        "importedAt": "2026-07-10T21:21:05.748Z",
+        "sourceId": "planet-012"
+      }
+    },
+    {
+      "id": "skybox-004",
+      "file": "skybox-004.png",
+      "type": "skybox",
+      "tags": [
+        "emerald and abyssal blue wisps"
+      ],
+      "seedHints": {
+        "variant": "emerald and abyssal blue wisps"
+      },
+      "hash": "0010011000100111110001011100110011001100111001100111001100111010",
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "skybox-004.png",
+        "importedAt": "2026-07-10T21:21:17.931Z",
+        "sourceId": "skybox-004"
+      }
+    },
+    {
+      "id": "skybox-005",
+      "file": "skybox-005.png",
+      "type": "skybox",
+      "tags": [
+        "amber and rose drift"
+      ],
+      "seedHints": {
+        "variant": "amber and rose drift"
+      },
+      "hash": "1001110110011001100111101000010010011001110110111101101101011110",
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "skybox-005.png",
+        "importedAt": "2026-07-10T21:22:14.638Z",
+        "sourceId": "skybox-005"
+      }
+    },
+    {
+      "id": "planet-013",
+      "file": "planet-013.png",
+      "type": "planet",
+      "tags": [
+        "salt flats with hexagonal cracking"
+      ],
+      "seedHints": {
+        "variant": "salt flats with hexagonal cracking"
+      },
+      "hash": "1001010000110101101000101000010000110101110001001001001000110001",
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "planet-013.png",
+        "importedAt": "2026-07-10T21:23:00.117Z",
+        "sourceId": "planet-013"
+      }
+    },
+    {
+      "id": "skybox-006",
+      "file": "skybox-006.png",
+      "type": "skybox",
+      "tags": [
+        "ice white and cobalt filaments"
+      ],
+      "seedHints": {
+        "variant": "ice white and cobalt filaments"
+      },
+      "hash": "1110100001100010011100100011011010011100100011001000110010001100",
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "skybox-006.png",
+        "importedAt": "2026-07-10T21:23:16.190Z",
+        "sourceId": "skybox-006"
+      }
+    },
+    {
+      "id": "skybox-007",
+      "file": "skybox-007.png",
+      "type": "skybox",
+      "tags": [
+        "magenta and deep indigo bloom"
+      ],
+      "seedHints": {
+        "variant": "magenta and deep indigo bloom"
+      },
+      "hash": "0100111100100111101110001001101111010011010011001010110000101100",
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "skybox-007.png",
+        "importedAt": "2026-07-10T21:24:19.452Z",
+        "sourceId": "skybox-007"
+      }
+    },
+    {
+      "id": "planet-014",
+      "file": "planet-014.png",
+      "type": "planet",
+      "tags": [
+        "salt flats with hexagonal cracking"
+      ],
+      "seedHints": {
+        "variant": "salt flats with hexagonal cracking"
+      },
+      "hash": "1011101110001010110001100010010010011010000100111100001010010010",
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "planet-014.png",
+        "importedAt": "2026-07-10T21:25:04.022Z",
+        "sourceId": "planet-014"
+      }
+    },
+    {
+      "id": "planet-015",
+      "file": "planet-015.png",
+      "type": "planet",
+      "tags": [
+        "jungle canopy seen from orbit"
+      ],
+      "seedHints": {
+        "variant": "jungle canopy seen from orbit"
+      },
+      "hash": "0010100100111010100101100011010000100001001100000110010000011110",
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "planet-015.png",
+        "importedAt": "2026-07-10T21:27:08.906Z",
+        "sourceId": "planet-015"
+      }
+    },
+    {
+      "id": "planet-016",
+      "file": "planet-016.png",
+      "type": "planet",
+      "tags": [
+        "jungle canopy seen from orbit"
+      ],
+      "seedHints": {
+        "variant": "jungle canopy seen from orbit"
+      },
+      "hash": "1010011010010010010001001111011001100110101010001010110110011000",
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "planet-016.png",
+        "importedAt": "2026-07-10T21:28:47.401Z",
+        "sourceId": "planet-016"
+      }
+    },
+    {
+      "id": "planet-017",
+      "file": "planet-017.png",
+      "type": "planet",
+      "tags": [
+        "sulfur springs and mineral terraces"
+      ],
+      "seedHints": {
+        "variant": "sulfur springs and mineral terraces"
+      },
+      "hash": "0011000100011010100101000001101011001100011001100011010010001010",
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "planet-017.png",
+        "importedAt": "2026-07-10T21:32:34.611Z",
+        "sourceId": "planet-017"
+      }
+    },
+    {
+      "id": "planet-018",
+      "file": "planet-018.png",
+      "type": "planet",
+      "tags": [
+        "sulfur springs and mineral terraces"
+      ],
+      "seedHints": {
+        "variant": "sulfur springs and mineral terraces"
+      },
+      "hash": "1001001011001010001011001010101010001010010010111101001011010010",
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "planet-018.png",
+        "importedAt": "2026-07-10T21:33:57.891Z",
+        "sourceId": "planet-018"
+      }
+    },
+    {
+      "id": "planet-019",
+      "file": "planet-019.png",
+      "type": "planet",
+      "tags": [
+        "glacial melt braided rivers"
+      ],
+      "seedHints": {
+        "variant": "glacial melt braided rivers"
+      },
+      "hash": "0100110111010110011000101001010101010111000100111001010100111010",
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "planet-019.png",
+        "importedAt": "2026-07-10T21:34:46.256Z",
+        "sourceId": "planet-019"
+      }
+    },
+    {
+      "id": "planet-020",
+      "file": "planet-020.png",
+      "type": "planet",
+      "tags": [
+        "glacial melt braided rivers"
+      ],
+      "seedHints": {
+        "variant": "glacial melt braided rivers"
+      },
+      "hash": "0100101010010010100011010111100100110011000010010100001110010011",
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "planet-020.png",
+        "importedAt": "2026-07-10T21:35:58.671Z",
+        "sourceId": "planet-020"
+      }
+    },
+    {
+      "id": "planet-021",
+      "file": "planet-021.png",
+      "type": "planet",
+      "tags": [
+        "obsidian plains with glowing seams"
+      ],
+      "seedHints": {
+        "variant": "obsidian plains with glowing seams"
+      },
+      "hash": "0111011010001100001100101010001110011010001000100010101010010011",
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "planet-021.png",
+        "importedAt": "2026-07-10T21:37:00.087Z",
+        "sourceId": "planet-021"
+      }
+    },
+    {
+      "id": "skybox-008",
+      "file": "skybox-008.png",
+      "type": "skybox",
+      "tags": [
+        "copper and jade currents"
+      ],
+      "seedHints": {
+        "variant": "copper and jade currents"
+      },
+      "hash": "0110010101101100010011000100100110011001011100110110001101001111",
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "skybox-008.png",
+        "importedAt": "2026-07-10T21:37:39.854Z",
+        "sourceId": "skybox-008"
+      }
+    },
+    {
+      "id": "skybox-009",
+      "file": "skybox-009.png",
+      "type": "skybox",
+      "tags": [
+        "ultraviolet and silver haze"
+      ],
+      "seedHints": {
+        "variant": "ultraviolet and silver haze"
+      },
+      "hash": "1101100110011001100110010100110001100100011101100111001010011001",
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "skybox-009.png",
+        "importedAt": "2026-07-10T21:38:55.661Z",
+        "sourceId": "skybox-009"
+      }
+    },
+    {
+      "id": "skybox-010",
+      "file": "skybox-010.png",
+      "type": "skybox",
+      "tags": [
+        "sunset orange and plum banks"
+      ],
+      "seedHints": {
+        "variant": "sunset orange and plum banks"
+      },
+      "hash": "1100001011100010110000101001101010011110110011001110100011110000",
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "skybox-010.png",
+        "importedAt": "2026-07-10T21:40:13.641Z",
+        "sourceId": "skybox-010"
+      }
+    },
+    {
+      "id": "skybox-011",
+      "file": "skybox-011.png",
+      "type": "skybox",
+      "tags": [
+        "arctic cyan and charcoal veil"
+      ],
+      "seedHints": {
+        "variant": "arctic cyan and charcoal veil"
+      },
+      "hash": "1001101011001010010010010010110010111101000111010111110001011010",
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "skybox-011.png",
+        "importedAt": "2026-07-10T21:41:42.376Z",
+        "sourceId": "skybox-011"
+      }
+    },
+    {
+      "id": "skybox-012",
+      "file": "skybox-012.png",
+      "type": "skybox",
+      "tags": [
+        "honey and turquoise shallows"
+      ],
+      "seedHints": {
+        "variant": "honey and turquoise shallows"
+      },
+      "hash": "1100110010000011100100111001011110000011110010101010110000101100",
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "skybox-012.png",
+        "importedAt": "2026-07-10T21:43:04.782Z",
+        "sourceId": "skybox-012"
+      }
+    },
+    {
+      "id": "planet-022",
+      "file": "planet-022.png",
+      "type": "planet",
+      "tags": [
+        "obsidian plains with glowing seams"
+      ],
+      "seedHints": {
+        "variant": "obsidian plains with glowing seams"
+      },
+      "hash": "1010010100110000010100100010001010100110010001011010010110011001",
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "planet-022.png",
+        "importedAt": "2026-07-10T21:43:46.397Z",
+        "sourceId": "planet-022"
+      }
+    },
+    {
+      "id": "planet-023",
+      "file": "planet-023.png",
+      "type": "planet",
+      "tags": [
+        "sandstone canyons and mesas"
+      ],
+      "seedHints": {
+        "variant": "sandstone canyons and mesas"
+      },
+      "hash": "0100100110101000011001100110001100100100011011001100110010001100",
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "planet-023.png",
+        "importedAt": "2026-07-10T21:45:22.835Z",
+        "sourceId": "planet-023"
+      }
+    },
+    {
+      "id": "planet-024",
+      "file": "planet-024.png",
+      "type": "planet",
+      "tags": [
+        "sandstone canyons and mesas"
+      ],
+      "seedHints": {
+        "variant": "sandstone canyons and mesas"
+      },
+      "hash": "0101010101100101101010110010110001010010001010101101100110010111",
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "planet-024.png",
+        "importedAt": "2026-07-10T21:47:48.652Z",
+        "sourceId": "planet-024"
+      }
+    },
+    {
+      "id": "planet-025",
+      "file": "planet-025.png",
+      "type": "planet",
+      "tags": [
+        "toxic green chemical seas"
+      ],
+      "seedHints": {
+        "variant": "toxic green chemical seas"
+      },
+      "hash": "1101100100101100010100101101001001001010101011011000110101011011",
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "planet-025.png",
+        "importedAt": "2026-07-10T21:50:29.474Z",
+        "sourceId": "planet-025"
+      }
+    },
+    {
+      "id": "planet-026",
+      "file": "planet-026.png",
+      "type": "planet",
+      "tags": [
+        "toxic green chemical seas"
+      ],
+      "seedHints": {
+        "variant": "toxic green chemical seas"
+      },
+      "hash": "1010101000001100110011101100111000101010001100010101100011001010",
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "planet-026.png",
+        "importedAt": "2026-07-10T21:52:45.240Z",
+        "sourceId": "planet-026"
+      }
+    },
+    {
+      "id": "planet-027",
+      "file": "planet-027.png",
+      "type": "planet",
+      "tags": [
+        "crystalline shard fields"
+      ],
+      "seedHints": {
+        "variant": "crystalline shard fields"
+      },
+      "hash": "1110101010001101001001010010011001101101001001011100101011011000",
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "planet-027.png",
+        "importedAt": "2026-07-10T21:57:41.004Z",
+        "sourceId": "planet-027"
+      }
+    },
+    {
+      "id": "planet-028",
+      "file": "planet-028.png",
+      "type": "planet",
+      "tags": [
+        "crystalline shard fields"
+      ],
+      "seedHints": {
+        "variant": "crystalline shard fields"
+      },
+      "hash": "1100111101101100011001101101011010011101100100011101011010110110",
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "planet-028.png",
+        "importedAt": "2026-07-10T21:59:56.994Z",
+        "sourceId": "planet-028"
+      }
+    },
+    {
+      "id": "planet-029",
+      "file": "planet-029.png",
+      "type": "planet",
+      "tags": [
+        "fungal bloom continents"
+      ],
+      "seedHints": {
+        "variant": "fungal bloom continents"
+      },
+      "hash": "0011101000011001100110011001001011010101010010101010100101001000",
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "planet-029.png",
+        "importedAt": "2026-07-10T22:02:42.019Z",
+        "sourceId": "planet-029"
+      }
+    },
+    {
+      "id": "planet-030",
+      "file": "planet-030.png",
+      "type": "planet",
+      "tags": [
+        "fungal bloom continents"
+      ],
+      "seedHints": {
+        "variant": "fungal bloom continents"
+      },
+      "hash": "0101000001010101000011111011001001110101000010101001010000010100",
+      "provenance": {
+        "producer": "codex-gpt-bootstrap",
+        "method": "external-import",
+        "sourceFile": "planet-030.png",
+        "importedAt": "2026-07-10T22:05:40.761Z",
+        "sourceId": "planet-030"
+      }
+    },
+    {
+      "id": "planet-031",
+      "file": "planet-031.png",
+      "bumpFile": "planet-031-bump.png",
+      "normalFile": "planet-031-normal.png",
+      "type": "planet",
+      "tags": [
+        "indigo basalt test world",
+        "cyan mineral rifts",
+        "rust highlands"
+      ],
+      "seedHints": {
+        "variant": "indigo basalt test world"
+      },
+      "hash": "1000001111011111101100000011000110110011001110111111111100110111",
+      "provenance": {
+        "producer": "project-asset-workflow",
+        "method": "generated-texture",
+        "sourceFile": "planet-031.png",
+        "importedAt": "2026-08-11T00:00:00.000Z",
+        "sourceId": "testbed-delta"
+      }
+    },
+    {
+      "id": "asteroid-001",
+      "file": "asteroid-001.png",
+      "bumpFile": "asteroid-001-bump.png",
+      "normalFile": "asteroid-001-normal.png",
+      "type": "asteroid",
+      "tags": ["cratered carbonaceous rock"],
+      "seedHints": { "variant": "dark cratered asteroid" },
+      "provenance": {
+        "producer": "project-asset-workflow",
+        "method": "derived-texture",
+        "sourceFile": "planet-001.png",
+        "importedAt": "2026-08-11T00:00:00.000Z",
+        "sourceId": "asteroid-001"
+      }
+    },
+    {
+      "id": "asteroid-002",
+      "file": "asteroid-002.png",
+      "bumpFile": "asteroid-002-bump.png",
+      "normalFile": "asteroid-002-normal.png",
+      "type": "asteroid",
+      "tags": ["cool gray cratered rock"],
+      "seedHints": { "variant": "gray cratered asteroid" },
+      "provenance": {
+        "producer": "project-asset-workflow",
+        "method": "derived-texture",
+        "sourceFile": "planet-001.png",
+        "importedAt": "2026-08-11T00:00:00.000Z",
+        "sourceId": "asteroid-002"
+      }
+    },
+    {
+      "id": "asteroid-003",
+      "file": "asteroid-003.png",
+      "bumpFile": "asteroid-003-bump.png",
+      "normalFile": "asteroid-003-normal.png",
+      "type": "asteroid",
+      "tags": ["warm iron-rich cratered rock"],
+      "seedHints": { "variant": "iron-rich cratered asteroid" },
+      "provenance": {
+        "producer": "project-asset-workflow",
+        "method": "derived-texture",
+        "sourceFile": "planet-001.png",
+        "importedAt": "2026-08-11T00:00:00.000Z",
+        "sourceId": "asteroid-003"
+      }
+    }
+  ]
+}

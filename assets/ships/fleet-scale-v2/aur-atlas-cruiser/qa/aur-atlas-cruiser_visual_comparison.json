@@ -1,0 +1,14 @@
+{
+  "silhouette_iou": 0.9635,
+  "edge_similarity": 0.9699,
+  "grayscale_similarity": 0.7344,
+  "detail_density_similarity": 0.7513,
+  "objective_score": 83.54,
+  "schema_version": 1,
+  "reference": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-atlas-cruiser\\references\\aur-atlas-cruiser-model-locked-front-reference.png",
+  "render": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-atlas-cruiser\\qa\\aur-atlas-cruiser_front_three_quarter.png",
+  "comparison_sheet": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-atlas-cruiser\\qa\\aur-atlas-cruiser_visual_comparison.png",
+  "threshold": 75.0,
+  "passed_threshold": true,
+  "warning": "Objective score is a rejection tripwire and never overrides visible human-audit failures."
+}
