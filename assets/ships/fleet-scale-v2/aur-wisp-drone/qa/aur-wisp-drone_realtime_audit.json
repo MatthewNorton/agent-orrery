@@ -1,0 +1,48 @@
+{
+  "status": "PASS",
+  "glb": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-wisp-drone\\aur-wisp-drone.glb",
+  "profile": "report-only",
+  "budgets": {
+    "glb_bytes": 3000000,
+    "mesh_nodes": 150,
+    "estimated_draw_calls": 150,
+    "materials": 8,
+    "textures": 18,
+    "rendered_triangles": 75000,
+    "embedded_image_bytes": 1500000
+  },
+  "metrics": {
+    "glb_bytes": 1836396,
+    "nodes": 149,
+    "mesh_nodes": 148,
+    "mesh_definitions": 148,
+    "unique_mesh_references": 148,
+    "unique_primitives": 148,
+    "estimated_draw_calls": 148,
+    "materials": 6,
+    "textures": 14,
+    "images": 7,
+    "embedded_image_bytes": 13632,
+    "external_images": 0,
+    "unique_triangles": 31472,
+    "rendered_triangles": 31472,
+    "gpu_instancing_nodes": 0,
+    "repeated_mesh_definitions": 0,
+    "exact_duplicate_mesh_groups": 26,
+    "exact_duplicate_mesh_definitions": 108,
+    "instance_candidate_nodes": 108,
+    "potential_draw_call_savings": 82,
+    "extensions_used": [
+      "KHR_materials_emissive_strength"
+    ],
+    "extensions_required": [],
+    "repeated_mesh_references": {}
+  },
+  "requirements": {
+    "instancing_when_repeated": false,
+    "instancing_threshold": 25,
+    "meshopt": false,
+    "ktx2": false
+  },
+  "errors": []
+}

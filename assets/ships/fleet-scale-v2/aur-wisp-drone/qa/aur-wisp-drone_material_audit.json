@@ -1,0 +1,57 @@
+{
+  "status": "PASS",
+  "glb": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-wisp-drone\\aur-wisp-drone.glb",
+  "materials": 6,
+  "images": 7,
+  "textures": 14,
+  "hero_materials": [
+    "hull_primary",
+    "armor_secondary",
+    "structure_light",
+    "mechanical_gunmetal"
+  ],
+  "records": {
+    "structure_light": {
+      "base_color_texture": true,
+      "base_color_factor": null,
+      "normal_texture": true,
+      "metallic_roughness_texture": true
+    },
+    "mechanical_gunmetal": {
+      "base_color_texture": true,
+      "base_color_factor": null,
+      "normal_texture": true,
+      "metallic_roughness_texture": true
+    },
+    "armor_secondary": {
+      "base_color_texture": true,
+      "base_color_factor": null,
+      "normal_texture": true,
+      "metallic_roughness_texture": true
+    },
+    "recess_dark": {
+      "base_color_texture": false,
+      "base_color_factor": [
+        0.004000000189989805,
+        0.007000000216066837,
+        0.012000000104308128,
+        1
+      ],
+      "normal_texture": false,
+      "metallic_roughness_texture": false
+    },
+    "accent_energy": {
+      "base_color_texture": true,
+      "base_color_factor": null,
+      "normal_texture": false,
+      "metallic_roughness_texture": false
+    },
+    "hull_primary": {
+      "base_color_texture": true,
+      "base_color_factor": null,
+      "normal_texture": true,
+      "metallic_roughness_texture": true
+    }
+  },
+  "errors": []
+}

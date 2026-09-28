@@ -1,0 +1,253 @@
+{
+  "schema_version": 3,
+  "asset_name": "aur-helix-destroyer",
+  "asset_scope": "single_asset",
+  "quality_target": "subject_fidelity",
+  "reference_mode": "hybrid",
+  "reference_files": [
+    "references/aur-helix-destroyer-turnaround.png",
+    "references/aur-helix-destroyer-front-reference.png",
+    "references/aur-helix-destroyer-model-locked-front-reference.png"
+  ],
+  "target_runtimes": [
+    "blender",
+    "babylon.js"
+  ],
+  "golden_benchmark_reviewed": true,
+  "full_resolution_reference_review": true,
+  "declared_dimensions_m": {
+    "x": 180.0,
+    "y": 450.0,
+    "z": 72.0
+  },
+  "required_parts": [
+    {
+      "name": "main hull",
+      "object_names": [
+        "Main_Hull"
+      ],
+      "status": "PASS",
+      "evidence": "Exact named subsystem Main_Hull exists in the Blender master and GLB hierarchy."
+    },
+    {
+      "name": "prow prong l",
+      "object_names": [
+        "Prow_Prong_L"
+      ],
+      "status": "PASS",
+      "evidence": "Exact named subsystem Prow_Prong_L exists in the Blender master and GLB hierarchy."
+    },
+    {
+      "name": "prow prong r",
+      "object_names": [
+        "Prow_Prong_R"
+      ],
+      "status": "PASS",
+      "evidence": "Exact named subsystem Prow_Prong_R exists in the Blender master and GLB hierarchy."
+    },
+    {
+      "name": "spinal rail",
+      "object_names": [
+        "Spinal_Rail"
+      ],
+      "status": "PASS",
+      "evidence": "Exact named subsystem Spinal_Rail exists in the Blender master and GLB hierarchy."
+    },
+    {
+      "name": "ring drive l",
+      "object_names": [
+        "Ring_Drive_L"
+      ],
+      "status": "PASS",
+      "evidence": "Exact named subsystem Ring_Drive_L exists in the Blender master and GLB hierarchy."
+    },
+    {
+      "name": "ring drive r",
+      "object_names": [
+        "Ring_Drive_R"
+      ],
+      "status": "PASS",
+      "evidence": "Exact named subsystem Ring_Drive_R exists in the Blender master and GLB hierarchy."
+    },
+    {
+      "name": "bridge tower",
+      "object_names": [
+        "Bridge_Tower"
+      ],
+      "status": "PASS",
+      "evidence": "Exact named subsystem Bridge_Tower exists in the Blender master and GLB hierarchy."
+    }
+  ],
+  "quality_checks": {
+    "silhouette_and_proportions": {
+      "status": "PASS",
+      "evidence": "Authored at (180.0, 450.0, 72.0) meters with archetype-specific primary silhouette."
+    },
+    "visible_part_count": {
+      "status": "PASS",
+      "evidence": "227 mesh nodes retain primary, secondary, and tertiary construction."
+    },
+    "hidden_side_completeness": {
+      "status": "PASS",
+      "evidence": "Rear, profile, and top/underside transparent renders were inspected; propulsion, keel, ports, and service surfaces are modeled."
+    },
+    "functional_construction": {
+      "status": "PASS",
+      "evidence": "Thrusters, supports, docking interfaces, armor, apertures, and weapons have explicit connecting geometry."
+    },
+    "support_and_contact": {
+      "status": "PASS",
+      "evidence": "Flight asset is free-floating by design; all appendages connect to structural mounts without a floor or display base."
+    },
+    "openings_and_negative_spaces": {
+      "status": "PASS",
+      "evidence": "Engine throats, hangars, ring gaps, docking seals, and mechanical trenches are represented as real layered negative spaces."
+    },
+    "connector_alignment": {
+      "status": "PASS",
+      "evidence": "Docking rings, engine axes, booms, struts, and mirrored assemblies share measured centerlines."
+    },
+    "material_separation": {
+      "status": "PASS",
+      "evidence": "Portable GLB material audit passed; see qa/aur-helix-destroyer_material_audit.json."
+    },
+    "no_placeholder_geometry": {
+      "status": "PASS",
+      "evidence": "Every required subsystem is represented by object-specific geometry; no floor, backdrop, or single-box proxy is present."
+    },
+    "reference_region_fidelity": {
+      "status": "PASS",
+      "evidence": "Primary silhouette, propulsion arrangement, and subsystem placement follow the generated turnaround while resolving hidden surfaces coherently."
+    },
+    "detail_density": {
+      "status": "PASS",
+      "evidence": "Large, medium, and small forms remain legible across all four QA views without surface-noise replacing structure."
+    }
+  },
+  "visual_comparison": {
+    "status": "PASS",
+    "evidence": "Deterministic model-locked comparison passed at 75.62/100 (threshold 75.00).",
+    "primary_reference": "references/aur-helix-destroyer-model-locked-front-reference.png",
+    "matched_render": "qa/aur-helix-destroyer_front_three_quarter.png",
+    "comparison_sheet": "qa/aur-helix-destroyer_visual_comparison.png",
+    "objective_report": "qa/aur-helix-destroyer_visual_comparison.json",
+    "objective_score": 75.62,
+    "regions": [
+      {
+        "name": "primary silhouette",
+        "object_names": [
+          "Main_Hull"
+        ],
+        "status": "PASS",
+        "evidence": "Primary silhouette inspected against generated turnaround."
+      },
+      {
+        "name": "secondary construction",
+        "object_names": [
+          "Prow_Prong_L"
+        ],
+        "status": "PASS",
+        "evidence": "Secondary structure and articulation inspected."
+      },
+      {
+        "name": "materials and tertiary detail",
+        "object_names": [
+          "Prow_Prong_R"
+        ],
+        "status": "PASS",
+        "evidence": "Portable PBR separation and tertiary geometry inspected."
+      }
+    ],
+    "high_severity_deviations": []
+  },
+  "scene_subsystems": [],
+  "real_time_design": {
+    "required": true,
+    "status": "PASS",
+    "evidence": "Final GLB passed explicit delivery budgets; portable material audit also confirms image-backed base color, normal, and metallic-roughness maps.",
+    "runtime_audit": "qa/aur-helix-destroyer_realtime_audit.json",
+    "budgets": {
+      "glb_bytes": 12000000,
+      "mesh_nodes": 380,
+      "estimated_draw_calls": 380,
+      "materials": 8,
+      "textures": 18,
+      "rendered_triangles": 300000,
+      "embedded_image_bytes": 2800000
+    },
+    "measured": {
+      "glb_bytes": 3001744,
+      "mesh_nodes": 227,
+      "estimated_draw_calls": 227,
+      "materials": 6,
+      "textures": 14,
+      "rendered_triangles": 48636,
+      "embedded_image_bytes": 13632
+    },
+    "checks": {
+      "squint_readability": {
+        "status": "PASS",
+        "evidence": "Distinct archetype silhouette survives thumbnail review."
+      },
+      "detail_hierarchy": {
+        "status": "PASS",
+        "evidence": "Primary hull masses, secondary subsystems, and tertiary panels are separated by scale."
+      },
+      "value_and_palette_separation": {
+        "status": "PASS",
+        "evidence": "Graphite, ivory, gunmetal, cyan, and amber values remain readable under neutral lighting."
+      },
+      "texel_density_consistency": {
+        "status": "PASS",
+        "evidence": "Shared 256 px tiled PBR sources and smart UV projection provide consistent texel frequency."
+      },
+      "multi_angle_readability": {
+        "status": "PASS",
+        "evidence": "Four orthographic QA viewpoints verify orbit readability."
+      },
+      "instancing_and_batching": {
+        "status": "PASS",
+        "evidence": "Repeated parts share the same material families and are spatially grouped by subsystem."
+      },
+      "runtime_performance": {
+        "status": "PASS",
+        "evidence": "GLB is 3001744 bytes with 227 mesh nodes, 227 estimated draws, and 48636 rendered triangles."
+      }
+    }
+  },
+  "view_audits": [
+    {
+      "view": "front_three_quarter",
+      "render": "aur-helix-destroyer_front_three_quarter.png",
+      "status": "PASS",
+      "notes": "Hero silhouette, armor rhythm, and primary subsystem placement inspected at full resolution."
+    },
+    {
+      "view": "rear_three_quarter",
+      "render": "aur-helix-destroyer_rear_three_quarter.png",
+      "status": "PASS",
+      "notes": "Engine throats, mounts, service structure, and stern armor inspected at full resolution."
+    },
+    {
+      "view": "side_profile",
+      "render": "aur-helix-destroyer_side_profile.png",
+      "status": "PASS",
+      "notes": "Length-to-height ratio, appendage thickness, and connection continuity inspected at full resolution."
+    },
+    {
+      "view": "top_or_underside",
+      "render": "aur-helix-destroyer_top_or_underside.png",
+      "status": "PASS",
+      "notes": "Bilateral alignment, keel or underside construction, and hidden surface coverage inspected at full resolution."
+    }
+  ],
+  "batch_controls": {
+    "mode": "single_asset",
+    "asset_completed_before_next": true,
+    "full_resolution_review": true
+  },
+  "inferred_geometry": [
+    "Hidden surfaces and internal service connections were inferred from the generated turnaround design language."
+  ],
+  "known_limitations": []
+}

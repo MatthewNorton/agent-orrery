@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; font-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:" />
+  <title>Agent Universe</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="components/project-vcs-status.css" />
+</head>
+<body>
+  <canvas id="renderCanvas" touch-action="none"></canvas>
+
+  <!-- Top bar -->
+  <header class="topbar" id="topbar">
+    <div class="brand">
+      <span class="logo-dot"></span>
+      <span class="brand-name">AGENT UNIVERSE</span>
+      <span class="brand-badge">MULTI-PROVIDER</span>
+    </div>
+    <nav class="recent hidden" id="recent">
+      <span class="recent-label">RECENT</span>
+      <div class="recent-pills" id="recent-pills"></div>
+    </nav>
+    <div class="project-search hidden" id="project-search">
+      <label class="search-label" for="search-input">SEARCH</label>
+      <div class="search-control">
+        <input class="search-input" id="search-input" type="search"
+          placeholder="Search projects…" autocomplete="off" role="combobox"
+          aria-autocomplete="list" aria-controls="search-results" aria-expanded="false" />
+        <div class="panel search-results hidden" id="search-results" role="listbox"
+          aria-label="Project search results"></div>
+      </div>
+      <button class="project-vcs-filter" id="project-vcs-filter" type="button"
+        aria-label="Focus on projects with a GitHub repository" aria-pressed="false"
+        title="Focus on GitHub projects">
+        <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true">
+          <path d="M8 0C3.58 0 0 3.64 0 8.13c0 3.59 2.29 6.64 5.47 7.71.4.08.55-.17.55-.39 0-.19-.01-.7-.01-1.38-2.23.49-2.7-1.09-2.7-1.09-.36-.94-.89-1.19-.89-1.19-.73-.5.06-.49.06-.49.8.06 1.23.84 1.23.84.72 1.25 1.88.89 2.34.68.07-.53.28-.89.51-1.09-1.78-.21-3.65-.91-3.65-4.02 0-.89.31-1.61.82-2.18-.08-.21-.36-1.04.08-2.15 0 0 .67-.22 2.2.83A7.54 7.54 0 0 1 8 4.74c.68 0 1.36.09 2 .27 1.53-1.05 2.2-.83 2.2-.83.44 1.11.16 1.94.08 2.15.51.57.82 1.29.82 2.18 0 3.12-1.88 3.81-3.67 4.01.29.25.54.75.54 1.51 0 1.09-.01 1.97-.01 2.24 0 .22.15.47.55.39A8.14 8.14 0 0 0 16 8.13C16 3.64 12.42 0 8 0Z" />
+        </svg>
+        <span>GITHUB</span>
+        <span class="project-vcs-filter-count" id="project-vcs-filter-count">0</span>
+      </button>
+    </div>
+    <button class="project-directory-button" id="project-directory-button" type="button"
+      aria-label="Open all projects" aria-haspopup="dialog" aria-controls="project-directory"
+      aria-expanded="false" title="All projects">
+      <span class="project-directory-button-icon" aria-hidden="true">☷</span>
+      <span>PROJECTS</span>
+      <span class="project-directory-button-count" id="project-directory-button-count">0</span>
+    </button>
+    <button class="settings-button" id="settings-button" type="button"
+      aria-label="Project path settings" aria-haspopup="dialog"
+      aria-controls="settings-dialog" aria-expanded="false" title="Settings">
+      <span class="settings-glyph" aria-hidden="true">⚙</span>
+      <span class="settings-count hidden" id="settings-count" aria-hidden="true">0</span>
+    </button>
+  </header>
+
+  <!-- Settings stay above the current scene; they are not a fourth view. -->
+  <dialog class="settings-dialog" id="settings-dialog" aria-labelledby="settings-title">
+    <section class="panel settings-shell">
+      <header class="settings-head">
+        <div>
+          <h2 id="settings-title">SETTINGS</h2>
+          <p>PROJECT PATHS</p>
+        </div>
+        <button class="settings-close" id="settings-close" type="button"
+          aria-label="Close settings">×</button>
+      </header>
+      <div class="settings-body">
+        <div class="settings-summary-row">
+          <div>
+            <h3>Recover moved projects</h3>
+            <p>Reconnect derelicts to folders that still exist on this computer.</p>
+          </div>
+          <span class="settings-summary" id="settings-summary">0 missing</span>
+        </div>
+        <div class="settings-actions">
+          <button class="settings-primary" id="settings-scan" type="button">Scan folder…</button>
+          <span>Choose a workspace or parent folder. Matches are never applied automatically.</span>
+        </div>
+        <p class="settings-status" id="settings-status" role="status" aria-live="polite"></p>
+        <div class="settings-projects" id="settings-projects"></div>
+      </div>
+    </section>
+  </dialog>
+
+  <!-- Searchable project directory, available from every scene. -->
+  <div class="project-directory-scrim hidden" id="project-directory-scrim"></div>
+  <section class="panel project-directory hidden" id="project-directory" role="dialog"
+    aria-labelledby="project-directory-title">
+    <header class="project-directory-head">
+      <div>
+        <h2 id="project-directory-title">ALL PROJECTS</h2>
+        <p id="project-directory-subtitle">0 projects</p>
+      </div>
+      <button class="project-directory-close" id="project-directory-close" type="button"
+        aria-label="Close all projects">×</button>
+    </header>
+    <div class="project-directory-search">
+      <span aria-hidden="true">⌕</span>
+      <input id="project-directory-input" type="search" placeholder="Search name or path…"
+        autocomplete="off" role="combobox" aria-autocomplete="list"
+        aria-controls="project-directory-list" aria-expanded="false" />
+    </div>
+    <div class="project-directory-list" id="project-directory-list" role="listbox"
+      aria-label="Projects"></div>
+    <footer class="project-directory-footer">
+      <span><kbd>↑</kbd><kbd>↓</kbd> Navigate</span>
+      <span><kbd>Enter</kbd> Open</span>
+      <span><kbd>Esc</kbd> Close</span>
+    </footer>
+  </section>
+
+  <!-- Back control (system + planet views) -->
+  <button class="back-btn hidden" id="back-btn">← Universe</button>
+
+  <!-- Project card (system + planet views) -->
+  <section class="panel project-card hidden" id="project-card"></section>
+
+  <!-- Project goals (system view only) -->
+  <section class="panel tasks-panel hidden" id="tasks-panel" aria-label="Project tasks">
+    <div class="panel-head tasks-head">
+      <span class="panel-title">TASKS</span>
+      <span class="panel-note" id="tasks-count">0 / 0 done</span>
+    </div>
+    <div class="tasks-list" id="tasks-list"></div>
+    <p class="tasks-status" id="tasks-status" role="status" aria-live="polite"></p>
+    <form class="tasks-form" id="tasks-form">
+      <input class="tasks-input" id="tasks-input" type="text" placeholder="Add a goal…"
+        aria-label="Add a goal" autocomplete="off" />
+      <button class="tasks-add" id="tasks-add" type="submit">Add</button>
+    </form>
+  </section>
+
+  <!-- Planet card + status (planet view) -->
+  <section class="panel planet-card hidden" id="planet-card"></section>
+
+  <!-- Right command rail -->
+  <aside class="sidebar command-rail" id="sidebar" aria-label="Command rail">
+    <div class="panel command-rail-head">
+      <span class="command-rail-title">COMMAND RAIL</span>
+      <button class="command-rail-toggle" id="command-rail-toggle" type="button"
+        aria-label="Collapse command rail" aria-expanded="true" title="Collapse command rail">
+        <span aria-hidden="true">›</span>
+      </button>
+    </div>
+    <nav class="command-rail-compact" id="command-rail-compact" aria-label="Command rail sections">
+      <button class="compact-rail-button" id="compact-ideas-button" type="button"
+        aria-label="Show task ideas" title="Task ideas">
+        <span class="compact-rail-icon" aria-hidden="true">✦</span>
+        <span class="compact-rail-count" id="compact-ideas-count">0</span>
+      </button>
+      <button class="compact-rail-button" id="compact-agents-button" type="button"
+        aria-label="Show active agents" title="Active agents">
+        <span class="compact-rail-icon" aria-hidden="true">▲</span>
+        <span class="compact-rail-count" id="compact-agents-count">0</span>
+      </button>
+      <button class="compact-rail-button" id="compact-feed-button" type="button"
+        aria-label="Show event feed" title="Event feed">
+        <span class="compact-rail-icon" aria-hidden="true">◉</span>
+        <span class="compact-rail-count" id="compact-feed-count">0</span>
+      </button>
+    </nav>
+    <section class="panel command-section ideas-panel" id="ideas-panel" aria-label="Task ideas">
+      <div class="panel-head">
+        <span class="panel-title">IDEAS</span>
+        <span class="panel-head-actions">
+          <span class="panel-note" id="ideas-count">0 ideas</span>
+          <button class="command-section-toggle" id="ideas-panel-toggle" type="button"
+            aria-label="Collapse task ideas" aria-controls="ideas-list" aria-expanded="true">
+            <span aria-hidden="true">⌃</span>
+          </button>
+        </span>
+      </div>
+      <div class="ideas-list" id="ideas-list"></div>
+      <form class="ideas-form" id="ideas-form">
+        <label class="ideas-label" for="ideas-input">New to-do idea</label>
+        <div class="ideas-create-row">
+          <input class="ideas-input" id="ideas-input" type="text" maxlength="10000"
+            placeholder="Capture an idea…" autocomplete="off" />
+          <button class="ideas-create" id="ideas-create" type="submit">Create</button>
+        </div>
+      </form>
+      <p class="ideas-status" id="ideas-status" role="status" aria-live="polite"></p>
+    </section>
+    <section class="panel command-section agents-panel" id="agents-panel">
+      <div class="panel-head">
+        <span class="panel-title">ACTIVE AGENTS</span>
+        <span class="panel-head-actions">
+          <span class="panel-note" id="agents-count">0 Running</span>
+          <button class="command-section-toggle" id="agents-panel-toggle" type="button"
+            aria-label="Collapse active agents" aria-controls="agents-list" aria-expanded="true">
+            <span aria-hidden="true">⌃</span>
+          </button>
+        </span>
+      </div>
+      <div class="agents-list" id="agents-list"></div>
+    </section>
+    <section class="panel command-section feed-panel" id="feed-panel">
+      <div class="panel-head">
+        <span class="panel-title">EVENT FEED</span>
+        <span class="panel-head-actions">
+          <span class="panel-note feed-mode live" id="feed-mode">
+            <span id="feed-mode-label">Live</span><span class="live-dot"></span>
+          </span>
+          <button class="command-section-toggle" id="feed-panel-toggle" type="button"
+            aria-label="Collapse event feed" aria-controls="feed-list" aria-expanded="true">
+            <span aria-hidden="true">⌃</span>
+          </button>
+        </span>
+      </div>
+      <div class="feed-list" id="feed-list"></div>
+    </section>
+  </aside>
+
+  <!-- Bottom-left summary card -->
+  <section class="panel summary-card" id="summary-card"></section>
+
+  <!-- Bottom-center tab bar (planet view) -->
+  <nav class="tabbar hidden" id="tabbar"></nav>
+
+  <!-- Immersive first-person agent focus. The transparent foreground is a
+       physical cockpit while the live Babylon view remains visible outside. -->
+  <section class="agent-focus hidden" id="agent-focus" role="dialog" aria-modal="true"
+    aria-labelledby="agent-focus-name" aria-describedby="agent-focus-context">
+    <div class="agent-focus-vignette" aria-hidden="true"></div>
+
+    <nav class="agent-focus-environments" id="agent-focus-environments"
+      aria-label="First-person environment">
+      <button type="button" data-environment="cockpit" aria-pressed="true">Cockpit</button>
+      <button type="button" data-environment="quarters" aria-pressed="false">Quarters</button>
+      <button type="button" data-environment="office" aria-pressed="false">Office</button>
+      <button type="button" data-environment="station" aria-pressed="false">Station</button>
+    </nav>
+
+    <nav class="agent-focus-vantages" id="agent-focus-vantages"
+      aria-label="Ship-relative camera heading">
+      <span>Look</span>
+      <button type="button" data-vantage="forward" aria-pressed="true">Forward</button>
+      <button type="button" data-vantage="starboard" aria-pressed="false">Starboard</button>
+      <button type="button" data-vantage="aft" aria-pressed="false">Aft</button>
+      <button type="button" data-vantage="port" aria-pressed="false">Port</button>
+    </nav>
+
+    <!-- Keep the generated 16:9 room and its physical-screen overlays in one
+         cover-sized coordinate system. Narrow windows crop this stage rather
+         than independently stretching the artwork and display content. -->
+    <div class="agent-focus-stage">
+      <img class="agent-focus-frame" id="agent-focus-frame"
+        src="assets/cockpit-frame.png" alt="" aria-hidden="true" />
+
+      <div class="agent-focus-hologram" id="agent-focus-hologram" aria-hidden="true">
+        <div class="agent-focus-hologram-head">
+          <span>ORBITAL MAP</span>
+          <strong id="agent-focus-hologram-name">LOCAL SYSTEM</strong>
+        </div>
+        <div class="agent-focus-hologram-system" id="agent-focus-hologram-system">
+          <i class="agent-focus-hologram-belt"></i>
+          <i class="agent-focus-hologram-sun"></i>
+          <i class="agent-focus-hologram-ship" id="agent-focus-hologram-ship">
+            <b></b><span id="agent-focus-hologram-ship-label">SHIP</span>
+          </i>
+        </div>
+        <div class="agent-focus-hologram-foot">
+          <span>LIVE MODEL</span>
+          <span id="agent-focus-hologram-count">0 BODIES</span>
+        </div>
+      </div>
+
+      <header class="agent-focus-ident">
+        <span class="agent-focus-mode">FIRST PERSON <i></i>
+          <span id="agent-focus-environment-label">COCKPIT LINK</span>
+        </span>
+        <h2 id="agent-focus-name">Agent</h2>
+        <p id="agent-focus-context">System patrol</p>
+      </header>
+
+      <div class="agent-focus-target" aria-hidden="true">
+        <span>FLIGHT VECTOR</span>
+        <strong id="agent-focus-target">SYSTEM PATROL</strong>
+      </div>
+      <dl class="agent-focus-telemetry">
+        <div><dt>PROVIDER</dt><dd id="agent-focus-provider">—</dd></div>
+        <div><dt>STATUS</dt><dd id="agent-focus-status">—</dd></div>
+        <div><dt>PROJECT</dt><dd id="agent-focus-project">—</dd></div>
+      </dl>
+    </div>
+
+    <div class="agent-focus-actions">
+      <button id="agent-focus-folder" type="button">Open Folder</button>
+      <button id="agent-focus-terminal" type="button" aria-describedby="agent-focus-action-status">
+        Open Terminal
+      </button>
+      <button class="agent-focus-exit" id="agent-focus-exit" type="button">
+        Exit View <kbd>Esc</kbd>
+      </button>
+      <p id="agent-focus-action-status" role="status" aria-live="polite"></p>
+    </div>
+  </section>
+
+  <!-- Persistent live/history controls -->
+  <section class="panel history-bar" id="history-bar" data-mode="live" data-playing="false"
+    aria-label="History playback">
+    <button class="history-btn history-play" id="history-play" type="button"
+      aria-label="Play history" disabled>Play</button>
+    <button class="history-btn history-speed" id="history-speed" type="button"
+      aria-label="Playback speed" disabled>1x</button>
+    <div class="history-readout">
+      <span class="history-context" id="history-context">LIVE TIMELINE</span>
+      <time class="history-time" id="history-time">LIVE</time>
+    </div>
+    <div class="history-timeline">
+      <output class="history-project-event hidden" id="history-project-event"
+        aria-live="polite"></output>
+      <div class="history-track">
+        <div class="history-markers" id="history-markers" aria-hidden="true"></div>
+        <input class="history-scrubber" id="history-scrubber" type="range"
+          min="0" max="10000" step="1" value="10000" aria-label="History time" disabled />
+      </div>
+      <div class="history-range-labels" aria-hidden="true">
+        <time id="history-start">EARLIEST</time>
+        <span>PROJECT STARTS</span>
+        <time id="history-end">LATEST</time>
+      </div>
+    </div>
+    <button class="history-btn history-live active" id="history-live" type="button"
+      aria-label="Return to live activity" aria-pressed="true">LIVE</button>
+  </section>
+
+  <!-- Load order matters: globals then our namespace then views then app -->
+  <script src="../../node_modules/babylonjs/babylon.js"></script>
+  <script src="../../node_modules/babylonjs-gui/babylon.gui.min.js"></script>
+  <script src="../../node_modules/babylonjs-loaders/babylonjs.loaders.min.js"></script>
+  <script src="util.js"></script>
+  <script src="procedural-worlds.js"></script>
+  <script src="ship-assets.js"></script>
+  <script src="polish-math.js"></script>
+  <script src="galaxy-layout.js"></script>
+  <script src="search-core.js"></script>
+  <script src="components/project-vcs-status.js"></script>
+  <script src="scene-universe.js"></script>
+  <script src="scene-system.js"></script>
+  <script src="scene-planet.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

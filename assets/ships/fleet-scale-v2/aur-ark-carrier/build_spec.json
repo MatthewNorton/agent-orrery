@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "asset_id": "aur-ark-carrier",
+  "display_name": "AUR Ark Carrier",
+  "class": "trident fleet carrier",
+  "crew_capacity": 3400,
+  "dimensions_m": {
+    "x": 780.0,
+    "y": 1600.0,
+    "z": 240.0
+  },
+  "axis_convention": {
+    "forward": "+Y",
+    "up": "+Z"
+  },
+  "authorship": "Original procedural mesh authored from scratch; no third-party geometry.",
+  "design_language": {
+    "primary": "graphite layered armor",
+    "secondary": "cool ivory structural ribs",
+    "mechanical": "gunmetal machinery",
+    "accents": "cyan and amber emissive systems"
+  },
+  "outputs": {
+    "blend": "aur-ark-carrier.blend",
+    "glb": "aur-ark-carrier.glb",
+    "fbx": "aur-ark-carrier.fbx"
+  },
+  "qa_renders": {
+    "front_three_quarter": "qa/aur-ark-carrier_front_three_quarter.png",
+    "rear_three_quarter": "qa/aur-ark-carrier_rear_three_quarter.png",
+    "side_profile": "qa/aur-ark-carrier_side_profile.png",
+    "top_or_underside": "qa/aur-ark-carrier_top_or_underside.png"
+  },
+  "metrics": {
+    "mesh_nodes": 545,
+    "rendered_triangles": 146664,
+    "materials": 6,
+    "estimated_draw_calls": 545,
+    "textures": 8,
+    "glb_bytes": 6474300,
+    "embedded_image_bytes": 15008
+  }
+}

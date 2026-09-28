@@ -1,0 +1,50 @@
+{
+  "status": "PASS",
+  "glb": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-lance-interceptor\\aur-lance-interceptor.glb",
+  "profile": "report-only",
+  "budgets": {
+    "glb_bytes": 4000000,
+    "mesh_nodes": 160,
+    "estimated_draw_calls": 160,
+    "materials": 8,
+    "textures": 18,
+    "rendered_triangles": 100000,
+    "embedded_image_bytes": 1700000
+  },
+  "metrics": {
+    "glb_bytes": 1371520,
+    "nodes": 108,
+    "mesh_nodes": 107,
+    "mesh_definitions": 107,
+    "unique_mesh_references": 107,
+    "unique_primitives": 107,
+    "estimated_draw_calls": 107,
+    "materials": 7,
+    "textures": 14,
+    "images": 7,
+    "embedded_image_bytes": 13632,
+    "external_images": 0,
+    "unique_triangles": 26492,
+    "rendered_triangles": 26492,
+    "gpu_instancing_nodes": 0,
+    "repeated_mesh_definitions": 0,
+    "exact_duplicate_mesh_groups": 14,
+    "exact_duplicate_mesh_definitions": 52,
+    "instance_candidate_nodes": 52,
+    "potential_draw_call_savings": 38,
+    "extensions_used": [
+      "KHR_materials_clearcoat",
+      "KHR_materials_emissive_strength",
+      "KHR_materials_transmission"
+    ],
+    "extensions_required": [],
+    "repeated_mesh_references": {}
+  },
+  "requirements": {
+    "instancing_when_repeated": false,
+    "instancing_threshold": 25,
+    "meshopt": false,
+    "ktx2": false
+  },
+  "errors": []
+}

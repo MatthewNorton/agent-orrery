@@ -1,0 +1,26 @@
+{
+  "name": "agent-universe-lite",
+  "version": "0.1.0",
+  "description": "Lightweight persistent universe visualization of Claude Code agents. Projects are solar systems, agents are starships.",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "shots": "electron . --shots",
+    "ships:generate": "node scripts/generate-original-ship.mjs && node scripts/generate-vanta-seraph.mjs && node scripts/generate-fleet-ships.mjs",
+    "ships:generate:aster": "node scripts/generate-original-ship.mjs",
+    "ships:generate:flagship": "node scripts/generate-vanta-seraph.mjs",
+    "ships:generate:fleet": "node scripts/generate-fleet-ships.mjs",
+    "status:lab": "electron scripts/project-vcs-status-lab.js",
+    "test": "node --test test/*.test.js"
+  },
+  "author": "matt",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^44.4.2"
+  },
+  "dependencies": {
+    "babylonjs": "^9.28.0",
+    "babylonjs-loaders": "9.28.0",
+    "babylonjs-gui": "^9.28.0"
+  }
+}

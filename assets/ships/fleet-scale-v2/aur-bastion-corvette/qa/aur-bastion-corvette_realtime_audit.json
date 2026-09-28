@@ -1,0 +1,48 @@
+{
+  "status": "PASS",
+  "glb": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-bastion-corvette\\aur-bastion-corvette.glb",
+  "profile": "report-only",
+  "budgets": {
+    "glb_bytes": 7000000,
+    "mesh_nodes": 240,
+    "estimated_draw_calls": 240,
+    "materials": 8,
+    "textures": 18,
+    "rendered_triangles": 170000,
+    "embedded_image_bytes": 2200000
+  },
+  "metrics": {
+    "glb_bytes": 2376676,
+    "nodes": 215,
+    "mesh_nodes": 214,
+    "mesh_definitions": 214,
+    "unique_mesh_references": 214,
+    "unique_primitives": 214,
+    "estimated_draw_calls": 214,
+    "materials": 6,
+    "textures": 14,
+    "images": 7,
+    "embedded_image_bytes": 13632,
+    "external_images": 0,
+    "unique_triangles": 51456,
+    "rendered_triangles": 51456,
+    "gpu_instancing_nodes": 0,
+    "repeated_mesh_definitions": 0,
+    "exact_duplicate_mesh_groups": 27,
+    "exact_duplicate_mesh_definitions": 133,
+    "instance_candidate_nodes": 133,
+    "potential_draw_call_savings": 106,
+    "extensions_used": [
+      "KHR_materials_emissive_strength"
+    ],
+    "extensions_required": [],
+    "repeated_mesh_references": {}
+  },
+  "requirements": {
+    "instancing_when_repeated": false,
+    "instancing_threshold": 25,
+    "meshopt": false,
+    "ktx2": false
+  },
+  "errors": []
+}

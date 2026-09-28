@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "asset_id": "aur-wayfarer-shuttle",
+  "display_name": "AUR Wayfarer Shuttle",
+  "class": "crew and cargo shuttle",
+  "crew_capacity": 8,
+  "dimensions_m": {
+    "x": 24.0,
+    "y": 35.0,
+    "z": 8.5
+  },
+  "axis_convention": {
+    "forward": "+Y",
+    "up": "+Z"
+  },
+  "authorship": "Original procedural mesh authored from scratch; no third-party geometry.",
+  "design_language": {
+    "primary": "graphite layered armor",
+    "secondary": "cool ivory structural ribs",
+    "mechanical": "gunmetal machinery",
+    "accents": "cyan and amber emissive systems"
+  },
+  "outputs": {
+    "blend": "aur-wayfarer-shuttle.blend",
+    "glb": "aur-wayfarer-shuttle.glb",
+    "fbx": "aur-wayfarer-shuttle.fbx"
+  },
+  "qa_renders": {
+    "front_three_quarter": "qa/aur-wayfarer-shuttle_front_three_quarter.png",
+    "rear_three_quarter": "qa/aur-wayfarer-shuttle_rear_three_quarter.png",
+    "side_profile": "qa/aur-wayfarer-shuttle_side_profile.png",
+    "top_or_underside": "qa/aur-wayfarer-shuttle_top_or_underside.png"
+  },
+  "metrics": {
+    "mesh_nodes": 116,
+    "rendered_triangles": 31024,
+    "materials": 7,
+    "estimated_draw_calls": 116,
+    "textures": 8,
+    "glb_bytes": 1456056,
+    "embedded_image_bytes": 15008
+  }
+}

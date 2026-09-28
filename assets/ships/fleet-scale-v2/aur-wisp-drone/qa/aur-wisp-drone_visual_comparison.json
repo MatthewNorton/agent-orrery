@@ -1,0 +1,14 @@
+{
+  "silhouette_iou": 0.9345,
+  "edge_similarity": 0.9514,
+  "grayscale_similarity": 0.7711,
+  "detail_density_similarity": 0.6981,
+  "objective_score": 80.25,
+  "schema_version": 1,
+  "reference": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-wisp-drone\\references\\aur-wisp-drone-model-locked-front-reference-v2.png",
+  "render": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-wisp-drone\\qa\\aur-wisp-drone_front_three_quarter.png",
+  "comparison_sheet": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-wisp-drone\\qa\\aur-wisp-drone_visual_comparison.png",
+  "threshold": 75.0,
+  "passed_threshold": true,
+  "warning": "Objective score is a rejection tripwire and never overrides visible human-audit failures."
+}

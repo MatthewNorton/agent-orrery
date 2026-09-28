@@ -1,0 +1,15 @@
+# Store every text file as LF in the repository; working-tree endings follow
+# each developer's core.autocrlf/core.eol. Gate hashes are LF-normalized, so
+# checkout style never affects them.
+* text=auto
+
+# Shell scripts must be LF on disk or bash rejects them.
+*.sh text eol=lf
+
+# Binary art and models: never touch line endings or show text diffs.
+*.png   binary
+*.jpg   binary
+*.ico   binary
+*.glb   binary
+*.fbx   binary
+*.blend binary

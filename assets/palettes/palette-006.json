@@ -1,0 +1,11 @@
+{
+  "name": "Halyndra",
+  "descriptor": "luminous orchard habitat",
+  "colors": [
+    "#244B36",
+    "#78B159",
+    "#F4E3A1"
+  ],
+  "loreSentence": "Halyndra grows food, friendship, and practical hope beneath rings of carefully tended light.",
+  "kind": "station"
+}

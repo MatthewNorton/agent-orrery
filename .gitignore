@@ -1,0 +1,12 @@
+node_modules/
+.shots/
+output/
+kit/output/
+kit/BLOCKED.md
+kit/prompts/
+assets/staging/
+.claude/worktrees/
+
+# Archived kit evidence (screenshots of the developer's real universe, result JSON).
+# Kept only in the private archive; no gate reads these folders.
+kit/done/*/output/

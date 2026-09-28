@@ -1,0 +1,14 @@
+{
+  "silhouette_iou": 0.9671,
+  "edge_similarity": 0.9477,
+  "grayscale_similarity": 0.7175,
+  "detail_density_similarity": 0.6733,
+  "objective_score": 79.23,
+  "schema_version": 1,
+  "reference": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-citadel-station\\references\\aur-citadel-station-model-locked-front-reference.png",
+  "render": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-citadel-station\\qa\\aur-citadel-station_front_three_quarter.png",
+  "comparison_sheet": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-citadel-station\\qa\\aur-citadel-station_visual_comparison.png",
+  "threshold": 75.0,
+  "passed_threshold": true,
+  "warning": "Objective score is a rejection tripwire and never overrides visible human-audit failures."
+}

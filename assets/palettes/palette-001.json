@@ -1,0 +1,11 @@
+{
+  "name": "Astrivelle",
+  "descriptor": "bright jade pathfinder",
+  "colors": [
+    "#183F3A",
+    "#4FB286",
+    "#F2E863"
+  ],
+  "loreSentence": "Astrivelle flies where curiosity leads, carrying a workshop ready to mend both machines and plans.",
+  "kind": "ship"
+}

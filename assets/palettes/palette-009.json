@@ -1,0 +1,11 @@
+{
+  "name": "Calystrix",
+  "descriptor": "vivid rose nebula",
+  "colors": [
+    "#3D1E4F",
+    "#C05299",
+    "#73D2DE"
+  ],
+  "loreSentence": "Calystrix lights the frontier like a welcome signal, guiding small ventures toward lasting alliances.",
+  "kind": "system"
+}

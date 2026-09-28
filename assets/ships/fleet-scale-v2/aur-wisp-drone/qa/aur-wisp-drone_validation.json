@@ -1,0 +1,187 @@
+{
+  "status": "PASS",
+  "errors": [],
+  "blend": {
+    "objects": 153,
+    "mesh_objects": 148,
+    "triangles": 7872,
+    "materials": 6,
+    "bounds": {
+      "min_m": [
+        -1.2792,
+        -0.828,
+        -0.2592
+      ],
+      "max_m": [
+        1.2792,
+        0.9,
+        0.5208
+      ],
+      "dimensions_mm": [
+        2558.4,
+        1728.0,
+        780.0
+      ]
+    },
+    "film_transparent": true,
+    "world_background_strength": 0.0,
+    "forbidden_meshes": [],
+    "missing_external_images": []
+  },
+  "renders": [
+    {
+      "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-wisp-drone\\qa\\aur-wisp-drone_front_three_quarter.png",
+      "size": [
+        1536,
+        1536
+      ],
+      "channels": 4,
+      "corner_alpha": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "transparent_fraction": 0.828662,
+      "pass": true
+    },
+    {
+      "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-wisp-drone\\qa\\aur-wisp-drone_rear_three_quarter.png",
+      "size": [
+        1536,
+        1536
+      ],
+      "channels": 4,
+      "corner_alpha": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "transparent_fraction": 0.832952,
+      "pass": true
+    },
+    {
+      "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-wisp-drone\\qa\\aur-wisp-drone_side_profile.png",
+      "size": [
+        1536,
+        1536
+      ],
+      "channels": 4,
+      "corner_alpha": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "transparent_fraction": 0.923956,
+      "pass": true
+    },
+    {
+      "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-wisp-drone\\qa\\aur-wisp-drone_top_or_underside.png",
+      "size": [
+        1536,
+        1536
+      ],
+      "channels": 4,
+      "corner_alpha": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "transparent_fraction": 0.784192,
+      "pass": true
+    }
+  ],
+  "quality_manifest": {
+    "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-wisp-drone\\asset_quality_manifest.json",
+    "status": "PASS",
+    "errors": [],
+    "reference_files": [
+      {
+        "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-wisp-drone\\references\\aur-wisp-drone-turnaround.png",
+        "exists": true
+      },
+      {
+        "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-wisp-drone\\references\\aur-wisp-drone-front-reference.png",
+        "exists": true
+      },
+      {
+        "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-wisp-drone\\references\\aur-wisp-drone-model-locked-front-reference-v2.png",
+        "exists": true
+      }
+    ],
+    "required_parts": 7,
+    "audited_views": [
+      "front_three_quarter",
+      "rear_three_quarter",
+      "side_profile",
+      "top_or_underside"
+    ],
+    "objective_visual_score": 80.25,
+    "comparison_regions": 3,
+    "scene_subsystems": 0,
+    "real_time_design": {
+      "required": true,
+      "status": "PASS",
+      "audit": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-wisp-drone\\qa\\aur-wisp-drone_realtime_audit.json",
+      "budgets": {
+        "glb_bytes": 3000000,
+        "mesh_nodes": 150,
+        "estimated_draw_calls": 150,
+        "materials": 8,
+        "textures": 18,
+        "rendered_triangles": 75000,
+        "embedded_image_bytes": 1500000
+      },
+      "measured": {
+        "glb_bytes": 1836396,
+        "mesh_nodes": 148,
+        "estimated_draw_calls": 148,
+        "materials": 6,
+        "textures": 14,
+        "rendered_triangles": 31472,
+        "embedded_image_bytes": 13632
+      },
+      "checks": [
+        "detail_hierarchy",
+        "instancing_and_batching",
+        "multi_angle_readability",
+        "runtime_performance",
+        "squint_readability",
+        "texel_density_consistency",
+        "value_and_palette_separation"
+      ]
+    }
+  },
+  "glb": {
+    "objects": 149,
+    "mesh_objects": 148,
+    "triangles": 31472,
+    "materials": 6,
+    "bounds": {
+      "min_m": [
+        -1.2792,
+        -0.828,
+        -0.2592
+      ],
+      "max_m": [
+        1.2792,
+        0.9,
+        0.5208
+      ],
+      "dimensions_mm": [
+        2558.4,
+        1728.0,
+        780.0
+      ]
+    },
+    "forbidden_meshes": [],
+    "cameras": [],
+    "lights": [],
+    "actions": 0,
+    "animated_objects": [],
+    "missing_required_objects": []
+  }
+}

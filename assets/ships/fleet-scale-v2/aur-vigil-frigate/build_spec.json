@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "asset_id": "aur-vigil-frigate",
+  "display_name": "AUR Vigil Frigate",
+  "class": "long-keel escort frigate",
+  "crew_capacity": 96,
+  "dimensions_m": {
+    "x": 92.0,
+    "y": 220.0,
+    "z": 38.0
+  },
+  "axis_convention": {
+    "forward": "+Y",
+    "up": "+Z"
+  },
+  "authorship": "Original procedural mesh authored from scratch; no third-party geometry.",
+  "design_language": {
+    "primary": "graphite layered armor",
+    "secondary": "cool ivory structural ribs",
+    "mechanical": "gunmetal machinery",
+    "accents": "cyan and amber emissive systems"
+  },
+  "outputs": {
+    "blend": "aur-vigil-frigate.blend",
+    "glb": "aur-vigil-frigate.glb",
+    "fbx": "aur-vigil-frigate.fbx"
+  },
+  "qa_renders": {
+    "front_three_quarter": "qa/aur-vigil-frigate_front_three_quarter.png",
+    "rear_three_quarter": "qa/aur-vigil-frigate_rear_three_quarter.png",
+    "side_profile": "qa/aur-vigil-frigate_side_profile.png",
+    "top_or_underside": "qa/aur-vigil-frigate_top_or_underside.png"
+  },
+  "metrics": {
+    "mesh_nodes": 224,
+    "rendered_triangles": 50252,
+    "materials": 7,
+    "estimated_draw_calls": 224,
+    "textures": 8,
+    "glb_bytes": 2778756,
+    "embedded_image_bytes": 15008
+  }
+}

@@ -1,0 +1,187 @@
+{
+  "status": "PASS",
+  "errors": [],
+  "blend": {
+    "objects": 219,
+    "mesh_objects": 214,
+    "triangles": 16168,
+    "materials": 6,
+    "bounds": {
+      "min_m": [
+        -21.380381,
+        -49.10442,
+        -8.46
+      ],
+      "max_m": [
+        21.358578,
+        45.0,
+        9.36
+      ],
+      "dimensions_mm": [
+        42738.958,
+        94104.42,
+        17820.0
+      ]
+    },
+    "film_transparent": true,
+    "world_background_strength": 0.0,
+    "forbidden_meshes": [],
+    "missing_external_images": []
+  },
+  "renders": [
+    {
+      "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-bastion-corvette\\qa\\aur-bastion-corvette_front_three_quarter.png",
+      "size": [
+        1536,
+        1536
+      ],
+      "channels": 4,
+      "corner_alpha": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "transparent_fraction": 0.886946,
+      "pass": true
+    },
+    {
+      "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-bastion-corvette\\qa\\aur-bastion-corvette_rear_three_quarter.png",
+      "size": [
+        1536,
+        1536
+      ],
+      "channels": 4,
+      "corner_alpha": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "transparent_fraction": 0.889452,
+      "pass": true
+    },
+    {
+      "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-bastion-corvette\\qa\\aur-bastion-corvette_side_profile.png",
+      "size": [
+        1536,
+        1536
+      ],
+      "channels": 4,
+      "corner_alpha": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "transparent_fraction": 0.913127,
+      "pass": true
+    },
+    {
+      "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-bastion-corvette\\qa\\aur-bastion-corvette_top_or_underside.png",
+      "size": [
+        1536,
+        1536
+      ],
+      "channels": 4,
+      "corner_alpha": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "transparent_fraction": 0.806255,
+      "pass": true
+    }
+  ],
+  "quality_manifest": {
+    "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-bastion-corvette\\asset_quality_manifest.json",
+    "status": "PASS",
+    "errors": [],
+    "reference_files": [
+      {
+        "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-bastion-corvette\\references\\aur-bastion-corvette-turnaround.png",
+        "exists": true
+      },
+      {
+        "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-bastion-corvette\\references\\aur-bastion-corvette-front-reference.png",
+        "exists": true
+      },
+      {
+        "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-bastion-corvette\\references\\aur-bastion-corvette-model-locked-front-reference.png",
+        "exists": true
+      }
+    ],
+    "required_parts": 7,
+    "audited_views": [
+      "front_three_quarter",
+      "rear_three_quarter",
+      "side_profile",
+      "top_or_underside"
+    ],
+    "objective_visual_score": 81.17,
+    "comparison_regions": 3,
+    "scene_subsystems": 0,
+    "real_time_design": {
+      "required": true,
+      "status": "PASS",
+      "audit": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-bastion-corvette\\qa\\aur-bastion-corvette_realtime_audit.json",
+      "budgets": {
+        "glb_bytes": 7000000,
+        "mesh_nodes": 240,
+        "estimated_draw_calls": 240,
+        "materials": 8,
+        "textures": 18,
+        "rendered_triangles": 170000,
+        "embedded_image_bytes": 2200000
+      },
+      "measured": {
+        "glb_bytes": 2376676,
+        "mesh_nodes": 214,
+        "estimated_draw_calls": 214,
+        "materials": 6,
+        "textures": 14,
+        "rendered_triangles": 51456,
+        "embedded_image_bytes": 13632
+      },
+      "checks": [
+        "detail_hierarchy",
+        "instancing_and_batching",
+        "multi_angle_readability",
+        "runtime_performance",
+        "squint_readability",
+        "texel_density_consistency",
+        "value_and_palette_separation"
+      ]
+    }
+  },
+  "glb": {
+    "objects": 215,
+    "mesh_objects": 214,
+    "triangles": 51456,
+    "materials": 6,
+    "bounds": {
+      "min_m": [
+        -21.380381,
+        -49.10442,
+        -8.46
+      ],
+      "max_m": [
+        21.358578,
+        45.0,
+        9.36
+      ],
+      "dimensions_mm": [
+        42738.958,
+        94104.42,
+        17820.0
+      ]
+    },
+    "forbidden_meshes": [],
+    "cameras": [],
+    "lights": [],
+    "actions": 0,
+    "animated_objects": [],
+    "missing_required_objects": []
+  }
+}

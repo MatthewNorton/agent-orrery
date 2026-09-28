@@ -1,0 +1,410 @@
+# Agent Universe Lite — live app and renderer spec
+
+The Electron main process passively watches Claude Code and Codex transcript
+JSONL files plus explicitly configured metadata-only Signal directories, then
+streams one normalized event vocabulary to three Babylon.js views over a
+context-isolated bridge. An independent read-only replay source can reconstruct
+that same vocabulary from bounded historical ranges. Passive observation does
+not launch or own agent processes. Two explicit LIVE-only controls sit outside
+that boundary: Open Terminal opens the host terminal (Windows Terminal on
+Windows, Terminal.app on macOS) without starting an agent,
+while the global IDEAS queue can assign a tagged goal to a trusted project and
+start Codex for that exact task.
+
+Gold samples (visual ground truth, in repo root):
+
+- `3.universe-map-view.png` — universe map: project solar systems on a starfield
+- `2.solar-system-view.png` — one project: sun, orbits, planets, asteroid belt, ships
+- `1.planet-view.png` — one planet close-up with status panels
+
+Frozen files — read them, never modify them unless an active kit contract
+explicitly unfreezes a named test or product surface:
+
+- `src/main/main.js` — window bootstrap, active live/replay source controller,
+  IPC, and isolated screenshot modes
+- `src/main/tracker.js` — transcript tailing, ship/planet/event derivation
+- `src/main/replay-source.js` — bounded, read-only Claude/Codex history source
+- `src/preload.js` — the `window.AU` bridge (exact API below)
+- `package.json` — no new dependencies, no script changes
+
+## 1. Hard constraints
+
+1. Plain JavaScript only. No TypeScript, no JSX, no bundler, no `npm install`.
+2. Classic `<script>` tags only — **no ES modules** (`file://` module loading is
+   blocked by CORS in Electron). Load order gives you globals; attach your own
+   code to a single `window.AUR` namespace object.
+3. Babylon is loaded from local UMD bundles (globals `BABYLON` and
+   `BABYLON.GUI`). Script paths relative to `src/renderer/index.html`:
+   - `../../node_modules/babylonjs/babylon.js`
+   - `../../node_modules/babylonjs-gui/babylon.gui.min.js`
+4. The renderer is fully offline. Zero network requests, no CDN, no fonts from
+   the web. Use the `system-ui, 'Segoe UI', sans-serif` stack.
+5. `contextIsolation` is on. The ONLY way to reach the main process is
+   `window.AU` (documented below). No `require`, no `process`.
+6. New renderer files live under `src/renderer/`. Keep each file under ~600 lines
+   by default. `scene-universe.js` may remain under ~900 while galaxy region
+   lifecycle, shared GUI declutter, and live mesh-derived proof stay co-located;
+   further growth requires a kit that explicitly unfreezes a renderer-specific
+   helper rather than weakening the pure `galaxy-layout.js` boundary.
+7. One `BABYLON.Engine` for the whole app lifetime. Views may each build their
+   own `BABYLON.Scene`; dispose the old scene on view switch.
+
+## 2. Files to create
+
+| File | Responsibility |
+|---|---|
+| `src/renderer/index.html` | canvas + overlay DOM skeleton + script tags in order: babylon.js, babylon.gui.min.js, `util.js`, `polish-math.js`, `galaxy-layout.js`, `scene-universe.js`, `scene-system.js`, `scene-planet.js`, `app.js` |
+| `src/renderer/style.css` | design tokens + all overlay chrome styling |
+| `src/renderer/util.js` | `window.AUR` bootstrap: `fnv1a`, `mulberry32` (copy the exact algorithms from `src/main/tracker.js` so seeds agree), palettes, relative-time formatter, shared helpers |
+| `src/renderer/polish-math.js` | pure UMD/Node helpers for deterministic label collision selection and non-accumulating sun pulse color |
+| `src/renderer/galaxy-layout.js` | pure UMD/Node helpers for deterministic galaxy colors, member placement, and separated region packing |
+| `src/renderer/scene-universe.js` | universe map view |
+| `src/renderer/scene-system.js` | solar system view |
+| `src/renderer/scene-planet.js` | planet close-up view |
+| `src/renderer/app.js` | boot, view stack, event routing, overlay DOM rendering, debug hooks |
+
+Suggested view contract (you may adjust internally, keep it consistent):
+each `scene-*.js` registers `AUR.views.<name> = (engine, data, ctx) => ({ scene, update(eventBatch), dispose() })`
+where `ctx` provides callbacks like `openSystem(projectId)`, `openPlanet(projectId, name)`, `back()`.
+
+## 3. The `window.AU` bridge (matches `src/preload.js`)
+
+```js
+AU.snapshot()  -> Promise<{ projects: Project[], ships: Ship[], feed: FeedEntry[],
+                            eventSequence: number, streamEpoch: number,
+                            playback: PlaybackStatus }>
+AU.getSystem(projectId)          -> Promise<SystemData | null>
+AU.getPlanet(projectId, name)    -> Promise<PlanetData | null>
+AU.openProject(projectId)        -> Promise<void>   // opens folder in Explorer
+AU.openTerminal(projectId)       -> Promise<{ok:Boolean, code?:String}>
+                                   // LIVE-only host terminal request (win32/darwin)
+AU.onEvents(cb)                  // cb(eventBatch: Event[], {streamEpoch, mode})
+AU.replay({ action, ts?, speed? }) -> Promise<{playback, streamEpoch, snapshot?}>
+AU.onReplayState(cb)             // bounded playback progress/status updates
+AU.onDebugView(cb)               // cb('universe'|'system'|'planet') — shots mode
+AU.debugReady()                  // call after requested view has rendered a frame
+```
+
+```js
+PlaybackStatus = {
+  mode: 'live'|'replay', available, indexing, minTs, maxTs, cursorTs,
+  playing, speed: 1|10|100|1000, sourceCount, truncated
+}
+// replay actions: index, seek, play, pause, speed, live
+```
+
+Shapes (all fields always present unless marked `?`):
+
+```js
+Project = { id, path, name, exists, lastActivity, totalBytes, totalBuilds, seed,
+            galaxy: { key, label } }
+// id: slug string; path: absolute dir or null; exists: bool (false = deleted/temp
+// project -> render as dim "derelict" system); lastActivity: ms epoch;
+// totalBytes: transcript bytes (proxy for historical activity); seed: uint32;
+// galaxy is derived portably from cwd (workspace/home/container/path) and
+// deleted paths use key `graveyard` with label `Graveyard`.
+
+Ship = { id, name, provider, project, kind, status, detail, lastEvent,
+         attention, attentionSince }
+// provider: 'claude'|'codex'|'generic'; names use Claude-/Codex-/Signal-.
+// kind: 'main' | 'drone' (drone = subagent, render smaller);
+// status: 'Building'|'Exploring'|'Gathering Resources'|'Scanning'|'Delegating'|
+//         'Planning'|'Working'; detail: string|null (e.g. relative file path).
+// attention: 'question'|'permission'|'stalled'|'done'|null;
+// attentionSince: ms epoch|null.
+
+FeedEntry = { kind, text, project, ts }
+// kind: 'discover'|'form'|'build'|'info'|'spawn'|'depart'|'attention'|'done'
+
+SystemData = { project: Project, planets: Planet[], beltDensity: number }
+Planet     = { name, files, builds, procedural? }   // name '(root)' possible
+
+PlanetData = { name, project: Project, builds, files, sizeKb, subdirs,
+               resources: string[], procedural? }   // resources = top file exts
+```
+
+Event batch entries (from `AU.onEvents`):
+
+```js
+{ type: 'project-added',  project }        // new system discovered
+{ type: 'project-updated', project }
+{ type: 'ship-spawned',   ship }
+{ type: 'ship-updated',   ship }           // status/detail changed
+{ type: 'ship-departed',  shipId, ts }
+{ type: 'build', project, bucket, file, shipId, isNew, ts }
+   // project is the ID string; bucket = planet name; isNew => planet formation
+{ type: 'activity', project, shipId, tool, status, detail, ts }
+{ type: 'feed', entry: FeedEntry }
+```
+
+Every event entry also carries additive `seq: number`, monotonically increasing
+within its source stream. The renderer reconciles `(streamEpoch, seq)` with the
+snapshot boundary so live/replay transitions and events racing an invoke are
+neither mixed, lost, nor applied twice.
+
+Maintain a renderer-side store (in `app.js`): `projects` Map, `ships` Map, feed
+array (cap 60). Apply every batch to the store first, then hand the batch to the
+active view's `update()`, then re-render the affected overlay DOM.
+
+## 4. Shared chrome (all three views — copy the mockups)
+
+Design tokens (put in `:root`):
+
+```css
+--bg: #04050a;            --panel: rgba(13, 17, 28, 0.82);
+--panel-border: rgba(120, 140, 190, 0.14);
+--text: #e8ecf6;          --muted: #8b93a8;
+--accent: #6c8cff;        --radius: 10px;
+```
+
+- **Top bar** (full width, ~56px): purple glowing dot logo, `AGENT UNIVERSE`
+  (letter-spaced, semibold), pill badge `MULTI-PROVIDER` (purple-tinted
+  border). Window controls are native — do not draw min/max/close.
+  Universe view only: a `RECENT` strip after the badge — up to 5 pills, the
+  most recently active projects sorted by `lastActivity`, each showing the
+  project name (ellipsized), a green dot when the project has live ships, and
+  jumping to that project's system view on click.
+  A `SEARCH` glass field follows the strip: case-insensitive ranked project
+  matches appear in a keyboard-accessible dropdown and Enter/click opens the
+  existing guarded system route. It clears and closes outside universe view.
+  A persistent gear opens `SETTINGS · PROJECT PATHS`: missing project folders
+  can be recovered with a bounded scan beneath a user-chosen parent or a
+  native `Locate…` picker. Scan matches require explicit confirmation, remaps
+  keep the original project ID/history, and path changes are LIVE-only.
+- **Right sidebar** (fixed ~330px, full height under top bar, panel style):
+  - `ACTIVE AGENTS` header with right-aligned `N Running`.
+    Rows: small ship glyph (inline SVG, tinted from the provider palette), name
+    (`Claude-3`, `Codex-2`, or `Signal-1`), colored status dot, compact
+    `CLAUDE`/`CODEX`/`SIGNAL` tag, and `Status · ProjectName` in muted. Drones:
+    slightly smaller row, dimmer. Empty state: `No agents in flight`.
+  - `EVENT FEED` header with exact `LIVE` + green dot or `REPLAY` while history
+    is visible. Rows: colored dot, text
+    (wrap 2 lines max), right-aligned relative time (`12s ago`). Newest on top,
+    cap 30 rows. Kind colors: build `#4da3ff`, form `#ffb454`, spawn `#34d399`,
+    depart/info `#8b93a8`, discover `#a78bfa`.
+- Agent rows and feed rows are clickable: clicking one opens the system view
+  of that entry's project (no-op if already viewing that system; pointer
+  cursor + hover tint signal it).
+- **Bottom-left summary card** (panel): 3–4 big-number stats per view (below).
+- **Back control** (system + planet views, top-left under the project card or
+  above it): `← Universe` / `← Orion System` style button.
+- **History bar** (all views, fixed bottom): Play/Pause, `1x`/`10x`/`100x`/
+  `1000x`, historical clock, scrubber, and exact `LIVE`. Existing sidebar,
+  summaries, and planet tabs remain above it at 1200×720. Seeking atomically
+  reseeds the store; returning LIVE installs a fresh tracker snapshot.
+- Status dot colors: Building `#4da3ff`, Exploring `#a78bfa`,
+  Gathering Resources `#ffb454`, Scanning `#34d399`, Delegating `#f472b6`,
+  Planning `#facc15`, Working `#94a3b8`.
+- Ship hulls use deterministic provider variants: Claude purple, Codex
+  cyan/blue, and generic Signal amber/neutral. Missing provider values in
+  legacy fixtures normalize to Claude; raw/unknown values normalize to Signal.
+
+## 5. Universe view (`3.universe-map-view.png`)
+
+- Backdrop: `assets/skyboxes/skybox-001.png` (2048×1024 equirectangular) via
+  `BABYLON.PhotoDome` (size ~1200), universe-only texture level `0.04`, plus a
+  ~2500-point starfield (PointsCloudSystem or small billboards). Keep it dark —
+  the mockup is near-black.
+- Each project = a **mini solar-system glyph**:
+  - Emissive sun sphere; diameter ~ `1.2 + log10(totalBytes+1) * 0.35`.
+    Sun color from seed: pick from `#ffb454, #ff7a59, #dfe6ff, #ffd27d, #9db8ff`.
+  - 2–3 thin elliptical orbit rings (LinesMesh circles, alpha ~0.25, tilted
+    slightly toward camera like the mockup).
+  - 3–5 tiny planet dots on the rings (deterministic from seed).
+  - Label above: `PROJECT: <NAME uppercased>` — GUI TextBlock linked to the sun.
+- Render every project glyph; never hide systems to solve label crowding.
+  Labels use a deterministic, 6px-padded screen-space collision pass. Priority
+  is hovered project → question/permission → galaxy → online project → recent
+  idle project. The pass clips to the canvas area outside fixed DOM chrome,
+  reveals a hidden project label on hover, allows more recent idle labels as
+  the camera zooms in, and reruns only when camera/viewport, hover, project,
+  galaxy, or ship state becomes dirty.
+- **Deterministic galaxy layout** (persistent universe — same every launch):
+  group projects by their additive `galaxy.key`, place members on a
+  hash-rotated spiral inside a galaxy disc, and collision-pack the discs with
+  a positive gap. Render a very faint non-pickable hashed-color region,
+  outline, and `GALAXY: <LABEL> · N SYSTEMS` label for each group; Graveyard is
+  muted and peripheral. Galaxy and project labels share the 6px screen-space
+  declutter pass. Camera framing uses all region extents. ArcRotateCamera keeps
+  wheel zoom + drag rotation and a dynamically sufficient radius clamp.
+- States: system with ≥1 ship = "online" (brighter, sun pulse, label full
+  opacity). Idle = normal dim. `exists: false` = derelict (very dim, ~40%
+  opacity, no pulse).
+- While project search is active, matching system glyphs and labels brighten
+  through those same state materials and nonmatches dim; clearing or leaving
+  the universe restores the ordinary online/idle/derelict appearance.
+- Ships: every live ship = small dart mesh cruising near its project's system
+  (slow orbit at radius ~6 around the glyph, gentle bob). Optional short
+  `TrailMesh` (≤30 length). Drones smaller. On `ship-spawned`: warp-in flash;
+  `ship-departed`: fade out.
+- Events: `build`/`activity` → that system's sun does a quick pulse.
+  `project-added` → glyph grows in from zero.
+- Interaction: hover glyph → highlight + pointer cursor; click → zoom/fade
+  transition into system view.
+- Summary card: `UNIVERSE SUMMARY` — Projects / Active Agents / Systems Online
+  (systems online = distinct projects with ≥1 ship).
+
+## 6. Solar system view (`2.solar-system-view.png`)
+
+Data: `AU.getSystem(projectId)`.
+
+- Backdrop: skybox `assets/skyboxes/skybox-XXX.png` where
+  `XXX = String(1 + seed % 12).padStart(3, '0')`, plus starfield.
+- Central sun: emissive sphere + `BABYLON.GlowLayer`, subtle pulse.
+- Planets: one per `planets[]` entry, on concentric orbit rings
+  (LinesMesh circles, like the mockup's grid rings). Orbit radius by index
+  (e.g. `10 + i*6`); diameter `1.1 + sqrt(files + builds*5) * 0.18` clamped
+  [1.1, 4.5]. Texture: `assets/planets/planet-XXX.png` where
+  `XXX = String(1 + fnv1a(project.id + ':' + name) % 31).padStart(3,'0')` —
+  tileable albedo, set `uScale=vScale=2`. Slow orbital motion, varied speeds
+  (0.02–0.08 rad/s, deterministic per planet). Planet label (name) appears on
+  hover; keep labels for 2–3 largest planets always on, like the mockup.
+- Asteroid belt: ring of instanced small rocks (one low-poly mesh +
+  `thinInstance` transforms), count `min(beltDensity*4, 300)`, placed in an
+  annulus between two middle orbits, slow rotation.
+- Ships (only ships where `ship.project === projectId`): dart mesh + name label
+  (GUI, always visible, like `Claude-1` callouts in the mockup) + short trail.
+  Idle behavior: patrol orbit. On `build` event: fly to the `bucket` planet
+  (~1.5s ease), fire a thin emissive beam at it for ~1s, planet pulses
+  (scale 1 → 1.15 → 1). On `build` with `isNew: true`: re-fetch
+  `AU.getSystem`, grow the new planet in from zero, feed shows planet formation.
+  On `activity`: brief thruster flash.
+- Project card (top-left, panel): `PROJECT: <NAME>`; rows: `STATE` (any ship
+  Building → `Building` in accent blue; else the busiest ship status; no ships →
+  `Dormant`), `BUILDS <totalBuilds>`, `LAST SIGNAL <relative time>`; plus an
+  `Open Folder` button → `AU.openProject(id)` and a LIVE-only `Open Terminal`
+  button → `AU.openTerminal(id)` (both hidden when `exists` is false). History
+  replay keeps the terminal action visible but disabled. The renderer supplies
+  only the project ID; main resolves and revalidates the live working directory.
+  (The mockup shows a fake progress %; we deliberately show honest metrics in
+  the same visual style.)
+- TASKS panel (system view only, below the project card): reads the trusted
+  project's root `GOALS.md`, shows open/total checklist progress, and supports
+  adding, toggling, or removing manual goals. Removal is confirmed and uses an
+  exact line/text check so stale views cannot delete a different entry;
+  internally tagged agent goals remain protected. It refreshes every 10
+  seconds so external agent edits appear without reopening the view; prose and
+  source line endings in the file are preserved.
+- IDEAS panel (global command rail): captures root-level to-do ideas before a
+  project is selected. In LIVE mode the user can assign one to an existing
+  project, which idempotently adds an internally tagged `GOALS.md` item and
+  starts Codex. Unassigned ideas can be removed after confirmation; assigned
+  records remain protected. The task shows Agent working while correlated work
+  is active and Ready for review after successful agent completion marks it
+  checked.
+- Summary card: `PROJECT SUMMARY` — Active Agents / Building / Gathering /
+  Exploring (counts of this project's ships by status; Scanning counts as
+  Exploring).
+- Interaction: hover planet → highlight + label; click planet → planet view.
+  Back button → universe.
+
+## 7. Planet view (`1.planet-view.png`)
+
+Data: `AU.getPlanet(projectId, name)`.
+
+- Large textured planet (same texture-pick rule) filling ~60% of view height,
+  slow rotation, subtle atmosphere rim (Fresnel emissive or a slightly larger
+  additive-alpha shell). 1–2 small moons orbiting. Skybox + starfield backdrop.
+- This project's ships orbit the planet with name labels.
+- Left panels (stacked, like the mockup):
+  1. `PROJECT: <NAME>` mini-card (state + builds and the same folder/terminal
+     actions as in system view).
+  2. `PLANET: <NAME uppercased>` card — status dot `Active` (ships present) or
+     `Dormant`; rows: `TYPE` `Terrestrial` (or `Unknown` when `procedural`),
+     `RESOURCES` top file extensions joined (`TS, JSON, PNG`), `MASS`
+     `<files> files`, `DIAMETER` `<sizeKb> KB`, `STRUCTURES` `<subdirs>`.
+  3. `PLANET STATUS` card with labeled progress bars (clamped 0–100%):
+     Infrastructure `subdirs/10`, Resources `files/500`, Build Energy
+     `builds/50`.
+- Bottom-center tab bar like the mockup: `Overview · Surface · Orbit ·
+  Resources · Structures · Scans` — `Overview` active; all others rendered but
+  disabled (muted, no-op). This is deliberate visual parity without scope creep.
+- Summary card: `PLANET SUMMARY` — Active Agents / Structures / Resources /
+  Builds.
+- Back button → system view.
+
+## 8. Debug / shots contract (grading depends on this — get it exact)
+
+`npm run shots` launches with `--shots`. Main will send view names via
+`AU.onDebugView(cb)`. On each:
+
+- `'universe'` → show universe view.
+- `'system'` → open the system for the best demo project: `exists === true`
+  with the most recent `lastActivity`.
+- `'planet'` → open that same system's largest planet.
+- When the requested view has actually rendered (first frame after scene ready —
+  e.g. `scene.executeWhenReady` then one `onAfterRenderObservable` tick), call
+  `AU.debugReady()`. Main then waits ~1.8s (animations settle) and captures.
+
+Also: `app.js` must catch and `console.error` any async boot failure — renderer
+console is forwarded to stdout in shots mode and scanned by the grader.
+
+Item-02 adds a second test-only main-process mode:
+`electron . --polish-test --polish-output=<dir>`. It reads renderer state only
+to locate projected pick targets, then uses real Electron pointer input for
+sun → system, Open Folder, planet → planet view, and both Back transitions.
+Open Folder is recorded instead of launching Explorer in this mode. It writes
+seven screenshots plus `result.json`; normal launch and `--shots` behavior stay
+unchanged.
+
+Item-06 adds `electron . --history-test --history-output=<dir>`. It owns
+isolated Claude/Codex fixtures, drives the real history DOM controls at
+1200×720, proves epoch isolation and background live catch-up, and writes four
+screenshots plus bounded `result.json`. It never reads the real profile.
+
+Item-07 adds `electron . --control-test --control-output=<dir>`. It owns an
+isolated live/history fixture and an injected recording launcher, drives the
+real project/history controls at 1200×720, proves LIVE-only behavior and safe
+fixed Windows Terminal arguments, and writes two screenshots plus a bounded
+`result.json`. It never reads the real profile or opens a real terminal.
+
+## 9. Performance guardrails
+
+- Target 60fps idle on integrated graphics: ≤3000 starfield points, belt via
+  thin instances only, one GlowLayer per scene max, no per-frame allocations in
+  observables (reuse Vector3s), dispose scenes fully on view switch
+  (`scene.dispose()` and drop references).
+- Textures are 1–5MB PNGs; load per scene, never re-fetch in a loop.
+- The event stream can burst (a batch per second per active session). `update()`
+  must be O(batch) for ordinary ship/activity events and never rebuild the
+  scene. A project add or galaxy-changing project update may trigger one
+  coalesced pure layout/region reflow after the whole batch while reusing every
+  existing glyph root. Overlay DOM re-renders only affected sections.
+- Dense-universe label layout is dirty-driven. Do not allocate/reflow label
+  candidates on idle frames; camera movement, resize, hover, and relevant
+  store updates are the only invalidators.
+- History indexing uses at most 256 KiB each from a candidate's head and tail,
+  retains at most 50,000 newest effective sources, and captures immutable byte
+  lengths. Replay streams only to the selected cursor, caps lines at 1 MiB,
+  yields after bounded I/O, emits batches of at most 256, and never writes a
+  transcript or persistent universe state. Generic Signal content is never
+  read and is therefore not replayable.
+
+## 10. Assets manifest
+
+- `assets/planets/planet-001.png` … `planet-031.png` — 1024×1024 seamless
+  tileable albedo (flat texture, not equirect; tile it on spheres).
+- `assets/planets/planet-031-bump.png` — optional 1024×1024 grayscale height map
+  used as a bump texture by the Testbed Delta surface.
+- Authored planet albedo remains the default. Deterministic runtime height maps
+  supply bump variation, while explicitly procedural `Sector-*` worlds generate
+  both albedo and height data for rocky, gas, ice, volcanic, and oceanic classes.
+  Generated maps are square and use the same `uScale=vScale=2` contract as the
+  authored library; a bounded 48-surface cache keeps revisits fast.
+- `assets/asteroids/asteroid-001.png` … `asteroid-003.png` with matching
+  grayscale `-bump.png` source heights and Babylon-ready `-normal.png` maps —
+  dedicated 512×512 cratered rock surfaces for the three deformed asteroid
+  archetypes. Babylon materials consume the RGB normal maps, not raw grayscale.
+- `assets/skyboxes/skybox-001.png` … `skybox-012.png` — 2048×1024 true
+  equirectangular, for PhotoDome.
+- `assets/palettes/palette-001.json` … `palette-012.json` — named color trios:
+  `{ name, descriptor, colors: [hex, hex, hex], loreSentence, kind }` with
+  `kind` one of `ship | station | system` (4 of each). OPTIONAL, not graded:
+  you may pick one by `fnv1a(id) % 12` to tint suns/ships or flavor tooltips;
+  the §4 palettes remain the default.
+- `assets/manifest.json` — index of the library (id/file/type/tags per asset);
+  use it if you want to enumerate assets instead of hardcoding counts.
+- Paths from `index.html` are `../../assets/...`.
+- Missing something (ship sprite, icon, texture variant)? Do NOT generate,
+  download, or inline large data-URI art — use a procedural/geometric fallback
+  and log the want in `kit/ASSET-REQUESTS.md`.

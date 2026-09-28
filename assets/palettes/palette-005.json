@@ -1,0 +1,11 @@
+{
+  "name": "Cadrivox",
+  "descriptor": "layered copper sanctuary",
+  "colors": [
+    "#4A3026",
+    "#B8734F",
+    "#8DD9C4"
+  ],
+  "loreSentence": "Cadrivox welcomes every weary vessel with warm docks, shared tools, and a fresh route onward.",
+  "kind": "station"
+}

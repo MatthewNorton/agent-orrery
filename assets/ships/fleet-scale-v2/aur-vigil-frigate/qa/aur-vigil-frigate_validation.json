@@ -1,0 +1,187 @@
+{
+  "status": "PASS",
+  "errors": [],
+  "blend": {
+    "objects": 230,
+    "mesh_objects": 224,
+    "triangles": 11780,
+    "materials": 7,
+    "bounds": {
+      "min_m": [
+        -45.069016,
+        -125.247742,
+        -14.4033
+      ],
+      "max_m": [
+        45.069016,
+        110.0,
+        33.3792
+      ],
+      "dimensions_mm": [
+        90138.031,
+        235247.742,
+        47782.5
+      ]
+    },
+    "film_transparent": true,
+    "world_background_strength": 0.0,
+    "forbidden_meshes": [],
+    "missing_external_images": []
+  },
+  "renders": [
+    {
+      "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-vigil-frigate\\qa\\aur-vigil-frigate_front_three_quarter.png",
+      "size": [
+        1536,
+        1536
+      ],
+      "channels": 4,
+      "corner_alpha": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "transparent_fraction": 0.919003,
+      "pass": true
+    },
+    {
+      "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-vigil-frigate\\qa\\aur-vigil-frigate_rear_three_quarter.png",
+      "size": [
+        1536,
+        1536
+      ],
+      "channels": 4,
+      "corner_alpha": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "transparent_fraction": 0.921131,
+      "pass": true
+    },
+    {
+      "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-vigil-frigate\\qa\\aur-vigil-frigate_side_profile.png",
+      "size": [
+        1536,
+        1536
+      ],
+      "channels": 4,
+      "corner_alpha": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "transparent_fraction": 0.933231,
+      "pass": true
+    },
+    {
+      "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-vigil-frigate\\qa\\aur-vigil-frigate_top_or_underside.png",
+      "size": [
+        1536,
+        1536
+      ],
+      "channels": 4,
+      "corner_alpha": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "transparent_fraction": 0.862034,
+      "pass": true
+    }
+  ],
+  "quality_manifest": {
+    "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-vigil-frigate\\asset_quality_manifest.json",
+    "status": "PASS",
+    "errors": [],
+    "reference_files": [
+      {
+        "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-vigil-frigate\\references\\aur-vigil-frigate-turnaround.png",
+        "exists": true
+      },
+      {
+        "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-vigil-frigate\\references\\aur-vigil-frigate-front-reference.png",
+        "exists": true
+      },
+      {
+        "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-vigil-frigate\\references\\aur-vigil-frigate-model-locked-front-reference.png",
+        "exists": true
+      }
+    ],
+    "required_parts": 7,
+    "audited_views": [
+      "front_three_quarter",
+      "rear_three_quarter",
+      "side_profile",
+      "top_or_underside"
+    ],
+    "objective_visual_score": 77.42,
+    "comparison_regions": 3,
+    "scene_subsystems": 0,
+    "real_time_design": {
+      "required": true,
+      "status": "PASS",
+      "audit": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-vigil-frigate\\qa\\aur-vigil-frigate_realtime_audit.json",
+      "budgets": {
+        "glb_bytes": 9000000,
+        "mesh_nodes": 300,
+        "estimated_draw_calls": 300,
+        "materials": 8,
+        "textures": 18,
+        "rendered_triangles": 220000,
+        "embedded_image_bytes": 2500000
+      },
+      "measured": {
+        "glb_bytes": 2778756,
+        "mesh_nodes": 224,
+        "estimated_draw_calls": 224,
+        "materials": 7,
+        "textures": 17,
+        "rendered_triangles": 50252,
+        "embedded_image_bytes": 15008
+      },
+      "checks": [
+        "detail_hierarchy",
+        "instancing_and_batching",
+        "multi_angle_readability",
+        "runtime_performance",
+        "squint_readability",
+        "texel_density_consistency",
+        "value_and_palette_separation"
+      ]
+    }
+  },
+  "glb": {
+    "objects": 226,
+    "mesh_objects": 224,
+    "triangles": 50252,
+    "materials": 7,
+    "bounds": {
+      "min_m": [
+        -45.069016,
+        -125.247742,
+        -14.4033
+      ],
+      "max_m": [
+        45.069016,
+        110.0,
+        33.3792
+      ],
+      "dimensions_mm": [
+        90138.031,
+        235247.742,
+        47782.5
+      ]
+    },
+    "forbidden_meshes": [],
+    "cameras": [],
+    "lights": [],
+    "actions": 0,
+    "animated_objects": [],
+    "missing_required_objects": []
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "status": "PASS",
+  "glb": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-wayfarer-shuttle\\aur-wayfarer-shuttle.glb",
+  "profile": "report-only",
+  "budgets": {
+    "glb_bytes": 5000000,
+    "mesh_nodes": 190,
+    "estimated_draw_calls": 190,
+    "materials": 8,
+    "textures": 18,
+    "rendered_triangles": 130000,
+    "embedded_image_bytes": 1900000
+  },
+  "metrics": {
+    "glb_bytes": 1456056,
+    "nodes": 117,
+    "mesh_nodes": 116,
+    "mesh_definitions": 116,
+    "unique_mesh_references": 116,
+    "unique_primitives": 116,
+    "estimated_draw_calls": 116,
+    "materials": 7,
+    "textures": 14,
+    "images": 7,
+    "embedded_image_bytes": 13632,
+    "external_images": 0,
+    "unique_triangles": 31024,
+    "rendered_triangles": 31024,
+    "gpu_instancing_nodes": 0,
+    "repeated_mesh_definitions": 0,
+    "exact_duplicate_mesh_groups": 18,
+    "exact_duplicate_mesh_definitions": 71,
+    "instance_candidate_nodes": 71,
+    "potential_draw_call_savings": 53,
+    "extensions_used": [
+      "KHR_materials_clearcoat",
+      "KHR_materials_emissive_strength",
+      "KHR_materials_transmission"
+    ],
+    "extensions_required": [],
+    "repeated_mesh_references": {}
+  },
+  "requirements": {
+    "instancing_when_repeated": false,
+    "instancing_threshold": 25,
+    "meshopt": false,
+    "ktx2": false
+  },
+  "errors": []
+}

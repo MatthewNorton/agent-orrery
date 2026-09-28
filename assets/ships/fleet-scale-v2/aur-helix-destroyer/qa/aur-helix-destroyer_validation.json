@@ -1,0 +1,187 @@
+{
+  "status": "PASS",
+  "errors": [],
+  "blend": {
+    "objects": 232,
+    "mesh_objects": 227,
+    "triangles": 9684,
+    "materials": 6,
+    "bounds": {
+      "min_m": [
+        -84.09111,
+        -216.0,
+        -30.701773
+      ],
+      "max_m": [
+        83.599495,
+        220.5,
+        42.480003
+      ],
+      "dimensions_mm": [
+        167690.605,
+        436500.0,
+        73181.776
+      ]
+    },
+    "film_transparent": true,
+    "world_background_strength": 0.0,
+    "forbidden_meshes": [],
+    "missing_external_images": []
+  },
+  "renders": [
+    {
+      "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-helix-destroyer\\qa\\aur-helix-destroyer_front_three_quarter.png",
+      "size": [
+        1536,
+        1536
+      ],
+      "channels": 4,
+      "corner_alpha": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "transparent_fraction": 0.90625,
+      "pass": true
+    },
+    {
+      "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-helix-destroyer\\qa\\aur-helix-destroyer_rear_three_quarter.png",
+      "size": [
+        1536,
+        1536
+      ],
+      "channels": 4,
+      "corner_alpha": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "transparent_fraction": 0.908386,
+      "pass": true
+    },
+    {
+      "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-helix-destroyer\\qa\\aur-helix-destroyer_side_profile.png",
+      "size": [
+        1536,
+        1536
+      ],
+      "channels": 4,
+      "corner_alpha": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "transparent_fraction": 0.924305,
+      "pass": true
+    },
+    {
+      "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-helix-destroyer\\qa\\aur-helix-destroyer_top_or_underside.png",
+      "size": [
+        1536,
+        1536
+      ],
+      "channels": 4,
+      "corner_alpha": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "transparent_fraction": 0.83995,
+      "pass": true
+    }
+  ],
+  "quality_manifest": {
+    "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-helix-destroyer\\asset_quality_manifest.json",
+    "status": "PASS",
+    "errors": [],
+    "reference_files": [
+      {
+        "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-helix-destroyer\\references\\aur-helix-destroyer-turnaround.png",
+        "exists": true
+      },
+      {
+        "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-helix-destroyer\\references\\aur-helix-destroyer-front-reference.png",
+        "exists": true
+      },
+      {
+        "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-helix-destroyer\\references\\aur-helix-destroyer-model-locked-front-reference.png",
+        "exists": true
+      }
+    ],
+    "required_parts": 7,
+    "audited_views": [
+      "front_three_quarter",
+      "rear_three_quarter",
+      "side_profile",
+      "top_or_underside"
+    ],
+    "objective_visual_score": 75.62,
+    "comparison_regions": 3,
+    "scene_subsystems": 0,
+    "real_time_design": {
+      "required": true,
+      "status": "PASS",
+      "audit": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-helix-destroyer\\qa\\aur-helix-destroyer_realtime_audit.json",
+      "budgets": {
+        "glb_bytes": 12000000,
+        "mesh_nodes": 380,
+        "estimated_draw_calls": 380,
+        "materials": 8,
+        "textures": 18,
+        "rendered_triangles": 300000,
+        "embedded_image_bytes": 2800000
+      },
+      "measured": {
+        "glb_bytes": 3001744,
+        "mesh_nodes": 227,
+        "estimated_draw_calls": 227,
+        "materials": 6,
+        "textures": 14,
+        "rendered_triangles": 48636,
+        "embedded_image_bytes": 13632
+      },
+      "checks": [
+        "detail_hierarchy",
+        "instancing_and_batching",
+        "multi_angle_readability",
+        "runtime_performance",
+        "squint_readability",
+        "texel_density_consistency",
+        "value_and_palette_separation"
+      ]
+    }
+  },
+  "glb": {
+    "objects": 228,
+    "mesh_objects": 227,
+    "triangles": 48636,
+    "materials": 6,
+    "bounds": {
+      "min_m": [
+        -84.09111,
+        -216.0,
+        -30.701773
+      ],
+      "max_m": [
+        83.599495,
+        220.5,
+        42.480003
+      ],
+      "dimensions_mm": [
+        167690.605,
+        436500.0,
+        73181.776
+      ]
+    },
+    "forbidden_meshes": [],
+    "cameras": [],
+    "lights": [],
+    "actions": 0,
+    "animated_objects": [],
+    "missing_required_objects": []
+  }
+}

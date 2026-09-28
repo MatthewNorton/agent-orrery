@@ -1,0 +1,187 @@
+{
+  "status": "PASS",
+  "errors": [],
+  "blend": {
+    "objects": 112,
+    "mesh_objects": 107,
+    "triangles": 8356,
+    "materials": 7,
+    "bounds": {
+      "min_m": [
+        -4.405154,
+        -8.2528,
+        -1.068
+      ],
+      "max_m": [
+        4.405154,
+        7.0,
+        1.190276
+      ],
+      "dimensions_mm": [
+        8810.308,
+        15252.8,
+        2258.276
+      ]
+    },
+    "film_transparent": true,
+    "world_background_strength": 0.0,
+    "forbidden_meshes": [],
+    "missing_external_images": []
+  },
+  "renders": [
+    {
+      "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-lance-interceptor\\qa\\aur-lance-interceptor_front_three_quarter.png",
+      "size": [
+        1536,
+        1536
+      ],
+      "channels": 4,
+      "corner_alpha": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "transparent_fraction": 0.911286,
+      "pass": true
+    },
+    {
+      "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-lance-interceptor\\qa\\aur-lance-interceptor_rear_three_quarter.png",
+      "size": [
+        1536,
+        1536
+      ],
+      "channels": 4,
+      "corner_alpha": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "transparent_fraction": 0.91693,
+      "pass": true
+    },
+    {
+      "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-lance-interceptor\\qa\\aur-lance-interceptor_side_profile.png",
+      "size": [
+        1536,
+        1536
+      ],
+      "channels": 4,
+      "corner_alpha": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "transparent_fraction": 0.945803,
+      "pass": true
+    },
+    {
+      "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-lance-interceptor\\qa\\aur-lance-interceptor_top_or_underside.png",
+      "size": [
+        1536,
+        1536
+      ],
+      "channels": 4,
+      "corner_alpha": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "transparent_fraction": 0.835229,
+      "pass": true
+    }
+  ],
+  "quality_manifest": {
+    "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-lance-interceptor\\asset_quality_manifest.json",
+    "status": "PASS",
+    "errors": [],
+    "reference_files": [
+      {
+        "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-lance-interceptor\\references\\aur-lance-interceptor-turnaround.png",
+        "exists": true
+      },
+      {
+        "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-lance-interceptor\\references\\aur-lance-interceptor-front-reference.png",
+        "exists": true
+      },
+      {
+        "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-lance-interceptor\\references\\aur-lance-interceptor-model-locked-front-reference-v2.png",
+        "exists": true
+      }
+    ],
+    "required_parts": 7,
+    "audited_views": [
+      "front_three_quarter",
+      "rear_three_quarter",
+      "side_profile",
+      "top_or_underside"
+    ],
+    "objective_visual_score": 77.61,
+    "comparison_regions": 3,
+    "scene_subsystems": 0,
+    "real_time_design": {
+      "required": true,
+      "status": "PASS",
+      "audit": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-lance-interceptor\\qa\\aur-lance-interceptor_realtime_audit.json",
+      "budgets": {
+        "glb_bytes": 4000000,
+        "mesh_nodes": 160,
+        "estimated_draw_calls": 160,
+        "materials": 8,
+        "textures": 18,
+        "rendered_triangles": 100000,
+        "embedded_image_bytes": 1700000
+      },
+      "measured": {
+        "glb_bytes": 1371520,
+        "mesh_nodes": 107,
+        "estimated_draw_calls": 107,
+        "materials": 7,
+        "textures": 14,
+        "rendered_triangles": 26492,
+        "embedded_image_bytes": 13632
+      },
+      "checks": [
+        "detail_hierarchy",
+        "instancing_and_batching",
+        "multi_angle_readability",
+        "runtime_performance",
+        "squint_readability",
+        "texel_density_consistency",
+        "value_and_palette_separation"
+      ]
+    }
+  },
+  "glb": {
+    "objects": 108,
+    "mesh_objects": 107,
+    "triangles": 26492,
+    "materials": 7,
+    "bounds": {
+      "min_m": [
+        -4.405154,
+        -8.2528,
+        -1.068
+      ],
+      "max_m": [
+        4.405154,
+        7.0,
+        1.190276
+      ],
+      "dimensions_mm": [
+        8810.308,
+        15252.8,
+        2258.276
+      ]
+    },
+    "forbidden_meshes": [],
+    "cameras": [],
+    "lights": [],
+    "actions": 0,
+    "animated_objects": [],
+    "missing_required_objects": []
+  }
+}

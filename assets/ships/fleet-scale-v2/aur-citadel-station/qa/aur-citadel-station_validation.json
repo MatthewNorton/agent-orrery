@@ -1,0 +1,187 @@
+{
+  "status": "PASS",
+  "errors": [],
+  "blend": {
+    "objects": 298,
+    "mesh_objects": 289,
+    "triangles": 54560,
+    "materials": 7,
+    "bounds": {
+      "min_m": [
+        -2750.0,
+        -2750.0,
+        -1079.0
+      ],
+      "max_m": [
+        2750.0,
+        2750.0,
+        1130.47998
+      ],
+      "dimensions_mm": [
+        5500000.0,
+        5500000.0,
+        2209479.98
+      ]
+    },
+    "film_transparent": true,
+    "world_background_strength": 0.0,
+    "forbidden_meshes": [],
+    "missing_external_images": []
+  },
+  "renders": [
+    {
+      "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-citadel-station\\qa\\aur-citadel-station_front_three_quarter.png",
+      "size": [
+        1536,
+        1536
+      ],
+      "channels": 4,
+      "corner_alpha": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "transparent_fraction": 0.796143,
+      "pass": true
+    },
+    {
+      "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-citadel-station\\qa\\aur-citadel-station_rear_three_quarter.png",
+      "size": [
+        1536,
+        1536
+      ],
+      "channels": 4,
+      "corner_alpha": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "transparent_fraction": 0.801601,
+      "pass": true
+    },
+    {
+      "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-citadel-station\\qa\\aur-citadel-station_side_profile.png",
+      "size": [
+        1536,
+        1536
+      ],
+      "channels": 4,
+      "corner_alpha": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "transparent_fraction": 0.843661,
+      "pass": true
+    },
+    {
+      "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-citadel-station\\qa\\aur-citadel-station_top_or_underside.png",
+      "size": [
+        1536,
+        1536
+      ],
+      "channels": 4,
+      "corner_alpha": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "transparent_fraction": 0.750213,
+      "pass": true
+    }
+  ],
+  "quality_manifest": {
+    "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-citadel-station\\asset_quality_manifest.json",
+    "status": "PASS",
+    "errors": [],
+    "reference_files": [
+      {
+        "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-citadel-station\\references\\aur-citadel-station-turnaround.png",
+        "exists": true
+      },
+      {
+        "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-citadel-station\\references\\aur-citadel-station-front-reference.png",
+        "exists": true
+      },
+      {
+        "path": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-citadel-station\\references\\aur-citadel-station-model-locked-front-reference.png",
+        "exists": true
+      }
+    ],
+    "required_parts": 8,
+    "audited_views": [
+      "front_three_quarter",
+      "rear_three_quarter",
+      "side_profile",
+      "top_or_underside"
+    ],
+    "objective_visual_score": 79.23,
+    "comparison_regions": 3,
+    "scene_subsystems": 0,
+    "real_time_design": {
+      "required": true,
+      "status": "PASS",
+      "audit": "C:\\workspace\\code\\experimental\\agent-universe-lite\\assets\\ships\\fleet-scale-v2\\aur-citadel-station\\qa\\aur-citadel-station_realtime_audit.json",
+      "budgets": {
+        "glb_bytes": 28000000,
+        "mesh_nodes": 900,
+        "estimated_draw_calls": 900,
+        "materials": 8,
+        "textures": 18,
+        "rendered_triangles": 700000,
+        "embedded_image_bytes": 4000000
+      },
+      "measured": {
+        "glb_bytes": 4645164,
+        "mesh_nodes": 289,
+        "estimated_draw_calls": 289,
+        "materials": 7,
+        "textures": 17,
+        "rendered_triangles": 102496,
+        "embedded_image_bytes": 15008
+      },
+      "checks": [
+        "detail_hierarchy",
+        "instancing_and_batching",
+        "multi_angle_readability",
+        "runtime_performance",
+        "squint_readability",
+        "texel_density_consistency",
+        "value_and_palette_separation"
+      ]
+    }
+  },
+  "glb": {
+    "objects": 294,
+    "mesh_objects": 289,
+    "triangles": 102496,
+    "materials": 7,
+    "bounds": {
+      "min_m": [
+        -2750.0,
+        -2750.0,
+        -1079.0
+      ],
+      "max_m": [
+        2750.0,
+        2750.0,
+        1130.47998
+      ],
+      "dimensions_mm": [
+        5500000.0,
+        5500000.0,
+        2209479.98
+      ]
+    },
+    "forbidden_meshes": [],
+    "cameras": [],
+    "lights": [],
+    "actions": 0,
+    "animated_objects": [],
+    "missing_required_objects": []
+  }
+}
