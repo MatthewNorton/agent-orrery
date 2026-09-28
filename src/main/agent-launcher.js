@@ -125,8 +125,13 @@ function resolveCodexExecutable({ platform, arch = process.arch, env, fsImpl = f
     );
     if (direct) return direct;
 
-    // Presence of npm's regular wrapper anchors the fixed package-relative lookup. Its
-    // contents are never read and the wrapper itself is never executed.
+    // Presence of npm's wrapper anchors the fixed package-relative lookup; its contents
+    // are never read. For npm's own layouts (a `codex` symlink on POSIX, `codex.cmd` on
+    // Windows) the wrapper itself is never executed: the direct lookup above resolves the
+    // symlink and rejects its JavaScript target, and `.cmd` is never a lookup target. A
+    // regular executable file named `codex` on a POSIX PATH (pnpm, volta or asdf shims)
+    // is different: the direct lookup above accepts it, so it IS spawned (with
+    // shell: false) and runs through its shebang.
     const wrapper = platform === 'win32'
       ? flavor.join(directory, 'codex.cmd') : flavor.join(directory, 'codex');
     if (!isNpmWrapper(wrapper, fsImpl, platform)) continue;
