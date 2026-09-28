@@ -3,6 +3,12 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
+const {
+  pathFlavor,
+  isCanonicalPath,
+  isCanonicalPathFor,
+  isInsidePath,
+} = require('./path-safety');
 
 const GOAL_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const FAILURE_CODES = new Set(['INVALID', 'UNAVAILABLE', 'FAILED']);
@@ -107,7 +113,7 @@ function resolveCodexExecutable({ platform, arch = process.arch, env, fsImpl = f
   const executableName = platform === 'win32' ? 'codex.exe' : 'codex';
 
   const directories = pathValue.split(flavor.delimiter)
-    .map((entry) => entry.trim())
+    .map((entry) => stripTrailingSeparator(entry.trim(), platform))
     .filter((entry) => entry.length > 0 && isCanonicalPathFor(entry, platform));
 
   if (!validFilesystem(fsImpl)) throw launchError('UNAVAILABLE');
@@ -119,8 +125,13 @@ function resolveCodexExecutable({ platform, arch = process.arch, env, fsImpl = f
     );
     if (direct) return direct;
 
-    // Presence of npm's regular wrapper anchors the fixed package-relative lookup. Its
-    // contents are never read and the wrapper itself is never executed.
+    // Presence of npm's wrapper anchors the fixed package-relative lookup; its contents
+    // are never read. For npm's own layouts (a `codex` symlink on POSIX, `codex.cmd` on
+    // Windows) the wrapper itself is never executed: the direct lookup above resolves the
+    // symlink and rejects its JavaScript target, and `.cmd` is never a lookup target. A
+    // regular executable file named `codex` on a POSIX PATH (pnpm, volta or asdf shims)
+    // is different: the direct lookup above accepts it, so it IS spawned (with
+    // shell: false) and runs through its shebang.
     const wrapper = platform === 'win32'
       ? flavor.join(directory, 'codex.cmd') : flavor.join(directory, 'codex');
     if (!isNpmWrapper(wrapper, fsImpl, platform)) continue;
@@ -318,47 +329,20 @@ function flavorForPlatform(platform) {
   return platform === 'win32' ? path.win32 : path.posix;
 }
 
-/** Decide the path syntax from the value itself: drive/UNC roots are Windows, `/` is POSIX. */
-function pathFlavor(value) {
-  if (typeof value !== 'string' || value.length === 0) return null;
-  if (/^[A-Za-z]:[\\/]/.test(value) || /^\\\\/.test(value)) return path.win32;
-  if (value.startsWith('/')) return path.posix;
-  return null;
-}
-
-function validPathString(value) {
-  return typeof value === 'string' && value.length > 0 && value.length <= 32_767 &&
-    !value.includes('\0');
-}
-
-function isCanonicalPath(value) {
-  const flavor = pathFlavor(value);
-  return Boolean(flavor) && validPathString(value) && flavor.isAbsolute(value) &&
-    flavor.normalize(value) === value;
-}
-
-function isCanonicalPathFor(value, platform) {
-  return isCanonicalPath(value) && pathFlavor(value) === flavorForPlatform(platform);
+// PATH entries are often written with a trailing separator (`C:\Users\x\AppData\Roaming\npm\`).
+// Drop exactly one before the canonical-path check; roots (`C:\`, `/`) are left untouched.
+function stripTrailingSeparator(entry, platform) {
+  const trailing = platform === 'win32' ? /[\\/]$/ : /\/$/;
+  const root = platform === 'win32' ? /^[A-Za-z]:[\\/]$/ : /^\/$/;
+  return trailing.test(entry) && !root.test(entry) ? entry.slice(0, -1) : entry;
 }
 
 function isCodexExecutablePath(value) {
   if (!isCanonicalPath(value)) return false;
-  const flavor = pathFlavor(value);
+  const flavor = path[pathFlavor(value)];
   const expected = flavor === path.win32 ? 'codex.exe' : 'codex';
   const basename = flavor.basename(value);
   return (flavor === path.win32 ? basename.toLowerCase() : basename) === expected;
-}
-
-function isInsidePath(root, candidate) {
-  const flavor = pathFlavor(root);
-  if (!isCanonicalPath(root) || !isCanonicalPath(candidate) || pathFlavor(candidate) !== flavor) {
-    return false;
-  }
-  // Fold case for every flavor: Windows and the default macOS volume format are
-  // case-insensitive, and folding on a case-sensitive host only fails closed.
-  const relative = flavor.relative(root.toLowerCase(), candidate.toLowerCase());
-  return relative === '' || (!flavor.isAbsolute(relative) && relative !== '..' &&
-    !relative.startsWith(`..${flavor.sep}`));
 }
 
 function failure(code) {

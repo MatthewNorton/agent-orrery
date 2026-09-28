@@ -3,7 +3,8 @@
 // Fails cleanly until the kit is built. `--full` additionally runs every archived
 // gate and the renderer gate three times. Exit 0 only when everything passes.
 //
-// Usage: node kit/todo/grade-structure.mjs [--stage A|0|B|C|D|all] [--full]
+// Usage: node kit/done/structural-cleanup/grade-structure.mjs [--stage A|0|B|C|D|all] [--full]
+// (run from kit/todo/grade-structure.mjs while the kit was executing)
 //
 // --stage names the last task of the contract that is expected to be complete.
 // Checks that belong to later tasks are reported as SKIP instead of FAIL, so every
@@ -123,7 +124,7 @@ else {
   if (failures === before) ok('T4', 'one path classifier in path-safety.js; launchers import it');
 }
 
-// ---- T5: scene dispose waits on the load observable (task D) ----
+// ---- T5: scene dispose is a documented, bounded isReady() poll (task D; §2.6 reversed) ----
 if (!reached('D')) skip('T5', 'D');
 else {
   const before = failures;
@@ -132,11 +133,12 @@ else {
   if (!disposeMatch) fail('T5', 'disposeSettled not found in the app layer');
   else {
     const body = disposeMatch[0];
-    if (!/onLoadObservable/.test(body)) fail('T5', 'disposeSettled does not use onLoadObservable');
-    if (/setTimeout\(tick,\s*50\)/.test(body) || /waited\s*\+=\s*50/.test(body)) fail('T5', 'disposeSettled still polls every 50 ms');
-    if (!/4000/.test(body)) fail('T5', 'disposeSettled lacks the 4 s fallback');
+    if (!/isReady/.test(body)) fail('T5', 'disposeSettled does not poll isReady()');
+    if (!/4000/.test(body)) fail('T5', 'disposeSettled lacks the 4 s bound');
+    if (!/Kit 13/.test(body)) fail('T5', 'disposeSettled lacks the Kit 13 design comment');
+    if (/onLoadObservable\.addOnce/.test(body)) fail('T5', 'disposeSettled uses onLoadObservable.addOnce (fires before the BRDF decode)');
   }
-  if (failures === before) ok('T5', 'disposeSettled is observable-driven with a single 4 s fallback');
+  if (failures === before) ok('T5', 'disposeSettled is a documented, bounded isReady() poll');
 }
 
 // ---- T6: pins current (task A; always checked because A is the first task) ----
@@ -162,6 +164,15 @@ if (FULL) {
     fs.readdirSync(path.join(doneDir, d)).filter((f) => /^grade-.*\.mjs$/.test(f)).map((f) => path.join('kit', 'done', d, f)));
   for (const g of gates) {
     if (g.endsWith('grade-structure.mjs')) continue; // never recurse into ourselves
+    if (g.includes('packaging')) {
+      // The packaging gate's W0 check fails on any `git status` change, so it can only run
+      // on a clean tree; every task re-runs this gate immediately after its commit.
+      const st = spawnSync('git', ['status', '--porcelain'], { cwd: ROOT, encoding: 'utf8' });
+      if ((st.stdout || '').trim()) {
+        console.log(`FULL SKIP  ${g} needs a clean tree; re-run this gate right after committing`);
+        continue;
+      }
+    }
     const r = spawnSync(process.execPath, [path.join(ROOT, g)], { cwd: ROOT, encoding: 'utf8', timeout: 900_000 });
     if (r.status !== 0) fail('FULL', `${g} failed:\n${(r.stdout + r.stderr).split(/\r?\n/).filter((l) => /FAIL|Error/.test(l)).slice(0, 3).join('\n')}`);
     else ok('FULL', `${g} green`);

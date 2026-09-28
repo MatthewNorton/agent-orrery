@@ -21,7 +21,7 @@ with every gate green after every commit:
 | 0 | **Kill switch**: extract ONE module (agent focus) from `app.js` using the module mechanism in §2 | ~1 h |
 | B | Extract the remaining modules until every renderer file is ≤ 600 lines | ~3–4 h |
 | C | One shared path classifier `src/main/path-safety.js`; launchers use it | ~1.5 h |
-| D | Scene dispose waits on the BRDF texture's load observable, not a 50 ms poll | ~30 min |
+| D | Document why scene dispose polls isReady() (original design withdrawn, see §2.6) | ~15 min |
 | E | Truthful comment on POSIX `codex` shims in `agent-launcher.js` (no behaviour change) | ~10 min |
 | F | Gate maintenance, docs, archive the kit | ~30 min |
 
@@ -160,13 +160,7 @@ the UNC and `//host/share` rejections and a Windows-vs-POSIX `isInsidePath` mism
 
 ### 2.6 Scene dispose (task D)
 
-In `disposeSettled(view)` (currently `app.js` ≈ line 631): keep the synchronous path
-exactly as is (`settled()` true → `view.dispose()` immediately). For the pending case,
-replace the 50 ms `setTimeout` chain with: `detachControl()` as today, then
-`pending.onLoadObservable.addOnce(finish)` **and** one fallback `setTimeout(finish, 4000)`;
-`finish` is idempotent (a `done` flag) and clears the fallback timer. If
-`pending.onLoadObservable` is missing, fall back to the timer alone. Net effect: disposal
-happens the moment the BRDF decode completes, never later than 4 s, never twice.
+**Decision reversed 2026-09-28 during execution.** Babylon 9.28 has no observable for BRDF decode completion: `onLoadObservable` fires when the RGBD image loads, before `RGBDTextureTools.ExpandRGBDTexture` runs its asynchronous decode, and a late `addOnce` never fires (runtime probe in `EXECUTOR-REPORT.md`). Implementing the original design would have reintroduced the dispose-during-decode crash. The existing bounded `isReady()` poll is therefore correct and stays; task D only documents why. Gate T5 checks the documented design.
 
 ### 2.7 Launcher comment (task E)
 
@@ -190,25 +184,33 @@ The gate checks the finished kit by default. Every intermediate commit runs it w
 | `D` | the scene-dispose commit and the task E comment commit | T5 |
 | `all` (default) | task F and the archived gate forever after | everything |
 
+The packaging gate inspects `git status`, so `--full` reports it as SKIP while the tree is
+dirty. Therefore every task is gated twice: once before the commit (packaging skipped) and
+once immediately after the commit with the same flags (everything runs). The post-commit
+run must be fully green before the next task starts; if it is red, fix and amend the commit.
+
 Line counts use `wc -l` semantics (newline characters). `scene-universe.js` is 971 and
 `scene-system.js` is 618 on `main`; those are their caps.
 
 ## 3. Order of work and the kill switch
 
-1. **Task A** (`kit/repin.mjs` + test). Gate: `--stage A --full`. Commit
-   `feat(kit): add repin helper`.
+1. **Task A** (`kit/repin.mjs` + test). Gate `--stage A --full` before and again right after
+   the commit. Commit `feat(kit): add repin helper`.
 2. **Task 0 — kill switch.** Create `app-state.js` and `app-agent-focus.js` only; wire
    them in `index.html`; `node kit/repin.mjs --note "kit 13 task 0: app-state/app-agent-focus split"`;
-   apply §2.3 to the three gates; run `node kit/todo/grade-structure.mjs --stage 0 --full`.
+   apply §2.3 to the three gates; gate `node kit/todo/grade-structure.mjs --stage 0 --full`
+   before and again right after the commit.
    **If the renderer gate or any archived gate fails for a reason attributable to the
    module mechanism, STOP. Revert to `main`, write `kit/BLOCKED.md` with the failure,
    and report. Do not try a different mechanism.** Otherwise commit
    `refactor(renderer): extract app-state and app-agent-focus`.
-3. **Task B**, one module per commit in the §2.2 order. Gate `--stage 0 --full` before
-   each commit while `app.js` is still above 600 lines; `--stage B --full` for the commit
-   that brings it under.
-4. **Task C** (gate `--stage C --full`), **Task D** (`--stage D --full`), **Task E**
-   (`--stage D --full`; it changes no code), one commit each.
+3. **Task B**, one module per commit in the §2.2 order. Gate `--stage 0 --full` before and
+   again right after each commit while `app.js` is still above 600 lines; gate
+   `--stage B --full` before and again right after the commit that brings it under.
+4. **Task C** (gate `--stage C --full` before and again right after the commit), **Task D**
+   (gate `--stage D --full` before and again right after the commit), **Task E** (gate
+   `--stage D --full` before and again right after the commit; it changes no code), one
+   commit each.
 5. **Task F**: update `CLAUDE.md` renderer-size bullet to `Renderer files stay under
    ~600 lines (scene-universe.js and scene-system.js are frozen at their current size).`
    and describe the `AUR.app` module rule in one sentence under Architecture → Renderer;
@@ -217,8 +219,9 @@ Line counts use `wc -l` semantics (newline characters). `scene-universe.js` is 9
    `kit/done/structural-cleanup/grade-structure.mjs` (fix its relative paths); add the
    status-board rows in `kit/README.md` and `kit/todo/README.md`; write
    `kit/done/structural-cleanup/EXECUTOR-REPORT.md` (what moved where, line counts before
-   and after, every gate's final output). Gate: `node kit/done/structural-cleanup/grade-structure.mjs --full`
-   with no `--stage` (everything checked). Commit `chore(kit): archive kit 13`.
+   and after, every gate's final output). Gate `node kit/done/structural-cleanup/grade-structure.mjs --full`
+   with no `--stage` (everything checked) before and again right after the commit. Commit
+   `chore(kit): archive kit 13`.
 6. Push the branch and open a PR to `main` with the executor report as the body. Do not merge.
 
 ## 4. Rubric (what "done" means)
@@ -277,11 +280,13 @@ on a new branch kit/13-structural-cleanup created from main. Rules that are not 
 2. Task 0 is a kill switch. If node kit/todo/grade-structure.mjs --stage 0 --full is not
    fully green after task 0 for a reason attributable to the module mechanism, revert to
    main, write kit/BLOCKED.md, and stop.
-3. One commit per task (task B is one commit per extracted module). Before every commit run
-   node kit/todo/grade-structure.mjs --stage <task> --full, where <task> is the stage the
-   contract's section 2.8 assigns to that commit (A, 0, B, C or D; task F runs it with no
-   --stage), and paste its summary lines into the commit body. Checks reported as SKIP are
-   expected; any FAIL means do not commit.
+3. One commit per task (task B is one commit per extracted module). Before every commit, and
+   again immediately after it, run node kit/todo/grade-structure.mjs --stage <task> --full,
+   where <task> is the stage the contract's section 2.8 assigns to that commit (A, 0, B, C or
+   D; task F runs it with no --stage), and paste its summary lines into the commit body.
+   Checks reported as SKIP are expected; any FAIL means do not commit. The pre-commit run may
+   report the packaging gate as SKIP; the post-commit run must have no SKIP from it and no
+   FAIL.
 4. Frozen files never change. The only pinned file you may edit is src/renderer/index.html,
    script tags only. Before every commit run
    git diff --stat main -- src/main/main.js src/main/tracker.js src/main/replay-source.js src/main/provider-adapters.js src/preload.js package.json package-lock.json src/renderer/util.js src/renderer/scene-universe.js src/renderer/scene-system.js src/renderer/scene-planet.js src/renderer/galaxy-layout.js src/renderer/polish-math.js

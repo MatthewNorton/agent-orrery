@@ -80,11 +80,19 @@ if (!fs.existsSync(launcherPath)) {
 // All hashes re-pinned 2026-09-27 as LF-normalized digests (docs/PUBLIC-RELEASE-TASKS.md
 // item 5.6); file contents are unchanged from the previous pins.
 // package.json and package-lock.json re-pinned 2026-09-27 after Dependabot #27 (Babylon 9.28) and #30 (Electron 44).
+// 2026-09-28 re-pinned: src/renderer/index.html — kit 13 task 0: app-state/app-agent-focus split
+// 2026-09-28 re-pinned: src/renderer/index.html — kit 13 task B: app-playback split
+// 2026-09-28 re-pinned: src/renderer/index.html — kit 13 task B: app-chrome split
+// 2026-09-28 re-pinned: src/renderer/index.html — kit 13 task B: app-project-search split
+// 2026-09-28 re-pinned: src/renderer/index.html — kit 13 task B: app-project-settings split
+// 2026-09-28 re-pinned: src/renderer/index.html — kit 13 task B: app-project-control split
+// 2026-09-28 re-pinned: src/renderer/index.html — kit 13 task B: app-ideas split
+// 2026-09-28 re-pinned: src/renderer/index.html — kit 13 task B: app-project-tasks split
 const frozen = new Map([
   ['src/main/tracker.js', '600c950483280eb66dd2726849ef4643dd5b894d5cec175eddf75035449bf5fb'],
   ['src/main/provider-adapters.js', 'e6930f483b6e52335b47ddccb34968d6a0e3d211aafe04cbaaa2e0aa31e5a037'],
   ['src/main/replay-source.js', 'd3f16564970e7500ac54a135936a75eb3b10ba03a466fa78ba3c75b38f493f36'],
-  ['src/renderer/index.html', '7b5e884f6d9010c2ee71c738593f51e0344f0fa180afd350394f69e325075431'],
+  ['src/renderer/index.html', '5f871aab64e18bfbd9e827a201d149495d3f82c69daa6deae8ee1ffd6e234ca8'],
   ['src/renderer/util.js', 'c8f49b054033d95be89846359a8bf065a07a26e37284775f3970afc49cf3bf2c'],
   ['src/renderer/scene-universe.js', '61ff27fa53ea8ca6d3d944c29ece4f9f82aa46fea53321df0e01d1e82b1a5b3a'],
   ['src/renderer/scene-system.js', '1819bfc26082fd06f4035a98197821808d35c8826d29fb962764d65ed4a8968b'],
@@ -103,7 +111,10 @@ for (const [rel, expected] of frozen) {
 const launcherSource = read(launcherRel);
 const mainSource = read('src/main/main.js');
 const preloadSource = read('src/preload.js');
-const appSource = read('src/renderer/app.js');
+// 2026-09-27 kit 13: app.js split into app-*.js modules; grep the whole app layer.
+const appSource = fs.readdirSync(path.join(root, 'src', 'renderer'))
+  .filter((f) => /^app.*\.js$/.test(f)).sort()
+  .map((f) => read(`src/renderer/${f}`)).join('\n');
 const styleSource = read('src/renderer/style.css');
 const docsSource = read('docs/AGENT-CONTROL.md');
 

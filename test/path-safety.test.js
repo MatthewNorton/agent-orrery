@@ -156,3 +156,98 @@ test('getPlanet ignores inherited property names and returns a cloneable result'
     assert.equal(tracker.getPlanet('p1', 'src').builds, 3);
   });
 });
+
+// ---------- shared classifier: src/main/path-safety.js (kit 13, task C) ----------
+const pathSafety = require('../src/main/path-safety');
+
+test('path-safety exports the shared classifier and re-exports the project-path helpers', () => {
+  for (const name of [
+    'pathFlavor', 'validPathString', 'isCanonicalPath', 'isCanonicalPathFor',
+    'isAbsolutePosixPath', 'isInsidePath', 'isLocalProjectPath', 'canonicalProjectPath',
+  ]) {
+    assert.equal(typeof pathSafety[name], 'function', name);
+  }
+  assert.equal(pathSafety.isLocalProjectPath, isLocalProjectPath);
+  assert.equal(pathSafety.canonicalProjectPath, canonicalProjectPath);
+});
+
+test('pathFlavor names drive-rooted and POSIX paths and rejects UNC and //host/share', () => {
+  const { pathFlavor } = pathSafety;
+  assert.equal(pathFlavor('C:\\Work\\proj'), 'win32');
+  assert.equal(pathFlavor('c:/work/proj'), 'win32');
+  assert.equal(pathFlavor('/Users/coder/proj'), 'posix');
+  assert.equal(pathFlavor('\\\\host\\share\\x'), null); // UNC
+  assert.equal(pathFlavor('//host/share/x'), null); // POSIX-style UNC
+  for (const bad of ['C:relative', 'relative/path', '', null, undefined, 42, {}]) {
+    assert.equal(pathFlavor(bad), null, String(bad));
+  }
+});
+
+test('validPathString bounds length and rejects NUL and control characters', () => {
+  const { validPathString } = pathSafety;
+  assert.equal(validPathString('C:\\Work'), true);
+  assert.equal(validPathString('/' + 'a'.repeat(4095)), true);
+  assert.equal(validPathString('/' + 'a'.repeat(4096)), false);
+  for (const bad of ['', 'C:\\Work\0', 'C:\\Work\nnext', '/tmp/\tx', '/tmp/\u001bx', '/tmp/\u007fx', null, 7]) {
+    assert.equal(validPathString(bad), false, JSON.stringify(bad));
+  }
+});
+
+test('isCanonicalPath accepts only normalized absolute local paths', () => {
+  const { isCanonicalPath } = pathSafety;
+  for (const ok of ['C:\\Work\\proj', 'C:\\', '/Users/coder/proj']) {
+    assert.equal(isCanonicalPath(ok), true, ok);
+  }
+  for (const bad of [
+    'C:\\Work\\proj\\', // trailing separator
+    '/Users/coder/proj/', // trailing separator
+    'c:/work/proj', // not in win32 normalized form
+    'C:\\Work\\.\\proj', // `.` segment
+    'C:\\Work\\..\\proj', // `..` segment
+    '/Users/coder/../proj',
+    '/Users//coder',
+    '\\\\host\\share\\x', // UNC
+    '//host/share/x',
+    'relative/path',
+    'C:\\Work\0',
+  ]) {
+    assert.equal(isCanonicalPath(bad), false, bad);
+  }
+});
+
+test('isCanonicalPathFor requires the flavor of the platform', () => {
+  const { isCanonicalPathFor } = pathSafety;
+  assert.equal(isCanonicalPathFor('C:\\Work', 'win32'), true);
+  assert.equal(isCanonicalPathFor('C:\\Work', 'darwin'), false);
+  assert.equal(isCanonicalPathFor('/Users/coder', 'darwin'), true);
+  assert.equal(isCanonicalPathFor('/Users/coder', 'linux'), true);
+  assert.equal(isCanonicalPathFor('/Users/coder', 'win32'), false);
+  assert.equal(isCanonicalPathFor('C:\\Work\\', 'win32'), false);
+});
+
+test('isAbsolutePosixPath accepts normalized POSIX paths only', () => {
+  const { isAbsolutePosixPath } = pathSafety;
+  assert.equal(isAbsolutePosixPath('/Users/coder/proj'), true);
+  assert.equal(isAbsolutePosixPath('/'), true);
+  for (const bad of ['//host/share', 'C:\\Work', 'relative', '/Users/coder/../x', '/tmp/\0x', '']) {
+    assert.equal(isAbsolutePosixPath(bad), false, bad);
+  }
+});
+
+test('isInsidePath requires canonical paths of one flavor and a non-escaping relative', () => {
+  const { isInsidePath } = pathSafety;
+  assert.equal(isInsidePath('C:\\Work\\proj', 'C:\\Work\\proj'), true);
+  assert.equal(isInsidePath('C:\\Work\\proj', 'C:\\Work\\proj\\bin\\codex.exe'), true);
+  assert.equal(isInsidePath('C:\\Work\\proj', 'C:\\work\\PROJ\\bin'), true); // case folded
+  assert.equal(isInsidePath('C:\\Work\\proj', 'C:\\Work\\project'), false);
+  assert.equal(isInsidePath('C:\\Work\\proj', 'C:\\Work'), false);
+  assert.equal(isInsidePath('C:\\Work\\proj', 'D:\\Work\\proj'), false);
+  assert.equal(isInsidePath('/Users/coder/proj', '/Users/coder/proj/src'), true);
+  assert.equal(isInsidePath('/Users/coder/proj', '/Users/coder/other'), false);
+  // Windows-vs-POSIX mismatch never counts as inside, in either direction.
+  assert.equal(isInsidePath('C:\\Work\\proj', '/Work/proj/bin'), false);
+  assert.equal(isInsidePath('/Work/proj', 'C:\\Work\\proj\\bin'), false);
+  // Non-canonical inputs fail closed.
+  assert.equal(isInsidePath('C:\\Work\\proj\\', 'C:\\Work\\proj\\bin'), false);
+  assert.equal(isInsidePath('\\\\host\\share', '\\\\host\\share\\x'), false);
+});

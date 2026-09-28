@@ -111,6 +111,35 @@ test('resolver finds the current npm x64 native package without executing its cm
   }), native);
 });
 
+test('resolver treats a PATH entry with a trailing separator like the same entry without', () => {
+  const npm = 'C:\\Users\\coder\\AppData\\Roaming\\npm';
+  const wrapper = `${npm}\\codex.cmd`;
+  const native = `${npm}\\node_modules\\@openai\\codex\\node_modules\\@openai\\` +
+    'codex-win32-x64\\vendor\\x86_64-pc-windows-msvc\\bin\\codex.exe';
+  const fsImpl = fakeFs({ [wrapper]: {}, [native]: {}, [CODEX]: {} });
+  const resolve = (PATH) => resolveCodexExecutable({
+    platform: 'win32', arch: 'x64', env: { PATH }, fsImpl, cwd: PROJECT,
+  });
+  assert.equal(resolve(npm), native);
+  assert.equal(resolve(`${npm}\\`), native);
+  assert.equal(resolve(`${npm}/`), native);
+  assert.equal(resolve('C:\\Program Files\\Codex\\'), CODEX);
+  assert.equal(resolve('C:\\Program Files\\Codex'), CODEX);
+  // Only one separator is dropped; a doubled one stays non-canonical and is skipped.
+  assert.throws(() => resolve(`${npm}\\\\`), { code: 'UNAVAILABLE' });
+});
+
+test('resolver treats a POSIX PATH entry with a trailing slash like the same entry without', () => {
+  const cwd = '/Users/coder/project';
+  const codex = '/opt/codex/bin/codex';
+  const fsImpl = fakeFs({ [codex]: {} });
+  const resolve = (PATH) => resolveCodexExecutable({
+    platform: 'darwin', arch: 'arm64', env: { PATH }, fsImpl, cwd,
+  });
+  assert.equal(resolve('/opt/codex/bin'), codex);
+  assert.equal(resolve('/opt/codex/bin/'), codex);
+});
+
 test('resolver supports the legacy bundled-vendor arm64 layout', () => {
   const npm = 'C:\\Users\\coder\\AppData\\Roaming\\npm';
   const wrapper = `${npm}\\codex.cmd`;
