@@ -2,8 +2,10 @@
 
 Distilled 2026-09-27. Executor: **Codex** (`codex` CLI in this checkout). Fallback:
 **none — stop and report**; no other model may substitute without the owner saying so.
-Gate: `node kit/todo/grade-structure.mjs` (FAILS cleanly until built; `--full` also
-runs every archived gate and the renderer gate three times). On completion the
+Gate: `node kit/todo/grade-structure.mjs --stage <task> [--full]` (FAILS cleanly until
+built; `--stage` skips checks that belong to later tasks so every incremental commit can
+be gated, see §2.8; `--full` also runs every archived gate and the renderer gate three
+times). On completion the
 executor moves this file and the gate to `kit/done/structural-cleanup/` with an
 `EXECUTOR-REPORT.md`, exactly like the other archived kits.
 
@@ -173,18 +175,40 @@ True for npm's symlink/`codex.cmd` case, false for a regular executable named `c
 on PATH (pnpm, volta, asdf shims): that file **is** spawned with `shell: false` and runs
 through its shebang. Rewrite the comment to say exactly that. No code change.
 
+### 2.8 Gate stages (which checks apply to which commit)
+
+The gate checks the finished kit by default. Every intermediate commit runs it with
+`--stage <task>` so checks that belong to later tasks are reported as `SKIP`, not
+`FAIL`. Checks T6 (`repin --check`), T7 (`npm test`) and `--full` apply at every stage.
+
+| `--stage` | Use it for | Adds checks |
+|---|---|---|
+| `A` | the `kit/repin.mjs` commit | T6, T7 |
+| `0` | the kill-switch commit and every task B commit that leaves `app.js` above 600 lines | T1 (modules and frozen files only), T2, T3 |
+| `B` | the task B commit that brings `app.js` under 600 lines | T1 including `app.js` |
+| `C` | the path-classifier commit | T4 |
+| `D` | the scene-dispose commit and the task E comment commit | T5 |
+| `all` (default) | task F and the archived gate forever after | everything |
+
+Line counts use `wc -l` semantics (newline characters). `scene-universe.js` is 971 and
+`scene-system.js` is 618 on `main`; those are their caps.
+
 ## 3. Order of work and the kill switch
 
-1. **Task A** (`kit/repin.mjs` + test). Commit `feat(kit): add repin helper`.
+1. **Task A** (`kit/repin.mjs` + test). Gate: `--stage A --full`. Commit
+   `feat(kit): add repin helper`.
 2. **Task 0 — kill switch.** Create `app-state.js` and `app-agent-focus.js` only; wire
    them in `index.html`; `node kit/repin.mjs --note "kit 13 task 0: app-state/app-agent-focus split"`;
-   apply §2.3 to the three gates; run `node kit/todo/grade-structure.mjs --full`.
+   apply §2.3 to the three gates; run `node kit/todo/grade-structure.mjs --stage 0 --full`.
    **If the renderer gate or any archived gate fails for a reason attributable to the
    module mechanism, STOP. Revert to `main`, write `kit/BLOCKED.md` with the failure,
    and report. Do not try a different mechanism.** Otherwise commit
    `refactor(renderer): extract app-state and app-agent-focus`.
-3. **Task B**, one module per commit in the §2.2 order, `--full` green before each commit.
-4. **Task C**, **Task D**, **Task E**, one commit each, `--full` green before each.
+3. **Task B**, one module per commit in the §2.2 order. Gate `--stage 0 --full` before
+   each commit while `app.js` is still above 600 lines; `--stage B --full` for the commit
+   that brings it under.
+4. **Task C** (gate `--stage C --full`), **Task D** (`--stage D --full`), **Task E**
+   (`--stage D --full`; it changes no code), one commit each.
 5. **Task F**: update `CLAUDE.md` renderer-size bullet to `Renderer files stay under
    ~600 lines (scene-universe.js and scene-system.js are frozen at their current size).`
    and describe the `AUR.app` module rule in one sentence under Architecture → Renderer;
@@ -193,7 +217,8 @@ through its shebang. Rewrite the comment to say exactly that. No code change.
    `kit/done/structural-cleanup/grade-structure.mjs` (fix its relative paths); add the
    status-board rows in `kit/README.md` and `kit/todo/README.md`; write
    `kit/done/structural-cleanup/EXECUTOR-REPORT.md` (what moved where, line counts before
-   and after, every gate's final output). Commit `chore(kit): archive kit 13`.
+   and after, every gate's final output). Gate: `node kit/done/structural-cleanup/grade-structure.mjs --full`
+   with no `--stage` (everything checked). Commit `chore(kit): archive kit 13`.
 6. Push the branch and open a PR to `main` with the executor report as the body. Do not merge.
 
 ## 4. Rubric (what "done" means)
@@ -249,12 +274,14 @@ on a new branch kit/13-structural-cleanup created from main. Rules that are not 
    mechanism, the file map, the classifier semantics or the dispose approach. If a decision
    cannot be implemented as written, stop, write kit/BLOCKED.md explaining exactly why, and
    report; do not improvise an alternative.
-2. Task 0 is a kill switch. If node kit/todo/grade-structure.mjs --full is not fully green
-   after task 0 for a reason attributable to the module mechanism, revert to main, write
-   kit/BLOCKED.md, and stop.
+2. Task 0 is a kill switch. If node kit/todo/grade-structure.mjs --stage 0 --full is not
+   fully green after task 0 for a reason attributable to the module mechanism, revert to
+   main, write kit/BLOCKED.md, and stop.
 3. One commit per task (task B is one commit per extracted module). Before every commit run
-   node kit/todo/grade-structure.mjs --full and paste its summary lines into the commit body.
-   Never commit with a red gate.
+   node kit/todo/grade-structure.mjs --stage <task> --full, where <task> is the stage the
+   contract's section 2.8 assigns to that commit (A, 0, B, C or D; task F runs it with no
+   --stage), and paste its summary lines into the commit body. Checks reported as SKIP are
+   expected; any FAIL means do not commit.
 4. Frozen files never change. The only pinned file you may edit is src/renderer/index.html,
    script tags only. Before every commit run
    git diff --stat main -- src/main/main.js src/main/tracker.js src/main/replay-source.js src/main/provider-adapters.js src/preload.js package.json package-lock.json src/renderer/util.js src/renderer/scene-universe.js src/renderer/scene-system.js src/renderer/scene-planet.js src/renderer/galaxy-layout.js src/renderer/polish-math.js
