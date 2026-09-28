@@ -162,6 +162,15 @@ if (FULL) {
     fs.readdirSync(path.join(doneDir, d)).filter((f) => /^grade-.*\.mjs$/.test(f)).map((f) => path.join('kit', 'done', d, f)));
   for (const g of gates) {
     if (g.endsWith('grade-structure.mjs')) continue; // never recurse into ourselves
+    if (g.includes('packaging')) {
+      // The packaging gate's W0 check fails on any `git status` change, so it can only run
+      // on a clean tree; every task re-runs this gate immediately after its commit.
+      const st = spawnSync('git', ['status', '--porcelain'], { cwd: ROOT, encoding: 'utf8' });
+      if ((st.stdout || '').trim()) {
+        console.log(`FULL SKIP  ${g} needs a clean tree; re-run this gate right after committing`);
+        continue;
+      }
+    }
     const r = spawnSync(process.execPath, [path.join(ROOT, g)], { cwd: ROOT, encoding: 'utf8', timeout: 900_000 });
     if (r.status !== 0) fail('FULL', `${g} failed:\n${(r.stdout + r.stderr).split(/\r?\n/).filter((l) => /FAIL|Error/.test(l)).slice(0, 3).join('\n')}`);
     else ok('FULL', `${g} green`);
