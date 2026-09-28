@@ -10,9 +10,14 @@ const renderer = (name) => fs.readFileSync(
   'utf8'
 );
 
+// 2026-09-27 kit 13: app.js split into app-*.js modules; grep the whole app layer.
+const appLayer = () => fs.readdirSync(path.join(__dirname, '..', 'src', 'renderer'))
+  .filter((f) => /^app.*\.js$/.test(f)).sort()
+  .map((f) => renderer(f)).join('\n');
+
 test('first-person environments render a live orbital hologram', () => {
   const html = renderer('index.html');
-  const app = renderer('app.js');
+  const app = appLayer();
   const css = renderer('style.css');
 
   assert.match(html, /id="agent-focus-hologram-system"/);
@@ -33,12 +38,12 @@ test('focused ships expose a normalized position for the navigation map', () => 
 });
 
 test('POV environment registry keeps each generated foreground distinct', () => {
-  const app = renderer('app.js');
+  const app = appLayer();
 
   assert.match(app, /environment-quarters\.png/);
   assert.match(app, /environment-office\.png/);
   assert.match(app, /environment-station\.png/);
-  assert.match(app, /Object\.hasOwn\(AGENT_FOCUS_ENVIRONMENTS,/);
+  assert.match(app, /Object\.hasOwn\(C\.AGENT_FOCUS_ENVIRONMENTS,/);
 });
 
 test('POV foreground covers the viewport without distorting its native aspect ratio', () => {
@@ -54,7 +59,7 @@ test('POV foreground covers the viewport without distorting its native aspect ra
 
 test('first-person mode offers persistent ship-relative camera headings', () => {
   const html = renderer('index.html');
-  const app = renderer('app.js');
+  const app = appLayer();
   const system = renderer('scene-system.js');
 
   for (const vantage of ['forward', 'starboard', 'aft', 'port']) {
