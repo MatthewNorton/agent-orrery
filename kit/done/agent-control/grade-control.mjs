@@ -86,11 +86,12 @@ if (!fs.existsSync(launcherPath)) {
 // 2026-09-28 re-pinned: src/renderer/index.html — kit 13 task B: app-project-search split
 // 2026-09-28 re-pinned: src/renderer/index.html — kit 13 task B: app-project-settings split
 // 2026-09-28 re-pinned: src/renderer/index.html — kit 13 task B: app-project-control split
+// 2026-09-28 re-pinned: src/renderer/index.html — kit 13 task B: app-ideas split
 const frozen = new Map([
   ['src/main/tracker.js', '600c950483280eb66dd2726849ef4643dd5b894d5cec175eddf75035449bf5fb'],
   ['src/main/provider-adapters.js', 'e6930f483b6e52335b47ddccb34968d6a0e3d211aafe04cbaaa2e0aa31e5a037'],
   ['src/main/replay-source.js', 'd3f16564970e7500ac54a135936a75eb3b10ba03a466fa78ba3c75b38f493f36'],
-  ['src/renderer/index.html', 'f33a63c8d1df81a59aac2df42e9ddb1bd7f11b58ccbe04979259d2b28d72efad'],
+  ['src/renderer/index.html', 'e8082cd03683377e72f4a9a031459723a5dead6bd4514fedb4566f362aa47fe0'],
   ['src/renderer/util.js', 'c8f49b054033d95be89846359a8bf065a07a26e37284775f3970afc49cf3bf2c'],
   ['src/renderer/scene-universe.js', '61ff27fa53ea8ca6d3d944c29ece4f9f82aa46fea53321df0e01d1e82b1a5b3a'],
   ['src/renderer/scene-system.js', '1819bfc26082fd06f4035a98197821808d35c8826d29fb962764d65ed4a8968b'],
