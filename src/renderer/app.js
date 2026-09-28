@@ -5,182 +5,37 @@
   const AUR = window.AUR;
   const AU = window.AU;
   const VCS = AUR.ProjectVcsStatus;
-
-  // ---------- store ----------
-  const store = {
-    projects: new Map(), // id -> Project
-    ships: new Map(),    // id -> Ship
-    feed: [],            // chronological FeedEntry[], capped
-  };
-  const FEED_CAP = 60;
-  const FEED_SHOW = 30;
-  const NOTIFICATION_SHIP_THROTTLE_MS = 30_000;
-  const NOTIFICATION_GLOBAL_THROTTLE_MS = 10_000;
-  const REPLAY_SPEEDS = [1, 10, 100, 1000];
-  const HISTORY_SLIDER_MAX = 10_000;
-  const HISTORY_MARKER_LIMIT = 24;
-  const SEARCH_DEBOUNCE_MS = 120;
-  const COMMAND_RAIL_STORAGE_KEY = 'agent-universe.command-rail.v1';
-  const AGENT_FOCUS_ENVIRONMENT_STORAGE_KEY = 'agent-universe.focus-environment.v1';
-  const AGENT_FOCUS_VANTAGE_STORAGE_KEY = 'agent-universe.focus-vantage.v1';
-  const AGENT_FOCUS_ENVIRONMENTS = Object.freeze({
-    cockpit: { label: 'COCKPIT LINK', asset: 'assets/cockpit-frame.png' },
-    quarters: { label: 'LIVING QUARTERS', asset: 'assets/environment-quarters.png' },
-    office: { label: 'ORBITAL OFFICE', asset: 'assets/environment-office.png' },
-    station: { label: 'STATION OBSERVATORY', asset: 'assets/environment-station.png' },
-  });
-  const AGENT_FOCUS_VANTAGES = Object.freeze({
-    forward: 'FORWARD',
-    starboard: 'STARBOARD',
-    aft: 'AFT',
-    port: 'PORT',
-  });
-
-  const notificationByShip = new Map();
-  const liveProjectEvents = new Map();
-  let lastNotificationAt = -Infinity;
-
-  // ---------- runtime ----------
-  let engine = null;
-  let canvas = null;
-  let activeView = null;   // { scene, update, dispose }
-  let activeScene = null;
-  const current = { view: 'universe', projectId: null, planetName: null };
-  let routeRequestGeneration = 0;
-  let booting = true;
-  let bootEventQueue = [];
-  let bootVcsQueue = [];
-  let lastEventSequence = -Infinity;
-  let streamEpoch = null;
-  const retiredEpochs = new Set();
-  let deferredEpochBatches = [];
-  let transitionEventQueue = [];
-  let replayTransitionPending = false;
-  let replayRequest = 0;
-  let replayBusy = false;
-  let historyPreviewTs = null;
-  let historyPreviewFrame = null;
-  let historyPendingPreviewTs = null;
-  let historyMarkerKey = '';
-  const historyPerf = {
-    inputEvents: 0,
-    previewFrames: 0,
-    seekRequests: 0,
-    maxInputHandlerMs: 0,
-  };
-  let historyEls = null;
-  let terminalRequestSerial = 0;
-  let projectControl = {
-    projectId: null,
-    requestId: 0,
-    phase: 'idle',
-    code: null,
-  };
-  const taskPanel = {
-    owner: 0,
-    request: 0,
-    projectId: null,
-    items: [],
-    trusted: false,
-    saving: false,
-    refreshAfterSave: false,
-    status: '',
-    error: false,
-    focusAfterRender: null,
-    interval: null,
-    els: null,
-  };
-  const ideaPanel = {
-    request: 0,
-    items: [],
-    busy: false,
-    refreshAfterBusy: false,
-    selections: new Map(),
-    status: '',
-    error: false,
-    interval: null,
-    visibleLimit: 100,
-    renderKey: '',
-    focusAfterRender: null,
-    els: null,
-  };
-  const projectSearch = {
-    timer: null,
-    query: '',
-    filter: VCS.FILTERS.ALL,
-    results: [],
-    selected: 0,
-    els: null,
-  };
-  const projectDirectory = {
-    open: false,
-    timer: null,
-    query: '',
-    results: [],
-    selected: 0,
-    els: null,
-  };
-  const commandRail = {
-    compact: false,
-    ideasCollapsed: false,
-    agentsCollapsed: false,
-    feedCollapsed: false,
-    els: null,
-  };
-  const agentFocus = {
-    shipId: null,
-    pendingShipId: null,
-    previousFocus: null,
-    lastFlightUpdate: 0,
-    environment: 'cockpit',
-    vantage: 'forward',
-    els: null,
-  };
-  const projectSettings = {
-    open: false,
-    owner: 0,
-    request: 0,
-    busy: false,
-    scanPerformed: false,
-    scanRoot: '',
-    matches: new Map(),
-    status: '',
-    error: false,
-    els: null,
-  };
-  let playback = {
-    mode: 'live', available: false, indexing: true,
-    minTs: null, maxTs: null, cursorTs: null,
-    playing: false, speed: 1, truncated: false,
-  };
+  const A = AUR.app;               // created by app-state.js; throw if missing
+  if (!A) throw new Error('app-state.js must load before app.js');
+  const S = A.state, C = A.const;
 
   // ---------- boot ----------
   async function boot() {
-    canvas = document.getElementById('renderCanvas');
-    engine = new BABYLON.Engine(canvas, true, {
+    S.canvas = document.getElementById('renderCanvas');
+    S.engine = new BABYLON.Engine(S.canvas, true, {
       preserveDrawingBuffer: true, stencil: true, antialias: true,
     }, true);
-    engine.runRenderLoop(() => {
-      if (activeScene && !activeScene.isDisposed) {
-        try { activeScene.render(); } catch (e) { /* swallow transient swap frames */ }
+    S.engine.runRenderLoop(() => {
+      if (S.activeScene && !S.activeScene.isDisposed) {
+        try { S.activeScene.render(); } catch (e) { /* swallow transient swap frames */ }
       }
-      if (agentFocus.shipId) {
+      if (S.agentFocus.shipId) {
         const now = performance.now();
-        if (now - agentFocus.lastFlightUpdate >= 250) {
-          agentFocus.lastFlightUpdate = now;
-          renderAgentFocusFlightTarget();
+        if (now - S.agentFocus.lastFlightUpdate >= 250) {
+          S.agentFocus.lastFlightUpdate = now;
+          A.renderAgentFocusFlightTarget();
         }
       }
     });
     window.addEventListener('resize', () => {
-      engine.resize();
+      S.engine.resize();
       positionTasksPanel();
     });
     wireHistoryBar();
     wireTasksPanel();
     wireIdeasPanel();
     wireCommandRail();
-    wireAgentFocus();
+    A.wireAgentFocus();
     wireProjectSearch();
     wireProjectDirectory();
     wireProjectSettings();
@@ -195,20 +50,20 @@
     AU.onProjectVcsStatusChanged(routeProjectVcsStatus);
     const snap = await AU.snapshot();
     seedStore(snap);
-    streamEpoch = epochOf(snap);
+    S.streamEpoch = epochOf(snap);
     applyPlayback(snap && snap.playback, false);
     const cutoff = Number.isFinite(snap && snap.eventSequence) ? snap.eventSequence : -Infinity;
-    lastEventSequence = cutoff;
-    const queued = bootEventQueue;
-    bootEventQueue = [];
-    booting = false;
+    S.lastEventSequence = cutoff;
+    const queued = S.bootEventQueue;
+    S.bootEventQueue = [];
+    S.booting = false;
     for (const packet of queued) handleSequencedEvents(packet.batch, packet.meta);
-    const queuedVcs = bootVcsQueue;
-    bootVcsQueue = [];
+    const queuedVcs = S.bootVcsQueue;
+    S.bootVcsQueue = [];
     for (const packet of queuedVcs) routeProjectVcsStatus(packet.status, packet.meta);
 
     // Dev self-check: our copied hash must be bit-exact with the tracker's.
-    for (const p of store.projects.values()) {
+    for (const p of S.store.projects.values()) {
       if (AUR.fnv1a(p.id) !== p.seed) {
         AUR.log('WARN fnv1a mismatch for', p.id, AUR.fnv1a(p.id), 'vs', p.seed);
       }
@@ -218,15 +73,15 @@
     wireBackButton();
     showUniverse();
     refreshIdeas();
-    ideaPanel.interval = setInterval(refreshIdeas, 5_000);
+    S.ideaPanel.interval = setInterval(refreshIdeas, 5_000);
     renderChrome();
 
     AU.onDebugView(handleDebugView);
   }
 
   function routeEvents(batch, meta) {
-    if (booting) bootEventQueue.push({ batch, meta });
-    else if (replayTransitionPending) transitionEventQueue.push({ batch, meta });
+    if (S.booting) S.bootEventQueue.push({ batch, meta });
+    else if (S.replayTransitionPending) S.transitionEventQueue.push({ batch, meta });
     else handleSequencedEvents(batch, meta);
   }
 
@@ -242,19 +97,19 @@
   function routeProjectVcsStatus(status, meta) {
     if (!status || typeof status.projectId !== 'string' ||
         (meta && meta.mode && meta.mode !== 'live')) return;
-    if (booting) {
-      bootVcsQueue.push({ status, meta });
+    if (S.booting) {
+      S.bootVcsQueue.push({ status, meta });
       return;
     }
     const incomingEpoch = epochOf(meta);
-    if (playback.mode !== 'live' ||
-        (incomingEpoch != null && streamEpoch != null && !sameEpoch(incomingEpoch, streamEpoch))) return;
-    const project = store.projects.get(status.projectId);
+    if (S.playback.mode !== 'live' ||
+        (incomingEpoch != null && S.streamEpoch != null && !sameEpoch(incomingEpoch, S.streamEpoch))) return;
+    const project = S.store.projects.get(status.projectId);
     if (!project || vcsFreshness(project.vcs) > vcsFreshness(status)) return;
-    store.projects.set(status.projectId, { ...project, vcs: status });
+    S.store.projects.set(status.projectId, { ...project, vcs: status });
     const event = { type: 'project-vcs-status', projectId: status.projectId, status };
-    if (activeView && typeof activeView.update === 'function') {
-      try { activeView.update([event]); } catch (error) { AUR.log('VCS view update failed'); }
+    if (S.activeView && typeof S.activeView.update === 'function') {
+      try { S.activeView.update([event]); } catch (error) { AUR.log('VCS view update failed'); }
     }
     scheduleChrome(CHROME_PROJECT | CHROME_SEARCH | CHROME_DIRECTORY);
   }
@@ -262,18 +117,18 @@
   function handleSequencedEvents(batch, meta) {
     if (!Array.isArray(batch)) return;
     const incomingEpoch = epochOf(meta);
-    if (incomingEpoch != null && streamEpoch != null && !sameEpoch(incomingEpoch, streamEpoch)) {
+    if (incomingEpoch != null && S.streamEpoch != null && !sameEpoch(incomingEpoch, S.streamEpoch)) {
       if (!isRetiredEpoch(incomingEpoch)) {
-        deferredEpochBatches.push({ batch, meta });
+        S.deferredEpochBatches.push({ batch, meta });
       }
       return;
     }
-    if (streamEpoch == null && incomingEpoch != null) streamEpoch = incomingEpoch;
+    if (S.streamEpoch == null && incomingEpoch != null) S.streamEpoch = incomingEpoch;
     const unseen = [];
     for (const ev of batch) {
       if (Number.isFinite(ev.seq)) {
-        if (ev.seq <= lastEventSequence) continue;
-        lastEventSequence = ev.seq;
+        if (ev.seq <= S.lastEventSequence) continue;
+        S.lastEventSequence = ev.seq;
       }
       unseen.push(ev);
     }
@@ -289,28 +144,28 @@
   }
 
   function isRetiredEpoch(value) {
-    if (retiredEpochs.has(String(value))) return true;
-    return Number.isInteger(value) && Number.isInteger(streamEpoch) && value < streamEpoch;
+    if (S.retiredEpochs.has(String(value))) return true;
+    return Number.isInteger(value) && Number.isInteger(S.streamEpoch) && value < S.streamEpoch;
   }
 
   function retireEpoch(value) {
     if (value == null) return;
-    retiredEpochs.add(String(value));
-    while (retiredEpochs.size > 64) retiredEpochs.delete(retiredEpochs.values().next().value);
+    S.retiredEpochs.add(String(value));
+    while (S.retiredEpochs.size > 64) S.retiredEpochs.delete(S.retiredEpochs.values().next().value);
   }
 
   function seedStore(snap) {
-    store.projects.clear();
-    store.ships.clear();
-    store.feed = [];
+    S.store.projects.clear();
+    S.store.ships.clear();
+    S.store.feed = [];
     if (snap && Array.isArray(snap.projects)) {
-      for (const p of snap.projects) store.projects.set(p.id, p);
+      for (const p of snap.projects) S.store.projects.set(p.id, p);
     }
     if (snap && Array.isArray(snap.ships)) {
-      for (const s of snap.ships) store.ships.set(s.id, s);
+      for (const s of snap.ships) S.store.ships.set(s.id, s);
     }
     if (snap && Array.isArray(snap.feed)) {
-      store.feed = snap.feed.slice(-FEED_CAP);
+      S.store.feed = snap.feed.slice(-C.FEED_CAP);
     }
   }
 
@@ -322,17 +177,17 @@
   }
 
   function normalizePlayback(value) {
-    if (!value || typeof value !== 'object') return playback;
-    const minTs = finiteField(value, ['minTs', 'startTs', 'start'], playback.minTs);
-    const maxTs = finiteField(value, ['maxTs', 'endTs', 'end'], playback.maxTs);
-    let cursorTs = finiteField(value, ['cursorTs', 'cursor', 'ts'], playback.cursorTs);
+    if (!value || typeof value !== 'object') return S.playback;
+    const minTs = finiteField(value, ['minTs', 'startTs', 'start'], S.playback.minTs);
+    const maxTs = finiteField(value, ['maxTs', 'endTs', 'end'], S.playback.maxTs);
+    let cursorTs = finiteField(value, ['cursorTs', 'cursor', 'ts'], S.playback.cursorTs);
     const stateWord = typeof value.state === 'string' ? value.state.toLowerCase() : '';
-    let mode = value.mode === 'replay' || value.mode === 'live' ? value.mode : playback.mode;
+    let mode = value.mode === 'replay' || value.mode === 'live' ? value.mode : S.playback.mode;
     if (stateWord === 'live') mode = 'live';
     else if (!value.mode && (stateWord === 'playing' || stateWord === 'paused')) mode = 'replay';
     if (mode === 'live' && Number.isFinite(maxTs)) cursorTs = maxTs;
     const requestedSpeed = Number(value.speed);
-    const speed = REPLAY_SPEEDS.includes(requestedSpeed) ? requestedSpeed : playback.speed;
+    const speed = C.REPLAY_SPEEDS.includes(requestedSpeed) ? requestedSpeed : S.playback.speed;
     const available = typeof value.available === 'boolean'
       ? value.available
       : (Number.isFinite(minTs) && Number.isFinite(maxTs) && maxTs >= minTs);
@@ -341,18 +196,18 @@
     return {
       mode,
       available,
-      indexing: typeof value.indexing === 'boolean' ? value.indexing : playback.indexing,
+      indexing: typeof value.indexing === 'boolean' ? value.indexing : S.playback.indexing,
       minTs,
       maxTs,
       cursorTs,
       playing: mode === 'replay' && playingValue,
       speed,
-      truncated: typeof value.truncated === 'boolean' ? value.truncated : playback.truncated,
+      truncated: typeof value.truncated === 'boolean' ? value.truncated : S.playback.truncated,
     };
   }
 
   function applyPlayback(value, updateChrome = true) {
-    if (value && typeof value === 'object') playback = normalizePlayback(value);
+    if (value && typeof value === 'object') S.playback = normalizePlayback(value);
     if (updateChrome) {
       renderHistory();
       renderFeed();
@@ -363,15 +218,15 @@
   }
 
   function handleReplayState(next) {
-    if (replayTransitionPending) return;
+    if (S.replayTransitionPending) return;
     const nextEpoch = epochOf(next);
-    if (nextEpoch != null && streamEpoch != null && !sameEpoch(nextEpoch, streamEpoch)) return;
+    if (nextEpoch != null && S.streamEpoch != null && !sameEpoch(nextEpoch, S.streamEpoch)) return;
     applyPlayback(next);
   }
 
   function playbackReferenceTs() {
-    return playback.mode === 'replay' && Number.isFinite(playback.cursorTs)
-      ? playback.cursorTs : Date.now();
+    return S.playback.mode === 'replay' && Number.isFinite(S.playback.cursorTs)
+      ? S.playback.cursorTs : Date.now();
   }
 
   function adoptReplayResult(result, forceReset) {
@@ -384,22 +239,22 @@
 
     const nextEpoch = result.streamEpoch != null
       ? result.streamEpoch : epochOf(snap);
-    const changedEpoch = nextEpoch != null && !sameEpoch(nextEpoch, streamEpoch);
-    if (snap && (forceReset || changedEpoch || streamEpoch == null)) {
-      const previousRoute = { ...current };
-      routeRequestGeneration++;
-      if (streamEpoch != null && changedEpoch) retireEpoch(streamEpoch);
-      if (nextEpoch != null) streamEpoch = nextEpoch;
+    const changedEpoch = nextEpoch != null && !sameEpoch(nextEpoch, S.streamEpoch);
+    if (snap && (forceReset || changedEpoch || S.streamEpoch == null)) {
+      const previousRoute = { ...S.current };
+      S.routeRequestGeneration++;
+      if (S.streamEpoch != null && changedEpoch) retireEpoch(S.streamEpoch);
+      if (nextEpoch != null) S.streamEpoch = nextEpoch;
       seedStore(snap);
-      lastEventSequence = Number.isFinite(snap.eventSequence) ? snap.eventSequence : -Infinity;
-      notificationByShip.clear();
-      lastNotificationAt = -Infinity;
-      historyPreviewTs = null;
+      S.lastEventSequence = Number.isFinite(snap.eventSequence) ? snap.eventSequence : -Infinity;
+      S.notificationByShip.clear();
+      S.lastNotificationAt = -Infinity;
+      S.historyPreviewTs = null;
       // A complete route rebuild is the safe reconciliation point: it removes
       // projects, galaxies, and ships that do not exist at the new cursor
       // without adding reset branches to each scene.
-      if (!booting && activeView) rebuildRoute(previousRoute);
-      else if (!booting) renderChrome();
+      if (!S.booting && S.activeView) rebuildRoute(previousRoute);
+      else if (!S.booting) renderChrome();
       drainDeferredEpochEvents();
       return;
     }
@@ -410,7 +265,7 @@
 
   function rebuildRoute(route) {
     if (!route || route.view === 'universe' || !route.projectId ||
-        !store.projects.has(route.projectId)) {
+        !S.store.projects.has(route.projectId)) {
       showUniverse();
       return;
     }
@@ -418,51 +273,51 @@
       openPlanet(route.projectId, route.planetName);
       return;
     }
-    openSystem(route.projectId);
+    A.openSystem(route.projectId);
   }
 
   function drainDeferredEpochEvents() {
-    if (deferredEpochBatches.length === 0) return;
-    const queued = deferredEpochBatches;
-    deferredEpochBatches = [];
+    if (S.deferredEpochBatches.length === 0) return;
+    const queued = S.deferredEpochBatches;
+    S.deferredEpochBatches = [];
     for (const packet of queued) {
       const incomingEpoch = epochOf(packet.meta);
-      if (incomingEpoch == null || sameEpoch(incomingEpoch, streamEpoch)) {
+      if (incomingEpoch == null || sameEpoch(incomingEpoch, S.streamEpoch)) {
         handleSequencedEvents(packet.batch, packet.meta);
       } else if (!isRetiredEpoch(incomingEpoch)) {
-        deferredEpochBatches.push(packet);
+        S.deferredEpochBatches.push(packet);
       }
     }
   }
 
   async function issueReplay(command) {
-    const request = ++replayRequest;
+    const request = ++S.replayRequest;
     const modeBoundary = command.action === 'seek' || command.action === 'live';
-    if (modeBoundary) replayTransitionPending = true;
-    replayBusy = true;
+    if (modeBoundary) S.replayTransitionPending = true;
+    S.replayBusy = true;
     renderHistory();
     renderProjectCard();
-    renderAgentFocus();
+    A.renderAgentFocus();
     renderProjectSettings();
     renderIdeas();
     try {
       const result = await AU.replay(command);
-      if (request !== replayRequest) return;
+      if (request !== S.replayRequest) return;
       const forceReset = command.action === 'seek' || command.action === 'live';
       adoptReplayResult(result, forceReset);
     } catch (error) {
-      if (request === replayRequest) AUR.log('replay command failed', error && error.message);
+      if (request === S.replayRequest) AUR.log('replay command failed', error && error.message);
     } finally {
-      if (request === replayRequest) {
-        replayTransitionPending = false;
-        replayBusy = false;
-        historyPreviewTs = null;
-        const queued = transitionEventQueue;
-        transitionEventQueue = [];
+      if (request === S.replayRequest) {
+        S.replayTransitionPending = false;
+        S.replayBusy = false;
+        S.historyPreviewTs = null;
+        const queued = S.transitionEventQueue;
+        S.transitionEventQueue = [];
         for (const packet of queued) handleSequencedEvents(packet.batch, packet.meta);
         renderHistory();
         renderProjectCard();
-        renderAgentFocus();
+        A.renderAgentFocus();
         renderProjectSettings();
         renderIdeas();
       }
@@ -479,28 +334,28 @@
       // queued events are reconciled. Checking store membership therefore
       // distinguishes a genuinely new live project even if its event arrives
       // around the end of renderer boot.
-      if (ev.type === 'project-added' && ev.project && playback.mode === 'live' &&
-          !store.projects.has(ev.project.id)) {
-        liveProjectEvents.set(ev.project.id, Number.isFinite(ev.project.firstSeen)
+      if (ev.type === 'project-added' && ev.project && S.playback.mode === 'live' &&
+          !S.store.projects.has(ev.project.id)) {
+        S.liveProjectEvents.set(ev.project.id, Number.isFinite(ev.project.firstSeen)
           ? ev.project.firstSeen : Date.now());
-        while (liveProjectEvents.size > HISTORY_MARKER_LIMIT) {
-          liveProjectEvents.delete(liveProjectEvents.keys().next().value);
+        while (S.liveProjectEvents.size > C.HISTORY_MARKER_LIMIT) {
+          S.liveProjectEvents.delete(S.liveProjectEvents.keys().next().value);
         }
       }
       const previous = ev.type === 'project-updated' && ev.project
-        ? store.projects.get(ev.project.id) : null;
+        ? S.store.projects.get(ev.project.id) : null;
       applyEvent(ev);
       chromeMask |= chromeMaskFor(ev);
       if (previous && previous.exists === false && ev.project.exists === true &&
-          current.view !== 'universe' && current.projectId === ev.project.id) {
-        recoveredRoute = { ...current };
+          S.current.view !== 'universe' && S.current.projectId === ev.project.id) {
+        recoveredRoute = { ...S.current };
       }
     }
-    if (activeView && activeView.update) {
-      try { activeView.update(batch); } catch (e) { AUR.log('view update err', e && e.message); }
+    if (S.activeView && S.activeView.update) {
+      try { S.activeView.update(batch); } catch (e) { AUR.log('view update err', e && e.message); }
     }
-    if (agentFocus.shipId && !store.ships.has(agentFocus.shipId)) {
-      exitAgentFocus(false);
+    if (S.agentFocus.shipId && !S.store.ships.has(S.agentFocus.shipId)) {
+      A.exitAgentFocus(false);
     }
     // Project creation is rare and its live-region announcement should not
     // wait behind a busy scene/chrome animation frame.
@@ -541,27 +396,27 @@
     switch (ev.type) {
       case 'project-added':
       case 'project-updated':
-        store.projects.set(ev.project.id, ev.project);
+        S.store.projects.set(ev.project.id, ev.project);
         break;
       case 'ship-spawned':
-        store.ships.set(ev.ship.id, ev.ship);
+        S.store.ships.set(ev.ship.id, ev.ship);
         break;
       case 'ship-updated': {
-        const previous = store.ships.get(ev.ship.id);
+        const previous = S.store.ships.get(ev.ship.id);
         maybeNotifyAttention(previous ? previous.attention : null, ev.ship);
-        store.ships.set(ev.ship.id, ev.ship);
+        S.store.ships.set(ev.ship.id, ev.ship);
         break;
       }
       case 'ship-departed':
-        store.ships.delete(ev.shipId);
-        notificationByShip.delete(ev.shipId);
+        S.store.ships.delete(ev.shipId);
+        S.notificationByShip.delete(ev.shipId);
         break;
       case 'feed':
-        store.feed.push(ev.entry);
-        if (store.feed.length > FEED_CAP) store.feed = store.feed.slice(-FEED_CAP);
+        S.store.feed.push(ev.entry);
+        if (S.store.feed.length > C.FEED_CAP) S.store.feed = S.store.feed.slice(-C.FEED_CAP);
         break;
       case 'build': {
-        const p = store.projects.get(ev.project);
+        const p = S.store.projects.get(ev.project);
         if (p) p.totalBuilds = (p.totalBuilds || 0) + 1;
         break;
       }
@@ -571,13 +426,13 @@
 
   function maybeNotifyAttention(previousAttention, ship) {
     const entered = ship && (ship.attention === 'question' || ship.attention === 'permission');
-    if (playback.mode !== 'live' || previousAttention != null || !entered ||
+    if (S.playback.mode !== 'live' || previousAttention != null || !entered ||
         typeof window.Notification !== 'function') return;
 
     const now = Date.now();
-    const lastForShip = notificationByShip.get(ship.id) ?? -Infinity;
-    if (now - lastForShip < NOTIFICATION_SHIP_THROTTLE_MS ||
-        now - lastNotificationAt < NOTIFICATION_GLOBAL_THROTTLE_MS) return;
+    const lastForShip = S.notificationByShip.get(ship.id) ?? -Infinity;
+    if (now - lastForShip < C.NOTIFICATION_SHIP_THROTTLE_MS ||
+        now - S.lastNotificationAt < C.NOTIFICATION_GLOBAL_THROTTLE_MS) return;
 
     const meta = AUR.attentionMeta(ship.attention);
     if (!meta) return;
@@ -585,14 +440,14 @@
       new window.Notification(ship.name + ' needs you', {
         body: meta.label + ' · ' + projectName(ship.project),
       });
-      notificationByShip.set(ship.id, now);
-      lastNotificationAt = now;
+      S.notificationByShip.set(ship.id, now);
+      S.lastNotificationAt = now;
     } catch (e) { /* notifications are best-effort */ }
   }
 
   // ---------- view switching ----------
   function makeCtx() {
-    return { store, openSystem, openPlanet, back };
+    return { store: S.store, openSystem: A.openSystem, openPlanet, back };
   }
 
   function setView(name, data) {
@@ -604,22 +459,22 @@
     }
     let next;
     try {
-      next = factory(engine, data, makeCtx());
+      next = factory(S.engine, data, makeCtx());
     } catch (e) {
       AUR.log('view build failed:', name, e && e.message);
       if (name !== 'universe') return showUniverse();
       return;
     }
-    const old = activeView;
+    const old = S.activeView;
     if (name !== 'universe') clearProjectSearch();
-    if (agentFocus.shipId) exitAgentFocus(false);
-    activeView = next;
-    activeScene = next.scene;
-    current.view = name;
+    if (S.agentFocus.shipId) A.exitAgentFocus(false);
+    S.activeView = next;
+    S.activeScene = next.scene;
+    S.current.view = name;
     stopTasksView();
     if (old && old.dispose) disposeSettled(old);
     renderChrome();
-    if (name === 'system' && current.projectId) startTasksView(current.projectId);
+    if (name === 'system' && S.current.projectId) startTasksView(S.current.projectId);
     if (name === 'universe') refreshProjectSearchFromStore();
   }
 
@@ -645,49 +500,49 @@
   }
 
   function showUniverse() {
-    routeRequestGeneration++;
-    current.view = 'universe';
-    current.projectId = null;
-    current.planetName = null;
-    setView('universe', { store });
+    S.routeRequestGeneration++;
+    S.current.view = 'universe';
+    S.current.projectId = null;
+    S.current.planetName = null;
+    setView('universe', { store: S.store });
   }
 
-  async function openSystem(projectId) {
+  A.openSystem = async function openSystem(projectId) {
     clearProjectSearch();
-    const request = ++routeRequestGeneration;
-    const requestedEpoch = streamEpoch;
+    const request = ++S.routeRequestGeneration;
+    const requestedEpoch = S.streamEpoch;
     let data = null;
     try { data = await AU.getSystem(projectId); } catch (e) { AUR.log('getSystem err', e && e.message); }
-    if (request !== routeRequestGeneration || !sameEpoch(requestedEpoch, streamEpoch)) return;
-    current.projectId = projectId;
-    current.planetName = null;
+    if (request !== S.routeRequestGeneration || !sameEpoch(requestedEpoch, S.streamEpoch)) return;
+    S.current.projectId = projectId;
+    S.current.planetName = null;
     if (!data) { AUR.log('no system data for', projectId); return showUniverse(); }
-    setView('system', { system: data, projectId, store });
-  }
+    setView('system', { system: data, projectId, store: S.store });
+  };
 
   async function openPlanet(projectId, name) {
-    const request = ++routeRequestGeneration;
-    const requestedEpoch = streamEpoch;
+    const request = ++S.routeRequestGeneration;
+    const requestedEpoch = S.streamEpoch;
     let data = null;
     try { data = await AU.getPlanet(projectId, name); } catch (e) { AUR.log('getPlanet err', e && e.message); }
-    if (request !== routeRequestGeneration || !sameEpoch(requestedEpoch, streamEpoch)) return;
-    current.projectId = projectId;
-    current.planetName = name;
-    if (!data) { AUR.log('no planet data for', projectId, name); return openSystem(projectId); }
-    setView('planet', { planet: data, projectId, name, store });
+    if (request !== S.routeRequestGeneration || !sameEpoch(requestedEpoch, S.streamEpoch)) return;
+    S.current.projectId = projectId;
+    S.current.planetName = name;
+    if (!data) { AUR.log('no planet data for', projectId, name); return A.openSystem(projectId); }
+    setView('planet', { planet: data, projectId, name, store: S.store });
   }
 
   function back() {
-    if (current.view === 'planet' && current.projectId) openSystem(current.projectId);
+    if (S.current.view === 'planet' && S.current.projectId) A.openSystem(S.current.projectId);
     else showUniverse();
   }
 
   // Direct project links (feed, recent, task views) jump to the system. Agent
   // rows use the first-person focus flow below.
   function jumpToProject(projectId) {
-    if (!projectId || !store.projects.has(projectId)) return;
-    if (current.view === 'system' && current.projectId === projectId) return;
-    openSystem(projectId);
+    if (!projectId || !S.store.projects.has(projectId)) return;
+    if (S.current.view === 'system' && S.current.projectId === projectId) return;
+    A.openSystem(projectId);
   }
 
   function wireBackButton() {
@@ -695,345 +550,9 @@
     btn.addEventListener('click', back);
   }
 
-  // ---------- first-person agent focus ----------
-  const AGENT_FOCUS_INERT_IDS = [
-    'topbar', 'sidebar', 'back-btn', 'project-card', 'tasks-panel',
-    'planet-card', 'summary-card', 'tabbar', 'history-bar',
-  ];
-
-  function wireAgentFocus() {
-    agentFocus.els = {
-      root: document.getElementById('agent-focus'),
-      frame: document.getElementById('agent-focus-frame'),
-      environmentLabel: document.getElementById('agent-focus-environment-label'),
-      environments: document.getElementById('agent-focus-environments'),
-      vantages: document.getElementById('agent-focus-vantages'),
-      hologram: document.getElementById('agent-focus-hologram'),
-      hologramName: document.getElementById('agent-focus-hologram-name'),
-      hologramSystem: document.getElementById('agent-focus-hologram-system'),
-      hologramCount: document.getElementById('agent-focus-hologram-count'),
-      hologramShip: document.getElementById('agent-focus-hologram-ship'),
-      hologramShipLabel: document.getElementById('agent-focus-hologram-ship-label'),
-      name: document.getElementById('agent-focus-name'),
-      context: document.getElementById('agent-focus-context'),
-      target: document.getElementById('agent-focus-target'),
-      provider: document.getElementById('agent-focus-provider'),
-      status: document.getElementById('agent-focus-status'),
-      project: document.getElementById('agent-focus-project'),
-      folder: document.getElementById('agent-focus-folder'),
-      terminal: document.getElementById('agent-focus-terminal'),
-      exit: document.getElementById('agent-focus-exit'),
-      actionStatus: document.getElementById('agent-focus-action-status'),
-    };
-    const els = agentFocus.els;
-    if (!els.root || !els.frame || !els.exit || !els.folder || !els.terminal) return;
-    let environment = 'cockpit';
-    try {
-      const stored = localStorage.getItem(AGENT_FOCUS_ENVIRONMENT_STORAGE_KEY);
-      if (stored && Object.hasOwn(AGENT_FOCUS_ENVIRONMENTS, stored)) environment = stored;
-    } catch (e) { /* storage can be unavailable in hardened renderers */ }
-    setAgentFocusEnvironment(environment, false);
-    let vantage = 'forward';
-    try {
-      const stored = localStorage.getItem(AGENT_FOCUS_VANTAGE_STORAGE_KEY);
-      if (stored && Object.hasOwn(AGENT_FOCUS_VANTAGES, stored)) vantage = stored;
-    } catch (e) { /* storage can be unavailable in hardened renderers */ }
-    setAgentFocusVantage(vantage, false);
-    if (els.environments) {
-      for (const button of els.environments.querySelectorAll('[data-environment]')) {
-        button.addEventListener('click', () => {
-          setAgentFocusEnvironment(button.dataset.environment, true);
-        });
-      }
-    }
-    if (els.vantages) {
-      for (const button of els.vantages.querySelectorAll('[data-vantage]')) {
-        button.addEventListener('click', () => {
-          setAgentFocusVantage(button.dataset.vantage, true);
-        });
-      }
-    }
-    for (const item of Object.values(AGENT_FOCUS_ENVIRONMENTS)) {
-      if (item.asset === els.frame.getAttribute('src')) continue;
-      const preload = new Image();
-      preload.src = item.asset;
-    }
-    els.exit.addEventListener('click', () => exitAgentFocus(true));
-    els.folder.addEventListener('click', () => {
-      const ship = store.ships.get(agentFocus.shipId);
-      if (ship) AU.openProject(ship.project);
-    });
-    els.terminal.addEventListener('click', () => {
-      const ship = store.ships.get(agentFocus.shipId);
-      if (ship) requestProjectTerminal(ship.project);
-    });
-    document.addEventListener('keydown', (event) => {
-      if (event.key !== 'Escape' || !agentFocus.shipId) return;
-      event.preventDefault();
-      event.stopPropagation();
-      exitAgentFocus(true);
-    });
-  }
-
-  function setAgentFocusEnvironment(value, persist) {
-    const key = typeof value === 'string' && Object.hasOwn(AGENT_FOCUS_ENVIRONMENTS, value)
-      ? value : 'cockpit';
-    const config = AGENT_FOCUS_ENVIRONMENTS[key];
-    agentFocus.environment = key;
-    const els = agentFocus.els;
-    if (els && els.root) els.root.dataset.environment = key;
-    if (els && els.frame && els.frame.getAttribute('src') !== config.asset) {
-      els.frame.setAttribute('src', config.asset);
-    }
-    if (els && els.environmentLabel) els.environmentLabel.textContent = config.label;
-    if (els && els.environments) {
-      for (const button of els.environments.querySelectorAll('[data-environment]')) {
-        button.setAttribute('aria-pressed', String(button.dataset.environment === key));
-      }
-    }
-    if (!persist) return;
-    try { localStorage.setItem(AGENT_FOCUS_ENVIRONMENT_STORAGE_KEY, key); } catch (e) { /* ignore */ }
-  }
-
-  function setAgentFocusVantage(value, persist) {
-    const key = typeof value === 'string' && Object.hasOwn(AGENT_FOCUS_VANTAGES, value)
-      ? value : 'forward';
-    agentFocus.vantage = key;
-    const els = agentFocus.els;
-    if (els && els.root) els.root.dataset.vantage = key;
-    if (els && els.vantages) {
-      for (const button of els.vantages.querySelectorAll('[data-vantage]')) {
-        button.setAttribute('aria-pressed', String(button.dataset.vantage === key));
-      }
-    }
-    if (activeView && typeof activeView.setShipFocusVantage === 'function') {
-      activeView.setShipFocusVantage(key);
-    }
-    if (!persist) return;
-    try { localStorage.setItem(AGENT_FOCUS_VANTAGE_STORAGE_KEY, key); } catch (e) { /* ignore */ }
-  }
-
-  function setAgentFocusInert(value) {
-    for (const id of AGENT_FOCUS_INERT_IDS) {
-      const element = document.getElementById(id);
-      if (element) element.inert = value;
-    }
-  }
-
-  async function enterAgentFocus(shipId) {
-    const id = String(shipId || '');
-    if (!id || agentFocus.pendingShipId) return;
-    if (agentFocus.shipId === id) {
-      exitAgentFocus(true);
-      return;
-    }
-    const selected = store.ships.get(id);
-    if (!selected || !selected.project || !store.projects.has(selected.project)) return;
-    if (agentFocus.shipId) exitAgentFocus(false);
-
-    agentFocus.previousFocus = document.activeElement;
-    agentFocus.pendingShipId = id;
-    renderAgents();
-    if (current.view !== 'system' || current.projectId !== selected.project) {
-      await openSystem(selected.project);
-    }
-
-    const ship = store.ships.get(id);
-    const canFocus = ship && current.view === 'system' && current.projectId === ship.project &&
-      activeView && typeof activeView.focusShip === 'function' && activeView.focusShip(id);
-    agentFocus.pendingShipId = null;
-    if (!canFocus) {
-      renderAgents();
-      return;
-    }
-
-    setAgentFocusVantage(agentFocus.vantage, false);
-    agentFocus.shipId = id;
-    document.body.classList.add('agent-focus-active');
-    setAgentFocusInert(true);
-    renderAgentFocus();
-    renderAgents();
-    requestAnimationFrame(() => {
-      if (agentFocus.shipId === id && agentFocus.els && agentFocus.els.exit) {
-        agentFocus.els.exit.focus({ preventScroll: true });
-      }
-    });
-  }
-
-  function exitAgentFocus(restoreFocus) {
-    const id = agentFocus.shipId || agentFocus.pendingShipId;
-    agentFocus.pendingShipId = null;
-    if (activeView && typeof activeView.clearShipFocus === 'function') {
-      activeView.clearShipFocus();
-    }
-    agentFocus.shipId = null;
-    document.body.classList.remove('agent-focus-active');
-    setAgentFocusInert(false);
-    renderAgentFocus();
-    renderAgents();
-    if (!restoreFocus) return;
-    requestAnimationFrame(() => {
-      const previous = agentFocus.previousFocus;
-      const fallback = id
-        ? document.querySelector(`.agent-row[data-ship-id="${CSS.escape(String(id))}"]`)
-        : null;
-      const target = previous && previous.isConnected ? previous : fallback;
-      if (target && typeof target.focus === 'function') target.focus({ preventScroll: true });
-    });
-  }
-
-  function renderAgentFocus() {
-    const els = agentFocus.els;
-    if (!els || !els.root) return;
-    const ship = agentFocus.shipId ? store.ships.get(agentFocus.shipId) : null;
-    const visible = Boolean(ship && current.view === 'system' &&
-      current.projectId === ship.project && activeView);
-    els.root.classList.toggle('hidden', !visible);
-    if (!visible) return;
-
-    const project = store.projects.get(ship.project);
-    const provider = AUR.providerMeta(ship.provider);
-    const attention = AUR.attentionMeta(ship.attention);
-    const tint = AUR.shipTint(ship.id, ship.provider);
-    els.root.dataset.provider = provider.key;
-    els.root.style.setProperty('--focus-accent', tint);
-    els.root.style.setProperty('--focus-alert', attention ? attention.color : tint);
-    els.name.textContent = ship.name;
-    els.context.textContent = (attention ? attention.label : ship.status) +
-      ' · ' + (project ? project.name : ship.project);
-    renderAgentFocusHologram(project);
-    renderAgentFocusFlightTarget();
-    els.provider.textContent = provider.label;
-    els.status.textContent = attention ? attention.label : ship.status;
-    els.project.textContent = project ? project.name : ship.project;
-    els.folder.disabled = !project || project.exists === false;
-
-    const presentation = projectControlPresentation(ship.project);
-    els.terminal.textContent = presentation.buttonText;
-    els.terminal.disabled = presentation.disabled;
-    els.terminal.setAttribute('aria-busy', String(presentation.busy));
-    els.terminal.dataset.state = presentation.phase;
-    els.actionStatus.textContent = presentation.note;
-    els.actionStatus.dataset.state = presentation.phase;
-  }
-
-  function renderAgentFocusHologram(project) {
-    const els = agentFocus.els;
-    if (!els || !els.hologramSystem) return;
-    const systemPlanets = activeView && activeView.systemData &&
-      Array.isArray(activeView.systemData.planets)
-      ? activeView.systemData.planets : [];
-    const planets = systemPlanets.slice(0, 7);
-    const names = planets.map((planet) => String(planet.name || 'body'));
-    const projectId = project ? project.id : current.projectId;
-    const projectName = String(project && project.name || 'LOCAL SYSTEM');
-    const signature = String(projectId || '') + ':' + projectName + ':' + names.join('|');
-    if (els.hologramSystem.dataset.signature !== signature) {
-      els.hologramSystem.dataset.signature = signature;
-      for (const orbit of els.hologramSystem.querySelectorAll('.agent-focus-hologram-orbit')) {
-        orbit.remove();
-      }
-
-      const colors = ['#60a5fa', '#a78bfa', '#fb7185', '#f59e0b', '#22d3ee', '#94a3b8'];
-      const count = Math.max(1, planets.length);
-      planets.forEach((planet, index) => {
-        const seed = AUR.fnv1a(String(projectId || '') + ':' + names[index]);
-        const extent = (index + 1) / count;
-        const orbit = document.createElement('i');
-        orbit.className = 'agent-focus-hologram-orbit';
-        orbit.dataset.phase = String((seed % 6283) / 1000);
-        orbit.dataset.rate = String(
-          (AUR.MOTION.systemPlanetOrbitMin +
-            ((seed >>> 8) % 1000) / 1000 * AUR.MOTION.systemPlanetOrbitRange) /
-          (1 + index * 0.16)
-        );
-        orbit.style.setProperty('--orbit-width', (22 + extent * 72) + '%');
-        orbit.style.setProperty('--orbit-height', (18 + extent * 60) + '%');
-        orbit.style.setProperty('--planet-color', colors[seed % colors.length]);
-        const score = Number(planet.files || 0) + Number(planet.builds || 0) * 5;
-        orbit.style.setProperty('--planet-size', AUR.clamp(4 + Math.log10(score + 1), 4, 8) + 'px');
-        const body = document.createElement('b');
-        const label = document.createElement('span');
-        label.textContent = names[index].toUpperCase();
-        body.appendChild(label);
-        orbit.appendChild(body);
-        els.hologramSystem.appendChild(orbit);
-      });
-
-      if (els.hologramName) els.hologramName.textContent = projectName.toUpperCase();
-      if (els.hologramCount) {
-        els.hologramCount.textContent = systemPlanets.length +
-          (systemPlanets.length === 1 ? ' BODY' : ' BODIES');
-      }
-    }
-    renderAgentFocusNavigationMap();
-  }
-
-  function renderAgentFocusNavigationMap() {
-    const els = agentFocus.els;
-    if (!els || !els.hologramSystem) return;
-    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const time = reducedMotion ? 0 : performance.now() / 1000;
-    for (const orbit of els.hologramSystem.querySelectorAll('.agent-focus-hologram-orbit')) {
-      const body = orbit.querySelector('b');
-      if (!body) continue;
-      const angle = Number(orbit.dataset.phase || 0) + Number(orbit.dataset.rate || 0) * time;
-      body.style.left = (50 + Math.cos(angle) * 50) + '%';
-      body.style.top = (50 + Math.sin(angle) * 50) + '%';
-    }
-
-    const state = activeView && typeof activeView.shipFocusState === 'function'
-      ? activeView.shipFocusState() : null;
-    if (!els.hologramShip || !state || !state.map) {
-      if (els.hologramShip) els.hologramShip.classList.add('hidden');
-      return;
-    }
-    els.hologramShip.classList.remove('hidden');
-    els.hologramShip.style.left =
-      (50 + Math.cos(state.map.angle) * state.map.radiusRatio * 47) + '%';
-    els.hologramShip.style.top =
-      (50 + Math.sin(state.map.angle) * state.map.radiusRatio * 39) + '%';
-    if (els.hologramShipLabel) {
-      const ship = store.ships.get(state.shipId);
-      els.hologramShipLabel.textContent = String(ship && ship.name || 'SHIP').toUpperCase();
-    }
-  }
-
-  function renderAgentFocusFlightTarget() {
-    const els = agentFocus.els;
-    if (!agentFocus.shipId || !els || !els.target || !activeView) return;
-    renderAgentFocusNavigationMap();
-    const flight = typeof activeView.shipFocusState === 'function'
-      ? activeView.shipFocusState() : null;
-    const target = flight && flight.target
-      ? String(flight.target).toUpperCase() : 'SYSTEM PATROL';
-    if (els.target.textContent !== target) els.target.textContent = target;
-  }
-
-  function agentFocusStats() {
-    const sceneStats = activeScene && activeScene.metadata &&
-      typeof activeScene.metadata.focusStats === 'function'
-      ? activeScene.metadata.focusStats() : null;
-    return {
-      active: Boolean(agentFocus.shipId),
-      shipId: agentFocus.shipId,
-      pendingShipId: agentFocus.pendingShipId,
-      environment: agentFocus.environment,
-      vantage: agentFocus.vantage,
-      view: current.view,
-      bodyClass: document.body.classList.contains('agent-focus-active'),
-      overlayVisible: Boolean(agentFocus.els && agentFocus.els.root &&
-        !agentFocus.els.root.classList.contains('hidden')),
-      hologramBodies: agentFocus.els && agentFocus.els.hologramSystem
-        ? agentFocus.els.hologramSystem.querySelectorAll('.agent-focus-hologram-orbit').length : 0,
-      scene: sceneStats,
-    };
-  }
-  AUR.agentFocusStats = agentFocusStats;
-
   // ---------- live/history controls ----------
   function wireHistoryBar() {
-    historyEls = {
+    S.historyEls = {
       bar: document.getElementById('history-bar'),
       play: document.getElementById('history-play'),
       speed: document.getElementById('history-speed'),
@@ -1048,40 +567,40 @@
       feedMode: document.getElementById('feed-mode'),
       feedLabel: document.getElementById('feed-mode-label'),
     };
-    if (!historyEls.bar || !historyEls.play || !historyEls.speed ||
-        !historyEls.scrubber || !historyEls.time || !historyEls.live) return;
+    if (!S.historyEls.bar || !S.historyEls.play || !S.historyEls.speed ||
+        !S.historyEls.scrubber || !S.historyEls.time || !S.historyEls.live) return;
 
-    historyEls.play.addEventListener('click', () => {
-      if (playback.mode !== 'replay' || !playback.available) return;
-      issueReplay({ action: playback.playing ? 'pause' : 'play' });
+    S.historyEls.play.addEventListener('click', () => {
+      if (S.playback.mode !== 'replay' || !S.playback.available) return;
+      issueReplay({ action: S.playback.playing ? 'pause' : 'play' });
     });
-    historyEls.speed.addEventListener('click', () => {
-      if (playback.mode !== 'replay' || !playback.available) return;
-      const index = Math.max(0, REPLAY_SPEEDS.indexOf(playback.speed));
-      const speed = REPLAY_SPEEDS[(index + 1) % REPLAY_SPEEDS.length];
+    S.historyEls.speed.addEventListener('click', () => {
+      if (S.playback.mode !== 'replay' || !S.playback.available) return;
+      const index = Math.max(0, C.REPLAY_SPEEDS.indexOf(S.playback.speed));
+      const speed = C.REPLAY_SPEEDS[(index + 1) % C.REPLAY_SPEEDS.length];
       issueReplay({ action: 'speed', speed });
     });
-    historyEls.scrubber.addEventListener('input', () => {
+    S.historyEls.scrubber.addEventListener('input', () => {
       const started = performance.now();
-      historyPerf.inputEvents++;
-      historyPendingPreviewTs = historyTimestampFromPosition(historyEls.scrubber.value);
-      if (historyPreviewFrame === null) {
-        historyPreviewFrame = requestAnimationFrame(flushHistoryPreview);
+      S.historyPerf.inputEvents++;
+      S.historyPendingPreviewTs = historyTimestampFromPosition(S.historyEls.scrubber.value);
+      if (S.historyPreviewFrame === null) {
+        S.historyPreviewFrame = requestAnimationFrame(flushHistoryPreview);
       }
-      historyPerf.maxInputHandlerMs = Math.max(
-        historyPerf.maxInputHandlerMs, performance.now() - started
+      S.historyPerf.maxInputHandlerMs = Math.max(
+        S.historyPerf.maxInputHandlerMs, performance.now() - started
       );
     });
-    historyEls.scrubber.addEventListener('change', () => {
-      historyPendingPreviewTs = historyTimestampFromPosition(historyEls.scrubber.value);
+    S.historyEls.scrubber.addEventListener('change', () => {
+      S.historyPendingPreviewTs = historyTimestampFromPosition(S.historyEls.scrubber.value);
       flushHistoryPreview();
-      if (Number.isFinite(historyPreviewTs) && !replayBusy) {
-        historyPerf.seekRequests++;
-        issueReplay({ action: 'seek', ts: historyPreviewTs });
+      if (Number.isFinite(S.historyPreviewTs) && !S.replayBusy) {
+        S.historyPerf.seekRequests++;
+        issueReplay({ action: 'seek', ts: S.historyPreviewTs });
       }
     });
-    historyEls.live.addEventListener('click', () => {
-      if (playback.mode !== 'live') issueReplay({ action: 'live' });
+    S.historyEls.live.addEventListener('click', () => {
+      if (S.playback.mode !== 'live') issueReplay({ action: 'live' });
     });
     renderHistory();
   }
@@ -1118,163 +637,163 @@
   }
 
   function historyTimestampFromPosition(value) {
-    if (!Number.isFinite(playback.minTs) || !Number.isFinite(playback.maxTs)) return null;
-    const position = AUR.clamp(Number(value) || 0, 0, HISTORY_SLIDER_MAX);
-    const ratio = position / HISTORY_SLIDER_MAX;
-    return playback.minTs + (playback.maxTs - playback.minTs) * ratio;
+    if (!Number.isFinite(S.playback.minTs) || !Number.isFinite(S.playback.maxTs)) return null;
+    const position = AUR.clamp(Number(value) || 0, 0, C.HISTORY_SLIDER_MAX);
+    const ratio = position / C.HISTORY_SLIDER_MAX;
+    return S.playback.minTs + (S.playback.maxTs - S.playback.minTs) * ratio;
   }
 
   function historyPositionFromTimestamp(ts) {
-    if (!Number.isFinite(ts) || !Number.isFinite(playback.minTs) ||
-        !Number.isFinite(playback.maxTs) || playback.maxTs <= playback.minTs) {
-      return HISTORY_SLIDER_MAX;
+    if (!Number.isFinite(ts) || !Number.isFinite(S.playback.minTs) ||
+        !Number.isFinite(S.playback.maxTs) || S.playback.maxTs <= S.playback.minTs) {
+      return C.HISTORY_SLIDER_MAX;
     }
     return AUR.clamp(
-      ((ts - playback.minTs) / (playback.maxTs - playback.minTs)) * HISTORY_SLIDER_MAX,
+      ((ts - S.playback.minTs) / (S.playback.maxTs - S.playback.minTs)) * C.HISTORY_SLIDER_MAX,
       0,
-      HISTORY_SLIDER_MAX
+      C.HISTORY_SLIDER_MAX
     );
   }
 
   function setHistoryTimestamp(ts, label = null) {
-    if (!historyEls || !historyEls.time) return;
+    if (!S.historyEls || !S.historyEls.time) return;
     const text = label || formatHistoryTime(ts);
-    historyEls.time.textContent = text;
+    S.historyEls.time.textContent = text;
     if (Number.isFinite(ts)) {
       const iso = new Date(ts).toISOString();
-      historyEls.time.dateTime = iso;
-      historyEls.time.title = (playback.truncated ? 'Indexed range truncated · ' : '') + iso;
-      historyEls.scrubber.setAttribute('aria-valuetext', text);
+      S.historyEls.time.dateTime = iso;
+      S.historyEls.time.title = (S.playback.truncated ? 'Indexed range truncated · ' : '') + iso;
+      S.historyEls.scrubber.setAttribute('aria-valuetext', text);
     } else {
-      historyEls.time.removeAttribute('datetime');
-      historyEls.time.title = '';
-      historyEls.scrubber.removeAttribute('aria-valuetext');
+      S.historyEls.time.removeAttribute('datetime');
+      S.historyEls.time.title = '';
+      S.historyEls.scrubber.removeAttribute('aria-valuetext');
     }
   }
 
   function flushHistoryPreview() {
-    if (historyPreviewFrame !== null) cancelAnimationFrame(historyPreviewFrame);
-    historyPreviewFrame = null;
-    const ts = historyPendingPreviewTs;
-    historyPendingPreviewTs = null;
+    if (S.historyPreviewFrame !== null) cancelAnimationFrame(S.historyPreviewFrame);
+    S.historyPreviewFrame = null;
+    const ts = S.historyPendingPreviewTs;
+    S.historyPendingPreviewTs = null;
     if (!Number.isFinite(ts)) return;
-    historyPreviewTs = ts;
-    historyPerf.previewFrames++;
+    S.historyPreviewTs = ts;
+    S.historyPerf.previewFrames++;
     const position = historyPositionFromTimestamp(ts);
-    historyEls.bar.style.setProperty('--history-progress', `${position / 100}%`);
+    S.historyEls.bar.style.setProperty('--history-progress', `${position / 100}%`);
     setHistoryTimestamp(ts);
   }
 
   function renderHistoryMarkers(hasRange) {
-    if (!historyEls.markers || !historyEls.projectEvent) return;
-    const projects = [...store.projects.values()]
+    if (!S.historyEls.markers || !S.historyEls.projectEvent) return;
+    const projects = [...S.store.projects.values()]
       .filter((project) => Number.isFinite(project.firstSeen))
       .sort((a, b) => a.firstSeen - b.firstSeen || a.id.localeCompare(b.id));
-    const visible = projects.slice(-HISTORY_MARKER_LIMIT);
-    const key = `${playback.minTs}:${playback.maxTs}:${playback.mode}:` +
+    const visible = projects.slice(-C.HISTORY_MARKER_LIMIT);
+    const key = `${S.playback.minTs}:${S.playback.maxTs}:${S.playback.mode}:` +
       visible.map((project) => (
-        `${project.id}:${project.firstSeen}:${liveProjectEvents.has(project.id)}`
+        `${project.id}:${project.firstSeen}:${S.liveProjectEvents.has(project.id)}`
       )).join('|');
-    if (key === historyMarkerKey) return;
-    historyMarkerKey = key;
-    AUR.clear(historyEls.markers);
+    if (key === S.historyMarkerKey) return;
+    S.historyMarkerKey = key;
+    AUR.clear(S.historyEls.markers);
     if (!hasRange) {
-      historyEls.projectEvent.textContent = '';
-      historyEls.projectEvent.classList.add('hidden');
+      S.historyEls.projectEvent.textContent = '';
+      S.historyEls.projectEvent.classList.add('hidden');
       return;
     }
     for (const project of visible) {
       const marker = document.createElement('span');
-      const live = playback.mode === 'live' && liveProjectEvents.has(project.id);
+      const live = S.playback.mode === 'live' && S.liveProjectEvents.has(project.id);
       const position = historyPositionFromTimestamp(project.firstSeen);
       marker.className = 'history-marker' + (live ? ' new' : '');
       marker.style.left = `${position / 100}%`;
       marker.title = `${project.name} · ${formatHistoryTime(project.firstSeen)}`;
-      historyEls.markers.appendChild(marker);
+      S.historyEls.markers.appendChild(marker);
     }
-    const newestLive = playback.mode === 'live'
+    const newestLive = S.playback.mode === 'live'
       ? [...visible].sort((a, b) => (
-        (liveProjectEvents.get(b.id) || 0) - (liveProjectEvents.get(a.id) || 0)
-      )).find((project) => liveProjectEvents.has(project.id))
+        (S.liveProjectEvents.get(b.id) || 0) - (S.liveProjectEvents.get(a.id) || 0)
+      )).find((project) => S.liveProjectEvents.has(project.id))
       : null;
-    historyEls.projectEvent.textContent = newestLive ? `NEW SYSTEM · ${newestLive.name}` : '';
-    historyEls.projectEvent.classList.toggle('hidden', !newestLive);
+    S.historyEls.projectEvent.textContent = newestLive ? `NEW SYSTEM · ${newestLive.name}` : '';
+    S.historyEls.projectEvent.classList.toggle('hidden', !newestLive);
   }
 
   function renderHistory() {
-    if (!historyEls || !historyEls.bar) return;
-    const replayMode = playback.mode === 'replay';
-    const hasRange = playback.available && Number.isFinite(playback.minTs) &&
-      Number.isFinite(playback.maxTs);
-    const busy = replayBusy || playback.indexing;
-    const shownTs = Number.isFinite(historyPreviewTs)
-      ? historyPreviewTs
-      : (replayMode ? playback.cursorTs : playback.maxTs);
+    if (!S.historyEls || !S.historyEls.bar) return;
+    const replayMode = S.playback.mode === 'replay';
+    const hasRange = S.playback.available && Number.isFinite(S.playback.minTs) &&
+      Number.isFinite(S.playback.maxTs);
+    const busy = S.replayBusy || S.playback.indexing;
+    const shownTs = Number.isFinite(S.historyPreviewTs)
+      ? S.historyPreviewTs
+      : (replayMode ? S.playback.cursorTs : S.playback.maxTs);
 
-    historyEls.bar.dataset.mode = replayMode ? 'replay' : 'live';
-    historyEls.bar.dataset.playing = String(Boolean(playback.playing));
-    historyEls.bar.dataset.indexing = String(Boolean(playback.indexing));
-    historyEls.bar.dataset.truncated = String(Boolean(playback.truncated));
-    historyEls.bar.classList.toggle('busy', replayBusy);
+    S.historyEls.bar.dataset.mode = replayMode ? 'replay' : 'live';
+    S.historyEls.bar.dataset.playing = String(Boolean(S.playback.playing));
+    S.historyEls.bar.dataset.indexing = String(Boolean(S.playback.indexing));
+    S.historyEls.bar.dataset.truncated = String(Boolean(S.playback.truncated));
+    S.historyEls.bar.classList.toggle('busy', S.replayBusy);
     document.body.dataset.playbackMode = replayMode ? 'replay' : 'live';
 
-    historyEls.play.textContent = playback.playing ? 'Pause' : 'Play';
-    historyEls.play.setAttribute('aria-label', playback.playing ? 'Pause history' : 'Play history');
-    historyEls.play.disabled = !replayMode || !hasRange || busy;
-    historyEls.speed.textContent = playback.speed + 'x';
-    historyEls.speed.disabled = !replayMode || !hasRange || busy;
-    historyEls.live.classList.toggle('active', !replayMode);
-    historyEls.live.setAttribute('aria-pressed', String(!replayMode));
-    historyEls.live.disabled = !replayMode || replayBusy;
+    S.historyEls.play.textContent = S.playback.playing ? 'Pause' : 'Play';
+    S.historyEls.play.setAttribute('aria-label', S.playback.playing ? 'Pause history' : 'Play history');
+    S.historyEls.play.disabled = !replayMode || !hasRange || busy;
+    S.historyEls.speed.textContent = S.playback.speed + 'x';
+    S.historyEls.speed.disabled = !replayMode || !hasRange || busy;
+    S.historyEls.live.classList.toggle('active', !replayMode);
+    S.historyEls.live.setAttribute('aria-pressed', String(!replayMode));
+    S.historyEls.live.disabled = !replayMode || S.replayBusy;
 
     if (hasRange) {
-      const fallback = replayMode ? playback.cursorTs : playback.maxTs;
+      const fallback = replayMode ? S.playback.cursorTs : S.playback.maxTs;
       const value = Number.isFinite(shownTs) ? shownTs : fallback;
       const position = historyPositionFromTimestamp(value);
-      historyEls.scrubber.value = String(position);
-      historyEls.scrubber.dataset.minTs = String(playback.minTs);
-      historyEls.scrubber.dataset.maxTs = String(playback.maxTs);
-      historyEls.bar.style.setProperty('--history-progress', `${position / 100}%`);
-      if (historyEls.start) {
-        historyEls.start.textContent = formatHistoryEdge(playback.minTs);
-        historyEls.start.dateTime = new Date(playback.minTs).toISOString();
+      S.historyEls.scrubber.value = String(position);
+      S.historyEls.scrubber.dataset.minTs = String(S.playback.minTs);
+      S.historyEls.scrubber.dataset.maxTs = String(S.playback.maxTs);
+      S.historyEls.bar.style.setProperty('--history-progress', `${position / 100}%`);
+      if (S.historyEls.start) {
+        S.historyEls.start.textContent = formatHistoryEdge(S.playback.minTs);
+        S.historyEls.start.dateTime = new Date(S.playback.minTs).toISOString();
       }
-      if (historyEls.end) {
-        historyEls.end.textContent = replayMode ? formatHistoryEdge(playback.maxTs) : 'LATEST';
-        historyEls.end.dateTime = new Date(playback.maxTs).toISOString();
+      if (S.historyEls.end) {
+        S.historyEls.end.textContent = replayMode ? formatHistoryEdge(S.playback.maxTs) : 'LATEST';
+        S.historyEls.end.dateTime = new Date(S.playback.maxTs).toISOString();
       }
     }
-    historyEls.scrubber.disabled = !hasRange || busy;
+    S.historyEls.scrubber.disabled = !hasRange || busy;
 
     let label;
-    if (Number.isFinite(historyPreviewTs)) label = formatHistoryTime(historyPreviewTs);
-    else if (playback.indexing && !hasRange) label = 'INDEXING…';
+    if (Number.isFinite(S.historyPreviewTs)) label = formatHistoryTime(S.historyPreviewTs);
+    else if (S.playback.indexing && !hasRange) label = 'INDEXING…';
     else if (!hasRange) label = 'NO HISTORY';
     else if (!replayMode) label = 'LIVE';
-    else label = formatHistoryTime(playback.cursorTs);
+    else label = formatHistoryTime(S.playback.cursorTs);
     setHistoryTimestamp(shownTs, label);
-    if (historyEls.context) {
-      historyEls.context.textContent = replayMode ? 'HISTORY TIMELINE' : 'LIVE TIMELINE';
+    if (S.historyEls.context) {
+      S.historyEls.context.textContent = replayMode ? 'HISTORY TIMELINE' : 'LIVE TIMELINE';
     }
     renderHistoryMarkers(hasRange);
 
-    if (historyEls.feedMode && historyEls.feedLabel) {
-      const feedState = replayMode ? (playback.playing ? 'replay' : 'paused') : 'live';
-      historyEls.feedMode.className = 'panel-note feed-mode ' + feedState;
-      historyEls.feedLabel.textContent = replayMode ? 'REPLAY' : 'LIVE';
+    if (S.historyEls.feedMode && S.historyEls.feedLabel) {
+      const feedState = replayMode ? (S.playback.playing ? 'replay' : 'paused') : 'live';
+      S.historyEls.feedMode.className = 'panel-note feed-mode ' + feedState;
+      S.historyEls.feedLabel.textContent = replayMode ? 'REPLAY' : 'LIVE';
     }
   }
 
   // ---------- debug / shots ----------
   function pickDemoProject() {
     let best = null;
-    for (const p of store.projects.values()) {
+    for (const p of S.store.projects.values()) {
       if (!p.exists) continue;
       if (!best || p.lastActivity > best.lastActivity) best = p;
     }
     if (best) return best;
     // fallback: any project at all
-    for (const p of store.projects.values()) return p;
+    for (const p of S.store.projects.values()) return p;
     return null;
   }
 
@@ -1293,7 +812,7 @@
     try {
       if (view === 'system') {
         const p = pickDemoProject();
-        if (p) await openSystem(p.id);
+        if (p) await A.openSystem(p.id);
       } else if (view === 'planet') {
         const p = pickDemoProject();
         if (p) {
@@ -1303,7 +822,7 @@
           if (planet) await openPlanet(p.id, planet.name);
         }
       } else {
-        if (current.view !== 'universe') showUniverse();
+        if (S.current.view !== 'universe') showUniverse();
       }
     } catch (e) {
       AUR.log('debug-view handling issue:', view, e && e.message);
@@ -1314,7 +833,7 @@
   // Fire AU.debugReady() exactly once, after the active scene is ready and has
   // rendered one frame. Never from a recurring observable.
   function signalReadyOnce() {
-    const scene = activeScene;
+    const scene = S.activeScene;
     if (!scene || scene.isDisposed) { AU.debugReady(); return; }
     scene.executeWhenReady(() => {
       if (scene.isDisposed) { AU.debugReady(); return; }
@@ -1333,7 +852,7 @@
       chromePending = false;
       const next = pendingChromeMask;
       pendingChromeMask = 0;
-      if (next & CHROME_AGENTS) renderAgents();
+      if (next & CHROME_AGENTS) A.renderAgents();
       if (next & CHROME_FEED) renderFeed();
       if (next & CHROME_SUMMARY) renderSummary();
       if (next & CHROME_PROJECT) renderProjectCard();
@@ -1343,13 +862,13 @@
       if (next & CHROME_SETTINGS) renderProjectSettings();
       if (next & CHROME_DIRECTORY) refreshProjectDirectoryFromStore();
       if (next & CHROME_IDEAS) renderIdeas();
-      if (next & CHROME_FOCUS) renderAgentFocus();
+      if (next & CHROME_FOCUS) A.renderAgentFocus();
       if (next & CHROME_HISTORY) renderHistory();
     });
   }
 
   function renderChrome() {
-    renderAgents();
+    A.renderAgents();
     renderFeed();
     renderSummary();
     renderProjectCard();
@@ -1362,34 +881,34 @@
     renderProjectSettings();
     renderIdeas();
     renderHistory();
-    renderAgentFocus();
+    A.renderAgentFocus();
   }
 
   // ---------- collapsible command rail ----------
   function readCommandRailState() {
     try {
-      const value = JSON.parse(localStorage.getItem(COMMAND_RAIL_STORAGE_KEY) || 'null');
+      const value = JSON.parse(localStorage.getItem(C.COMMAND_RAIL_STORAGE_KEY) || 'null');
       if (!value || typeof value !== 'object') return;
-      commandRail.compact = value.compact === true;
-      commandRail.ideasCollapsed = value.ideasCollapsed === true;
-      commandRail.agentsCollapsed = value.agentsCollapsed === true;
-      commandRail.feedCollapsed = value.feedCollapsed === true;
+      S.commandRail.compact = value.compact === true;
+      S.commandRail.ideasCollapsed = value.ideasCollapsed === true;
+      S.commandRail.agentsCollapsed = value.agentsCollapsed === true;
+      S.commandRail.feedCollapsed = value.feedCollapsed === true;
     } catch (error) { /* use the roomy default */ }
   }
 
   function saveCommandRailState() {
     try {
-      localStorage.setItem(COMMAND_RAIL_STORAGE_KEY, JSON.stringify({
-        compact: commandRail.compact,
-        ideasCollapsed: commandRail.ideasCollapsed,
-        agentsCollapsed: commandRail.agentsCollapsed,
-        feedCollapsed: commandRail.feedCollapsed,
+      localStorage.setItem(C.COMMAND_RAIL_STORAGE_KEY, JSON.stringify({
+        compact: S.commandRail.compact,
+        ideasCollapsed: S.commandRail.ideasCollapsed,
+        agentsCollapsed: S.commandRail.agentsCollapsed,
+        feedCollapsed: S.commandRail.feedCollapsed,
       }));
     } catch (error) { /* persistence is a convenience, never a requirement */ }
   }
 
   function wireCommandRail() {
-    commandRail.els = {
+    S.commandRail.els = {
       root: document.getElementById('sidebar'),
       toggle: document.getElementById('command-rail-toggle'),
       ideasPanel: document.getElementById('ideas-panel'),
@@ -1405,28 +924,28 @@
       feedCompact: document.getElementById('compact-feed-button'),
       feedCompactCount: document.getElementById('compact-feed-count'),
     };
-    const els = commandRail.els;
+    const els = S.commandRail.els;
     if (!els.root || !els.toggle || !els.ideasPanel || !els.ideasToggle ||
         !els.ideasCompact || !els.agentsPanel || !els.agentsToggle ||
         !els.agentsCompact || !els.feedPanel || !els.feedToggle || !els.feedCompact) return;
     readCommandRailState();
     els.toggle.addEventListener('click', () => {
-      commandRail.compact = !commandRail.compact;
+      S.commandRail.compact = !S.commandRail.compact;
       applyCommandRailState();
       saveCommandRailState();
     });
     els.agentsToggle.addEventListener('click', () => {
-      commandRail.agentsCollapsed = !commandRail.agentsCollapsed;
+      S.commandRail.agentsCollapsed = !S.commandRail.agentsCollapsed;
       applyCommandRailState();
       saveCommandRailState();
     });
     els.ideasToggle.addEventListener('click', () => {
-      commandRail.ideasCollapsed = !commandRail.ideasCollapsed;
+      S.commandRail.ideasCollapsed = !S.commandRail.ideasCollapsed;
       applyCommandRailState();
       saveCommandRailState();
     });
     els.feedToggle.addEventListener('click', () => {
-      commandRail.feedCollapsed = !commandRail.feedCollapsed;
+      S.commandRail.feedCollapsed = !S.commandRail.feedCollapsed;
       applyCommandRailState();
       saveCommandRailState();
     });
@@ -1437,33 +956,33 @@
   }
 
   function expandCommandRailSection(section) {
-    commandRail.compact = false;
-    if (section === 'ideas') commandRail.ideasCollapsed = false;
-    if (section === 'agents') commandRail.agentsCollapsed = false;
-    if (section === 'feed') commandRail.feedCollapsed = false;
+    S.commandRail.compact = false;
+    if (section === 'ideas') S.commandRail.ideasCollapsed = false;
+    if (section === 'agents') S.commandRail.agentsCollapsed = false;
+    if (section === 'feed') S.commandRail.feedCollapsed = false;
     applyCommandRailState();
     saveCommandRailState();
   }
 
   function applyCommandRailState() {
-    const els = commandRail.els;
+    const els = S.commandRail.els;
     if (!els) return;
-    els.root.classList.toggle('compact', commandRail.compact);
-    document.body.classList.toggle('command-rail-is-compact', commandRail.compact);
-    els.toggle.setAttribute('aria-expanded', String(!commandRail.compact));
-    els.toggle.setAttribute('aria-label', commandRail.compact
+    els.root.classList.toggle('compact', S.commandRail.compact);
+    document.body.classList.toggle('command-rail-is-compact', S.commandRail.compact);
+    els.toggle.setAttribute('aria-expanded', String(!S.commandRail.compact));
+    els.toggle.setAttribute('aria-label', S.commandRail.compact
       ? 'Expand command rail' : 'Collapse command rail');
-    els.toggle.title = commandRail.compact ? 'Expand command rail' : 'Collapse command rail';
+    els.toggle.title = S.commandRail.compact ? 'Expand command rail' : 'Collapse command rail';
     applyCommandSectionState(
-      els.ideasPanel, els.ideasToggle, commandRail.ideasCollapsed,
+      els.ideasPanel, els.ideasToggle, S.commandRail.ideasCollapsed,
       'task ideas'
     );
     applyCommandSectionState(
-      els.agentsPanel, els.agentsToggle, commandRail.agentsCollapsed,
+      els.agentsPanel, els.agentsToggle, S.commandRail.agentsCollapsed,
       'active agents'
     );
     applyCommandSectionState(
-      els.feedPanel, els.feedToggle, commandRail.feedCollapsed,
+      els.feedPanel, els.feedToggle, S.commandRail.feedCollapsed,
       'event feed'
     );
   }
@@ -1477,9 +996,9 @@
   const RECENT_MAX = 5;
   function renderRecent() {
     const nav = document.getElementById('recent');
-    if (current.view !== 'universe') { nav.classList.add('hidden'); return; }
+    if (S.current.view !== 'universe') { nav.classList.add('hidden'); return; }
     const pills = document.getElementById('recent-pills');
-    const recent = [...store.projects.values()]
+    const recent = [...S.store.projects.values()]
       .sort((a, b) => (b.lastActivity || 0) - (a.lastActivity || 0))
       .slice(0, RECENT_MAX);
     if (recent.length === 0) { nav.classList.add('hidden'); return; }
@@ -1497,14 +1016,14 @@
 
   // ---------- universe project search ----------
   function wireProjectSearch() {
-    projectSearch.els = {
+    S.projectSearch.els = {
       root: document.getElementById('project-search'),
       input: document.getElementById('search-input'),
       results: document.getElementById('search-results'),
       filter: document.getElementById('project-vcs-filter'),
       filterCount: document.getElementById('project-vcs-filter-count'),
     };
-    const els = projectSearch.els;
+    const els = S.projectSearch.els;
     if (!els.root || !els.input || !els.results) return;
 
     els.input.addEventListener('input', () => {
@@ -1513,17 +1032,17 @@
         updateProjectSearch();
         return;
       }
-      projectSearch.timer = setTimeout(() => {
-        projectSearch.timer = null;
+      S.projectSearch.timer = setTimeout(() => {
+        S.projectSearch.timer = null;
         updateProjectSearch();
-      }, SEARCH_DEBOUNCE_MS);
+      }, C.SEARCH_DEBOUNCE_MS);
     });
 
     els.input.addEventListener('focus', () => closeProjectDirectory(false));
 
     if (els.filter) {
       els.filter.addEventListener('click', () => {
-        projectSearch.filter = projectSearch.filter === VCS.FILTERS.GITHUB
+        S.projectSearch.filter = S.projectSearch.filter === VCS.FILTERS.GITHUB
           ? VCS.FILTERS.ALL : VCS.FILTERS.GITHUB;
         updateProjectSearch();
         refreshProjectDirectoryFromStore();
@@ -1542,34 +1061,34 @@
       event.stopPropagation();
       flushProjectSearch();
       if (event.key === 'Enter') {
-        activateProjectSearchResult(projectSearch.selected);
+        activateProjectSearchResult(S.projectSearch.selected);
         return;
       }
-      if (projectSearch.results.length === 0) return;
+      if (S.projectSearch.results.length === 0) return;
       const delta = event.key === 'ArrowDown' ? 1 : -1;
-      projectSearch.selected = (projectSearch.selected + delta + projectSearch.results.length) %
-        projectSearch.results.length;
+      S.projectSearch.selected = (S.projectSearch.selected + delta + S.projectSearch.results.length) %
+        S.projectSearch.results.length;
       renderProjectSearchResults();
     });
   }
 
   function cancelProjectSearchTimer() {
-    if (projectSearch.timer != null) clearTimeout(projectSearch.timer);
-    projectSearch.timer = null;
+    if (S.projectSearch.timer != null) clearTimeout(S.projectSearch.timer);
+    S.projectSearch.timer = null;
   }
 
   function flushProjectSearch() {
-    if (projectSearch.timer == null) return;
+    if (S.projectSearch.timer == null) return;
     cancelProjectSearchTimer();
     updateProjectSearch();
   }
 
   function clearProjectSearch() {
     cancelProjectSearchTimer();
-    projectSearch.query = '';
-    projectSearch.results = [];
-    projectSearch.selected = 0;
-    const els = projectSearch.els;
+    S.projectSearch.query = '';
+    S.projectSearch.results = [];
+    S.projectSearch.selected = 0;
+    const els = S.projectSearch.els;
     if (els) {
       els.input.value = '';
       els.input.setAttribute('aria-expanded', 'false');
@@ -1577,25 +1096,25 @@
       els.results.classList.add('hidden');
       AUR.clear(els.results);
     }
-    if (activeView && typeof activeView.setSearchMatches === 'function') {
+    if (S.activeView && typeof S.activeView.setSearchMatches === 'function') {
       syncUniverseProjectMatches();
     }
   }
 
   function renderProjectSearchVisibility() {
-    const els = projectSearch.els;
+    const els = S.projectSearch.els;
     if (!els) return;
-    els.root.classList.toggle('hidden', current.view !== 'universe');
+    els.root.classList.toggle('hidden', S.current.view !== 'universe');
     renderProjectVcsFilter();
   }
 
   function renderProjectVcsFilter() {
-    const els = projectSearch.els;
+    const els = S.projectSearch.els;
     if (!els || !els.filter) return;
-    const githubCount = VCS.filterProjects([...store.projects.values()], {
+    const githubCount = VCS.filterProjects([...S.store.projects.values()], {
       filter: VCS.FILTERS.GITHUB,
     }).length;
-    const active = projectSearch.filter === VCS.FILTERS.GITHUB;
+    const active = S.projectSearch.filter === VCS.FILTERS.GITHUB;
     els.filter.setAttribute('aria-pressed', String(active));
     els.filter.setAttribute('aria-label', active
       ? `Show all projects; ${githubCount} have GitHub repositories`
@@ -1605,58 +1124,58 @@
   }
 
   function refreshProjectSearchFromStore() {
-    const els = projectSearch.els;
+    const els = S.projectSearch.els;
     renderProjectSearchVisibility();
-    if (!els || current.view !== 'universe') return;
-    if (els.input.value.trim() || projectSearch.filter !== VCS.FILTERS.ALL) updateProjectSearch();
+    if (!els || S.current.view !== 'universe') return;
+    if (els.input.value.trim() || S.projectSearch.filter !== VCS.FILTERS.ALL) updateProjectSearch();
     else syncUniverseProjectMatches();
   }
 
   function matchingUniverseProjects(projects, query) {
-    return VCS.filterProjects(projects, { filter: projectSearch.filter, query });
+    return VCS.filterProjects(projects, { filter: S.projectSearch.filter, query });
   }
 
   function syncUniverseProjectMatches(projects, query) {
-    if (!activeView || typeof activeView.setSearchMatches !== 'function' ||
-        current.view !== 'universe') return;
-    const source = projects || [...store.projects.values()];
-    const needle = query == null && projectSearch.els
-      ? projectSearch.els.input.value.trim() : String(query || '').trim();
-    const active = Boolean(needle) || projectSearch.filter !== VCS.FILTERS.ALL;
-    activeView.setSearchMatches(active
+    if (!S.activeView || typeof S.activeView.setSearchMatches !== 'function' ||
+        S.current.view !== 'universe') return;
+    const source = projects || [...S.store.projects.values()];
+    const needle = query == null && S.projectSearch.els
+      ? S.projectSearch.els.input.value.trim() : String(query || '').trim();
+    const active = Boolean(needle) || S.projectSearch.filter !== VCS.FILTERS.ALL;
+    S.activeView.setSearchMatches(active
       ? new Set(matchingUniverseProjects(source, needle).map((project) => project.id))
       : null);
   }
 
   function updateProjectSearch() {
-    const els = projectSearch.els;
-    if (!els || current.view !== 'universe') return;
+    const els = S.projectSearch.els;
+    if (!els || S.current.view !== 'universe') return;
     const query = els.input.value.trim();
-    const queryChanged = query !== projectSearch.query;
-    const previous = queryChanged ? null : projectSearch.results[projectSearch.selected];
-    projectSearch.query = query;
+    const queryChanged = query !== S.projectSearch.query;
+    const previous = queryChanged ? null : S.projectSearch.results[S.projectSearch.selected];
+    S.projectSearch.query = query;
     if (!query) {
-      projectSearch.results = [];
-      projectSearch.selected = 0;
+      S.projectSearch.results = [];
+      S.projectSearch.selected = 0;
       renderProjectSearchResults();
       syncUniverseProjectMatches();
       renderProjectVcsFilter();
       return;
     }
 
-    const projects = [...store.projects.values()];
+    const projects = [...S.store.projects.values()];
     const matches = matchingUniverseProjects(projects, query);
     const ranked = AUR.searchProjects(matches, query);
     const rankedIds = new Set(ranked.map((project) => project.id));
     const extras = matches.filter((project) => !rankedIds.has(project.id)).sort((a, b) =>
       String(a.name || a.id).localeCompare(String(b.name || b.id))
     );
-    projectSearch.results = [...ranked, ...extras].slice(0, 8);
+    S.projectSearch.results = [...ranked, ...extras].slice(0, 8);
     const previousIndex = previous
-      ? projectSearch.results.findIndex((project) => project.id === previous.id)
+      ? S.projectSearch.results.findIndex((project) => project.id === previous.id)
       : -1;
-    projectSearch.selected = queryChanged ? 0 : previousIndex >= 0
-      ? previousIndex : Math.min(projectSearch.selected, Math.max(0, projectSearch.results.length - 1));
+    S.projectSearch.selected = queryChanged ? 0 : previousIndex >= 0
+      ? previousIndex : Math.min(S.projectSearch.selected, Math.max(0, S.projectSearch.results.length - 1));
     renderProjectSearchResults();
     syncUniverseProjectMatches(projects, query);
     renderProjectVcsFilter();
@@ -1676,9 +1195,9 @@
   }
 
   function renderProjectSearchResults() {
-    const els = projectSearch.els;
+    const els = S.projectSearch.els;
     if (!els) return;
-    const open = current.view === 'universe' && Boolean(els.input.value.trim());
+    const open = S.current.view === 'universe' && Boolean(els.input.value.trim());
     els.results.classList.toggle('hidden', !open);
     els.input.setAttribute('aria-expanded', String(open));
     AUR.clear(els.results);
@@ -1686,14 +1205,14 @@
       els.input.removeAttribute('aria-activedescendant');
       return;
     }
-    if (projectSearch.results.length === 0) {
+    if (S.projectSearch.results.length === 0) {
       els.results.appendChild(AUR.el('div', 'search-empty', 'No systems found'));
       els.input.removeAttribute('aria-activedescendant');
       return;
     }
 
-    projectSearch.results.forEach((project, index) => {
-      const selected = index === projectSearch.selected;
+    S.projectSearch.results.forEach((project, index) => {
+      const selected = index === S.projectSearch.selected;
       const row = AUR.el('button', 'search-result' + (selected ? ' selected' : ''));
       row.type = 'button';
       row.id = 'search-result-' + index;
@@ -1709,21 +1228,21 @@
       row.addEventListener('click', () => activateProjectSearchResult(index));
       els.results.appendChild(row);
     });
-    els.input.setAttribute('aria-activedescendant', 'search-result-' + projectSearch.selected);
+    els.input.setAttribute('aria-activedescendant', 'search-result-' + S.projectSearch.selected);
     const selectedRow = els.results.querySelector('.search-result.selected');
     if (selectedRow) selectedRow.scrollIntoView({ block: 'nearest' });
   }
 
   function activateProjectSearchResult(index) {
-    const project = projectSearch.results[index] || projectSearch.results[0];
+    const project = S.projectSearch.results[index] || S.projectSearch.results[0];
     if (!project) return;
     clearProjectSearch();
-    openSystem(project.id);
+    A.openSystem(project.id);
   }
 
   // ---------- searchable all-projects directory ----------
   function wireProjectDirectory() {
-    projectDirectory.els = {
+    S.projectDirectory.els = {
       button: document.getElementById('project-directory-button'),
       buttonCount: document.getElementById('project-directory-button-count'),
       panel: document.getElementById('project-directory'),
@@ -1733,22 +1252,22 @@
       input: document.getElementById('project-directory-input'),
       list: document.getElementById('project-directory-list'),
     };
-    const els = projectDirectory.els;
+    const els = S.projectDirectory.els;
     if (!els.button || !els.buttonCount || !els.panel || !els.scrim || !els.close ||
         !els.subtitle || !els.input || !els.list) return;
 
     els.button.addEventListener('click', () => {
-      if (projectDirectory.open) closeProjectDirectory();
+      if (S.projectDirectory.open) closeProjectDirectory();
       else openProjectDirectory();
     });
     els.close.addEventListener('click', () => closeProjectDirectory());
     els.scrim.addEventListener('click', () => closeProjectDirectory());
     els.input.addEventListener('input', () => {
       cancelProjectDirectoryTimer();
-      projectDirectory.timer = setTimeout(() => {
-        projectDirectory.timer = null;
+      S.projectDirectory.timer = setTimeout(() => {
+        S.projectDirectory.timer = null;
         updateProjectDirectory();
-      }, SEARCH_DEBOUNCE_MS);
+      }, C.SEARCH_DEBOUNCE_MS);
     });
     els.input.addEventListener('keydown', (event) => {
       if (event.key === 'Escape') {
@@ -1762,18 +1281,18 @@
       event.stopPropagation();
       flushProjectDirectory();
       if (event.key === 'Enter') {
-        activateProjectDirectoryResult(projectDirectory.selected);
+        activateProjectDirectoryResult(S.projectDirectory.selected);
         return;
       }
-      if (projectDirectory.results.length === 0) return;
+      if (S.projectDirectory.results.length === 0) return;
       const delta = event.key === 'ArrowDown' ? 1 : -1;
-      projectDirectory.selected = (
-        projectDirectory.selected + delta + projectDirectory.results.length
-      ) % projectDirectory.results.length;
+      S.projectDirectory.selected = (
+        S.projectDirectory.selected + delta + S.projectDirectory.results.length
+      ) % S.projectDirectory.results.length;
       renderProjectDirectoryResults();
     });
     document.addEventListener('keydown', (event) => {
-      if (event.key !== 'Escape' || !projectDirectory.open) return;
+      if (event.key !== 'Escape' || !S.projectDirectory.open) return;
       event.preventDefault();
       closeProjectDirectory();
     });
@@ -1781,50 +1300,50 @@
   }
 
   function openProjectDirectory() {
-    const els = projectDirectory.els;
-    if (!els || projectDirectory.open) return;
+    const els = S.projectDirectory.els;
+    if (!els || S.projectDirectory.open) return;
     clearProjectSearch();
-    projectDirectory.open = true;
-    projectDirectory.query = '';
-    projectDirectory.selected = 0;
+    S.projectDirectory.open = true;
+    S.projectDirectory.query = '';
+    S.projectDirectory.selected = 0;
     els.input.value = '';
     updateProjectDirectory();
     requestAnimationFrame(() => els.input.focus());
   }
 
   function closeProjectDirectory(restoreFocus = true) {
-    const els = projectDirectory.els;
-    if (!els || !projectDirectory.open) return;
+    const els = S.projectDirectory.els;
+    if (!els || !S.projectDirectory.open) return;
     cancelProjectDirectoryTimer();
-    projectDirectory.open = false;
-    projectDirectory.query = '';
-    projectDirectory.results = [];
-    projectDirectory.selected = 0;
+    S.projectDirectory.open = false;
+    S.projectDirectory.query = '';
+    S.projectDirectory.results = [];
+    S.projectDirectory.selected = 0;
     els.input.value = '';
     renderProjectDirectory();
-    if (activeView && typeof activeView.setSearchMatches === 'function') {
+    if (S.activeView && typeof S.activeView.setSearchMatches === 'function') {
       syncUniverseProjectMatches();
     }
     if (restoreFocus) els.button.focus();
   }
 
   function cancelProjectDirectoryTimer() {
-    if (projectDirectory.timer != null) clearTimeout(projectDirectory.timer);
-    projectDirectory.timer = null;
+    if (S.projectDirectory.timer != null) clearTimeout(S.projectDirectory.timer);
+    S.projectDirectory.timer = null;
   }
 
   function flushProjectDirectory() {
-    if (projectDirectory.timer == null) return;
+    if (S.projectDirectory.timer == null) return;
     cancelProjectDirectoryTimer();
     updateProjectDirectory();
   }
 
   function projectsByActivity() {
     const activeCounts = new Map();
-    for (const ship of store.ships.values()) {
+    for (const ship of S.store.ships.values()) {
       activeCounts.set(ship.project, (activeCounts.get(ship.project) || 0) + 1);
     }
-    return [...store.projects.values()].sort((a, b) => {
+    return [...S.store.projects.values()].sort((a, b) => {
       const activeDelta = (activeCounts.get(b.id) || 0) - (activeCounts.get(a.id) || 0);
       if (activeDelta !== 0) return activeDelta;
       const existsDelta = Number(b.exists !== false) - Number(a.exists !== false);
@@ -1836,64 +1355,64 @@
   }
 
   function updateProjectDirectory() {
-    const els = projectDirectory.els;
-    if (!els || !projectDirectory.open) return;
+    const els = S.projectDirectory.els;
+    if (!els || !S.projectDirectory.open) return;
     const query = els.input.value.trim();
-    const queryChanged = query !== projectDirectory.query;
-    const previous = queryChanged ? null : projectDirectory.results[projectDirectory.selected];
+    const queryChanged = query !== S.projectDirectory.query;
+    const previous = queryChanged ? null : S.projectDirectory.results[S.projectDirectory.selected];
     const allProjects = projectsByActivity();
-    const projects = current.view === 'universe'
-      ? VCS.filterProjects(allProjects, { filter: projectSearch.filter })
+    const projects = S.current.view === 'universe'
+      ? VCS.filterProjects(allProjects, { filter: S.projectSearch.filter })
       : allProjects;
-    projectDirectory.query = query;
+    S.projectDirectory.query = query;
     if (query) {
       const matches = VCS.filterProjects(projects, { query });
       const ranked = AUR.searchProjects(matches, query, Math.max(matches.length, 8));
       const rankedIds = new Set(ranked.map((project) => project.id));
-      projectDirectory.results = [
+      S.projectDirectory.results = [
         ...ranked,
         ...matches.filter((project) => !rankedIds.has(project.id)),
       ];
     } else {
-      projectDirectory.results = projects;
+      S.projectDirectory.results = projects;
     }
     const previousIndex = previous
-      ? projectDirectory.results.findIndex((project) => project.id === previous.id)
+      ? S.projectDirectory.results.findIndex((project) => project.id === previous.id)
       : -1;
-    projectDirectory.selected = queryChanged ? 0 : previousIndex >= 0
+    S.projectDirectory.selected = queryChanged ? 0 : previousIndex >= 0
       ? previousIndex
-      : Math.min(projectDirectory.selected, Math.max(0, projectDirectory.results.length - 1));
+      : Math.min(S.projectDirectory.selected, Math.max(0, S.projectDirectory.results.length - 1));
     renderProjectDirectory();
-    if (activeView && typeof activeView.setSearchMatches === 'function') {
-      const active = Boolean(query) || projectSearch.filter !== VCS.FILTERS.ALL;
-      activeView.setSearchMatches(active
-        ? new Set(projectDirectory.results.map((project) => project.id))
+    if (S.activeView && typeof S.activeView.setSearchMatches === 'function') {
+      const active = Boolean(query) || S.projectSearch.filter !== VCS.FILTERS.ALL;
+      S.activeView.setSearchMatches(active
+        ? new Set(S.projectDirectory.results.map((project) => project.id))
         : null);
     }
   }
 
   function refreshProjectDirectoryFromStore() {
     renderProjectDirectory();
-    if (projectDirectory.open) updateProjectDirectory();
+    if (S.projectDirectory.open) updateProjectDirectory();
   }
 
   function renderProjectDirectory() {
-    const els = projectDirectory.els;
+    const els = S.projectDirectory.els;
     if (!els) return;
-    const total = store.projects.size;
+    const total = S.store.projects.size;
     els.buttonCount.textContent = String(total);
     els.button.setAttribute('aria-label', `Open all projects, ${total} projects`);
-    els.button.setAttribute('aria-expanded', String(projectDirectory.open));
-    els.panel.classList.toggle('hidden', !projectDirectory.open);
-    els.scrim.classList.toggle('hidden', !projectDirectory.open);
-    els.input.setAttribute('aria-expanded', String(projectDirectory.open));
-    if (!projectDirectory.open) {
+    els.button.setAttribute('aria-expanded', String(S.projectDirectory.open));
+    els.panel.classList.toggle('hidden', !S.projectDirectory.open);
+    els.scrim.classList.toggle('hidden', !S.projectDirectory.open);
+    els.input.setAttribute('aria-expanded', String(S.projectDirectory.open));
+    if (!S.projectDirectory.open) {
       els.input.removeAttribute('aria-activedescendant');
       return;
     }
-    const shown = projectDirectory.results.length;
-    const githubOnly = current.view === 'universe' && projectSearch.filter === VCS.FILTERS.GITHUB;
-    els.subtitle.textContent = projectDirectory.query || githubOnly
+    const shown = S.projectDirectory.results.length;
+    const githubOnly = S.current.view === 'universe' && S.projectSearch.filter === VCS.FILTERS.GITHUB;
+    els.subtitle.textContent = S.projectDirectory.query || githubOnly
       ? `${shown} of ${total} projects${githubOnly ? ' · GitHub only' : ''}`
       : `${total} projects · active first`;
     renderProjectDirectoryResults();
@@ -1906,20 +1425,20 @@
   }
 
   function renderProjectDirectoryResults() {
-    const els = projectDirectory.els;
-    if (!els || !projectDirectory.open) return;
+    const els = S.projectDirectory.els;
+    if (!els || !S.projectDirectory.open) return;
     AUR.clear(els.list);
-    if (projectDirectory.results.length === 0) {
+    if (S.projectDirectory.results.length === 0) {
       els.list.appendChild(AUR.el('div', 'project-directory-empty', 'No projects found'));
       els.input.removeAttribute('aria-activedescendant');
       return;
     }
 
-    projectDirectory.results.forEach((project, index) => {
+    S.projectDirectory.results.forEach((project, index) => {
       const ships = shipsInProject(project.id);
       const active = ships.length > 0;
       const missing = project.exists === false;
-      const selected = index === projectDirectory.selected;
+      const selected = index === S.projectDirectory.selected;
       const row = AUR.el(
         'button', 'project-directory-row' + (active ? ' active' : '') +
           (missing ? ' missing' : '') + (selected ? ' selected' : '')
@@ -1950,26 +1469,26 @@
       els.list.appendChild(row);
     });
     els.input.setAttribute(
-      'aria-activedescendant', 'project-directory-result-' + projectDirectory.selected
+      'aria-activedescendant', 'project-directory-result-' + S.projectDirectory.selected
     );
     const selectedRow = els.list.querySelector('.project-directory-row.selected');
     if (selectedRow) selectedRow.scrollIntoView({ block: 'nearest' });
   }
 
   function activateProjectDirectoryResult(index) {
-    const project = projectDirectory.results[index] || projectDirectory.results[0];
+    const project = S.projectDirectory.results[index] || S.projectDirectory.results[0];
     if (!project) return;
     closeProjectDirectory(false);
     if (project.exists === false) {
       openProjectSettings();
       return;
     }
-    openSystem(project.id);
+    A.openSystem(project.id);
   }
 
   // ---------- project path settings ----------
   function wireProjectSettings() {
-    projectSettings.els = {
+    S.projectSettings.els = {
       button: document.getElementById('settings-button'),
       count: document.getElementById('settings-count'),
       dialog: document.getElementById('settings-dialog'),
@@ -1980,7 +1499,7 @@
       status: document.getElementById('settings-status'),
       projects: document.getElementById('settings-projects'),
     };
-    const els = projectSettings.els;
+    const els = S.projectSettings.els;
     if (!els.button || !els.dialog || !els.close || !els.scan || !els.projects) return;
 
     els.button.addEventListener('click', openProjectSettings);
@@ -1998,25 +1517,25 @@
   }
 
   function missingPathProjects() {
-    return [...store.projects.values()]
+    return [...S.store.projects.values()]
       .filter((project) => project && project.exists === false)
       .sort((a, b) => String(a.name || a.id).localeCompare(String(b.name || b.id)));
   }
 
   function openProjectSettings() {
-    const els = projectSettings.els;
-    if (!els || !els.dialog || projectSettings.open) return;
+    const els = S.projectSettings.els;
+    if (!els || !els.dialog || S.projectSettings.open) return;
     clearProjectSearch();
     closeProjectDirectory(false);
-    projectSettings.owner++;
-    projectSettings.request++;
-    projectSettings.open = true;
-    projectSettings.busy = false;
-    projectSettings.scanPerformed = false;
-    projectSettings.scanRoot = '';
-    projectSettings.matches.clear();
-    projectSettings.status = '';
-    projectSettings.error = false;
+    S.projectSettings.owner++;
+    S.projectSettings.request++;
+    S.projectSettings.open = true;
+    S.projectSettings.busy = false;
+    S.projectSettings.scanPerformed = false;
+    S.projectSettings.scanRoot = '';
+    S.projectSettings.matches.clear();
+    S.projectSettings.status = '';
+    S.projectSettings.error = false;
     els.button.setAttribute('aria-expanded', 'true');
     els.dialog.showModal();
     renderProjectSettings();
@@ -2027,22 +1546,22 @@
   }
 
   function closeProjectSettings() {
-    const els = projectSettings.els;
+    const els = S.projectSettings.els;
     if (!els || !els.dialog || !els.dialog.open) return;
     els.dialog.close();
   }
 
   function finishProjectSettingsClose() {
-    const els = projectSettings.els;
-    projectSettings.owner++;
-    projectSettings.request++;
-    projectSettings.open = false;
-    projectSettings.busy = false;
-    projectSettings.scanPerformed = false;
-    projectSettings.scanRoot = '';
-    projectSettings.matches.clear();
-    projectSettings.status = '';
-    projectSettings.error = false;
+    const els = S.projectSettings.els;
+    S.projectSettings.owner++;
+    S.projectSettings.request++;
+    S.projectSettings.open = false;
+    S.projectSettings.busy = false;
+    S.projectSettings.scanPerformed = false;
+    S.projectSettings.scanRoot = '';
+    S.projectSettings.matches.clear();
+    S.projectSettings.status = '';
+    S.projectSettings.error = false;
     if (els && els.button) {
       els.button.setAttribute('aria-expanded', 'false');
       els.button.focus();
@@ -2062,18 +1581,18 @@
   }
 
   function setProjectSettingsStatus(message, error = false) {
-    projectSettings.status = message || '';
-    projectSettings.error = Boolean(error);
+    S.projectSettings.status = message || '';
+    S.projectSettings.error = Boolean(error);
   }
 
   function settingsRequestIsCurrent(owner, request) {
-    return projectSettings.open && owner === projectSettings.owner && request === projectSettings.request;
+    return S.projectSettings.open && owner === S.projectSettings.owner && request === S.projectSettings.request;
   }
 
   function focusProjectSettingsControl(kind, projectId, token) {
     requestAnimationFrame(() => {
-      if (!projectSettings.open || !projectSettings.els) return;
-      const els = projectSettings.els;
+      if (!S.projectSettings.open || !S.projectSettings.els) return;
+      const els = S.projectSettings.els;
       let target = null;
       if (kind === 'locate') {
         target = [...els.projects.querySelectorAll('.settings-locate')].find(
@@ -2095,13 +1614,13 @@
   }
 
   async function scanForProjectPaths() {
-    if (projectSettings.busy || playback.mode !== 'live') return;
-    const owner = projectSettings.owner;
-    const request = ++projectSettings.request;
-    projectSettings.busy = true;
+    if (S.projectSettings.busy || S.playback.mode !== 'live') return;
+    const owner = S.projectSettings.owner;
+    const request = ++S.projectSettings.request;
+    S.projectSettings.busy = true;
     setProjectSettingsStatus('Choose a parent folder to scan.');
     renderProjectSettings();
-    projectSettings.els.close.focus();
+    S.projectSettings.els.close.focus();
     let result;
     try {
       result = await AU.projectPathsScan();
@@ -2109,7 +1628,7 @@
       result = { ok: false, code: 'FAILED' };
     }
     if (!settingsRequestIsCurrent(owner, request)) return;
-    projectSettings.busy = false;
+    S.projectSettings.busy = false;
     if (!result || result.ok !== true) {
       setProjectSettingsStatus(projectPathErrorText(result && result.code), true);
       renderProjectSettings();
@@ -2123,21 +1642,21 @@
       return;
     }
 
-    projectSettings.scanPerformed = true;
-    projectSettings.scanRoot = typeof result.root === 'string' ? result.root : '';
-    projectSettings.matches = new Map();
+    S.projectSettings.scanPerformed = true;
+    S.projectSettings.scanRoot = typeof result.root === 'string' ? result.root : '';
+    S.projectSettings.matches = new Map();
     for (const match of Array.isArray(result.matches) ? result.matches : []) {
       if (!match || typeof match.projectId !== 'string') continue;
       const candidates = (Array.isArray(match.candidates) ? match.candidates : []).filter(
         (candidate) => candidate && typeof candidate.token === 'string' &&
           typeof candidate.path === 'string'
       );
-      projectSettings.matches.set(match.projectId, candidates);
+      S.projectSettings.matches.set(match.projectId, candidates);
     }
-    const found = [...projectSettings.matches.values()].filter((items) => items.length > 0).length;
+    const found = [...S.projectSettings.matches.values()].filter((items) => items.length > 0).length;
     const visited = Number.isFinite(result.directoriesVisited) ? result.directoriesVisited : 0;
     const suffix = result.truncated ? ' The bounded scan stopped early.' : '';
-    const root = projectSettings.scanRoot ? ` under ${projectSettings.scanRoot}` : '';
+    const root = S.projectSettings.scanRoot ? ` under ${S.projectSettings.scanRoot}` : '';
     setProjectSettingsStatus(
       `Scanned ${visited.toLocaleString()} folders${root}; found matches for ${found} project${found === 1 ? '' : 's'}.${suffix}`
     );
@@ -2146,13 +1665,13 @@
   }
 
   async function locateProjectPath(projectId) {
-    if (projectSettings.busy || playback.mode !== 'live') return;
-    const owner = projectSettings.owner;
-    const request = ++projectSettings.request;
-    projectSettings.busy = true;
+    if (S.projectSettings.busy || S.playback.mode !== 'live') return;
+    const owner = S.projectSettings.owner;
+    const request = ++S.projectSettings.request;
+    S.projectSettings.busy = true;
     setProjectSettingsStatus('Choose the project folder.');
     renderProjectSettings();
-    projectSettings.els.close.focus();
+    S.projectSettings.els.close.focus();
     let result;
     try {
       result = await AU.projectPathLocate(projectId);
@@ -2160,13 +1679,13 @@
       result = { ok: false, code: 'FAILED' };
     }
     if (!settingsRequestIsCurrent(owner, request)) return;
-    projectSettings.busy = false;
+    S.projectSettings.busy = false;
     if (!result || result.ok !== true) {
       setProjectSettingsStatus(projectPathErrorText(result && result.code), true);
     } else if (result.canceled) {
       setProjectSettingsStatus('No folder selected. No paths were changed.');
     } else {
-      projectSettings.matches.delete(projectId);
+      S.projectSettings.matches.delete(projectId);
       setProjectSettingsStatus(`Recovered ${result.project && result.project.name || 'project'}.`);
     }
     renderProjectSettings();
@@ -2176,13 +1695,13 @@
   }
 
   async function applyProjectPathCandidate(projectId, token) {
-    if (projectSettings.busy || playback.mode !== 'live') return;
-    const owner = projectSettings.owner;
-    const request = ++projectSettings.request;
-    projectSettings.busy = true;
+    if (S.projectSettings.busy || S.playback.mode !== 'live') return;
+    const owner = S.projectSettings.owner;
+    const request = ++S.projectSettings.request;
+    S.projectSettings.busy = true;
     setProjectSettingsStatus('Applying the selected project folder…');
     renderProjectSettings();
-    projectSettings.els.close.focus();
+    S.projectSettings.els.close.focus();
     let result;
     try {
       result = await AU.projectPathApply(projectId, token);
@@ -2190,12 +1709,12 @@
       result = { ok: false, code: 'FAILED' };
     }
     if (!settingsRequestIsCurrent(owner, request)) return;
-    projectSettings.busy = false;
+    S.projectSettings.busy = false;
     if (!result || result.ok !== true) {
       setProjectSettingsStatus(projectPathErrorText(result && result.code), true);
-      if (result && result.code === 'EXPIRED') projectSettings.matches.delete(projectId);
+      if (result && result.code === 'EXPIRED') S.projectSettings.matches.delete(projectId);
     } else {
-      projectSettings.matches.delete(projectId);
+      S.projectSettings.matches.delete(projectId);
       setProjectSettingsStatus(`Recovered ${result.project && result.project.name || 'project'}.`);
     }
     renderProjectSettings();
@@ -2205,7 +1724,7 @@
   }
 
   function renderProjectSettings() {
-    const els = projectSettings.els;
+    const els = S.projectSettings.els;
     if (!els || !els.button || !els.count) return;
     const projects = missingPathProjects();
     const missingCount = projects.length;
@@ -2214,18 +1733,18 @@
     els.button.setAttribute('aria-label', missingCount === 0
       ? 'Project path settings'
       : `Project path settings, ${missingCount} missing`);
-    if (!projectSettings.open || !els.dialog || !els.dialog.open) return;
+    if (!S.projectSettings.open || !els.dialog || !els.dialog.open) return;
 
-    const live = playback.mode === 'live' && !replayTransitionPending;
+    const live = S.playback.mode === 'live' && !S.replayTransitionPending;
     els.summary.textContent = missingCount === 0
       ? 'All paths valid' : `${missingCount} missing`;
     els.summary.classList.toggle('clear', missingCount === 0);
-    els.scan.disabled = projectSettings.busy || !live || missingCount === 0;
-    els.scan.textContent = projectSettings.busy ? 'Working…' : 'Scan folder…';
+    els.scan.disabled = S.projectSettings.busy || !live || missingCount === 0;
+    els.scan.textContent = S.projectSettings.busy ? 'Working…' : 'Scan folder…';
     const visibleStatus = !live
-      ? 'Return to LIVE before changing project paths.' : projectSettings.status;
+      ? 'Return to LIVE before changing project paths.' : S.projectSettings.status;
     els.status.textContent = visibleStatus;
-    els.status.classList.toggle('error', !live || projectSettings.error);
+    els.status.classList.toggle('error', !live || S.projectSettings.error);
 
     AUR.clear(els.projects);
     if (missingCount === 0) {
@@ -2247,7 +1766,7 @@
       ));
       const locate = AUR.el('button', 'settings-locate', 'Locate…');
       locate.type = 'button';
-      locate.disabled = projectSettings.busy || !live;
+      locate.disabled = S.projectSettings.busy || !live;
       locate.dataset.projectId = project.id;
       locate.setAttribute('aria-label', `Locate folder for ${projectName}`);
       locate.addEventListener('click', () => locateProjectPath(project.id));
@@ -2255,7 +1774,7 @@
       head.appendChild(locate);
       row.appendChild(head);
 
-      const candidates = projectSettings.matches.get(project.id) || [];
+      const candidates = S.projectSettings.matches.get(project.id) || [];
       if (candidates.length > 0) {
         const list = AUR.el('div', 'settings-candidates');
         const candidateLabel = AUR.el(
@@ -2271,7 +1790,7 @@
           candidateRow.appendChild(AUR.el('div', 'settings-candidate-path', candidate.path));
           const use = AUR.el('button', 'settings-candidate-use', 'Use this folder');
           use.type = 'button';
-          use.disabled = projectSettings.busy || !live;
+          use.disabled = S.projectSettings.busy || !live;
           use.dataset.projectId = project.id;
           use.dataset.token = candidate.token;
           use.setAttribute('aria-label', `Use ${candidate.path} for ${projectName}`);
@@ -2280,7 +1799,7 @@
           list.appendChild(candidateRow);
         }
         row.appendChild(list);
-      } else if (projectSettings.scanPerformed) {
+      } else if (S.projectSettings.scanPerformed) {
         row.appendChild(AUR.el(
           'div', 'settings-no-match', 'No exact folder-name match in the last scan.'
         ));
@@ -2290,7 +1809,7 @@
   }
 
   function shipsSorted() {
-    const arr = [...store.ships.values()];
+    const arr = [...S.store.ships.values()];
     arr.sort((a, b) => {
       const ma = AUR.attentionMeta(a.attention);
       const mb = AUR.attentionMeta(b.attention);
@@ -2302,15 +1821,15 @@
   }
 
   function projectName(id) {
-    const p = store.projects.get(id);
+    const p = S.store.projects.get(id);
     return p ? p.name : id;
   }
 
-  function renderAgents() {
+  A.renderAgents = function renderAgents() {
     const list = document.getElementById('agents-list');
     const count = document.getElementById('agents-count');
     const ships = shipsSorted();
-    const railEls = commandRail.els;
+    const railEls = S.commandRail.els;
     const agentsPanel = railEls && railEls.agentsPanel;
     if (agentsPanel) agentsPanel.classList.toggle('is-empty', ships.length === 0);
     if (railEls && railEls.agentsCompactCount) {
@@ -2331,8 +1850,8 @@
       const provider = AUR.providerMeta(s.provider);
       const tint = AUR.shipTint(s.id, s.provider);
       const attention = AUR.attentionMeta(s.attention);
-      const focused = agentFocus.shipId === String(s.id);
-      const pending = agentFocus.pendingShipId === String(s.id);
+      const focused = S.agentFocus.shipId === String(s.id);
+      const pending = S.agentFocus.pendingShipId === String(s.id);
       const row = AUR.el(
         'button',
         'agent-row clickable' + (s.kind === 'drone' ? ' drone' : '') +
@@ -2351,7 +1870,7 @@
         row.style.setProperty('--attention-color', attention.color);
       }
       row.title = focused ? 'Exit first-person view' : 'Enter first-person view';
-      row.addEventListener('click', () => enterAgentFocus(s.id));
+      row.addEventListener('click', () => A.enterAgentFocus(s.id));
       const glyph = AUR.el('div', 'agent-glyph');
       glyph.innerHTML = AUR.shipSvg(tint, AUR.isSignalEntity(s));
       const body = AUR.el('div', 'agent-body');
@@ -2389,13 +1908,13 @@
       row.appendChild(body);
       list.appendChild(row);
     }
-  }
+  };
 
   function renderFeed() {
     const list = document.getElementById('feed-list');
     AUR.clear(list);
-    const rows = store.feed.slice(-FEED_SHOW).reverse();
-    const railEls = commandRail.els;
+    const rows = S.store.feed.slice(-C.FEED_SHOW).reverse();
+    const railEls = S.commandRail.els;
     const feedPanel = railEls && railEls.feedPanel;
     if (feedPanel) feedPanel.classList.toggle('is-empty', rows.length === 0);
     if (railEls && railEls.feedCompactCount) {
@@ -2433,10 +1952,10 @@
     const card = document.getElementById('summary-card');
     AUR.clear(card);
     let title, stats;
-    if (current.view === 'system') {
+    if (S.current.view === 'system') {
       title = 'PROJECT SUMMARY';
-      stats = projectSummaryStats(current.projectId);
-    } else if (current.view === 'planet') {
+      stats = projectSummaryStats(S.current.projectId);
+    } else if (S.current.view === 'planet') {
       title = 'PLANET SUMMARY';
       stats = planetSummaryStats();
     } else {
@@ -2450,16 +1969,16 @@
   }
 
   function universeSummaryStats() {
-    const projects = store.projects.size;
-    const active = store.ships.size;
+    const projects = S.store.projects.size;
+    const active = S.store.ships.size;
     const online = new Set();
-    for (const s of store.ships.values()) online.add(s.project);
+    for (const s of S.store.ships.values()) online.add(s.project);
     return [[projects, 'Projects'], [active, 'Active Agents'], [online.size, 'Systems Online']];
   }
 
   function shipsInProject(projectId) {
     const arr = [];
-    for (const s of store.ships.values()) if (s.project === projectId) arr.push(s);
+    for (const s of S.store.ships.values()) if (s.project === projectId) arr.push(s);
     return arr;
   }
 
@@ -2476,8 +1995,8 @@
   }
 
   function planetSummaryStats() {
-    const ships = shipsInProject(current.projectId);
-    const pd = activeView && activeView.planetData ? activeView.planetData : null;
+    const ships = shipsInProject(S.current.projectId);
+    const pd = S.activeView && S.activeView.planetData ? S.activeView.planetData : null;
     const structures = pd ? pd.subdirs : 0;
     const resources = pd && pd.resources ? pd.resources.length : 0;
     const builds = pd ? pd.builds : 0;
@@ -2499,15 +2018,15 @@
   }
 
   function ensureProjectControl(projectId) {
-    if (projectControl.projectId !== projectId) {
-      projectControl = {
+    if (S.projectControl.projectId !== projectId) {
+      S.projectControl = {
         projectId,
-        requestId: ++terminalRequestSerial,
+        requestId: ++S.terminalRequestSerial,
         phase: 'idle',
         code: null,
       };
     }
-    return projectControl;
+    return S.projectControl;
   }
 
   function terminalFailureText(code) {
@@ -2519,15 +2038,15 @@
     return 'Terminal launch failed. Try again.';
   }
 
-  function projectControlPresentation(projectId) {
+  A.projectControlPresentation = function projectControlPresentation(projectId) {
     const state = ensureProjectControl(projectId);
-    if (playback.mode !== 'live') {
+    if (S.playback.mode !== 'live') {
       return {
         phase: 'replay', disabled: true, busy: false,
         buttonText: 'Open Terminal', note: 'Return to LIVE to open a terminal.',
       };
     }
-    if (replayTransitionPending || replayBusy) {
+    if (S.replayTransitionPending || S.replayBusy) {
       return {
         phase: 'transition', disabled: true, busy: true,
         buttonText: 'Open Terminal', note: 'History view is changing.',
@@ -2555,17 +2074,17 @@
       phase: 'idle', disabled: false, busy: false,
       buttonText: 'Open Terminal', note: '',
     };
-  }
+  };
 
-  async function requestProjectTerminal(projectId) {
+  A.requestProjectTerminal = async function requestProjectTerminal(projectId) {
     const state = ensureProjectControl(projectId);
-    if (state.phase === 'pending' || playback.mode !== 'live' ||
-        replayTransitionPending || replayBusy) return;
+    if (state.phase === 'pending' || S.playback.mode !== 'live' ||
+        S.replayTransitionPending || S.replayBusy) return;
 
-    const requestId = ++terminalRequestSerial;
-    projectControl = { projectId, requestId, phase: 'pending', code: null };
+    const requestId = ++S.terminalRequestSerial;
+    S.projectControl = { projectId, requestId, phase: 'pending', code: null };
     renderProjectCard();
-    renderAgentFocus();
+    A.renderAgentFocus();
 
     let result;
     try {
@@ -2573,23 +2092,23 @@
     } catch (error) {
       result = { ok: false, code: 'FAILED' };
     }
-    if (projectControl.projectId !== projectId || projectControl.requestId !== requestId) return;
+    if (S.projectControl.projectId !== projectId || S.projectControl.requestId !== requestId) return;
 
     const ok = Boolean(result && result.ok === true);
     const code = !ok && result && typeof result.code === 'string' ? result.code : 'FAILED';
-    projectControl = {
+    S.projectControl = {
       projectId,
       requestId,
       phase: ok ? 'success' : 'failure',
       code: ok ? null : code,
     };
     renderProjectCard();
-    renderAgentFocus();
-  }
+    A.renderAgentFocus();
+  };
 
   // ---------- root task ideas ----------
   function wireIdeasPanel() {
-    ideaPanel.els = {
+    S.ideaPanel.els = {
       panel: document.getElementById('ideas-panel'),
       count: document.getElementById('ideas-count'),
       list: document.getElementById('ideas-list'),
@@ -2598,20 +2117,20 @@
       create: document.getElementById('ideas-create'),
       status: document.getElementById('ideas-status'),
     };
-    const els = ideaPanel.els;
+    const els = S.ideaPanel.els;
     if (!els.panel || !els.count || !els.list || !els.form || !els.input ||
         !els.create || !els.status) return;
     els.form.addEventListener('submit', (event) => {
       event.preventDefault();
       const text = els.input.value.trim();
-      if (!text || ideaPanel.busy || playback.mode !== 'live') return;
+      if (!text || S.ideaPanel.busy || S.playback.mode !== 'live') return;
       mutateIdea(() => AU.rootTaskCreate(text), 'Idea created', true);
     });
   }
 
   function handleRootTasksChanged() {
-    if (ideaPanel.busy) {
-      ideaPanel.refreshAfterBusy = true;
+    if (S.ideaPanel.busy) {
+      S.ideaPanel.refreshAfterBusy = true;
       return;
     }
     refreshIdeas();
@@ -2632,20 +2151,20 @@
   }
 
   async function refreshIdeas() {
-    if (!ideaPanel.els || ideaPanel.busy) {
-      if (ideaPanel.busy) ideaPanel.refreshAfterBusy = true;
+    if (!S.ideaPanel.els || S.ideaPanel.busy) {
+      if (S.ideaPanel.busy) S.ideaPanel.refreshAfterBusy = true;
       return;
     }
-    const request = ++ideaPanel.request;
+    const request = ++S.ideaPanel.request;
     let result = null;
     try { result = await AU.rootTasksGet(); } catch (error) { /* retain the last good list */ }
-    if (request !== ideaPanel.request || !result) return;
-    ideaPanel.items = rootTaskItemsFrom(result);
+    if (request !== S.ideaPanel.request || !result) return;
+    S.ideaPanel.items = rootTaskItemsFrom(result);
     renderIdeas();
   }
 
   function liveIdeaProjects() {
-    return [...store.projects.values()]
+    return [...S.store.projects.values()]
       .filter((project) => project && project.exists === true)
       .sort((a, b) => String(a.name || a.id).localeCompare(String(b.name || b.id)) ||
         String(a.id).localeCompare(String(b.id)));
@@ -2680,7 +2199,7 @@
     const projectState = projects.map((project) => [
       project.id, project.name, project.path, projectGalaxyLabel(project), project.exists,
     ]);
-    return JSON.stringify([ideaPanel.visibleLimit, itemState, projectState]);
+    return JSON.stringify([S.ideaPanel.visibleLimit, itemState, projectState]);
   }
 
   function retryIdeaCopy(phase) {
@@ -2691,7 +2210,7 @@
   }
 
   function ideaMutationsDisabled() {
-    return ideaPanel.busy || playback.mode !== 'live' || replayTransitionPending;
+    return S.ideaPanel.busy || S.playback.mode !== 'live' || S.replayTransitionPending;
   }
 
   function ideaFocusedControl(list) {
@@ -2714,14 +2233,14 @@
   }
 
   function restoreIdeaFocus(list, previous) {
-    const requested = ideaPanel.focusAfterRender;
-    ideaPanel.focusAfterRender = null;
+    const requested = S.ideaPanel.focusAfterRender;
+    S.ideaPanel.focusAfterRender = null;
     const targetState = requested || previous;
     if (previous && Number.isFinite(previous.scrollTop)) list.scrollTop = previous.scrollTop;
     if (!targetState) return;
     if (!targetState.id && targetState.action === 'idea-input') {
-      if (ideaPanel.els && ideaPanel.els.input) {
-        ideaPanel.els.input.focus({ preventScroll: true });
+      if (S.ideaPanel.els && S.ideaPanel.els.input) {
+        S.ideaPanel.els.input.focus({ preventScroll: true });
       }
       return;
     }
@@ -2763,28 +2282,28 @@
   }
 
   function renderIdeas() {
-    const els = ideaPanel.els;
+    const els = S.ideaPanel.els;
     if (!els || !els.panel) return;
     const projects = liveIdeaProjects();
-    const replay = playback.mode !== 'live' || replayTransitionPending;
+    const replay = S.playback.mode !== 'live' || S.replayTransitionPending;
     const disabled = ideaMutationsDisabled();
-    els.panel.classList.toggle('is-empty', ideaPanel.items.length === 0);
-    els.panel.setAttribute('aria-busy', String(ideaPanel.busy));
-    els.count.textContent = `${ideaPanel.items.length} idea${ideaPanel.items.length === 1 ? '' : 's'}`;
-    if (commandRail.els && commandRail.els.ideasCompactCount) {
-      commandRail.els.ideasCompactCount.textContent = String(ideaPanel.items.length);
+    els.panel.classList.toggle('is-empty', S.ideaPanel.items.length === 0);
+    els.panel.setAttribute('aria-busy', String(S.ideaPanel.busy));
+    els.count.textContent = `${S.ideaPanel.items.length} idea${S.ideaPanel.items.length === 1 ? '' : 's'}`;
+    if (S.commandRail.els && S.commandRail.els.ideasCompactCount) {
+      S.commandRail.els.ideasCompactCount.textContent = String(S.ideaPanel.items.length);
     }
-    const nextRenderKey = ideaRenderKey(ideaPanel.items, projects);
-    if (nextRenderKey !== ideaPanel.renderKey) {
+    const nextRenderKey = ideaRenderKey(S.ideaPanel.items, projects);
+    if (nextRenderKey !== S.ideaPanel.renderKey) {
       const previousFocus = ideaFocusedControl(els.list);
-      ideaPanel.renderKey = nextRenderKey;
+      S.ideaPanel.renderKey = nextRenderKey;
       AUR.clear(els.list);
-      if (ideaPanel.items.length === 0) {
+      if (S.ideaPanel.items.length === 0) {
         els.list.appendChild(AUR.el(
           'div', 'empty-note', 'Capture an idea, then assign it to a project'
         ));
       } else {
-        const visibleItems = ideaPanel.items.slice(0, ideaPanel.visibleLimit);
+        const visibleItems = S.ideaPanel.items.slice(0, S.ideaPanel.visibleLimit);
         for (const item of visibleItems) {
           const row = AUR.el('article', 'idea-row');
           row.dataset.ideaId = item.id;
@@ -2811,7 +2330,7 @@
           }
           row.appendChild(heading);
 
-          const assigned = item.projectId ? store.projects.get(item.projectId) : null;
+          const assigned = item.projectId ? S.store.projects.get(item.projectId) : null;
           const assignedAvailable = Boolean(assigned && assigned.exists === true);
           if (item.projectId) {
             row.appendChild(AUR.el(
@@ -2833,10 +2352,10 @@
               const detail = projectSearchSubtitle(project);
               select.appendChild(new Option(detail ? `${name} — ${detail}` : name, project.id));
             }
-            const selected = ideaPanel.selections.get(item.id) || '';
+            const selected = S.ideaPanel.selections.get(item.id) || '';
             if (projects.some((project) => project.id === selected)) select.value = selected;
             select.addEventListener('change', () => {
-              ideaPanel.selections.set(item.id, select.value);
+              S.ideaPanel.selections.set(item.id, select.value);
               action.disabled = !select.value;
             });
             const action = AUR.el('button', 'idea-action', 'Assign & start');
@@ -2877,8 +2396,8 @@
           }
           els.list.appendChild(row);
         }
-        if (visibleItems.length < ideaPanel.items.length) {
-          const remaining = ideaPanel.items.length - visibleItems.length;
+        if (visibleItems.length < S.ideaPanel.items.length) {
+          const remaining = S.ideaPanel.items.length - visibleItems.length;
           const showMore = AUR.el(
             'button', 'idea-action idea-show-more',
             `Show ${Math.min(100, remaining)} more`
@@ -2886,11 +2405,11 @@
           showMore.type = 'button';
           showMore.dataset.ideaAction = 'show-more';
           showMore.addEventListener('click', () => {
-            const firstNewItem = ideaPanel.items[ideaPanel.visibleLimit];
-            ideaPanel.visibleLimit += 100;
-            ideaPanel.focusAfterRender = firstNewItem
+            const firstNewItem = S.ideaPanel.items[S.ideaPanel.visibleLimit];
+            S.ideaPanel.visibleLimit += 100;
+            S.ideaPanel.focusAfterRender = firstNewItem
               ? { id: firstNewItem.id, action: null, reveal: true } : null;
-            ideaPanel.renderKey = '';
+            S.ideaPanel.renderKey = '';
             renderIdeas();
           });
           els.list.appendChild(showMore);
@@ -2904,13 +2423,13 @@
     els.input.setAttribute('aria-disabled', String(disabled));
     els.create.disabled = false;
     els.create.setAttribute('aria-disabled', String(disabled));
-    els.status.textContent = replay ? 'Return to LIVE to create or start tasks.' : ideaPanel.status;
-    els.status.classList.toggle('error', !replay && ideaPanel.error);
+    els.status.textContent = replay ? 'Return to LIVE to create or start tasks.' : S.ideaPanel.status;
+    els.status.classList.toggle('error', !replay && S.ideaPanel.error);
   }
 
   function assignIdea(id, projectId) {
     if (!projectId) return;
-    const project = store.projects.get(projectId);
+    const project = S.store.projects.get(projectId);
     const label = project ? project.name : 'project';
     mutateIdea(() => AU.rootTaskAssign(id, projectId), `Assigned to ${label}; agent start requested`);
   }
@@ -2920,39 +2439,39 @@
   }
 
   function removeIdea(item) {
-    const index = ideaPanel.items.findIndex((entry) => entry.id === item.id);
+    const index = S.ideaPanel.items.findIndex((entry) => entry.id === item.id);
     mutateIdea(() => AU.rootTaskRemove(item.id), 'Idea removed', false, () => {
-      ideaPanel.selections.delete(item.id);
-      ideaPanel.items = ideaPanel.items.filter((entry) => entry.id !== item.id);
-      const next = ideaPanel.items[Math.min(index, ideaPanel.items.length - 1)] || null;
-      ideaPanel.focusAfterRender = next
+      S.ideaPanel.selections.delete(item.id);
+      S.ideaPanel.items = S.ideaPanel.items.filter((entry) => entry.id !== item.id);
+      const next = S.ideaPanel.items[Math.min(index, S.ideaPanel.items.length - 1)] || null;
+      S.ideaPanel.focusAfterRender = next
         ? { id: next.id, action: 'remove', reveal: true }
         : { id: null, action: 'idea-input' };
-      ideaPanel.renderKey = '';
+      S.ideaPanel.renderKey = '';
     });
   }
 
   async function mutateIdea(operation, successText, clearInput = false, onSuccess = null) {
-    if (ideaPanel.busy || playback.mode !== 'live' || replayTransitionPending) return;
-    ideaPanel.busy = true;
-    ideaPanel.refreshAfterBusy = false;
-    ideaPanel.status = '';
-    ideaPanel.error = false;
+    if (S.ideaPanel.busy || S.playback.mode !== 'live' || S.replayTransitionPending) return;
+    S.ideaPanel.busy = true;
+    S.ideaPanel.refreshAfterBusy = false;
+    S.ideaPanel.status = '';
+    S.ideaPanel.error = false;
     renderIdeas();
     let result = null;
     try { result = await operation(); } catch (error) { /* bounded failure below */ }
-    ideaPanel.busy = false;
+    S.ideaPanel.busy = false;
     if (result && result.ok === true) {
-      ideaPanel.status = successText;
-      ideaPanel.error = false;
-      if (clearInput && ideaPanel.els) ideaPanel.els.input.value = '';
+      S.ideaPanel.status = successText;
+      S.ideaPanel.error = false;
+      if (clearInput && S.ideaPanel.els) S.ideaPanel.els.input.value = '';
       if (typeof onSuccess === 'function') onSuccess(result);
     } else {
-      ideaPanel.status = ideaFailureText(result && result.code);
-      ideaPanel.error = true;
+      S.ideaPanel.status = ideaFailureText(result && result.code);
+      S.ideaPanel.error = true;
     }
-    const refreshAgain = ideaPanel.refreshAfterBusy;
-    ideaPanel.refreshAfterBusy = false;
+    const refreshAgain = S.ideaPanel.refreshAfterBusy;
+    S.ideaPanel.refreshAfterBusy = false;
     renderIdeas();
     await refreshIdeas();
     if (refreshAgain) refreshIdeas();
@@ -2980,17 +2499,17 @@
 
   // ---------- project tasks ----------
   function handleTasksChanged(update) {
-    if (!update || update.projectId !== taskPanel.projectId ||
-        current.view !== 'system' || playback.mode !== 'live') return;
-    if (taskPanel.saving) {
-      taskPanel.refreshAfterSave = true;
+    if (!update || update.projectId !== S.taskPanel.projectId ||
+        S.current.view !== 'system' || S.playback.mode !== 'live') return;
+    if (S.taskPanel.saving) {
+      S.taskPanel.refreshAfterSave = true;
       return;
     }
-    refreshTasks(taskPanel.owner);
+    refreshTasks(S.taskPanel.owner);
   }
 
   function wireTasksPanel() {
-    taskPanel.els = {
+    S.taskPanel.els = {
       panel: document.getElementById('tasks-panel'),
       count: document.getElementById('tasks-count'),
       list: document.getElementById('tasks-list'),
@@ -2999,12 +2518,12 @@
       add: document.getElementById('tasks-add'),
       status: document.getElementById('tasks-status'),
     };
-    const els = taskPanel.els;
+    const els = S.taskPanel.els;
     if (!els.panel || !els.count || !els.list || !els.form || !els.input || !els.add ||
         !els.status) return;
     els.form.addEventListener('submit', (event) => {
       event.preventDefault();
-      if (!taskPanel.trusted || taskPanel.saving) return;
+      if (!S.taskPanel.trusted || S.taskPanel.saving) return;
       const text = els.input.value.trim();
       if (!text) return;
       addTask(text);
@@ -3012,34 +2531,34 @@
   }
 
   function stopTasksView() {
-    taskPanel.owner++;
-    taskPanel.request++;
-    if (taskPanel.interval != null) clearInterval(taskPanel.interval);
-    taskPanel.interval = null;
-    taskPanel.projectId = null;
-    taskPanel.items = [];
-    taskPanel.trusted = false;
-    taskPanel.saving = false;
-    taskPanel.refreshAfterSave = false;
-    taskPanel.status = '';
-    taskPanel.error = false;
-    taskPanel.focusAfterRender = null;
-    if (taskPanel.els && taskPanel.els.panel) {
-      taskPanel.els.panel.classList.add('hidden');
-      taskPanel.els.panel.removeAttribute('aria-busy');
+    S.taskPanel.owner++;
+    S.taskPanel.request++;
+    if (S.taskPanel.interval != null) clearInterval(S.taskPanel.interval);
+    S.taskPanel.interval = null;
+    S.taskPanel.projectId = null;
+    S.taskPanel.items = [];
+    S.taskPanel.trusted = false;
+    S.taskPanel.saving = false;
+    S.taskPanel.refreshAfterSave = false;
+    S.taskPanel.status = '';
+    S.taskPanel.error = false;
+    S.taskPanel.focusAfterRender = null;
+    if (S.taskPanel.els && S.taskPanel.els.panel) {
+      S.taskPanel.els.panel.classList.add('hidden');
+      S.taskPanel.els.panel.removeAttribute('aria-busy');
     }
   }
 
   function startTasksView(projectId) {
-    taskPanel.projectId = projectId;
-    const owner = taskPanel.owner;
+    S.taskPanel.projectId = projectId;
+    const owner = S.taskPanel.owner;
     refreshTasks(owner);
-    taskPanel.interval = setInterval(() => refreshTasks(owner), 10_000);
+    S.taskPanel.interval = setInterval(() => refreshTasks(owner), 10_000);
   }
 
   function taskOwnerIsActive(owner, projectId) {
-    return owner === taskPanel.owner && current.view === 'system' &&
-      current.projectId === projectId && taskPanel.projectId === projectId;
+    return owner === S.taskPanel.owner && S.current.view === 'system' &&
+      S.current.projectId === projectId && S.taskPanel.projectId === projectId;
   }
 
   function taskItemsFrom(result) {
@@ -3057,24 +2576,24 @@
   }
 
   async function refreshTasks(owner) {
-    const projectId = taskPanel.projectId;
-    if (!taskOwnerIsActive(owner, projectId) || taskPanel.saving) return;
-    const request = ++taskPanel.request;
+    const projectId = S.taskPanel.projectId;
+    if (!taskOwnerIsActive(owner, projectId) || S.taskPanel.saving) return;
+    const request = ++S.taskPanel.request;
     let result = null;
     try { result = await AU.tasksGet(projectId); } catch (error) { /* hidden on trust/read failure */ }
-    if (!taskOwnerIsActive(owner, projectId) || request !== taskPanel.request) return;
+    if (!taskOwnerIsActive(owner, projectId) || request !== S.taskPanel.request) return;
     if (!result) {
-      taskPanel.trusted = false;
+      S.taskPanel.trusted = false;
       renderTasksPanel();
       return;
     }
-    taskPanel.trusted = true;
-    taskPanel.items = taskItemsFrom(result);
+    S.taskPanel.trusted = true;
+    S.taskPanel.items = taskItemsFrom(result);
     renderTasksPanel();
   }
 
   async function addTask(text) {
-    return mutateTasks(() => AU.taskAdd(taskPanel.projectId, text), true, {
+    return mutateTasks(() => AU.taskAdd(S.taskPanel.projectId, text), true, {
       successText: 'Task added',
     });
   }
@@ -3085,13 +2604,13 @@
       text: item.text,
       done,
     };
-    return mutateTasks(() => AU.taskSetDone(taskPanel.projectId, request), false);
+    return mutateTasks(() => AU.taskSetDone(S.taskPanel.projectId, request), false);
   }
 
   async function removeTask(item, index) {
     if (item.id || !confirmRemoval('Remove this project task?', item.text)) return;
     const request = { line: item.line, text: item.text };
-    return mutateTasks(() => AU.taskRemove(taskPanel.projectId, request), false, {
+    return mutateTasks(() => AU.taskRemove(S.taskPanel.projectId, request), false, {
       successText: 'Task removed',
       failureText: 'The task could not be removed. Refresh and try again.',
       focusIndex: index,
@@ -3099,39 +2618,39 @@
   }
 
   async function mutateTasks(operation, clearInput, options = {}) {
-    const owner = taskPanel.owner;
-    const projectId = taskPanel.projectId;
-    if (!taskOwnerIsActive(owner, projectId) || !taskPanel.trusted || taskPanel.saving) return;
-    taskPanel.saving = true;
-    taskPanel.refreshAfterSave = false;
-    taskPanel.status = '';
-    taskPanel.error = false;
-    const request = ++taskPanel.request;
+    const owner = S.taskPanel.owner;
+    const projectId = S.taskPanel.projectId;
+    if (!taskOwnerIsActive(owner, projectId) || !S.taskPanel.trusted || S.taskPanel.saving) return;
+    S.taskPanel.saving = true;
+    S.taskPanel.refreshAfterSave = false;
+    S.taskPanel.status = '';
+    S.taskPanel.error = false;
+    const request = ++S.taskPanel.request;
     renderTasksPanel();
     let result = null;
     try { result = await operation(); } catch (error) { /* refresh below */ }
-    if (!taskOwnerIsActive(owner, projectId) || request !== taskPanel.request) return;
-    taskPanel.saving = false;
-    const refreshAfterSave = taskPanel.refreshAfterSave;
-    taskPanel.refreshAfterSave = false;
+    if (!taskOwnerIsActive(owner, projectId) || request !== S.taskPanel.request) return;
+    S.taskPanel.saving = false;
+    const refreshAfterSave = S.taskPanel.refreshAfterSave;
+    S.taskPanel.refreshAfterSave = false;
     if (result && result.ok === true && Array.isArray(result.items)) {
-      taskPanel.items = taskItemsFrom(result);
-      if (clearInput && taskPanel.els) taskPanel.els.input.value = '';
-      taskPanel.status = options.successText || '';
+      S.taskPanel.items = taskItemsFrom(result);
+      if (clearInput && S.taskPanel.els) S.taskPanel.els.input.value = '';
+      S.taskPanel.status = options.successText || '';
       if (Number.isSafeInteger(options.focusIndex)) {
-        taskPanel.focusAfterRender = taskPanel.items.length > 0
-          ? { index: Math.min(options.focusIndex, taskPanel.items.length - 1), action: 'remove' }
+        S.taskPanel.focusAfterRender = S.taskPanel.items.length > 0
+          ? { index: Math.min(options.focusIndex, S.taskPanel.items.length - 1), action: 'remove' }
           : { action: 'input' };
       }
       renderTasksPanel();
       if (refreshAfterSave) refreshTasks(owner);
       return;
     }
-    taskPanel.status = options.failureText || 'The task could not be updated.';
-    taskPanel.error = true;
+    S.taskPanel.status = options.failureText || 'The task could not be updated.';
+    S.taskPanel.error = true;
     if (Number.isSafeInteger(options.focusIndex)) {
-      taskPanel.focusAfterRender = {
-        index: Math.min(options.focusIndex, Math.max(0, taskPanel.items.length - 1)),
+      S.taskPanel.focusAfterRender = {
+        index: Math.min(options.focusIndex, Math.max(0, S.taskPanel.items.length - 1)),
         action: 'remove',
       };
     }
@@ -3152,30 +2671,30 @@
   }
 
   function renderTasksPanel() {
-    const els = taskPanel.els;
+    const els = S.taskPanel.els;
     if (!els || !els.panel) return;
-    if (!taskPanel.trusted || current.view !== 'system' ||
-        current.projectId !== taskPanel.projectId) {
+    if (!S.taskPanel.trusted || S.current.view !== 'system' ||
+        S.current.projectId !== S.taskPanel.projectId) {
       els.panel.classList.add('hidden');
       return;
     }
 
     els.panel.classList.remove('hidden');
-    els.panel.setAttribute('aria-busy', String(taskPanel.saving));
-    const done = taskPanel.items.filter((item) => item.done).length;
-    els.count.textContent = `${done} / ${taskPanel.items.length} done`;
+    els.panel.setAttribute('aria-busy', String(S.taskPanel.saving));
+    const done = S.taskPanel.items.filter((item) => item.done).length;
+    els.count.textContent = `${done} / ${S.taskPanel.items.length} done`;
     const previousFocus = taskFocusState(els.list);
     const scrollTop = els.list.scrollTop;
     AUR.clear(els.list);
-    if (taskPanel.items.length === 0) {
+    if (S.taskPanel.items.length === 0) {
       els.list.appendChild(AUR.el('div', 'tasks-empty', 'No goals yet — add one'));
     } else {
-      taskPanel.items.forEach((item, index) => {
+      S.taskPanel.items.forEach((item, index) => {
         const row = AUR.el('div', 'task-row' + (item.done ? ' done' : ''));
         row.dataset.taskIndex = String(index);
         const toggle = AUR.el('button', 'task-toggle');
         toggle.type = 'button';
-        toggle.disabled = taskPanel.saving;
+        toggle.disabled = S.taskPanel.saving;
         toggle.setAttribute('role', 'checkbox');
         toggle.setAttribute('aria-checked', String(item.done));
         toggle.appendChild(AUR.el('span', 'task-check', item.done ? '☑' : '☐'));
@@ -3196,7 +2715,7 @@
         if (!item.id) {
           const remove = AUR.el('button', 'task-remove', '×');
           remove.type = 'button';
-          remove.disabled = taskPanel.saving;
+          remove.disabled = S.taskPanel.saving;
           remove.setAttribute('aria-label', 'Remove task');
           remove.setAttribute('aria-describedby', taskText.id);
           remove.title = 'Remove task';
@@ -3206,13 +2725,13 @@
         els.list.appendChild(row);
       });
     }
-    els.status.textContent = taskPanel.status;
-    els.status.classList.toggle('error', taskPanel.error);
-    els.input.disabled = taskPanel.saving;
-    els.add.disabled = taskPanel.saving;
+    els.status.textContent = S.taskPanel.status;
+    els.status.classList.toggle('error', S.taskPanel.error);
+    els.input.disabled = S.taskPanel.saving;
+    els.add.disabled = S.taskPanel.saving;
     els.list.scrollTop = scrollTop;
-    const requestedFocus = taskPanel.focusAfterRender;
-    taskPanel.focusAfterRender = null;
+    const requestedFocus = S.taskPanel.focusAfterRender;
+    S.taskPanel.focusAfterRender = null;
     const focus = requestedFocus || previousFocus;
     if (focus) {
       const row = Number.isSafeInteger(focus.index)
@@ -3234,7 +2753,7 @@
   }
 
   function positionTasksPanel() {
-    const els = taskPanel.els;
+    const els = S.taskPanel.els;
     if (!els || !els.panel || els.panel.classList.contains('hidden')) return;
     const project = document.getElementById('project-card');
     const summary = document.getElementById('summary-card');
@@ -3248,11 +2767,11 @@
 
   function renderProjectCard() {
     const card = document.getElementById('project-card');
-    if (current.view === 'universe' || !current.projectId) { card.classList.add('hidden'); return; }
-    const p = store.projects.get(current.projectId);
+    if (S.current.view === 'universe' || !S.current.projectId) { card.classList.add('hidden'); return; }
+    const p = S.store.projects.get(S.current.projectId);
     if (!p) { card.classList.add('hidden'); return; }
     card.classList.remove('hidden');
-    card.dataset.view = current.view;
+    card.dataset.view = S.current.view;
     AUR.clear(card);
 
     const head = AUR.el('div', 'pc-head');
@@ -3271,7 +2790,7 @@
     card.appendChild(pcRow('BUILDS', String(p.totalBuilds || 0)));
     card.appendChild(pcRow('LAST SIGNAL', AUR.relTime(p.lastActivity, playbackReferenceTs())));
 
-    if (current.view === 'system') {
+    if (S.current.view === 'system') {
       const repository = AUR.el('div', 'project-card-vcs');
       VCS.renderDetails(repository, p, {
         onOpenRepository(url) {
@@ -3289,7 +2808,7 @@
       folder.addEventListener('click', () => { AU.openProject(p.id); });
       actions.appendChild(folder);
 
-      const presentation = projectControlPresentation(p.id);
+      const presentation = A.projectControlPresentation(p.id);
       const terminal = AUR.el('button', 'pc-btn project-terminal', presentation.buttonText);
       terminal.id = 'project-terminal';
       terminal.type = 'button';
@@ -3298,7 +2817,7 @@
       terminal.setAttribute('aria-describedby', 'project-control-status');
       terminal.setAttribute('aria-busy', String(presentation.busy));
       terminal.dataset.state = presentation.phase;
-      terminal.addEventListener('click', () => { requestProjectTerminal(p.id); });
+      terminal.addEventListener('click', () => { A.requestProjectTerminal(p.id); });
       actions.appendChild(terminal);
       card.appendChild(actions);
 
@@ -3324,13 +2843,13 @@
   // ---------- planet card ----------
   function renderPlanetCard() {
     const card = document.getElementById('planet-card');
-    if (current.view !== 'planet') { card.classList.add('hidden'); return; }
-    const pd = activeView && activeView.planetData ? activeView.planetData : null;
+    if (S.current.view !== 'planet') { card.classList.add('hidden'); return; }
+    const pd = S.activeView && S.activeView.planetData ? S.activeView.planetData : null;
     if (!pd) { card.classList.add('hidden'); return; }
     card.classList.remove('hidden');
     AUR.clear(card);
 
-    const ships = shipsInProject(current.projectId);
+    const ships = shipsInProject(S.current.projectId);
     const active = ships.length > 0;
 
     const titleLine = AUR.el('div', 'plc-title-line');
@@ -3381,7 +2900,7 @@
   }
   function renderTabbar() {
     const bar = document.getElementById('tabbar');
-    if (current.view !== 'planet') { bar.classList.add('hidden'); return; }
+    if (S.current.view !== 'planet') { bar.classList.add('hidden'); return; }
     if (bar.childElementCount) { bar.classList.remove('hidden'); return; }
     bar.classList.remove('hidden');
     AUR.clear(bar);
@@ -3397,10 +2916,10 @@
 
   function renderBackButton() {
     const btn = document.getElementById('back-btn');
-    if (current.view === 'universe') { btn.classList.add('hidden'); return; }
+    if (S.current.view === 'universe') { btn.classList.add('hidden'); return; }
     btn.classList.remove('hidden');
-    btn.textContent = current.view === 'planet'
-      ? '← ' + (projectName(current.projectId) || 'System')
+    btn.textContent = S.current.view === 'planet'
+      ? '← ' + (projectName(S.current.projectId) || 'System')
       : '← Universe';
   }
 
@@ -3423,7 +2942,7 @@
       : null;
     const overlapIds = ['sidebar', 'summary-card', 'tabbar', 'project-card', 'planet-card']
       .filter((id) => overlaps(barRect, visibleRect(id)));
-    const scene = activeScene && !activeScene.isDisposed ? activeScene : null;
+    const scene = S.activeScene && !S.activeScene.isDisposed ? S.activeScene : null;
     let providerStats = null;
     let galaxyStats = null;
     try {
@@ -3435,41 +2954,41 @@
       }
     } catch (error) { /* a render frame may be between layout passes */ }
     let liveSceneCount = 0;
-    if (engine) {
-      for (const item of engine.scenes || []) if (!item.isDisposed) liveSceneCount++;
+    if (S.engine) {
+      for (const item of S.engine.scenes || []) if (!item.isDisposed) liveSceneCount++;
     }
     return {
-      streamEpoch,
-      playback: { ...playback },
+      streamEpoch: S.streamEpoch,
+      playback: { ...S.playback },
       store: {
-        projectCount: store.projects.size,
-        shipCount: store.ships.size,
-        feedCount: store.feed.length,
-        totalBuilds: [...store.projects.values()]
+        projectCount: S.store.projects.size,
+        shipCount: S.store.ships.size,
+        feedCount: S.store.feed.length,
+        totalBuilds: [...S.store.projects.values()]
           .reduce((sum, project) => sum + (Number(project.totalBuilds) || 0), 0),
-        latestActivity: [...store.projects.values()]
+        latestActivity: [...S.store.projects.values()]
           .reduce((latest, project) => Math.max(latest, Number(project.lastActivity) || 0), 0),
       },
       controls: {
-        playText: historyEls && historyEls.play ? historyEls.play.textContent : '',
-        speedText: historyEls && historyEls.speed ? historyEls.speed.textContent : '',
-        timeText: historyEls && historyEls.time ? historyEls.time.textContent : '',
-        livePressed: Boolean(historyEls && historyEls.live &&
-          historyEls.live.getAttribute('aria-pressed') === 'true'),
-        scrubberDisabled: Boolean(historyEls && historyEls.scrubber && historyEls.scrubber.disabled),
-        scrubberValue: historyEls && historyEls.scrubber ? Number(historyEls.scrubber.value) : null,
-        feedMode: historyEls && historyEls.feedLabel ? historyEls.feedLabel.textContent : '',
-        contextText: historyEls && historyEls.context ? historyEls.context.textContent : '',
-        startText: historyEls && historyEls.start ? historyEls.start.textContent : '',
-        endText: historyEls && historyEls.end ? historyEls.end.textContent : '',
-        markerCount: historyEls && historyEls.markers
-          ? historyEls.markers.querySelectorAll('.history-marker').length : 0,
-        newMarkerCount: historyEls && historyEls.markers
-          ? historyEls.markers.querySelectorAll('.history-marker.new').length : 0,
-        projectEventText: historyEls && historyEls.projectEvent
-          ? historyEls.projectEvent.textContent : '',
+        playText: S.historyEls && S.historyEls.play ? S.historyEls.play.textContent : '',
+        speedText: S.historyEls && S.historyEls.speed ? S.historyEls.speed.textContent : '',
+        timeText: S.historyEls && S.historyEls.time ? S.historyEls.time.textContent : '',
+        livePressed: Boolean(S.historyEls && S.historyEls.live &&
+          S.historyEls.live.getAttribute('aria-pressed') === 'true'),
+        scrubberDisabled: Boolean(S.historyEls && S.historyEls.scrubber && S.historyEls.scrubber.disabled),
+        scrubberValue: S.historyEls && S.historyEls.scrubber ? Number(S.historyEls.scrubber.value) : null,
+        feedMode: S.historyEls && S.historyEls.feedLabel ? S.historyEls.feedLabel.textContent : '',
+        contextText: S.historyEls && S.historyEls.context ? S.historyEls.context.textContent : '',
+        startText: S.historyEls && S.historyEls.start ? S.historyEls.start.textContent : '',
+        endText: S.historyEls && S.historyEls.end ? S.historyEls.end.textContent : '',
+        markerCount: S.historyEls && S.historyEls.markers
+          ? S.historyEls.markers.querySelectorAll('.history-marker').length : 0,
+        newMarkerCount: S.historyEls && S.historyEls.markers
+          ? S.historyEls.markers.querySelectorAll('.history-marker.new').length : 0,
+        projectEventText: S.historyEls && S.historyEls.projectEvent
+          ? S.historyEls.projectEvent.textContent : '',
       },
-      performance: { ...historyPerf },
+      performance: { ...S.historyPerf },
       dom: {
         agentRowCount: document.querySelectorAll('.agent-row').length,
         attentionRowCount: document.querySelectorAll('.agent-row.has-attention').length,
