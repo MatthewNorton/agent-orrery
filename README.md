@@ -20,12 +20,14 @@ Built with Electron and Babylon.js. The renderer is fully offline — no network
 
 ## Getting started
 
-Requirements: Node.js and npm. Developed primarily on Windows (the terminal-launch integration targets Windows Terminal); the visualization itself is cross-platform Electron.
+Requirements: Node.js 22.12 or newer and npm. Windows and macOS are first-class, including the terminal-launch integration (see `docs/WINDOWS-LAUNCH.md` and `docs/MACOS-LAUNCH.md`); Linux runs the viewer without terminal control.
 
 ```sh
 npm install
 npm start
 ```
+
+`npm install` also downloads the Electron runtime through a `postinstall` step. If it was skipped or removed, `npx install-electron` restores it.
 
 The app discovers projects and sessions by tailing your local Claude Code / Codex transcript directories. Click a system on the universe map to enter it, click a planet to get close, and use the timeline to replay history.
 
