@@ -6,7 +6,9 @@ Every project you work on becomes a solar system, grouped into galaxies. Live ag
 
 | Universe | Solar system | Planet |
 | --- | --- | --- |
-| ![Universe map](3.universe-map-view.png) | ![Solar system view](2.solar-system-view.png) | ![Planet view](1.planet-view.png) |
+| ![Universe map](docs/screenshots/universe.png) | ![Solar system view](docs/screenshots/system.png) | ![Planet view](docs/screenshots/planet.png) |
+
+Real captures of the app running against a synthetic demo universe (fictional projects and sessions), produced by `node scripts/demo-shots.mjs`; see `docs/DEMO-MEDIA.md`.
 
 ## How it works
 
@@ -38,6 +40,7 @@ npm test                 # all tests (Node's built-in runner)
 node kit/grade.mjs       # renderer regression gate — must stay green after any renderer change
 npm run shots            # headless screenshots into .shots/ for visual comparison
 npm run ships:generate   # regenerate procedural ship GLB assets
+node scripts/demo-shots.mjs   # README screenshots from a synthetic universe (docs/DEMO-MEDIA.md)
 ```
 
 Plain JavaScript throughout — no TypeScript, no bundler, no lint tooling. The renderer uses classic `<script>` tags attached to a single `window.AUR` namespace (no ES modules, since it runs from `file://`).
