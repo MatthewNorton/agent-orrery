@@ -24,31 +24,27 @@ const {
   trustedMainFrame: isTrustedMainFrame,
   hardenWebContents,
 } = require('./window-security');
+const { readFlags } = require('./flags');
+const {
+  createProviderFixture,
+  historyLine,
+  createHistoryFixture,
+  createControlFixture,
+  createRecordingTerminalLauncher,
+} = require('./harness/fixtures');
 
-const SHOT_MODE = process.argv.includes('--shots');
-const POLISH_TEST = process.argv.includes('--polish-test');
-const PROVIDER_TEST = process.argv.includes('--provider-test');
-const HISTORY_TEST = process.argv.includes('--history-test');
-const CONTROL_TEST = process.argv.includes('--control-test');
-const TEST_MODE = SHOT_MODE || POLISH_TEST || PROVIDER_TEST || HISTORY_TEST || CONTROL_TEST;
+const flags = readFlags(process.argv);
+const POLISH_TEST = flags.polishTest;
+const PROVIDER_TEST = flags.providerTest;
+const HISTORY_TEST = flags.historyTest;
+const CONTROL_TEST = flags.controlTest;
+const TEST_MODE = flags.testMode;
 const RENDERER_ENTRY_PATH = path.join(__dirname, '..', 'renderer', 'index.html');
 const RENDERER_ENTRY_URL = rendererUrl(RENDERER_ENTRY_PATH);
-const polishOutputArg = process.argv.find((arg) => arg.startsWith('--polish-output='));
-const POLISH_OUTPUT = polishOutputArg
-  ? path.resolve(polishOutputArg.slice('--polish-output='.length))
-  : path.join(__dirname, '..', '..', '.shots', 'polish');
-const providerOutputArg = process.argv.find((arg) => arg.startsWith('--provider-output='));
-const PROVIDER_OUTPUT = providerOutputArg
-  ? path.resolve(providerOutputArg.slice('--provider-output='.length))
-  : path.join(__dirname, '..', '..', '.shots', 'providers');
-const historyOutputArg = process.argv.find((arg) => arg.startsWith('--history-output='));
-const HISTORY_OUTPUT = historyOutputArg
-  ? path.resolve(historyOutputArg.slice('--history-output='.length))
-  : path.join(__dirname, '..', '..', '.shots', 'history');
-const controlOutputArg = process.argv.find((arg) => arg.startsWith('--control-output='));
-const CONTROL_OUTPUT = controlOutputArg
-  ? path.resolve(controlOutputArg.slice('--control-output='.length))
-  : path.join(__dirname, '..', '..', '.shots', 'control');
+const POLISH_OUTPUT = flags.outputs.polish;
+const PROVIDER_OUTPUT = flags.outputs.provider;
+const HISTORY_OUTPUT = flags.outputs.history;
+const CONTROL_OUTPUT = flags.outputs.control;
 let win = null;
 let tracker = null;
 let replaySource = null;
@@ -75,171 +71,9 @@ let projectPathDialogInFlight = false;
 let projectPathScanAbort = null;
 const projectPathCandidates = new Map();
 const PROJECT_PATH_CANDIDATE_TTL_MS = 10 * 60 * 1000;
-let controlTerminalUnrefs = 0;
-const controlTerminalCalls = [];
 const rendererTestErrors = [];
 const openedProjects = [];
 const pointerInputEvents = [];
-
-function createProviderFixture() {
-  providerFixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-universe-provider-render-'));
-  const projectDir = path.join(providerFixtureRoot, 'workspace', 'provider-fixture');
-  const claudeRoot = path.join(providerFixtureRoot, '.claude', 'projects');
-  const codexRoot = path.join(providerFixtureRoot, '.codex', 'sessions');
-  const signalRoot = path.join(providerFixtureRoot, 'signal-logs');
-  const statePath = path.join(providerFixtureRoot, 'state', 'universe-state.json');
-  const configPath = path.join(providerFixtureRoot, 'state', 'providers.json');
-  fs.mkdirSync(path.join(projectDir, 'src'), { recursive: true });
-  fs.writeFileSync(path.join(projectDir, 'src', 'fixture.js'), '/* provider fixture */\n');
-
-  const claudeDir = path.join(claudeRoot, 'fixture-provider-project');
-  fs.mkdirSync(claudeDir, { recursive: true });
-  fs.writeFileSync(path.join(claudeDir, 'claude-render.jsonl'), JSON.stringify({
-    type: 'user', timestamp: new Date().toISOString(), cwd: projectDir,
-    message: { role: 'user', content: 'fixture' },
-  }) + '\n');
-
-  const codexId = '019f0000-0000-7000-8000-000000000005';
-  const codexDir = path.join(codexRoot, '2026', '07', '21');
-  fs.mkdirSync(codexDir, { recursive: true });
-  fs.writeFileSync(
-    path.join(codexDir, `rollout-2026-07-21T00-00-00-${codexId}.jsonl`),
-    JSON.stringify({
-      timestamp: new Date().toISOString(), type: 'session_meta',
-      payload: { id: codexId, session_id: codexId, cwd: projectDir, source: 'cli' },
-    }) + '\n'
-  );
-
-  fs.mkdirSync(signalRoot, { recursive: true });
-  fs.writeFileSync(path.join(signalRoot, 'builder.log'), 'fixture\n');
-  fs.mkdirSync(path.dirname(configPath), { recursive: true });
-  fs.writeFileSync(configPath, JSON.stringify({
-    watch: [{ directory: signalRoot, projectPath: projectDir, label: 'Fixture' }],
-  }));
-  return {
-    statePath,
-    options: { claudeProjectsDir: claudeRoot, codexSessionsDir: codexRoot, providerConfigPath: configPath },
-  };
-}
-
-function historyLine(value) {
-  return `${JSON.stringify(value)}\n`;
-}
-
-function createHistoryFixture() {
-  historyFixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-universe-history-render-'));
-  const projectDir = path.join(historyFixtureRoot, 'workspace', 'history-fixture');
-  const claudeRoot = path.join(historyFixtureRoot, '.claude', 'projects');
-  const codexActive = path.join(historyFixtureRoot, '.codex', 'sessions');
-  const codexArchive = path.join(historyFixtureRoot, '.codex', 'archived_sessions');
-  const statePath = path.join(historyFixtureRoot, 'state', 'universe-state.json');
-  const providerConfigPath = path.join(historyFixtureRoot, 'state', 'providers.json');
-  const t0 = Date.now() - 12 * 60 * 1000;
-  const iso = (offset) => new Date(t0 + offset).toISOString();
-
-  fs.mkdirSync(path.join(projectDir, 'src'), { recursive: true });
-  fs.mkdirSync(path.join(projectDir, 'docs'), { recursive: true });
-  fs.mkdirSync(path.join(projectDir, 'live'), { recursive: true });
-  fs.writeFileSync(path.join(projectDir, 'src', 'fixture.js'), '// history fixture\n');
-
-  const claudeDir = path.join(claudeRoot, 'fixture-history-project');
-  fs.mkdirSync(claudeDir, { recursive: true });
-  const claudeFile = path.join(claudeDir, 'history-render.jsonl');
-  fs.writeFileSync(claudeFile, [
-    { type: 'user', timestamp: iso(0), cwd: projectDir,
-      message: { role: 'user', content: 'private fixture prompt' } },
-    { type: 'assistant', timestamp: iso(5_000), cwd: projectDir,
-      message: { role: 'assistant', content: [{ type: 'tool_use', id: 'history-read',
-        name: 'Read', input: { file_path: path.join(projectDir, 'src', 'fixture.js') } }] } },
-    { type: 'user', timestamp: iso(8_000), cwd: projectDir,
-      message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'history-read', content: 'private' }] } },
-    { type: 'assistant', timestamp: iso(30_000), cwd: projectDir,
-      message: { role: 'assistant', content: [{ type: 'tool_use', id: 'history-edit',
-        name: 'Edit', input: { file_path: path.join(projectDir, 'src', 'historical.js'), new_string: 'private' } }] } },
-    { type: 'user', timestamp: iso(35_000), cwd: projectDir,
-      message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'history-edit', content: 'private' }] } },
-    { type: 'system', subtype: 'turn_duration', timestamp: iso(600_000), cwd: projectDir },
-  ].map(historyLine).join(''));
-
-  const codexId = '019f0000-0000-7000-8000-000000000106';
-  const codexDay = path.join(codexActive, '2026', '07', '21');
-  fs.mkdirSync(codexDay, { recursive: true });
-  fs.mkdirSync(codexArchive, { recursive: true });
-  fs.writeFileSync(path.join(codexDay, `rollout-history-${codexId}.jsonl`), [
-    { timestamp: iso(2_000), type: 'session_meta', payload: {
-      id: codexId, session_id: codexId, cwd: projectDir, thread_source: 'user',
-      base_instructions: 'private fixture instructions' } },
-    { timestamp: iso(12_000), type: 'event_msg', payload: { type: 'task_started' } },
-    { timestamp: iso(40_000), type: 'response_item', payload: {
-      type: 'custom_tool_call', call_id: 'history-patch', name: 'apply_patch', input: 'private' } },
-    { timestamp: iso(45_000), type: 'event_msg', payload: {
-      type: 'patch_apply_end', call_id: 'history-patch', success: true,
-      changes: { [path.join(projectDir, 'docs', 'history.md')]: { type: 'add', content: 'private' } } } },
-    { timestamp: iso(50_000), type: 'event_msg', payload: {
-      type: 'task_complete', last_agent_message: 'private' } },
-  ].map(historyLine).join(''));
-
-  return {
-    projectDir,
-    claudeFile,
-    claudeRoot,
-    t0,
-    earlyTs: t0 + 10_000,
-    lateTs: t0 + 60_000,
-    forwardTs: t0 + 300_000,
-    statePath,
-    trackerOptions: {
-      claudeProjectsDir: claudeRoot,
-      codexSessionDirs: [codexActive, codexArchive],
-      providerConfigPath,
-    },
-    replayOptions: {
-      claudeProjectsDir: claudeRoot,
-      codexSessionDirs: [codexActive, codexArchive],
-    },
-  };
-}
-
-function createControlFixture() {
-  const fixture = createHistoryFixture();
-  fixture.localAppData = path.win32.join(historyFixtureRoot, 'Local App Data & (Orbit)');
-  return fixture;
-}
-
-function createRecordingTerminalLauncher(fixture) {
-  controlTerminalCalls.length = 0;
-  controlTerminalUnrefs = 0;
-  const fakeFs = {
-    constants: { F_OK: fs.constants.F_OK },
-    accessSync() { /* fixed app alias is deliberately intercepted */ },
-  };
-  const launcher = createTerminalLauncher({
-    platform: 'win32',
-    env: { LOCALAPPDATA: fixture.localAppData },
-    fsImpl: fakeFs,
-    spawnImpl(command, args, options) {
-      controlTerminalCalls.push({
-        command,
-        args: Array.isArray(args) ? args.slice() : args,
-        options: options && typeof options === 'object' ? { ...options } : options,
-      });
-      return {
-        once() { return this; },
-        unref() { controlTerminalUnrefs++; },
-      };
-    },
-  });
-  let delayFirstOpen = true;
-  return Object.freeze({
-    async open(request) {
-      if (delayFirstOpen) {
-        delayFirstOpen = false;
-        await new Promise((resolve) => setTimeout(resolve, 250));
-      }
-      return launcher.open(request);
-    },
-  });
-}
 
 function cleanupForExit() {
   replayOperation++;
@@ -980,6 +814,8 @@ function createWindow() {
   const providerFixture = PROVIDER_TEST ? createProviderFixture() : null;
   controlFixture = CONTROL_TEST ? createControlFixture() : null;
   historyFixture = CONTROL_TEST ? controlFixture : (HISTORY_TEST ? createHistoryFixture() : null);
+  if (providerFixture) providerFixtureRoot = providerFixture.root;
+  if (historyFixture) historyFixtureRoot = historyFixture.root;
   const fixture = historyFixture || providerFixture;
   const trackerOptions = historyFixture ? historyFixture.trackerOptions : providerFixture?.options;
   tracker = fixture
@@ -1654,12 +1490,12 @@ async function waitForControl(predicate, label, timeoutMs = 10_000) {
 }
 
 function safeRecordedTerminalCalls(cwd) {
-  if (!controlFixture || controlTerminalCalls.length === 0) return false;
+  if (!controlFixture || terminalLauncher.calls.length === 0) return false;
   const expectedCommand = path.win32.join(
     controlFixture.localAppData, 'Microsoft', 'WindowsApps', 'wt.exe'
   );
   const optionKeys = ['cwd', 'detached', 'shell', 'stdio', 'windowsHide'];
-  return controlTerminalCalls.every((call) => call && call.command === expectedCommand &&
+  return terminalLauncher.calls.every((call) => call && call.command === expectedCommand &&
     Array.isArray(call.args) && call.args.length === 2 && call.args[0] === '-d' &&
     call.args[1] === cwd && call.options && call.options.cwd === cwd &&
     call.options.shell === false && call.options.detached === true &&
@@ -1710,12 +1546,12 @@ async function runControlMode() {
     if (!pendingButton) throw new Error('pending terminal action was not visible');
     clickPoint(pendingButton);
     await wait(50);
-    const pendingLaunchCount = controlTerminalCalls.length;
-    const launchedControl = await waitForControl((value) => controlTerminalCalls.length === 1 &&
+    const pendingLaunchCount = terminalLauncher.calls.length;
+    const launchedControl = await waitForControl((value) => terminalLauncher.calls.length === 1 &&
       value.note === 'Terminal launch requested' && value.disabled === false,
     'first terminal launch');
     result.steps.push({ action: 'system-terminal', actualInput: true });
-    result.metrics.initialLaunchCount = controlTerminalCalls.length;
+    result.metrics.initialLaunchCount = terminalLauncher.calls.length;
     result.metrics.pendingRerenderPreserved = pendingControl.busy === true &&
       rerenderedPendingControl.busy === true && pendingLaunchCount === 0;
     await capture(CONTROL_OUTPUT, 'control-live');
@@ -1730,13 +1566,13 @@ async function runControlMode() {
     if (!replayButton) throw new Error('replay terminal action was not rendered');
     clickPoint(replayButton);
     await wait(120);
-    const replayCountAfterInput = controlTerminalCalls.length;
+    const replayCountAfterInput = terminalLauncher.calls.length;
     const forged = await rendererEval(
       `AU.openTerminal(${JSON.stringify(project.id)})`
     );
     await wait(80);
     result.steps.push({ action: 'replay-blocked', actualInput: true });
-    result.metrics.replayLaunchCount = controlTerminalCalls.length;
+    result.metrics.replayLaunchCount = terminalLauncher.calls.length;
     result.metrics.replayMainRejected = Boolean(forged && forged.ok === false && forged.code === 'REPLAY');
     await capture(CONTROL_OUTPUT, 'control-replay');
 
@@ -1749,10 +1585,10 @@ async function runControlMode() {
     const restoredButton = await elementCenter('#project-terminal');
     if (!restoredButton) throw new Error('restored terminal action was not visible');
     clickPoint(restoredButton);
-    await waitForControl((value) => controlTerminalCalls.length === 2 &&
+    await waitForControl((value) => terminalLauncher.calls.length === 2 &&
       value.note === 'Terminal launch requested', 'second terminal launch');
     result.steps.push({ action: 'live-return', actualInput: true });
-    result.metrics.finalLaunchCount = controlTerminalCalls.length;
+    result.metrics.finalLaunchCount = terminalLauncher.calls.length;
 
     const planetTarget = await acquirePointerTarget('planet', false);
     clickPoint(planetTarget);
@@ -1774,12 +1610,12 @@ async function runControlMode() {
       noProviderOrPromptControls: layouts.every((item) => item.noProviderOrPromptControls),
     };
     result.metrics.safeWindowsSpec = safeRecordedTerminalCalls(canonicalCwd);
-    result.metrics.sameCanonicalCwd = controlTerminalCalls.every((call) =>
+    result.metrics.sameCanonicalCwd = terminalLauncher.calls.every((call) =>
       call.args?.[1] === canonicalCwd && call.options?.cwd === canonicalCwd);
     result.metrics.planetRendered = planetControl.view === 'planet' &&
-      planetControl.terminalCount === 1 && controlTerminalCalls.length === 2;
-    result.metrics.noProcessOwnership = controlTerminalUnrefs === controlTerminalCalls.length &&
-      controlTerminalCalls.length === 2;
+      planetControl.terminalCount === 1 && terminalLauncher.calls.length === 2;
+    result.metrics.noProcessOwnership = terminalLauncher.unrefs === terminalLauncher.calls.length &&
+      terminalLauncher.calls.length === 2;
 
     result.passed = result.metrics.initialLaunchCount === 1 &&
       replayCountAfterInput === 1 && result.metrics.replayLaunchCount === 1 &&
