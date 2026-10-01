@@ -3,34 +3,18 @@
 const { app, BrowserWindow, ipcMain, shell, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const os = require('os');
 const crypto = require('crypto');
-const { Tracker } = require('./tracker');
-const { ReplaySource } = require('./replay-source');
 const { isLocalProjectPath } = require('./provider-adapters');
-const { createTerminalLauncher } = require('./terminal-launcher');
-const { createAgentLauncher } = require('./agent-launcher');
 const { appendGoal, readGoalsFile, removeGoal, setGoalDone } = require('./goals');
-const { TaskRunTracker } = require('./task-runs');
-const { RootTaskStore } = require('./root-tasks');
-const { RootTaskCoordinator } = require('./root-task-coordinator');
 const { scanProjectCandidates, isPathInside } = require('./project-paths');
-const { createLocalGitStatusCollector, githubIdentity } = require('./project-vcs-status');
-const { createGitHubMetadataProvider } = require('./github-metadata-provider');
-const { createProjectVcsStatusService } = require('./project-vcs-status-service');
-const { createProjectVcsStatusController } = require('./project-vcs-status-controller');
+const { githubIdentity } = require('./project-vcs-status');
 const {
   rendererUrl,
   trustedMainFrame: isTrustedMainFrame,
   hardenWebContents,
 } = require('./window-security');
 const { readFlags } = require('./flags');
-const {
-  createProviderFixture,
-  createHistoryFixture,
-  createControlFixture,
-  createRecordingTerminalLauncher,
-} = require('./harness/fixtures');
+const fixtures = require('./harness/fixtures');
 const { createDriver } = require('./harness/driver');
 const { createMetrics } = require('./harness/metrics');
 const shots = require('./harness/modes/shots');
@@ -38,6 +22,7 @@ const control = require('./harness/modes/control');
 const history = require('./harness/modes/history');
 const provider = require('./harness/modes/provider');
 const polish = require('./harness/modes/polish');
+const { createAppContext } = require('./app-context');
 
 const flags = readFlags(process.argv);
 const POLISH_TEST = flags.polishTest;
@@ -47,106 +32,62 @@ const CONTROL_TEST = flags.controlTest;
 const TEST_MODE = flags.testMode;
 const RENDERER_ENTRY_PATH = path.join(__dirname, '..', 'renderer', 'index.html');
 const RENDERER_ENTRY_URL = rendererUrl(RENDERER_ENTRY_PATH);
-let win = null;
-let tracker = null;
-let replaySource = null;
-let activeSource = null;
-let terminalLauncher = null;
-let taskRuns = null;
-let rootTasks = null;
-let rootTaskCoordinator = null;
-let taskRunSweepTimer = null;
-let projectVcsStatusController = null;
-let streamEpoch = 1;
 let replayOperation = 0;
 let replayBoundaryOperations = 0;
 let replayIndexPromise = null;
 let replayStateLastSent = 0;
 let replayStateTimer = null;
-let providerFixtureRoot = null;
-let historyFixtureRoot = null;
-let historyFixture = null;
-let controlFixture = null;
 let terminalLaunchInFlight = false;
 let terminalLaunchCooldownUntil = 0;
 let projectPathDialogInFlight = false;
 let projectPathScanAbort = null;
 const projectPathCandidates = new Map();
 const PROJECT_PATH_CANDIDATE_TTL_MS = 10 * 60 * 1000;
-const rendererTestErrors = [];
-const openedProjects = [];
-const ctx = {
-  flags,
-  get win() { return win; },
-  get tracker() { return tracker; },
-  get replaySource() { return replaySource; },
-  get terminalLauncher() { return terminalLauncher; },
-  get streamEpoch() { return streamEpoch; },
-  replay: { boundedReplayStatus },
-  cleanup: cleanupForExit,
-  harness: {
-    rendererTestErrors,
-    get controlFixture() { return controlFixture; },
-    get historyFixture() { return historyFixture; },
-    openedProjects,
+const ctx = createAppContext({ flags, fixtures });
+// Interim: these concerns still live here until replay-control.js and ipc/ own them.
+ctx.replay = {
+  boundedReplayStatus,
+  sendProjectVcsStatusChanged,
+  sendReplayState,
+  ensureReplayIndex,
+  reset() {
+    replayOperation++;
+    if (replayStateTimer) clearTimeout(replayStateTimer);
+    replayStateTimer = null;
+    replayBoundaryOperations = 0;
+  },
+};
+ctx.ipc = {
+  terminal: {
+    liveProjectCwd,
+    reset() {
+      terminalLaunchInFlight = false;
+      terminalLaunchCooldownUntil = 0;
+    },
+  },
+  rootTasks: { sendRootTasksChanged, liveProjectShips },
+  projectPaths: {
+    revokeProjectPathCandidates,
+    reset() {
+      if (projectPathScanAbort) projectPathScanAbort.abort();
+      projectPathScanAbort = null;
+      projectPathDialogInFlight = false;
+      projectPathCandidates.clear();
+    },
   },
 };
 const driver = createDriver(ctx);
 const metrics = createMetrics(ctx, driver);
 
-function cleanupForExit() {
-  replayOperation++;
-  if (projectPathScanAbort) projectPathScanAbort.abort();
-  projectPathScanAbort = null;
-  projectPathDialogInFlight = false;
-  projectPathCandidates.clear();
-  if (replayStateTimer) clearTimeout(replayStateTimer);
-  replayStateTimer = null;
-  if (taskRunSweepTimer) clearInterval(taskRunSweepTimer);
-  taskRunSweepTimer = null;
-  if (projectVcsStatusController) projectVcsStatusController.stop();
-  projectVcsStatusController = null;
-  if (replaySource) {
-    replaySource.stop();
-    replaySource = null;
-  }
-  if (tracker) {
-    tracker.stop();
-    tracker = null;
-  }
-  activeSource = null;
-  terminalLauncher = null;
-  rootTaskCoordinator = null;
-  rootTasks = null;
-  taskRuns = null;
-  terminalLaunchInFlight = false;
-  terminalLaunchCooldownUntil = 0;
-  replayBoundaryOperations = 0;
-  if (providerFixtureRoot) {
-    try { fs.rmSync(providerFixtureRoot, { recursive: true, force: true }); } catch { /* temporary test fixture */ }
-    providerFixtureRoot = null;
-  }
-  if (historyFixtureRoot) {
-    const target = path.resolve(historyFixtureRoot);
-    const tempRoot = path.resolve(os.tmpdir());
-    if (target.startsWith(`${tempRoot}${path.sep}`)) {
-      try { fs.rmSync(target, { recursive: true, force: true }); } catch { /* temporary test fixture */ }
-    }
-    historyFixtureRoot = null;
-    historyFixture = null;
-    controlFixture = null;
-  }
-}
-
 function boundedReplayStatus(mode = null) {
-  const raw = replaySource ? replaySource.status() : {};
+  const raw = ctx.replaySource ? ctx.replaySource.status() : {};
   const minTs = Number.isFinite(raw.minTs) ? raw.minTs :
     (Number.isFinite(raw.minMs) ? raw.minMs : null);
   const maxTs = Number.isFinite(raw.maxTs) ? raw.maxTs :
     (Number.isFinite(raw.maxMs) ? raw.maxMs : null);
   let cursorTs = Number.isFinite(raw.cursorTs) ? raw.cursorTs :
     (Number.isFinite(raw.cursorMs) ? raw.cursorMs : null);
-  const visibleMode = mode || (activeSource === replaySource ? 'replay' : 'live');
+  const visibleMode = mode || (ctx.activeSource === ctx.replaySource ? 'replay' : 'live');
   if (visibleMode === 'live' && Number.isFinite(maxTs)) cursorTs = maxTs;
   return {
     mode: visibleMode,
@@ -165,47 +106,47 @@ function boundedReplayStatus(mode = null) {
 }
 
 function visibleSnapshot() {
-  const source = activeSource || tracker;
+  const source = ctx.activeSource || ctx.tracker;
   let snapshot = source ? source.snapshot() : {
     projects: [], ships: [], feed: [], eventSequence: 0,
   };
-  if (projectVcsStatusController) {
-    snapshot = projectVcsStatusController.enrichSnapshot(source, snapshot);
+  if (ctx.projectVcsStatusController) {
+    snapshot = ctx.projectVcsStatusController.enrichSnapshot(source, snapshot);
   }
   return {
     ...snapshot,
-    streamEpoch,
-    playback: boundedReplayStatus(source === replaySource ? 'replay' : 'live'),
+    streamEpoch: ctx.streamEpoch,
+    playback: boundedReplayStatus(source === ctx.replaySource ? 'replay' : 'live'),
   };
 }
 
 function visibleSystem(projectId) {
-  const source = activeSource || tracker;
+  const source = ctx.activeSource || ctx.tracker;
   const system = source ? source.getSystem(projectId) : null;
-  return projectVcsStatusController
-    ? projectVcsStatusController.enrichSystem(source, system)
+  return ctx.projectVcsStatusController
+    ? ctx.projectVcsStatusController.enrichSystem(source, system)
     : system;
 }
 
 function sendProjectVcsStatusChanged(status) {
-  if (!status || activeSource !== tracker || !win || win.isDestroyed()) return;
-  win.webContents.send('au:project-vcs-status-changed', status, {
-    streamEpoch,
+  if (!status || ctx.activeSource !== ctx.tracker || !ctx.win || ctx.win.isDestroyed()) return;
+  ctx.win.webContents.send('au:project-vcs-status-changed', status, {
+    streamEpoch: ctx.streamEpoch,
     mode: 'live',
   });
 }
 
 function replayResult(includeSnapshot = false) {
-  const playback = boundedReplayStatus(activeSource === replaySource ? 'replay' : 'live');
+  const playback = boundedReplayStatus(ctx.activeSource === ctx.replaySource ? 'replay' : 'live');
   return {
     playback,
-    streamEpoch,
+    streamEpoch: ctx.streamEpoch,
     ...(includeSnapshot ? { snapshot: visibleSnapshot() } : {}),
   };
 }
 
 function sendReplayState() {
-  if (!win || win.isDestroyed()) return;
+  if (!ctx.win || ctx.win.isDestroyed()) return;
   const now = Date.now();
   const remaining = 100 - (now - replayStateLastSent);
   if (remaining > 0) {
@@ -218,18 +159,18 @@ function sendReplayState() {
     return;
   }
   replayStateLastSent = now;
-  win.webContents.send('au:replay-state', {
-    ...boundedReplayStatus(activeSource === replaySource ? 'replay' : 'live'),
-    streamEpoch,
+  ctx.win.webContents.send('au:replay-state', {
+    ...boundedReplayStatus(ctx.activeSource === ctx.replaySource ? 'replay' : 'live'),
+    streamEpoch: ctx.streamEpoch,
   });
 }
 
 async function ensureReplayIndex(force = false) {
-  if (!replaySource) throw new Error('history playback is unavailable');
+  if (!ctx.replaySource) throw new Error('history playback is unavailable');
   const current = boundedReplayStatus('replay');
   if (!force && current.available && !current.indexing) return current;
   if (!replayIndexPromise) {
-    replayIndexPromise = replaySource.index()
+    replayIndexPromise = ctx.replaySource.index()
       .finally(() => { replayIndexPromise = null; });
   }
   await replayIndexPromise;
@@ -259,7 +200,7 @@ async function handleReplayCommand(command) {
   const operation = ++replayOperation;
 
   if (action === 'index') {
-    if (activeSource === replaySource) throw new Error('return to LIVE before rebuilding the history index');
+    if (ctx.activeSource === ctx.replaySource) throw new Error('return to LIVE before rebuilding the history index');
     await ensureReplayIndex(true);
     return replayResult(false);
   }
@@ -273,20 +214,20 @@ async function handleReplayCommand(command) {
       const target = Math.max(status.minTs, Math.min(status.maxTs, command.ts));
       // Forward scrubs can reuse parsed source cursors and the current reducer.
       // Backward scrubs still take the deterministic cold-seek path.
-      if (activeSource === replaySource && Number.isFinite(status.cursorTs) &&
+      if (ctx.activeSource === ctx.replaySource && Number.isFinite(status.cursorTs) &&
           target >= status.cursorTs) {
         // Cancel a scheduled/in-flight playback generation before reusing its
         // source cursors. Otherwise a timer tick and this seek can interleave
         // reads against the same mutable cursor.
-        replaySource.pause();
-        await replaySource.advanceTo(target, { emit: false });
+        ctx.replaySource.pause();
+        await ctx.replaySource.advanceTo(target, { emit: false });
       } else {
-        await replaySource.seek(target);
+        await ctx.replaySource.seek(target);
       }
       if (operation !== replayOperation) return replayResult(false);
-      replaySource.pause();
-      activeSource = replaySource;
-      streamEpoch++;
+      ctx.replaySource.pause();
+      ctx.activeSource = ctx.replaySource;
+      ctx.streamEpoch++;
       sendReplayState();
       return replayResult(true);
     } finally {
@@ -295,26 +236,26 @@ async function handleReplayCommand(command) {
   }
 
   if (action === 'live') {
-    replaySource.pause();
-    if (activeSource !== tracker) {
-      activeSource = tracker;
-      streamEpoch++;
+    ctx.replaySource.pause();
+    if (ctx.activeSource !== ctx.tracker) {
+      ctx.activeSource = ctx.tracker;
+      ctx.streamEpoch++;
     }
     sendReplayState();
     return replayResult(true);
   }
 
-  if (activeSource !== replaySource) {
+  if (ctx.activeSource !== ctx.replaySource) {
     throw new Error(`${action} requires replay mode`);
   }
-  if (action === 'play') replaySource.play();
-  else if (action === 'pause') replaySource.pause();
-  else replaySource.setSpeed(Number(command.speed));
+  if (action === 'play') ctx.replaySource.play();
+  else if (action === 'pause') ctx.replaySource.pause();
+  else ctx.replaySource.setSpeed(Number(command.speed));
   return replayResult(false);
 }
 
 function visibleProject(id) {
-  const source = activeSource || tracker;
+  const source = ctx.activeSource || ctx.tracker;
   if (source && source.projects instanceof Map) return source.projects.get(id) || null;
   const snapshot = source ? source.snapshot() : null;
   return snapshot && Array.isArray(snapshot.projects)
@@ -328,12 +269,12 @@ function validProjectId(value) {
 }
 
 function trustedMainFrame(event) {
-  return isTrustedMainFrame(event, win, RENDERER_ENTRY_URL);
+  return isTrustedMainFrame(event, ctx.win, RENDERER_ENTRY_URL);
 }
 
 function liveProjectCwd(projectId) {
-  if (!tracker || !(tracker.projects instanceof Map)) return null;
-  const project = tracker.projects.get(projectId);
+  if (!ctx.tracker || !(ctx.tracker.projects instanceof Map)) return null;
+  const project = ctx.tracker.projects.get(projectId);
   // Security: project.path originates in transcript content. Refuse UNC/device paths
   // before any filesystem call so no network authentication can be forced.
   if (!project || project.exists !== true || !isLocalProjectPath(project.path) ||
@@ -357,7 +298,7 @@ function terminalFailure(code) {
 
 async function handleOpenTerminal(event, projectId) {
   if (!trustedMainFrame(event) || !validProjectId(projectId)) return terminalFailure('INVALID');
-  if (activeSource !== tracker || replayBoundaryOperations > 0) return terminalFailure('REPLAY');
+  if (ctx.activeSource !== ctx.tracker || replayBoundaryOperations > 0) return terminalFailure('REPLAY');
   if (terminalLaunchInFlight || Date.now() < terminalLaunchCooldownUntil) {
     return terminalFailure('BUSY');
   }
@@ -366,13 +307,13 @@ async function handleOpenTerminal(event, projectId) {
   }
   const cwd = liveProjectCwd(projectId);
   if (!cwd) return terminalFailure('NOT_FOUND');
-  if (!terminalLauncher || typeof terminalLauncher.open !== 'function') {
+  if (!ctx.terminalLauncher || typeof ctx.terminalLauncher.open !== 'function') {
     return terminalFailure('UNAVAILABLE');
   }
 
   terminalLaunchInFlight = true;
   try {
-    const outcome = await terminalLauncher.open({ cwd });
+    const outcome = await ctx.terminalLauncher.open({ cwd });
     if (outcome && outcome.ok === true) {
       terminalLaunchCooldownUntil = Date.now() + 750;
       return { ok: true };
@@ -387,13 +328,13 @@ async function handleOpenTerminal(event, projectId) {
 
 function handleTasksGet(event, projectId) {
   if (!trustedMainFrame(event) || !validProjectId(projectId)) return null;
-  if (activeSource !== tracker || replayBoundaryOperations > 0) return null;
+  if (ctx.activeSource !== ctx.tracker || replayBoundaryOperations > 0) return null;
   const cwd = liveProjectCwd(projectId);
   if (!cwd) return null;
   try {
     const result = readGoalsFile(cwd);
-    if (taskRuns) taskRuns.reconcile(projectId, result.items);
-    const items = taskRuns ? taskRuns.decorate(projectId, result.items) : result.items;
+    if (ctx.taskRuns) ctx.taskRuns.reconcile(projectId, result.items);
+    const items = ctx.taskRuns ? ctx.taskRuns.decorate(projectId, result.items) : result.items;
     return { exists: result.exists, path: result.path, items };
   } catch {
     return null;
@@ -404,7 +345,7 @@ function handleTasksSave(event, projectId, items) {
   if (!trustedMainFrame(event) || !validProjectId(projectId)) {
     return { ok: false, items: [] };
   }
-  if (activeSource !== tracker || replayBoundaryOperations > 0) {
+  if (ctx.activeSource !== ctx.tracker || replayBoundaryOperations > 0) {
     return { ok: false, items: [] };
   }
   const cwd = liveProjectCwd(projectId);
@@ -454,7 +395,7 @@ function handleTasksSave(event, projectId, items) {
 
 function handleTaskAdd(event, projectId, text) {
   if (!trustedMainFrame(event) || !validProjectId(projectId) ||
-      activeSource !== tracker || replayBoundaryOperations > 0) {
+      ctx.activeSource !== ctx.tracker || replayBoundaryOperations > 0) {
     return { ok: false, items: [] };
   }
   const cwd = liveProjectCwd(projectId);
@@ -468,7 +409,7 @@ function handleTaskAdd(event, projectId, text) {
 
 function handleTaskSetDone(event, projectId, request) {
   if (!trustedMainFrame(event) || !validProjectId(projectId) ||
-      activeSource !== tracker || replayBoundaryOperations > 0) {
+      ctx.activeSource !== ctx.tracker || replayBoundaryOperations > 0) {
     return { ok: false, items: [] };
   }
   const cwd = liveProjectCwd(projectId);
@@ -482,7 +423,7 @@ function handleTaskSetDone(event, projectId, request) {
 
 function handleTaskRemove(event, projectId, request) {
   if (!trustedMainFrame(event) || !validProjectId(projectId) ||
-      activeSource !== tracker || replayBoundaryOperations > 0) {
+      ctx.activeSource !== ctx.tracker || replayBoundaryOperations > 0) {
     return { ok: false, items: [] };
   }
   const cwd = liveProjectCwd(projectId);
@@ -496,10 +437,10 @@ function handleTaskRemove(event, projectId, request) {
 
 function taskMutationResult(projectId, result, ok) {
   const items = result && Array.isArray(result.items) ? result.items : [];
-  if (ok && taskRuns) taskRuns.reconcile(projectId, items);
+  if (ok && ctx.taskRuns) ctx.taskRuns.reconcile(projectId, items);
   return {
     ok: Boolean(ok),
-    items: taskRuns ? taskRuns.decorate(projectId, items) : items,
+    items: ctx.taskRuns ? ctx.taskRuns.decorate(projectId, items) : items,
   };
 }
 
@@ -514,17 +455,17 @@ function rootTaskFailure(code) {
 
 function rootTaskMutationDenied(event) {
   if (!trustedMainFrame(event)) return rootTaskFailure('INVALID');
-  if (!tracker || activeSource !== tracker || replayBoundaryOperations > 0) {
+  if (!ctx.tracker || ctx.activeSource !== ctx.tracker || replayBoundaryOperations > 0) {
     return rootTaskFailure('REPLAY');
   }
-  if (!rootTaskCoordinator) return rootTaskFailure('FAILED');
+  if (!ctx.rootTaskCoordinator) return rootTaskFailure('FAILED');
   return null;
 }
 
 function handleRootTasksGet(event) {
-  if (!trustedMainFrame(event) || !rootTaskCoordinator) return { items: [] };
+  if (!trustedMainFrame(event) || !ctx.rootTaskCoordinator) return { items: [] };
   try {
-    return rootTaskCoordinator.snapshot();
+    return ctx.rootTaskCoordinator.snapshot();
   } catch {
     return { items: [] };
   }
@@ -534,7 +475,7 @@ function handleRootTaskCreate(event, text) {
   const denied = rootTaskMutationDenied(event);
   if (denied) return denied;
   try {
-    return rootTaskCoordinator.create(text);
+    return ctx.rootTaskCoordinator.create(text);
   } catch {
     return rootTaskFailure('FAILED');
   }
@@ -544,7 +485,7 @@ function handleRootTaskRemove(event, taskId) {
   const denied = rootTaskMutationDenied(event);
   if (denied) return denied;
   try {
-    return rootTaskCoordinator.remove(taskId);
+    return ctx.rootTaskCoordinator.remove(taskId);
   } catch {
     return rootTaskFailure('FAILED');
   }
@@ -554,7 +495,7 @@ async function handleRootTaskAssign(event, taskId, projectId) {
   const denied = rootTaskMutationDenied(event);
   if (denied) return denied;
   try {
-    return await rootTaskCoordinator.assign(taskId, projectId);
+    return await ctx.rootTaskCoordinator.assign(taskId, projectId);
   } catch {
     return rootTaskFailure('FAILED');
   }
@@ -564,23 +505,23 @@ async function handleRootTaskRetry(event, taskId) {
   const denied = rootTaskMutationDenied(event);
   if (denied) return denied;
   try {
-    return await rootTaskCoordinator.retry(taskId);
+    return await ctx.rootTaskCoordinator.retry(taskId);
   } catch {
     return rootTaskFailure('FAILED');
   }
 }
 
 function sendRootTasksChanged(value, reason = null) {
-  if (!win || win.isDestroyed() || !value || typeof value.id !== 'string') return;
-  win.webContents.send('au:root-tasks-changed', {
+  if (!ctx.win || ctx.win.isDestroyed() || !value || typeof value.id !== 'string') return;
+  ctx.win.webContents.send('au:root-tasks-changed', {
     taskId: value.id,
     phase: reason === 'removed' ? null : (typeof value.phase === 'string' ? value.phase : null),
   });
 }
 
 function liveProjectShips(projectId) {
-  if (!validProjectId(projectId) || !tracker || !(tracker.ships instanceof Map)) return [];
-  return [...tracker.ships.values()].filter((ship) => ship && ship.project === projectId);
+  if (!validProjectId(projectId) || !ctx.tracker || !(ctx.tracker.ships instanceof Map)) return [];
+  return [...ctx.tracker.ships.values()].filter((ship) => ship && ship.project === projectId);
 }
 
 function projectPathFailure(code) {
@@ -593,15 +534,15 @@ function projectPathFailure(code) {
 
 function projectPathRequestAllowed(event) {
   if (!trustedMainFrame(event)) return projectPathFailure('INVALID');
-  if (!tracker || activeSource !== tracker || replayBoundaryOperations > 0) {
+  if (!ctx.tracker || ctx.activeSource !== ctx.tracker || replayBoundaryOperations > 0) {
     return projectPathFailure('REPLAY');
   }
   return null;
 }
 
 function missingLiveProject(projectId) {
-  if (!validProjectId(projectId) || !tracker || !(tracker.projects instanceof Map)) return null;
-  const project = tracker.projects.get(projectId);
+  if (!validProjectId(projectId) || !ctx.tracker || !(ctx.tracker.projects instanceof Map)) return null;
+  const project = ctx.tracker.projects.get(projectId);
   return project && project.exists === false ? project : null;
 }
 
@@ -631,8 +572,8 @@ function nearestExistingDirectory(inputPath) {
 }
 
 function currentMissingProjects() {
-  if (!tracker || !(tracker.projects instanceof Map)) return [];
-  return [...tracker.projects.values()]
+  if (!ctx.tracker || !(ctx.tracker.projects instanceof Map)) return [];
+  return [...ctx.tracker.projects.values()]
     .filter((project) => project && project.exists === false)
     .sort((a, b) => (b.lastActivity || 0) - (a.lastActivity || 0));
 }
@@ -671,7 +612,7 @@ async function handleProjectPathsScan(event) {
 
   projectPathDialogInFlight = true;
   try {
-    const selection = await dialog.showOpenDialog(win, {
+    const selection = await dialog.showOpenDialog(ctx.win, {
       title: 'Choose a folder to scan for moved projects',
       buttonLabel: 'Scan this folder',
       defaultPath: nearestExistingDirectory(projects[0].path),
@@ -726,14 +667,14 @@ async function handleProjectPathLocate(event, projectId) {
   const denied = projectPathRequestAllowed(event);
   if (denied) return denied;
   if (!validProjectId(projectId)) return projectPathFailure('INVALID');
-  if (!tracker.projects.has(projectId)) return projectPathFailure('NOT_FOUND');
+  if (!ctx.tracker.projects.has(projectId)) return projectPathFailure('NOT_FOUND');
   const project = missingLiveProject(projectId);
   if (!project) return projectPathFailure('NOT_MISSING');
   if (projectPathDialogInFlight) return projectPathFailure('BUSY');
 
   projectPathDialogInFlight = true;
   try {
-    const selection = await dialog.showOpenDialog(win, {
+    const selection = await dialog.showOpenDialog(ctx.win, {
       title: `Locate ${project.name || 'project'}`,
       buttonLabel: 'Use this folder',
       defaultPath: nearestExistingDirectory(project.path),
@@ -742,9 +683,9 @@ async function handleProjectPathLocate(event, projectId) {
     if (selection.canceled || !selection.filePaths[0]) return { ok: true, canceled: true };
     const afterSelectionDenied = projectPathRequestAllowed(event);
     if (afterSelectionDenied) return afterSelectionDenied;
-    if (!tracker.projects.has(projectId)) return projectPathFailure('NOT_FOUND');
+    if (!ctx.tracker.projects.has(projectId)) return projectPathFailure('NOT_FOUND');
     if (!missingLiveProject(projectId)) return projectPathFailure('NOT_MISSING');
-    const recovered = tracker.remapProjectPath(projectId, selection.filePaths[0]);
+    const recovered = ctx.tracker.remapProjectPath(projectId, selection.filePaths[0]);
     revokeProjectPathCandidates(projectId);
     return { ok: true, canceled: false, project: recovered };
   } catch (error) {
@@ -760,7 +701,7 @@ function handleProjectPathApply(event, projectId, token) {
   if (!validProjectId(projectId) || typeof token !== 'string' || !token || token.length > 128) {
     return projectPathFailure('INVALID');
   }
-  if (!tracker.projects.has(projectId)) return projectPathFailure('NOT_FOUND');
+  if (!ctx.tracker.projects.has(projectId)) return projectPathFailure('NOT_FOUND');
   if (!missingLiveProject(projectId)) return projectPathFailure('NOT_MISSING');
   pruneProjectPathCandidates();
   const candidate = projectPathCandidates.get(token);
@@ -774,7 +715,7 @@ function handleProjectPathApply(event, projectId, token) {
         !fs.statSync(realCandidate).isDirectory() || !isPathInside(realRoot, realCandidate)) {
       return projectPathFailure('INVALID');
     }
-    const project = tracker.remapProjectPath(projectId, realCandidate);
+    const project = ctx.tracker.remapProjectPath(projectId, realCandidate);
     revokeProjectPathCandidates(projectId);
     return { ok: true, canceled: false, project };
   } catch (error) {
@@ -783,7 +724,7 @@ function handleProjectPathApply(event, projectId, token) {
 }
 
 function createWindow() {
-  win = new BrowserWindow({
+  ctx.win = new BrowserWindow({
     width: PROVIDER_TEST || HISTORY_TEST || CONTROL_TEST ? 1200 : 1680,
     height: PROVIDER_TEST || HISTORY_TEST || CONTROL_TEST ? 720 : 980,
     minWidth: 1200,
@@ -801,164 +742,35 @@ function createWindow() {
       backgroundThrottling: !TEST_MODE,
     },
   });
-  hardenWebContents(win.webContents, RENDERER_ENTRY_URL);
+  hardenWebContents(ctx.win.webContents, RENDERER_ENTRY_URL);
 
   if (TEST_MODE) {
     // Register load diagnostics before navigation starts. A warm renderer can
     // finish loading while the synchronous tracker setup below is still
     // running; attaching these after loadFile() can miss did-finish-load and
     // leave the visual harness waiting forever.
-    win.webContents.on('console-message', (...args) => {
+    ctx.win.webContents.on('console-message', (...args) => {
       const d = args.find((a) => a && typeof a === 'object' && 'message' in a);
       const msg = d ? `${d.level ?? ''} ${d.message}` : `${args[1] ?? ''} ${args[2] ?? ''}`;
       console.log(`[renderer] ${msg}`);
       if (/Uncaught|ReferenceError|TypeError|SyntaxError|is not defined|Failed to load resource|boot-failure/i.test(msg)) {
-        rendererTestErrors.push(msg);
+        ctx.harness.rendererTestErrors.push(msg);
       }
     });
-    win.webContents.once('did-finish-load', () => {
+    ctx.win.webContents.once('did-finish-load', () => {
       if (CONTROL_TEST) control.run(ctx, driver, metrics);
       else if (HISTORY_TEST) history.run(ctx, driver, metrics);
       else if (PROVIDER_TEST) provider.run(ctx, driver, metrics);
       else if (POLISH_TEST) polish.run(ctx, driver, metrics);
       else shots.run(ctx, driver, metrics);
     });
-    win.webContents.on('did-fail-load', (e, code, desc) => {
+    ctx.win.webContents.on('did-fail-load', (e, code, desc) => {
       console.error(`did-fail-load: ${code} ${desc}`);
       app.exit(1);
     });
   }
-  win.loadFile(RENDERER_ENTRY_PATH);
-
-  const providerFixture = PROVIDER_TEST ? createProviderFixture() : null;
-  controlFixture = CONTROL_TEST ? createControlFixture() : null;
-  historyFixture = CONTROL_TEST ? controlFixture : (HISTORY_TEST ? createHistoryFixture() : null);
-  if (providerFixture) providerFixtureRoot = providerFixture.root;
-  if (historyFixture) historyFixtureRoot = historyFixture.root;
-  const fixture = historyFixture || providerFixture;
-  const trackerOptions = historyFixture ? historyFixture.trackerOptions : providerFixture?.options;
-  tracker = fixture
-    ? new Tracker(fixture.statePath, trackerOptions)
-    : new Tracker(path.join(app.getPath('userData'), 'universe-state.json'));
-  const projectVcsStatusService = createProjectVcsStatusService({
-    collector: createLocalGitStatusCollector(),
-    githubProvider: createGitHubMetadataProvider(),
-    onChange: sendProjectVcsStatusChanged,
-  });
-  projectVcsStatusController = createProjectVcsStatusController({
-    tracker,
-    service: projectVcsStatusService,
-    onError(error) {
-      console.warn(`[git] project status refresh failed: ${error && error.message ? error.message : error}`);
-    },
-  });
-  const workflowStateDirectory = fixture
-    ? path.dirname(fixture.statePath)
-    : app.getPath('userData');
-  const taskRunStatePath = path.join(workflowStateDirectory, 'task-runs.json');
-  rootTasks = new RootTaskStore(path.join(workflowStateDirectory, 'root-tasks.json'));
-  taskRuns = new TaskRunTracker({
-    statePath: taskRunStatePath,
-    resolveProjectRoot: liveProjectCwd,
-    onChange: ({ run }) => {
-      if (!run) return;
-      let rootObserved = false;
-      if (rootTaskCoordinator) {
-        try { rootObserved = rootTaskCoordinator.observeRun(run).ok === true; } catch {
-          rootObserved = false;
-        }
-      }
-      if (!rootObserved) sendRootTasksChanged(run);
-      if (win && !win.isDestroyed()) {
-        win.webContents.send('au:tasks-changed', {
-          projectId: run.projectId,
-          taskId: run.id,
-          phase: run.phase,
-        });
-      }
-    },
-  });
-  rootTaskCoordinator = new RootTaskCoordinator({
-    store: rootTasks,
-    taskRuns,
-    launcher: createAgentLauncher(),
-    resolveProjectRoot: liveProjectCwd,
-    listShips: liveProjectShips,
-    onChange: ({ reason, item }) => sendRootTasksChanged(item, reason),
-  });
-  for (const item of rootTasks.list()) {
-    const run = taskRuns.get(item.id);
-    if (run) rootTaskCoordinator.observeRun(run);
-  }
-  taskRunSweepTimer = setInterval(() => {
-    if (!taskRuns) return;
-    try { taskRuns.expire(); } catch (error) {
-      console.warn(`[tasks] stale-run cleanup failed: ${error && error.message ? error.message : error}`);
-    }
-  }, 30_000);
-  if (typeof taskRunSweepTimer.unref === 'function') taskRunSweepTimer.unref();
-  const replayOptions = historyFixture
-    ? historyFixture.replayOptions
-    : providerFixture
-      ? {
-          claudeProjectsDir: providerFixture.options.claudeProjectsDir,
-          codexSessionDirs: [providerFixture.options.codexSessionsDir],
-        }
-      : {};
-  replaySource = new ReplaySource(replayOptions);
-  terminalLauncher = CONTROL_TEST
-    ? createRecordingTerminalLauncher(controlFixture)
-    : createTerminalLauncher();
-  terminalLaunchInFlight = false;
-  terminalLaunchCooldownUntil = 0;
-  activeSource = tracker;
-  tracker.on('events', (batch) => {
-    if (projectVcsStatusController) projectVcsStatusController.observeEvents(batch);
-    for (const event of Array.isArray(batch) ? batch : []) {
-      if (event.type === 'project-updated' && event.project && event.project.exists === true) {
-        revokeProjectPathCandidates(event.project.id);
-      }
-    }
-    if (taskRuns) {
-      try { taskRuns.observe(batch); } catch (error) {
-        console.warn(`[tasks] completion tracking failed: ${error && error.message ? error.message : error}`);
-      }
-    }
-    if (activeSource === tracker && win && !win.isDestroyed()) {
-      win.webContents.send('au:events', batch, { streamEpoch, mode: 'live' });
-    }
-  });
-  replaySource.on('events', (batch) => {
-    if (activeSource === replaySource && win && !win.isDestroyed()) {
-      win.webContents.send('au:events', batch, { streamEpoch, mode: 'replay' });
-    }
-  });
-  replaySource.on('state', sendReplayState);
-  tracker.start();
-  projectVcsStatusController.start();
-  win.on('focus', () => {
-    if (projectVcsStatusController) projectVcsStatusController.refreshAll();
-  });
-  if (HISTORY_TEST || CONTROL_TEST || !TEST_MODE) {
-    ensureReplayIndex(false).catch((error) => {
-      console.warn(`[history] index unavailable: ${error && error.message ? error.message : error}`);
-    });
-  }
-  if (PROVIDER_TEST) {
-    const claudeShip = [...tracker.ships.values()].find((ship) => ship.provider === 'claude');
-    if (claudeShip) {
-      claudeShip.attention = 'question';
-      claudeShip.attentionSince = Date.now();
-      // Keep the rendered provider fixture in the same state after the five-second
-      // tracker sweep. A direct attention assignment alone is intentionally
-      // transient and made this gate depend on renderer startup speed.
-      claudeShip.pending.set('provider-test-question', {
-        tool: 'AskUserQuestion',
-        ts: Date.now() - 3_000,
-      });
-    }
-  }
-
+  ctx.win.loadFile(RENDERER_ENTRY_PATH);
+  ctx.start();
 }
 
 ipcMain.handle('au:snapshot', (event) => (trustedMainFrame(event) ? visibleSnapshot() : null));
@@ -977,7 +789,7 @@ ipcMain.handle('au:system', (event, id) => (trustedMainFrame(event) ? visibleSys
 ipcMain.handle('au:planet', (event, id, name) => {
   if (!trustedMainFrame(event) || typeof id !== 'string' || typeof name !== 'string' ||
       name.length > 255) return null;
-  return (activeSource || tracker).getPlanet(id, name);
+  return (ctx.activeSource || ctx.tracker).getPlanet(id, name);
 });
 ipcMain.handle('au:replay', (event, command) => (
   trustedMainFrame(event) ? handleReplayCommand(command) : null
@@ -1008,7 +820,7 @@ ipcMain.handle('au:open', (event, id) => {
   if (!trustedMainFrame(event)) return '';
   const p = visibleProject(id);
   if (POLISH_TEST || PROVIDER_TEST || HISTORY_TEST || CONTROL_TEST) {
-    openedProjects.push(id);
+    ctx.harness.openedProjects.push(id);
     return '';
   }
   // Security: only open local directories; a UNC path would force an SMB round-trip.
@@ -1018,4 +830,4 @@ ipcMain.handle('au:open', (event, id) => {
 
 app.whenReady().then(createWindow);
 app.on('window-all-closed', () => app.quit());
-app.on('before-quit', cleanupForExit);
+app.on('before-quit', ctx.cleanup);
