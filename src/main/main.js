@@ -31,12 +31,13 @@ const {
   createControlFixture,
   createRecordingTerminalLauncher,
 } = require('./harness/fixtures');
-const { createDriver, wait } = require('./harness/driver');
+const { createDriver } = require('./harness/driver');
 const { createMetrics } = require('./harness/metrics');
 const shots = require('./harness/modes/shots');
 const control = require('./harness/modes/control');
 const history = require('./harness/modes/history');
 const provider = require('./harness/modes/provider');
+const polish = require('./harness/modes/polish');
 
 const flags = readFlags(process.argv);
 const POLISH_TEST = flags.polishTest;
@@ -46,7 +47,6 @@ const CONTROL_TEST = flags.controlTest;
 const TEST_MODE = flags.testMode;
 const RENDERER_ENTRY_PATH = path.join(__dirname, '..', 'renderer', 'index.html');
 const RENDERER_ENTRY_URL = rendererUrl(RENDERER_ENTRY_PATH);
-const POLISH_OUTPUT = flags.outputs.polish;
 let win = null;
 let tracker = null;
 let replaySource = null;
@@ -74,6 +74,7 @@ let projectPathScanAbort = null;
 const projectPathCandidates = new Map();
 const PROJECT_PATH_CANDIDATE_TTL_MS = 10 * 60 * 1000;
 const rendererTestErrors = [];
+const openedProjects = [];
 const ctx = {
   flags,
   get win() { return win; },
@@ -87,22 +88,11 @@ const ctx = {
     rendererTestErrors,
     get controlFixture() { return controlFixture; },
     get historyFixture() { return historyFixture; },
+    openedProjects,
   },
 };
 const driver = createDriver(ctx);
-const {
-  waitForView,
-  readPolishStats,
-  acquirePointerTarget,
-  clickPoint,
-  elementCenter,
-  capture,
-  backdropLuma,
-  exerciseCamera,
-  pointerInputEvents,
-} = driver;
 const metrics = createMetrics(ctx, driver);
-const openedProjects = [];
 
 function cleanupForExit() {
   replayOperation++;
@@ -830,7 +820,7 @@ function createWindow() {
       if (CONTROL_TEST) control.run(ctx, driver, metrics);
       else if (HISTORY_TEST) history.run(ctx, driver, metrics);
       else if (PROVIDER_TEST) provider.run(ctx, driver, metrics);
-      else if (POLISH_TEST) runPolishMode();
+      else if (POLISH_TEST) polish.run(ctx, driver, metrics);
       else shots.run(ctx, driver, metrics);
     });
     win.webContents.on('did-fail-load', (e, code, desc) => {
@@ -1025,133 +1015,6 @@ ipcMain.handle('au:open', (event, id) => {
   if (p && p.exists && isLocalProjectPath(p.path)) return shell.openPath(p.path);
   return '';
 });
-
-async function runPolishMode() {
-  fs.mkdirSync(POLISH_OUTPUT, { recursive: true });
-  const result = {
-    schemaVersion: 1,
-    passed: false,
-    views: [],
-    steps: [],
-    projectId: null,
-    planetName: null,
-    openedProjectId: null,
-    labelMetrics: null,
-    galaxyMetrics: null,
-    backdropMetrics: null,
-  };
-  try {
-    const universe = await waitForView('universe');
-    if (universe.camera !== 'ucam' || universe.backVisible || universe.summary !== 'UNIVERSE SUMMARY') {
-      throw new Error(`bad universe chrome: ${JSON.stringify(universe)}`);
-    }
-    result.views.push('universe');
-    await wait(1200);
-    const initialLabels = await readPolishStats();
-    result.galaxyMetrics = initialLabels && initialLabels.galaxyMetrics
-      ? initialLabels.galaxyMetrics : null;
-    const universeImage = await capture(POLISH_OUTPUT, 'universe');
-    result.backdropMetrics = backdropLuma(universeImage);
-
-    const hoverTarget = await acquirePointerTarget('sun', true);
-    const initiallyHidden = initialLabels.labels.some((label) => label.id === hoverTarget.id && !label.visible);
-    await wait(180);
-    const hoveredLabels = await readPolishStats();
-    const hoverVisible = hoveredLabels.labels.some((label) => label.id === hoverTarget.id && label.visible);
-    await capture(POLISH_OUTPUT, 'hover');
-    await exerciseCamera();
-    const cameraLabels = await readPolishStats();
-    await capture(POLISH_OUTPUT, 'camera');
-    result.labelMetrics = {
-      glyphCount: initialLabels.glyphCount,
-      totalLabels: initialLabels.totalLabels,
-      pickableSunCount: initialLabels.pickableSunCount,
-      labelControlCount: initialLabels.labelControlCount,
-      visibleLabels: initialLabels.visibleLabels,
-      hiddenLabels: initialLabels.hiddenLabels,
-      overlaps: initialLabels.overlaps,
-      afterHoverOverlaps: hoveredLabels.overlaps,
-      afterCameraOverlaps: cameraLabels.overlaps,
-      measuredLabelCount: initialLabels.measuredLabelCount,
-      measuredOverlaps: initialLabels.measuredOverlaps,
-      measuredChromeOcclusions: initialLabels.measuredChromeOcclusions,
-      afterHoverMeasuredOverlaps: hoveredLabels.measuredOverlaps,
-      afterHoverChromeOcclusions: hoveredLabels.measuredChromeOcclusions,
-      afterCameraMeasuredOverlaps: cameraLabels.measuredOverlaps,
-      afterCameraChromeOcclusions: cameraLabels.measuredChromeOcclusions,
-      hoverReveal: initiallyHidden && hoverVisible,
-      hoverProjectId: hoverTarget.id,
-      finiteProjections: initialLabels.finiteProjections,
-    };
-
-    const sunTarget = await acquirePointerTarget('sun', false, hoverTarget.id);
-    result.projectId = sunTarget.id;
-    const sunInput = clickPoint(sunTarget);
-    const system = await waitForView('system');
-    if (system.camera !== 'scam' || !system.backVisible || system.backText !== '← Universe' ||
-        system.summary !== 'PROJECT SUMMARY' || !system.projectCard.includes('PROJECT:')) {
-      throw new Error(`bad system chrome: ${JSON.stringify(system)}`);
-    }
-    result.views.push('system');
-    result.steps.push({ action: 'canvas-sun-click', input: sunInput, pickValidated: true, from: 'universe', to: 'system', id: sunTarget.id });
-    result.systemColorMetrics = await readPolishStats();
-    await capture(POLISH_OUTPUT, 'system');
-
-    const openFolder = await elementCenter('#project-card .pc-btn');
-    if (!openFolder) throw new Error('Open Folder button missing');
-    result.openFolderInput = clickPoint(openFolder);
-    const openUntil = Date.now() + 2000;
-    while (Date.now() < openUntil && openedProjects[openedProjects.length - 1] !== result.projectId) await wait(40);
-    result.openedProjectId = openedProjects[openedProjects.length - 1] || null;
-
-    const planetTarget = await acquirePointerTarget('planet', false);
-    result.planetName = planetTarget.id;
-    const planetInput = clickPoint(planetTarget);
-    const planet = await waitForView('planet');
-    if (planet.camera !== 'pcam' || !planet.backVisible || !planet.tabbarVisible ||
-        planet.summary !== 'PLANET SUMMARY' || !planet.planetCard.includes('PLANET:')) {
-      throw new Error(`bad planet chrome: ${JSON.stringify(planet)}`);
-    }
-    result.views.push('planet');
-    result.steps.push({ action: 'canvas-planet-click', input: planetInput, pickValidated: true, from: 'system', to: 'planet', id: planetTarget.id });
-    await capture(POLISH_OUTPUT, 'planet');
-
-    const backToSystem = await elementCenter('#back-btn');
-    if (!backToSystem) throw new Error('planet Back button missing');
-    const backSystemInput = clickPoint(backToSystem);
-    const systemAgain = await waitForView('system');
-    if (systemAgain.summary !== 'PROJECT SUMMARY' || systemAgain.backText !== '← Universe') {
-      throw new Error(`bad returned system chrome: ${JSON.stringify(systemAgain)}`);
-    }
-    result.views.push('system');
-    result.steps.push({ action: 'back-button-click', input: backSystemInput, from: 'planet', to: 'system' });
-    await capture(POLISH_OUTPUT, 'back-system');
-
-    const backToUniverse = await elementCenter('#back-btn');
-    if (!backToUniverse) throw new Error('system Back button missing');
-    const backUniverseInput = clickPoint(backToUniverse);
-    const universeAgain = await waitForView('universe');
-    if (universeAgain.backVisible || universeAgain.summary !== 'UNIVERSE SUMMARY') {
-      throw new Error(`bad returned universe chrome: ${JSON.stringify(universeAgain)}`);
-    }
-    result.views.push('universe');
-    result.steps.push({ action: 'back-button-click', input: backUniverseInput, from: 'system', to: 'universe' });
-    await capture(POLISH_OUTPUT, 'back-universe');
-
-    if (rendererTestErrors.length) throw new Error(`renderer errors: ${rendererTestErrors.join(' | ')}`);
-    if (result.openedProjectId !== result.projectId) throw new Error('Open Folder project id mismatch');
-    result.passed = true;
-  } catch (error) {
-    result.error = error && error.stack ? error.stack : String(error);
-    console.error(`[polish-test] ${result.error}`);
-  } finally {
-    result.rendererErrors = rendererTestErrors;
-    result.inputEvents = pointerInputEvents;
-    fs.writeFileSync(path.join(POLISH_OUTPUT, 'result.json'), JSON.stringify(result, null, 2));
-    if (result.passed) app.quit();
-    else app.exit(1);
-  }
-}
 
 app.whenReady().then(createWindow);
 app.on('window-all-closed', () => app.quit());
