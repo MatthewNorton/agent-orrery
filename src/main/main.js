@@ -8,7 +8,6 @@ const { isLocalProjectPath } = require('./provider-adapters');
 const { appendGoal, readGoalsFile, removeGoal, setGoalDone } = require('./goals');
 const { scanProjectCandidates, isPathInside } = require('./project-paths');
 const { githubIdentity } = require('./project-vcs-status');
-const { trustedMainFrame: isTrustedMainFrame } = require('./window-security');
 const { readFlags } = require('./flags');
 const fixtures = require('./harness/fixtures');
 const { createDriver } = require('./harness/driver');
@@ -19,8 +18,10 @@ const history = require('./harness/modes/history');
 const provider = require('./harness/modes/provider');
 const polish = require('./harness/modes/polish');
 const { createAppContext } = require('./app-context');
-const { createWindow, RENDERER_ENTRY_URL } = require('./window');
+const { createWindow } = require('./window');
 const { createReplayControl } = require('./replay-control');
+const guards = require('./ipc/guards');
+const { validProjectId } = guards;
 
 const flags = readFlags(process.argv);
 const POLISH_TEST = flags.polishTest;
@@ -66,14 +67,7 @@ ctx.harness.runTestMode = () => {
   else shots.run(ctx, driver, metrics);
 };
 
-function validProjectId(value) {
-  return typeof value === 'string' && value.length > 0 && value.length <= 256 &&
-    value.trim().length > 0 && !/[\u0000-\u001f\u007f-\u009f]/.test(value);
-}
-
-function trustedMainFrame(event) {
-  return isTrustedMainFrame(event, ctx.win, RENDERER_ENTRY_URL);
-}
+const trustedMainFrame = (event) => guards.trustedMainFrame(ctx, event);
 
 function liveProjectCwd(projectId) {
   if (!ctx.tracker || !(ctx.tracker.projects instanceof Map)) return null;
