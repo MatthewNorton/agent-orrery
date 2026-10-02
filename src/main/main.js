@@ -23,6 +23,7 @@ const guards = require('./ipc/guards');
 const { validProjectId } = guards;
 const { createTerminalIpc } = require('./ipc/terminal');
 const { createTasksIpc } = require('./ipc/tasks');
+const { createRootTasksIpc } = require('./ipc/root-tasks');
 
 const flags = readFlags(process.argv);
 const POLISH_TEST = flags.polishTest;
@@ -40,7 +41,7 @@ const { visibleSnapshot, visibleSystem, visibleProject, handleReplayCommand } = 
 ctx.ipc = {
   terminal: createTerminalIpc(ctx),
   tasks: createTasksIpc(ctx),
-  rootTasks: { sendRootTasksChanged, liveProjectShips },
+  rootTasks: createRootTasksIpc(ctx),
   projectPaths: {
     revokeProjectPathCandidates,
     reset() {
@@ -53,6 +54,9 @@ ctx.ipc = {
 };
 const { handleOpenTerminal } = ctx.ipc.terminal;
 const { handleTasksGet, handleTasksSave, handleTaskAdd, handleTaskSetDone, handleTaskRemove } = ctx.ipc.tasks;
+const {
+  handleRootTasksGet, handleRootTaskCreate, handleRootTaskRemove, handleRootTaskAssign, handleRootTaskRetry,
+} = ctx.ipc.rootTasks;
 const driver = createDriver(ctx);
 const metrics = createMetrics(ctx, driver);
 ctx.harness.runTestMode = () => {
@@ -64,86 +68,6 @@ ctx.harness.runTestMode = () => {
 };
 
 const trustedMainFrame = (event) => guards.trustedMainFrame(ctx, event);
-
-function rootTaskFailure(code) {
-  const allowed = new Set([
-    'INVALID', 'REPLAY', 'NOT_FOUND', 'LIMIT_REACHED', 'PROJECT_IMMUTABLE',
-    'INVALID_TRANSITION', 'PROJECT_NOT_FOUND', 'PROJECT_BUSY', 'BUSY',
-    'WRITE_FAILED', 'UNAVAILABLE', 'LAUNCH_FAILED', 'FAILED',
-  ]);
-  return { ok: false, code: allowed.has(code) ? code : 'FAILED' };
-}
-
-function rootTaskMutationDenied(event) {
-  if (!trustedMainFrame(event)) return rootTaskFailure('INVALID');
-  if (!ctx.tracker || ctx.activeSource !== ctx.tracker || ctx.replay.replayBoundaryOperations > 0) {
-    return rootTaskFailure('REPLAY');
-  }
-  if (!ctx.rootTaskCoordinator) return rootTaskFailure('FAILED');
-  return null;
-}
-
-function handleRootTasksGet(event) {
-  if (!trustedMainFrame(event) || !ctx.rootTaskCoordinator) return { items: [] };
-  try {
-    return ctx.rootTaskCoordinator.snapshot();
-  } catch {
-    return { items: [] };
-  }
-}
-
-function handleRootTaskCreate(event, text) {
-  const denied = rootTaskMutationDenied(event);
-  if (denied) return denied;
-  try {
-    return ctx.rootTaskCoordinator.create(text);
-  } catch {
-    return rootTaskFailure('FAILED');
-  }
-}
-
-function handleRootTaskRemove(event, taskId) {
-  const denied = rootTaskMutationDenied(event);
-  if (denied) return denied;
-  try {
-    return ctx.rootTaskCoordinator.remove(taskId);
-  } catch {
-    return rootTaskFailure('FAILED');
-  }
-}
-
-async function handleRootTaskAssign(event, taskId, projectId) {
-  const denied = rootTaskMutationDenied(event);
-  if (denied) return denied;
-  try {
-    return await ctx.rootTaskCoordinator.assign(taskId, projectId);
-  } catch {
-    return rootTaskFailure('FAILED');
-  }
-}
-
-async function handleRootTaskRetry(event, taskId) {
-  const denied = rootTaskMutationDenied(event);
-  if (denied) return denied;
-  try {
-    return await ctx.rootTaskCoordinator.retry(taskId);
-  } catch {
-    return rootTaskFailure('FAILED');
-  }
-}
-
-function sendRootTasksChanged(value, reason = null) {
-  if (!ctx.win || ctx.win.isDestroyed() || !value || typeof value.id !== 'string') return;
-  ctx.win.webContents.send('au:root-tasks-changed', {
-    taskId: value.id,
-    phase: reason === 'removed' ? null : (typeof value.phase === 'string' ? value.phase : null),
-  });
-}
-
-function liveProjectShips(projectId) {
-  if (!validProjectId(projectId) || !ctx.tracker || !(ctx.tracker.ships instanceof Map)) return [];
-  return [...ctx.tracker.ships.values()].filter((ship) => ship && ship.project === projectId);
-}
 
 function projectPathFailure(code) {
   const allowed = new Set([
