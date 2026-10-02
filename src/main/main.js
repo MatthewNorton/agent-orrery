@@ -22,14 +22,13 @@ const { createWindow } = require('./window');
 const { createReplayControl } = require('./replay-control');
 const guards = require('./ipc/guards');
 const { validProjectId } = guards;
+const { createTerminalIpc } = require('./ipc/terminal');
 
 const flags = readFlags(process.argv);
 const POLISH_TEST = flags.polishTest;
 const PROVIDER_TEST = flags.providerTest;
 const HISTORY_TEST = flags.historyTest;
 const CONTROL_TEST = flags.controlTest;
-let terminalLaunchInFlight = false;
-let terminalLaunchCooldownUntil = 0;
 let projectPathDialogInFlight = false;
 let projectPathScanAbort = null;
 const projectPathCandidates = new Map();
@@ -39,13 +38,7 @@ ctx.replay = createReplayControl(ctx);
 const { visibleSnapshot, visibleSystem, visibleProject, handleReplayCommand } = ctx.replay;
 // Interim: these concerns still live here until ipc/ owns them.
 ctx.ipc = {
-  terminal: {
-    liveProjectCwd,
-    reset() {
-      terminalLaunchInFlight = false;
-      terminalLaunchCooldownUntil = 0;
-    },
-  },
+  terminal: createTerminalIpc(ctx),
   rootTasks: { sendRootTasksChanged, liveProjectShips },
   projectPaths: {
     revokeProjectPathCandidates,
@@ -57,6 +50,7 @@ ctx.ipc = {
     },
   },
 };
+const { liveProjectCwd, handleOpenTerminal } = ctx.ipc.terminal;
 const driver = createDriver(ctx);
 const metrics = createMetrics(ctx, driver);
 ctx.harness.runTestMode = () => {
@@ -68,60 +62,6 @@ ctx.harness.runTestMode = () => {
 };
 
 const trustedMainFrame = (event) => guards.trustedMainFrame(ctx, event);
-
-function liveProjectCwd(projectId) {
-  if (!ctx.tracker || !(ctx.tracker.projects instanceof Map)) return null;
-  const project = ctx.tracker.projects.get(projectId);
-  // Security: project.path originates in transcript content. Refuse UNC/device paths
-  // before any filesystem call so no network authentication can be forced.
-  if (!project || project.exists !== true || !isLocalProjectPath(project.path) ||
-      !path.isAbsolute(project.path)) return null;
-  try {
-    const real = fs.realpathSync.native(project.path);
-    const cwd = path.normalize(real);
-    if (!isLocalProjectPath(cwd) || !path.isAbsolute(cwd) || !fs.statSync(cwd).isDirectory()) {
-      return null;
-    }
-    return cwd;
-  } catch {
-    return null;
-  }
-}
-
-function terminalFailure(code) {
-  const allowed = new Set(['INVALID', 'REPLAY', 'NOT_FOUND', 'UNAVAILABLE', 'BUSY', 'FAILED']);
-  return { ok: false, code: allowed.has(code) ? code : 'FAILED' };
-}
-
-async function handleOpenTerminal(event, projectId) {
-  if (!trustedMainFrame(event) || !validProjectId(projectId)) return terminalFailure('INVALID');
-  if (ctx.activeSource !== ctx.tracker || ctx.replay.replayBoundaryOperations > 0) return terminalFailure('REPLAY');
-  if (terminalLaunchInFlight || Date.now() < terminalLaunchCooldownUntil) {
-    return terminalFailure('BUSY');
-  }
-  if (process.platform !== 'win32' && process.platform !== 'darwin' && !CONTROL_TEST) {
-    return terminalFailure('UNAVAILABLE');
-  }
-  const cwd = liveProjectCwd(projectId);
-  if (!cwd) return terminalFailure('NOT_FOUND');
-  if (!ctx.terminalLauncher || typeof ctx.terminalLauncher.open !== 'function') {
-    return terminalFailure('UNAVAILABLE');
-  }
-
-  terminalLaunchInFlight = true;
-  try {
-    const outcome = await ctx.terminalLauncher.open({ cwd });
-    if (outcome && outcome.ok === true) {
-      terminalLaunchCooldownUntil = Date.now() + 750;
-      return { ok: true };
-    }
-    return terminalFailure(outcome && typeof outcome.code === 'string' ? outcome.code : 'FAILED');
-  } catch {
-    return terminalFailure('FAILED');
-  } finally {
-    terminalLaunchInFlight = false;
-  }
-}
 
 function handleTasksGet(event, projectId) {
   if (!trustedMainFrame(event) || !validProjectId(projectId)) return null;
