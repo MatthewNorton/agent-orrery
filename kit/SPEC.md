@@ -20,12 +20,13 @@ Gold samples (visual ground truth, in repo root):
 Frozen files — read them, never modify them unless an active kit contract
 explicitly unfreezes a named test or product surface:
 
-- `src/main/main.js` — window bootstrap, active live/replay source controller,
-  IPC, and isolated screenshot modes
 - `src/main/tracker.js` — transcript tailing, ship/planet/event derivation
 - `src/main/replay-source.js` — bounded, read-only Claude/Codex history source
 - `src/preload.js` — the `window.AU` bridge (exact API below)
 - `package.json` — no new dependencies, no script changes
+
+`main.js` is a bootstrap; concerns live in `app-context.js`, `window.js`,
+`replay-control.js`, `ipc/`, `harness/`.
 
 ## 1. Hard constraints
 

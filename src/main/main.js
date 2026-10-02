@@ -20,10 +20,6 @@ const { createProjectPathsIpc } = require('./ipc/project-paths');
 const { registerIpc } = require('./ipc/register');
 
 const flags = readFlags(process.argv);
-const POLISH_TEST = flags.polishTest;
-const PROVIDER_TEST = flags.providerTest;
-const HISTORY_TEST = flags.historyTest;
-const CONTROL_TEST = flags.controlTest;
 const ctx = createAppContext({ flags, fixtures });
 ctx.replay = createReplayControl(ctx);
 ctx.ipc = {
@@ -36,10 +32,10 @@ registerIpc(ctx, { replay: ctx.replay, ...ctx.ipc });
 const driver = createDriver(ctx);
 const metrics = createMetrics(ctx, driver);
 ctx.harness.runTestMode = () => {
-  if (CONTROL_TEST) control.run(ctx, driver, metrics);
-  else if (HISTORY_TEST) history.run(ctx, driver, metrics);
-  else if (PROVIDER_TEST) provider.run(ctx, driver, metrics);
-  else if (POLISH_TEST) polish.run(ctx, driver, metrics);
+  if (flags.controlTest) control.run(ctx, driver, metrics);
+  else if (flags.historyTest) history.run(ctx, driver, metrics);
+  else if (flags.providerTest) provider.run(ctx, driver, metrics);
+  else if (flags.polishTest) polish.run(ctx, driver, metrics);
   else shots.run(ctx, driver, metrics);
 };
 
