@@ -1,6 +1,6 @@
 'use strict';
 
-const { app, BrowserWindow, ipcMain, shell, dialog } = require('electron');
+const { app, ipcMain, shell, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
@@ -8,11 +8,7 @@ const { isLocalProjectPath } = require('./provider-adapters');
 const { appendGoal, readGoalsFile, removeGoal, setGoalDone } = require('./goals');
 const { scanProjectCandidates, isPathInside } = require('./project-paths');
 const { githubIdentity } = require('./project-vcs-status');
-const {
-  rendererUrl,
-  trustedMainFrame: isTrustedMainFrame,
-  hardenWebContents,
-} = require('./window-security');
+const { trustedMainFrame: isTrustedMainFrame } = require('./window-security');
 const { readFlags } = require('./flags');
 const fixtures = require('./harness/fixtures');
 const { createDriver } = require('./harness/driver');
@@ -23,15 +19,13 @@ const history = require('./harness/modes/history');
 const provider = require('./harness/modes/provider');
 const polish = require('./harness/modes/polish');
 const { createAppContext } = require('./app-context');
+const { createWindow, RENDERER_ENTRY_URL } = require('./window');
 
 const flags = readFlags(process.argv);
 const POLISH_TEST = flags.polishTest;
 const PROVIDER_TEST = flags.providerTest;
 const HISTORY_TEST = flags.historyTest;
 const CONTROL_TEST = flags.controlTest;
-const TEST_MODE = flags.testMode;
-const RENDERER_ENTRY_PATH = path.join(__dirname, '..', 'renderer', 'index.html');
-const RENDERER_ENTRY_URL = rendererUrl(RENDERER_ENTRY_PATH);
 let replayOperation = 0;
 let replayBoundaryOperations = 0;
 let replayIndexPromise = null;
@@ -78,6 +72,13 @@ ctx.ipc = {
 };
 const driver = createDriver(ctx);
 const metrics = createMetrics(ctx, driver);
+ctx.harness.runTestMode = () => {
+  if (CONTROL_TEST) control.run(ctx, driver, metrics);
+  else if (HISTORY_TEST) history.run(ctx, driver, metrics);
+  else if (PROVIDER_TEST) provider.run(ctx, driver, metrics);
+  else if (POLISH_TEST) polish.run(ctx, driver, metrics);
+  else shots.run(ctx, driver, metrics);
+};
 
 function boundedReplayStatus(mode = null) {
   const raw = ctx.replaySource ? ctx.replaySource.status() : {};
@@ -723,56 +724,6 @@ function handleProjectPathApply(event, projectId, token) {
   }
 }
 
-function createWindow() {
-  ctx.win = new BrowserWindow({
-    width: PROVIDER_TEST || HISTORY_TEST || CONTROL_TEST ? 1200 : 1680,
-    height: PROVIDER_TEST || HISTORY_TEST || CONTROL_TEST ? 720 : 980,
-    minWidth: 1200,
-    minHeight: 720,
-    backgroundColor: '#04050a',
-    autoHideMenuBar: true,
-    title: 'Agent Universe',
-    webPreferences: {
-      preload: path.join(__dirname, '..', 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-      // Visual runners can execute from an occluded desktop session. Keep
-      // their render loop alive so debug-ready can observe a completed frame.
-      backgroundThrottling: !TEST_MODE,
-    },
-  });
-  hardenWebContents(ctx.win.webContents, RENDERER_ENTRY_URL);
-
-  if (TEST_MODE) {
-    // Register load diagnostics before navigation starts. A warm renderer can
-    // finish loading while the synchronous tracker setup below is still
-    // running; attaching these after loadFile() can miss did-finish-load and
-    // leave the visual harness waiting forever.
-    ctx.win.webContents.on('console-message', (...args) => {
-      const d = args.find((a) => a && typeof a === 'object' && 'message' in a);
-      const msg = d ? `${d.level ?? ''} ${d.message}` : `${args[1] ?? ''} ${args[2] ?? ''}`;
-      console.log(`[renderer] ${msg}`);
-      if (/Uncaught|ReferenceError|TypeError|SyntaxError|is not defined|Failed to load resource|boot-failure/i.test(msg)) {
-        ctx.harness.rendererTestErrors.push(msg);
-      }
-    });
-    ctx.win.webContents.once('did-finish-load', () => {
-      if (CONTROL_TEST) control.run(ctx, driver, metrics);
-      else if (HISTORY_TEST) history.run(ctx, driver, metrics);
-      else if (PROVIDER_TEST) provider.run(ctx, driver, metrics);
-      else if (POLISH_TEST) polish.run(ctx, driver, metrics);
-      else shots.run(ctx, driver, metrics);
-    });
-    ctx.win.webContents.on('did-fail-load', (e, code, desc) => {
-      console.error(`did-fail-load: ${code} ${desc}`);
-      app.exit(1);
-    });
-  }
-  ctx.win.loadFile(RENDERER_ENTRY_PATH);
-  ctx.start();
-}
-
 ipcMain.handle('au:snapshot', (event) => (trustedMainFrame(event) ? visibleSnapshot() : null));
 ipcMain.handle('au:open-external', async (event, url) => {
   if (!trustedMainFrame(event)) return { ok: false, code: 'INVALID_URL' };
@@ -828,6 +779,9 @@ ipcMain.handle('au:open', (event, id) => {
   return '';
 });
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  ctx.win = createWindow(ctx);
+  ctx.start();
+});
 app.on('window-all-closed', () => app.quit());
 app.on('before-quit', ctx.cleanup);
