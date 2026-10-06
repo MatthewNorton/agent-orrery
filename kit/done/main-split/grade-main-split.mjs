@@ -5,7 +5,8 @@
 // can be gated. `--full` also runs every archived gate (packaging only on a clean tree)
 // and the renderer gate three times.
 //
-// Usage: node kit/todo/grade-main-split.mjs [--stage A|B|C|D|E|all] [--full]
+// Usage: node kit/done/main-split/grade-main-split.mjs [--stage A|B|C|D|E|all] [--full]
+// (run from kit/todo/grade-main-split.mjs while the kit was executing)
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';

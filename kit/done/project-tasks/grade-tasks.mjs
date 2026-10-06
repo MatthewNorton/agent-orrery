@@ -71,7 +71,13 @@ if (bad) fail(`T2: ${bad} fixture case(s) wrong`);
 console.log('T2 PASS  all fixtures');
 
 // ---- T3 wiring greps ----
-const mainSrc = fs.readFileSync(path.join(ROOT, 'src', 'main', 'main.js'), 'utf8');
+// Kit 14 (2026-10-01): main.js is split across src/main; grep the whole layer.
+const mainSrc = (function readMainLayer(dir) {
+  return fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))
+    .flatMap((e) => e.isDirectory() ? [readMainLayer(path.join(dir, e.name))]
+      : e.name.endsWith('.js') ? [fs.readFileSync(path.join(dir, e.name), 'utf8')] : [])
+    .join('\n');
+})(path.join(ROOT, 'src', 'main'));
 const preloadSrc = fs.readFileSync(path.join(ROOT, 'src', 'preload.js'), 'utf8');
 const rendererDir = path.join(ROOT, 'src', 'renderer');
 const rendererSrc = fs.readdirSync(rendererDir).filter((f) => f.endsWith('.js') || f.endsWith('.html'))

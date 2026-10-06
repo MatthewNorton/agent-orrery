@@ -150,7 +150,8 @@ None of these block release. Each is a kit-sized job.
       texture's `onLoadObservable.addOnce` (or `scene.executeWhenReady`) with
       a single fallback timeout. ~1 h. Withdrawn 2026-09-28: Babylon exposes no decode-complete signal; poll kept and documented (kit 13).
 - [ ] **5.4 Mapped network drives on Windows** (unverified).
-      `src/main/main.js:491` re-checks `isLocalProjectPath` after
+      `src/main/ipc/terminal.js:24` (`liveProjectCwd`; `main.js:491` before
+      kit 14) re-checks `isLocalProjectPath` after
       `realpathSync.native`, which resolves `Z:\` to UNC, so Open Terminal
       reports NOT_FOUND for a project the map shows as existing. Drop the
       post-realpath check; the pre-realpath one is the protective one. ~30 min

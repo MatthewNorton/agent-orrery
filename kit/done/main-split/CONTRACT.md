@@ -106,10 +106,15 @@ lines. Target ≤ 150 lines.
 
 ### 2.3 Gate greps (already done)
 
-The archived gates for agent-control, galaxy-grouping, history-playback, multi-provider
-and polish-pass read `src/main/main.js` and grep feature strings. In the PR that added
-this kit, each `mainSource` became the concatenation of **every `.js` under `src/main`**
-(recursive, sorted) with a dated comment, and every gate was green on the unsplit tree.
+Six archived gates read `src/main/main.js` and grep feature strings: agent-control,
+galaxy-grouping, history-playback, multi-provider, polish-pass and project-tasks. All six
+were widened: each `mainSource` (`mainSrc` in project-tasks) became the concatenation of
+**every `.js` under `src/main`** (recursive, sorted) with a dated comment. The first five
+were widened in the PR that added this kit, and every one was green on the unsplit tree.
+The distill missed project-tasks. The owner authorized widening it the same way during
+execution, in its own commit (`fix(kit): widen project-tasks gate to the src/main layer`)
+placed immediately before the `ipc/register.js` commit and green on the tree before it.
+That is the only archived-gate edit this kit made.
 The polish gate's `P4` rule (no `.click()` in the harness) therefore now applies to the
 whole main layer; the layer has none today, keep it that way.
 
