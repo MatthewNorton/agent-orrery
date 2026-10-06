@@ -6,7 +6,6 @@
 |---|---|---|
 | 09 | `09-ship-assets-gen.md` — locally generated hulls (ComfyUI image-to-3D) | stub — Kit 08's manifest contract has landed; ready to distill |
 | 12 | `12-standalone-installer.md` — packaged exe/installer independent of the checkout | parked — wanted later, not yet; don't distill until matt asks |
-| 14 | `14-main-split.md` — split the 2,217-line main.js into bootstrap + app-context, window, replay-control, ipc/*, harness/*; zero module-level `let` | **ready** — distilled 2026-10-01; gate `grade-main-split.mjs` beside it; executor prompt in §6 |
 
 Feed a ready kit to an executor via `kit/EXECUTOR-HANDOFF.md` with its
 CONTRACT.md path.
@@ -42,6 +41,11 @@ Completed:
   `../done/structural-cleanup/` with its contract (§2.6 reversed during
   execution), staged gate, and executor report: `app.js` split into `AUR.app`
   modules, shared `src/main/path-safety.js`, `kit/repin.mjs`.
+- 14 main-process split — **PASS 2026-10-01**; archived under
+  `../done/main-split/` with its contract (§2.3 amended: six archived gates
+  widened, project-tasks added during execution), staged gate, and executor
+  report: `main.js` is a bootstrap over `app-context.js`, `window.js`,
+  `replay-control.js`, `ipc/*` and `harness/*`, with no module-level state.
 
 A **stub** is a parked idea with goal + seed notes — not executable. To
 activate one: run `/distill` on the stub file to produce a full kit (contract +
