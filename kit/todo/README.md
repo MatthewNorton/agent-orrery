@@ -41,6 +41,11 @@ Completed:
   `../done/structural-cleanup/` with its contract (§2.6 reversed during
   execution), staged gate, and executor report: `app.js` split into `AUR.app`
   modules, shared `src/main/path-safety.js`, `kit/repin.mjs`.
+- 14 main-process split — **PASS 2026-10-01**; archived under
+  `../done/main-split/` with its contract (§2.3 amended: six archived gates
+  widened, project-tasks added during execution), staged gate, and executor
+  report: `main.js` is a bootstrap over `app-context.js`, `window.js`,
+  `replay-control.js`, `ipc/*` and `harness/*`, with no module-level state.
 
 A **stub** is a parked idea with goal + seed notes — not executable. To
 activate one: run `/distill` on the stub file to produce a full kit (contract +
