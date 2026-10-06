@@ -48,7 +48,13 @@ async function terminateTree(child) {
 }
 
 const trackerSource = read('src/main/tracker.js');
-const mainSource = read('src/main/main.js');
+// Kit 14 (2026-10-01): main.js is split across src/main; grep the whole layer.
+const mainSource = (function readMainLayer(dir) {
+  return fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))
+    .flatMap((e) => e.isDirectory() ? [readMainLayer(path.join(dir, e.name))]
+      : e.name.endsWith('.js') ? [fs.readFileSync(path.join(dir, e.name), 'utf8')] : [])
+    .join('\n');
+})(path.join(root, 'src', 'main'));
 const indexSource = read('src/renderer/index.html');
 const universeSource = read('src/renderer/scene-universe.js');
 const layoutPath = path.join(root, 'src', 'renderer', 'galaxy-layout.js');

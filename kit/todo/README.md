@@ -6,6 +6,7 @@
 |---|---|---|
 | 09 | `09-ship-assets-gen.md` — locally generated hulls (ComfyUI image-to-3D) | stub — Kit 08's manifest contract has landed; ready to distill |
 | 12 | `12-standalone-installer.md` — packaged exe/installer independent of the checkout | parked — wanted later, not yet; don't distill until matt asks |
+| 14 | `14-main-split.md` — split the 2,217-line main.js into bootstrap + app-context, window, replay-control, ipc/*, harness/*; zero module-level `let` | **ready** — distilled 2026-10-01; gate `grade-main-split.mjs` beside it; executor prompt in §6 |
 
 Feed a ready kit to an executor via `kit/EXECUTOR-HANDOFF.md` with its
 CONTRACT.md path.
