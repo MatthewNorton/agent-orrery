@@ -1,5 +1,8 @@
+// @ts-check
 // app-ideas.js — root task ideas (global IDEAS queue).
 'use strict';
+
+/** @import { RootTaskResult, RootTasksSnapshot } from '../types/contract' */
 
 (function () {
   const AUR = window.AUR;
@@ -38,6 +41,7 @@
     A.refreshIdeas();
   };
 
+  /** @param {RootTasksSnapshot} result */
   function rootTaskItemsFrom(result) {
     if (!result || !Array.isArray(result.items)) return [];
     return result.items.filter((item) => item && typeof item.id === 'string' &&
@@ -58,6 +62,7 @@
       return;
     }
     const request = ++S.ideaPanel.request;
+    /** @type {RootTasksSnapshot} */
     let result = null;
     try { result = await AU.rootTasksGet(); } catch (error) { /* retain the last good list */ }
     if (request !== S.ideaPanel.request || !result) return;
@@ -120,10 +125,10 @@
     if (!active || !list.contains(active)) {
       return { id: null, action: null, scrollTop: list.scrollTop };
     }
-    const row = active.closest('.idea-row');
+    const row = /** @type {HTMLElement | null} */ (active.closest('.idea-row'));
     return {
       id: row ? row.dataset.ideaId : null,
-      action: active.dataset.ideaAction || null,
+      action: /** @type {HTMLElement} */ (active).dataset.ideaAction || null,
       scrollTop: list.scrollTop,
     };
   }
@@ -353,6 +358,7 @@
     });
   }
 
+  /** @param {() => Promise<RootTaskResult>} operation */
   async function mutateIdea(operation, successText, clearInput = false, onSuccess = null) {
     if (S.ideaPanel.busy || S.playback.mode !== 'live' || S.replayTransitionPending) return;
     S.ideaPanel.busy = true;
@@ -360,6 +366,7 @@
     S.ideaPanel.status = '';
     S.ideaPanel.error = false;
     A.renderIdeas();
+    /** @type {RootTaskResult} */
     let result = null;
     try { result = await operation(); } catch (error) { /* bounded failure below */ }
     S.ideaPanel.busy = false;

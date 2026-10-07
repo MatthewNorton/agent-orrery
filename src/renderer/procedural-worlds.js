@@ -1,3 +1,4 @@
+// @ts-check
 // procedural-worlds.js — deterministic runtime planet surfaces and asteroid forms.
 'use strict';
 

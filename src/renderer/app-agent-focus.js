@@ -1,3 +1,4 @@
+// @ts-check
 // app-agent-focus.js — first-person agent focus: POV overlay, hologram, navigation map.
 'use strict';
 
