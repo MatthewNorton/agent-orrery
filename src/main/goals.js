@@ -2,10 +2,11 @@
 
 const fs = require('fs');
 const path = require('path');
+const { writeFileAtomic } = require('./shared/atomic-write');
+const { validGoalId } = require('./shared/ids');
 
 const TASK_LINE = /^(\s*)([-*])([ \t]+)\[([ xX])\]([ \t]+)(.*)$/;
 const ASSIGNED_GOAL_SUFFIX = /^(.*?)([ \t]+<!--\s*agent-universe:([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\s*-->[ \t]*)$/i;
-const GOAL_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function splitSourceLines(text) {
   const source = String(text);
@@ -192,26 +193,12 @@ function normalizeGoalItems(items) {
   });
 }
 
-function validGoalId(value) {
-  return typeof value === 'string' && GOAL_ID.test(value);
-}
-
 function writeGoalsFile(projectRoot, items) {
   const normalized = normalizeGoalItems(items);
   const before = readGoalsFile(projectRoot);
   const { root, goalsPath } = resolveGoalsPath(projectRoot);
   const nextText = serializeGoals(before.originalText, normalized);
-  const tempName = `.GOALS.md.${process.pid}.${Date.now()}.${Math.random().toString(16).slice(2)}.tmp`;
-  const tempPath = path.resolve(root, tempName);
-  if (!isInside(root, tempPath)) throw new Error('Temporary path escapes the project root');
-  try {
-    fs.writeFileSync(tempPath, nextText, { encoding: 'utf8', flag: 'wx' });
-    fs.renameSync(tempPath, goalsPath);
-  } finally {
-    try { fs.unlinkSync(tempPath); } catch (error) {
-      if (!error || error.code !== 'ENOENT') throw error;
-    }
-  }
+  writeFileAtomic(goalsPath, nextText);
   return readGoalsFile(root);
 }
 
@@ -331,21 +318,14 @@ function removeGoal(projectRoot, request) {
 
 function replaceGoalsIfUnchanged(projectRoot, before, nextText) {
   const { root, goalsPath } = resolveGoalsPath(projectRoot);
-  const tempName = `.GOALS.md.${process.pid}.${Date.now()}.${Math.random().toString(16).slice(2)}.tmp`;
-  const tempPath = path.resolve(root, tempName);
-  if (!isInside(root, tempPath)) throw new Error('Temporary path escapes the project root');
-  try {
-    fs.writeFileSync(tempPath, nextText, { encoding: 'utf8', flag: 'wx' });
-    const current = readGoalsFile(root);
-    if (current.path !== goalsPath || current.originalText !== before.originalText) {
-      throw new Error('GOALS.md changed during completion');
-    }
-    fs.renameSync(tempPath, goalsPath);
-  } finally {
-    try { fs.unlinkSync(tempPath); } catch (error) {
-      if (!error || error.code !== 'ENOENT') throw error;
-    }
-  }
+  writeFileAtomic(goalsPath, nextText, {
+    beforeRename() {
+      const current = readGoalsFile(root);
+      if (current.path !== goalsPath || current.originalText !== before.originalText) {
+        throw new Error('GOALS.md changed during completion');
+      }
+    },
+  });
 }
 
 function normalizeAssignedGoal(item) {
