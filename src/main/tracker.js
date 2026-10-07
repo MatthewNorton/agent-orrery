@@ -22,6 +22,7 @@ const {
 } = require('./provider-adapters');
 const { claudeRecordToSignals, claudeTool } = require('./transcripts/claude');
 const { fnv1a, hex8, mulberry32 } = require('./shared/hash');
+const { writeFileAtomic } = require('./shared/atomic-write');
 
 const DEFAULT_CLAUDE_PROJECTS_DIR = path.join(os.homedir(), '.claude', 'projects');
 const DEFAULT_CODEX_SESSION_DIRS = [
@@ -302,21 +303,11 @@ class Tracker extends EventEmitter {
     for (const [slug, p] of this.projects) {
       out.projects[slug] = { buckets: p.buckets, totalBuilds: p.totalBuilds, firstSeen: p.firstSeen };
     }
-    let tempPath = null;
     try {
-      const stateDirectory = path.dirname(this.statePath);
-      fs.mkdirSync(stateDirectory, { recursive: true });
-      tempPath = path.join(
-        stateDirectory,
-        `${path.basename(this.statePath)}.${process.pid}.${Date.now()}.tmp`
-      );
-      fs.writeFileSync(tempPath, JSON.stringify(out));
-      fs.renameSync(tempPath, this.statePath);
+      fs.mkdirSync(path.dirname(this.statePath), { recursive: true });
+      writeFileAtomic(this.statePath, JSON.stringify(out));
       return true;
     } catch (e) {
-      if (tempPath) {
-        try { fs.unlinkSync(tempPath); } catch { /* best-effort temp cleanup */ }
-      }
       if (throwOnError) throw e;
       console.error('state save failed', e.message);
       return false;
