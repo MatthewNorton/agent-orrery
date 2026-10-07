@@ -13,7 +13,8 @@ async function withTree(directories, run) {
     for (const directory of directories) {
       fs.mkdirSync(path.join(base, ...directory.split('/')), { recursive: true });
     }
-    const root = path.normalize(fs.realpathSync(base));
+    // The scanner resolves with the native realpath, which expands 8.3 names like RUNNER~1.
+    const root = path.normalize(fs.realpathSync.native(base));
     return await run(root, (relative) => path.join(root, ...relative.split('/')));
   } finally {
     fs.rmSync(base, { recursive: true, force: true });
