@@ -22,6 +22,7 @@ const {
 const { claudeRecordToSignals } = require('./transcripts/claude');
 const { fnv1a, hex8, mulberry32 } = require('./shared/hash');
 const { relativeInside } = require('./path-safety');
+const { bucketOf, bucketKey, countBuild, bucketBuilds } = require('./build-buckets');
 const { safeId, safePath } = require('./transcripts/fields');
 const { codexParentSessionId } = require('./transcripts/codex');
 
@@ -279,8 +280,8 @@ class ReplaySource extends EventEmitter {
   getPlanet(projectId, planetName) {
     const project = this._projects.get(projectId);
     if (!project || typeof planetName !== 'string') return null;
-    const builds = project.buckets[planetName] || 0;
-    const procedural = !Object.hasOwn(project.buckets, planetName);
+    const builds = bucketBuilds(project, planetName);
+    const procedural = bucketKey(project, planetName) === null;
     const rand = mulberry32(fnv1a(`${projectId}:${planetName}`));
     return {
       name: planetName,
@@ -945,9 +946,8 @@ class ReplaySource extends EventEmitter {
         ? relativeInside(project.path, filePath, { separator: '/', requireAbsolute: true }) : null;
       if (!relative || seen.has(relative)) continue;
       seen.add(relative);
-      const bucket = relative.includes('/') ? relative.split('/')[0] : '(root)';
-      const isNew = !Object.hasOwn(project.buckets, bucket);
-      project.buckets[bucket] = (project.buckets[bucket] || 0) + 1;
+      const bucket = bucketOf(relative, '/');
+      const isNew = countBuild(project, bucket);
       project.totalBuilds++;
       this._queue({
         type: 'build', project: project.id, bucket, file: relative,
