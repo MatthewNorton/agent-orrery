@@ -18,6 +18,7 @@ const {
   codexSessionIdFromFilename,
   createAdapterState,
 } = require('./provider-adapters');
+const { claudeRecordToSignals } = require('./transcripts/claude');
 
 const DEFAULT_CLAUDE_ROOT = path.join(os.homedir(), '.claude', 'projects');
 const DEFAULT_CODEX_ROOTS = [
@@ -703,61 +704,12 @@ class ReplaySource extends EventEmitter {
         recordTs: ts,
       };
     }
-
-    const signals = [];
-    let sessionEmitted = claudeSessionEmitted;
-    if (!sessionEmitted) {
-      signals.push({
-        type: 'session', provider: 'claude', sessionId: entry.sessionId,
-        cwd: entry.projectPath, kind: record.isSidechain === true ? 'drone' : entry.kind, ts,
-      });
-      sessionEmitted = true;
-    }
-
-    if (record.type === 'system' && record.subtype === 'turn_duration') {
-      signals.push({ type: 'turn-end', provider: 'claude', sessionId: entry.sessionId, ts });
-    }
-    const message = record.message && typeof record.message === 'object' ? record.message : null;
-    if (!message) return {
-      signals, adapterState, claudeSessionEmitted: sessionEmitted, recordTs: ts,
+    return {
+      signals: historicalClaudeSignals(entry, record, lineOffset, ts, claudeSessionEmitted),
+      adapterState,
+      claudeSessionEmitted: true,
+      recordTs: ts,
     };
-    const assistant = record.type === 'assistant' || message.role === 'assistant';
-    const user = record.type === 'user' || message.role === 'user';
-    const content = message.content;
-    if ((user && typeof content === 'string') || assistant) {
-      signals.push({ type: 'turn-start', provider: 'claude', sessionId: entry.sessionId, ts });
-    }
-    if (!Array.isArray(content)) {
-      return { signals, adapterState, claudeSessionEmitted: sessionEmitted, recordTs: ts };
-    }
-    if (user && content.some((block) => block && block.type === 'text')) {
-      signals.push({ type: 'turn-start', provider: 'claude', sessionId: entry.sessionId, ts });
-    }
-    for (const block of content) {
-      if (!block || typeof block !== 'object') continue;
-      if (assistant && block.type === 'tool_use') {
-        const callId = safeId(block.id) || `line-${lineOffset.toString(16)}`;
-        const classified = classifyTool(block.name);
-        signals.push({
-          type: 'tool-start', provider: 'claude', sessionId: entry.sessionId,
-          callId, tool: classified.tool, status: classified.status, ts,
-        });
-        const input = block.input && typeof block.input === 'object' ? block.input : null;
-        const filePath = input && safePath(input.file_path);
-        if (classified.build && filePath) {
-          signals.push({
-            type: 'build', provider: 'claude', sessionId: entry.sessionId,
-            callId, files: [filePath], success: true, ts,
-          });
-        }
-      } else if (user && block.type === 'tool_result') {
-        const callId = safeId(block.tool_use_id);
-        if (callId) signals.push({
-          type: 'tool-end', provider: 'claude', sessionId: entry.sessionId, callId, ts,
-        });
-      }
-    }
-    return { signals, adapterState, claudeSessionEmitted: sessionEmitted, recordTs: ts };
   }
 
   _applyRecord(record, emit) {
@@ -1231,6 +1183,46 @@ function parseTimestamp(value) {
   if (typeof value !== 'string' || !value) return null;
   const parsed = Date.parse(value);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+/**
+ * History's reading of one Claude record. The session is announced once per source, at its
+ * indexed project path. A prompt, any assistant message and user text each start a turn.
+ * Only assistant tool calls and user tool results count, named in the cross-provider
+ * vocabulary. The merge orders signals by position, so their order and count are part of
+ * the contract.
+ */
+function historicalClaudeSignals(entry, record, lineOffset, ts, sessionEmitted) {
+  const signal = (type, fields = {}) => ({ type, provider: 'claude', sessionId: entry.sessionId, ...fields, ts });
+  const signals = [];
+  let message = null;
+  for (const fact of claudeRecordToSignals(record)) {
+    if (fact.type === 'session') {
+      if (!sessionEmitted) {
+        signals.push(signal('session', {
+          cwd: entry.projectPath, kind: fact.kind === 'drone' ? 'drone' : entry.kind,
+        }));
+      }
+    } else if (fact.type === 'turn-end') {
+      signals.push(signal('turn-end'));
+    } else if (fact.type === 'message') {
+      message = fact;
+      if ((fact.user && fact.prompt) || fact.assistant) signals.push(signal('turn-start'));
+      if (fact.blocks && fact.user && fact.text) signals.push(signal('turn-start'));
+    } else if (fact.type === 'tool-start' && message.assistant) {
+      const callId = safeId(fact.callId) || `line-${lineOffset.toString(16)}`;
+      const classified = classifyTool(fact.tool);
+      signals.push(signal('tool-start', { callId, tool: classified.tool, status: classified.status }));
+      const filePath = safePath(fact.filePath);
+      if (classified.build && filePath) {
+        signals.push(signal('build', { callId, files: [filePath], success: true }));
+      }
+    } else if (fact.type === 'tool-end' && message.user) {
+      const callId = safeId(fact.callId);
+      if (callId) signals.push(signal('tool-end', { callId }));
+    }
+  }
+  return signals;
 }
 
 function compareIndexEntries(a, b) {
