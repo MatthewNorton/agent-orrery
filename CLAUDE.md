@@ -11,7 +11,7 @@ Electron + Babylon.js desktop app that passively visualizes Claude Code / Codex 
 - `npm start` — run the app
 - `npm test` — all tests (Node's built-in runner)
 - `node --test test/ship-assets.test.js` — single test file
-- `node kit/grade.mjs` — mechanical renderer regression gate; run after ANY renderer change, must stay green
+- `node kit/grade.mjs` — mechanical renderer regression gate; run after ANY renderer change, must stay green. Runs against the synthetic profile in `scripts/lib/synthetic-profile.mjs` (`--real` uses your own transcripts and app state) and replaces only its own files in `.shots/`
 - `npm run shots` — headless screenshot mode; writes `.shots/*.png` for visual comparison against the three mockup PNGs in the repo root (gold samples: `3.universe-map-view.png` → universe, `2.solar-system-view.png` → system, `1.planet-view.png` → planet)
 - `npm run ships:generate` — regenerate procedural ship GLB assets
 - `npm run typecheck` — type-checks the JSDoc in `src/` (`tsconfig.json`: main + preload; `src/renderer/tsconfig.json`: renderer; shared shapes in `src/types/`). Only files whose first line is `// @ts-check` are checked: every `src/` JS file except the hash-pinned ones, and every new file. Runs in CI; there is no lint tooling.

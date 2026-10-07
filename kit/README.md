@@ -10,7 +10,7 @@ kit/
   README.md            <- this status board
   SPEC.md              LIVE  renderer contract — update it when the app evolves
   RUBRIC.md            LIVE  visual/functional acceptance reference
-  grade.mjs            LIVE  mechanical regression gate — run after ANY renderer change
+  grade.mjs            LIVE  mechanical regression gate — run after ANY renderer change (synthetic profile; --real for yours)
   repin.mjs            LIVE  re-pins hashed files after a deliberate edit (CI runs --check)
   ASSET-REQUESTS.md    LIVE  intake for missing-asset wants (never source ad hoc)
   EXECUTOR-HANDOFF.md  LIVE  copy-paste prompt for handing a kit to ANY agent (Codex etc.)
