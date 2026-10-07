@@ -20,6 +20,7 @@ const {
   splitCompleteLines,
   adaptLine,
 } = require('./provider-adapters');
+const { claudeRecordToSignals, claudeTool } = require('./transcripts/claude');
 
 const DEFAULT_CLAUDE_PROJECTS_DIR = path.join(os.homedir(), '.claude', 'projects');
 const DEFAULT_CODEX_SESSION_DIRS = [
@@ -49,17 +50,6 @@ const IGNORE_DIRS = new Set([
   'node_modules', '.git', '.next', '.venv', 'venv', 'dist', 'build', 'out',
   'release', 'coverage', 'target', '__pycache__', '.idea', '.vscode', 'bin', 'obj',
 ]);
-
-const TOOL_STATUS = {
-  Edit: 'Building', Write: 'Building', NotebookEdit: 'Building', MultiEdit: 'Building',
-  Read: 'Exploring', Grep: 'Exploring', Glob: 'Exploring', LSP: 'Exploring',
-  Bash: 'Gathering Resources', PowerShell: 'Gathering Resources', BashOutput: 'Gathering Resources',
-  WebSearch: 'Scanning', WebFetch: 'Scanning',
-  Agent: 'Delegating', Task: 'Delegating', Workflow: 'Delegating',
-  TodoWrite: 'Planning', TaskCreate: 'Planning', EnterPlanMode: 'Planning', ExitPlanMode: 'Planning',
-};
-const BUILD_TOOLS = new Set(['Edit', 'Write', 'NotebookEdit', 'MultiEdit']);
-const SPAWN_TOOLS = new Set(['Agent', 'Task']);
 
 const GENERIC_WORKSPACE_DIRS = new Set([
   'code', 'src', 'source', 'repos', 'repositories', 'projects', 'dev',
@@ -91,6 +81,13 @@ function classifyAttention(ship, now) {
     return 'done';
   }
   return null;
+}
+
+// Live reads a typed prompt, assistant blocks, or user blocks that answer no tool call as the
+// agent working again. History has its own rule (historicalClaudeSignals).
+function resumesTurn(message) {
+  return (message.user && message.prompt) ||
+    (message.blocks && (message.assistant || (message.user && !message.toolResult)));
 }
 
 function fnv1a(str) {
@@ -993,16 +990,10 @@ class Tracker extends EventEmitter {
         const pendingId = `${provider}:${sessionId}:${signal.id || signal.callId || signal.key || ts}`;
         const classified = classifyTool(signal.tool);
         const tool = classified.tool;
-        ship.status = signal.status || classified.status || TOOL_STATUS[tool] || 'Working';
+        ship.status = signal.status || classified.status;
         ship.detail = null;
         ship.turnDone = false;
-        ship.pending.set(pendingId, { tool, ts });
-        this.pendingIndex.set(pendingId, ship.id);
-        while (ship.pending.size > 12) {
-          const oldestId = ship.pending.keys().next().value;
-          ship.pending.delete(oldestId);
-          if (this.pendingIndex.get(oldestId) === ship.id) this.pendingIndex.delete(oldestId);
-        }
+        this.addPending(ship, pendingId, tool, ts);
         this.queue({ type: 'ship-updated', ship: publicShip(ship) });
         if (!tail.catchup) {
           this.queue({
@@ -1050,122 +1041,103 @@ class Tracker extends EventEmitter {
       const rel = relativeInside(project.path, filePath);
       if (!rel || seen.has(rel)) continue;
       seen.add(rel);
-      const bucket = rel.includes(path.sep) ? rel.split(path.sep)[0] : '(root)';
-      const isNew = !(bucket in project.buckets);
-      project.buckets[bucket] = (project.buckets[bucket] || 0) + 1;
-      project.totalBuilds += 1;
-      this.systemCache.delete(project.id);
-      if (catchup) continue;
-      this.queue({
-        type: 'build', project: project.id, bucket, file: rel,
-        shipId: ship.id, isNew, ts,
-      });
-      if (isNew) this.pushFeed('form', `Planet formation started: ${bucket} in ${project.name}`, project.id);
-      this.pushFeed('build', `${ship.name} building ${rel} in ${project.name}`, project.id);
+      this.addBuild(project, ship, rel, ts, catchup);
+    }
+  }
+
+  // Counts an edit to a file inside the project; catchup counts it without announcing it.
+  addBuild(project, ship, rel, ts, catchup) {
+    const bucket = rel.includes(path.sep) ? rel.split(path.sep)[0] : '(root)';
+    const isNew = !(bucket in project.buckets);
+    project.buckets[bucket] = (project.buckets[bucket] || 0) + 1;
+    project.totalBuilds += 1;
+    this.systemCache.delete(project.id);
+    if (catchup) return;
+    this.queue({
+      type: 'build', project: project.id, bucket, file: rel,
+      shipId: ship.id, isNew, ts,
+    });
+    if (isNew) this.pushFeed('form', `Planet formation started: ${bucket} in ${project.name}`, project.id);
+    this.pushFeed('build', `${ship.name} building ${rel} in ${project.name}`, project.id);
+  }
+
+  addPending(ship, pendingId, tool, ts) {
+    ship.pending.set(pendingId, { tool, ts });
+    this.pendingIndex.set(pendingId, ship.id);
+    while (ship.pending.size > 12) {
+      const oldestId = ship.pending.keys().next().value;
+      ship.pending.delete(oldestId);
+      if (this.pendingIndex.get(oldestId) === ship.id) this.pendingIndex.delete(oldestId);
     }
   }
 
   parseLine(line, tail) {
-    let j;
-    try { j = JSON.parse(line); } catch { return; }
+    let record;
+    try { record = JSON.parse(line); } catch { return; }
     const project = this.projects.get(tail.project);
     if (!project) return;
-    const parsedTs = j.timestamp ? Date.parse(j.timestamp) : NaN;
+    // Live stamps an undated record with the time it was read.
+    const parsedTs = record.timestamp ? Date.parse(record.timestamp) : NaN;
     const ts = Number.isFinite(parsedTs) ? parsedTs : Date.now();
-    const sidechain = j.isSidechain === true;
+    let ship = null;
+    let message = null;
+    for (const signal of claudeRecordToSignals(record)) {
+      if (signal.type === 'session') {
+        ship = this.applyClaudeSession(project, tail, signal, ts);
+      } else if (signal.type === 'turn-end') {
+        ship.turnDone = true;
+      } else if (signal.type === 'message') {
+        message = signal;
+        if (resumesTurn(signal)) ship.turnDone = false;
+      } else if (signal.type === 'tool-start') {
+        if (message.assistant && signal.callId) {
+          // A tool_use id belongs to the ship that issued it last.
+          const previousOwnerId = this.pendingIndex.get(signal.callId);
+          if (previousOwnerId && previousOwnerId !== ship.id) {
+            const previousOwner = this.ships.get(previousOwnerId);
+            if (previousOwner) previousOwner.pending.delete(signal.callId);
+          }
+          this.addPending(ship, signal.callId, signal.tool, ts);
+        }
+        this.onToolUse(project, ship, signal, ts, tail.catchup);
+      } else if (signal.type === 'tool-end' && signal.callId) {
+        this.onToolResult(signal.callId, ts);
+      }
+    }
+  }
 
-    if (!project.path && typeof j.cwd === 'string' && canonicalProjectPath(j.cwd)) {
-      project.path = j.cwd;
-      project.name = path.basename(j.cwd);
-      project.exists = isProjectDirectory(j.cwd);
+  applyClaudeSession(project, tail, session, ts) {
+    if (!project.path && canonicalProjectPath(session.cwd)) {
+      project.path = session.cwd;
+      project.name = path.basename(session.cwd);
+      project.exists = isProjectDirectory(session.cwd);
       this.indexProjectPath(project);
       this.systemCache.delete(project.id);
       this.queue({ type: 'project-updated', project: publicProject(project) });
     }
     if (ts > project.lastActivity) project.lastActivity = ts;
-
-    const ship = this.ensureShip(tail.project, tail.session, sidechain, ts);
+    const ship = this.ensureShip(tail.project, tail.session, session.kind === 'drone', ts);
     ship.lastEvent = Math.max(ship.lastEvent, ts);
-
-    if (j.type === 'system' && j.subtype === 'turn_duration') {
-      ship.turnDone = true;
-    }
-
-    const msg = j.message;
-    const isAssistant = j.type === 'assistant' || (msg && msg.role === 'assistant');
-    const isUser = j.type === 'user' || (msg && msg.role === 'user');
-    if (msg && typeof msg.content === 'string' && isUser) ship.turnDone = false;
-    if (!msg || !Array.isArray(msg.content)) return;
-
-    if (isAssistant) ship.turnDone = false;
-    let hasToolResult = false;
-
-    for (const block of msg.content) {
-      if (block.type === 'tool_use') {
-        if (isAssistant && block.id) {
-          const previousOwnerId = this.pendingIndex.get(block.id);
-          if (previousOwnerId && previousOwnerId !== ship.id) {
-            const previousOwner = this.ships.get(previousOwnerId);
-            if (previousOwner) previousOwner.pending.delete(block.id);
-          }
-          ship.pending.set(block.id, { tool: block.name, ts });
-          this.pendingIndex.set(block.id, ship.id);
-          while (ship.pending.size > 12) {
-            const oldestId = ship.pending.keys().next().value;
-            ship.pending.delete(oldestId);
-            if (this.pendingIndex.get(oldestId) === ship.id) {
-              this.pendingIndex.delete(oldestId);
-            }
-          }
-        }
-        this.onToolUse(project, ship, block, ts, tail.catchup);
-      } else if (block.type === 'tool_result') {
-        hasToolResult = true;
-        if (block.tool_use_id) this.onToolResult(block.tool_use_id, ts);
-      }
-    }
-    if (isUser && !hasToolResult) ship.turnDone = false;
+    return ship;
   }
 
-  onToolUse(project, ship, block, ts, catchup) {
-    const tool = block.name || '?';
-    const input = block.input || {};
-    ship.status = TOOL_STATUS[tool] || 'Working';
-
-    let bucket = null;
-    let detail = null;
-    if (typeof input.file_path === 'string') {
-      const rel = relativeInside(project.path, input.file_path);
-      detail = rel ? rel : path.basename(input.file_path);
-      if (rel) bucket = rel.includes(path.sep) ? rel.split(path.sep)[0] : '(root)';
-    } else if (typeof input.pattern === 'string') {
-      detail = input.pattern.slice(0, 60);
-    } else if (typeof input.description === 'string') {
-      detail = input.description.slice(0, 60);
-    }
-    ship.detail = detail;
+  onToolUse(project, ship, signal, ts, catchup) {
+    const tool = signal.tool || '?';
+    const { status, build, spawn } = claudeTool(tool);
+    ship.status = status;
+    const rel = signal.filePath === null ? null : relativeInside(project.path, signal.filePath);
+    ship.detail = signal.filePath === null ? signal.detail : rel || path.basename(signal.filePath);
     this.queue({ type: 'ship-updated', ship: publicShip(ship) });
 
-    if (BUILD_TOOLS.has(tool) && bucket) {
-      const isNew = !(bucket in project.buckets);
-      project.buckets[bucket] = (project.buckets[bucket] || 0) + 1;
-      project.totalBuilds += 1;
-      this.systemCache.delete(project.id);
-      if (!catchup) {
-        this.queue({
-          type: 'build',
-          project: project.id, bucket, file: detail, shipId: ship.id, isNew, ts,
-        });
-        if (isNew) this.pushFeed('form', `Planet formation started: ${bucket} in ${project.name}`, project.id);
-        this.pushFeed('build', `${ship.name} building ${detail} in ${project.name}`, project.id);
-      }
+    if (build && rel) {
+      this.addBuild(project, ship, rel, ts, catchup);
     } else if (!catchup) {
       this.queue({
         type: 'activity',
-        project: project.id, shipId: ship.id, tool, status: ship.status, detail, ts,
+        project: project.id, shipId: ship.id, tool, status: ship.status, detail: ship.detail, ts,
       });
-      if (SPAWN_TOOLS.has(tool)) {
-        this.spawnDrone(project, ship, block.id, ts);
+      if (spawn) {
+        this.spawnDrone(project, ship, signal.callId, ts);
       } else if (Math.random() < 0.12) {
         // Sample non-build activity into the feed so it stays readable.
         this.pushFeed('info', `${ship.name} ${ship.status.toLowerCase()} in ${project.name}`, project.id);
