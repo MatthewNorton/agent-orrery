@@ -21,6 +21,8 @@ const {
 const { claudeRecordToSignals } = require('./transcripts/claude');
 const { fnv1a, hex8, mulberry32 } = require('./shared/hash');
 const { relativeInside } = require('./path-safety');
+const { safeId, safePath } = require('./transcripts/fields');
+const { codexParentSessionId } = require('./transcripts/codex');
 
 const DEFAULT_CLAUDE_ROOT = path.join(os.homedir(), '.claude', 'projects');
 const DEFAULT_CODEX_ROOTS = [
@@ -39,7 +41,6 @@ const ACTIVE_WINDOW_MS = 5 * 60 * 1000;
 const DRONE_WINDOW_MS = 15 * 60 * 1000;
 const MIN_TIMESTAMP_MS = Date.UTC(2000, 0, 1);
 const MAX_CLOCK_SKEW_MS = 24 * 60 * 60 * 1000;
-const SAFE_ID_RE = /^[A-Za-z0-9][A-Za-z0-9:._-]*$/;
 
 const DEFAULT_SCHEDULER = Object.freeze({
   setTimeout: (fn, delay) => setTimeout(fn, delay),
@@ -50,7 +51,7 @@ class ReplaySource extends EventEmitter {
   constructor(options = {}) {
     super();
     const roots = options.roots && typeof options.roots === 'object' ? options.roots : {};
-    this.claudeProjectsDir = firstString(
+    this.claudeProjectsDir = firstResolvedPath(
       options.claudeProjectsDir,
       options.claudeRoot,
       roots.claudeProjectsDir,
@@ -67,14 +68,14 @@ class ReplaySource extends EventEmitter {
     if (suppliedCodexRoots) {
       this.codexSessionDirs = suppliedCodexRoots.filter(isNonemptyString).map((item) => path.resolve(item));
     } else {
-      const active = firstString(
+      const active = firstResolvedPath(
         options.codexSessionsDir,
         options.codexSessionDir,
         options.codexActiveRoot,
         roots.codexSessionsDir,
         roots.codexActive
       );
-      const archived = firstString(
+      const archived = firstResolvedPath(
         options.codexArchivedSessionsDir,
         options.codexArchiveRoot,
         roots.codexArchivedSessionsDir,
@@ -414,16 +415,11 @@ class ReplaySource extends EventEmitter {
       const signal = codexRecordToSignals(record).find((item) => item.type === 'session');
       if (!signal) continue;
       if (filenameId && signal.sessionId.toLowerCase() !== filenameId.toLowerCase()) continue;
-      const payload = record.payload && typeof record.payload === 'object' ? record.payload : {};
       metadata = {
         sessionId: signal.sessionId,
         cwd: signal.cwd,
         kind: signal.kind,
-        parentSessionId: safeId(
-          payload.parent_thread_id || payload.forked_from_id ||
-          (payload.source && typeof payload.source === 'object'
-            ? payload.source.parent_thread_id || payload.source.forked_from_id : null)
-        ),
+        parentSessionId: codexParentSessionId(record.payload),
       };
       break;
     }
@@ -1330,25 +1326,13 @@ function proceduralPlanets(projectId) {
   return planets;
 }
 
-function safeId(value) {
-  if (typeof value !== 'string') return null;
-  const candidate = value.trim();
-  return candidate && candidate.length <= 256 && SAFE_ID_RE.test(candidate) ? candidate : null;
-}
-
-function safePath(value) {
-  if (typeof value !== 'string') return null;
-  const candidate = value.trim();
-  return candidate && candidate.length <= 4096 && !/[\0\r\n]/.test(candidate) ? candidate : null;
-}
-
 function safeExists(value) {
   // Security: never probe a UNC/device path derived from transcript content.
   if (!isLocalProjectPath(value)) return false;
   try { return fs.existsSync(value); } catch { return false; }
 }
 
-function firstString(...values) {
+function firstResolvedPath(...values) {
   for (const value of values) if (isNonemptyString(value)) return path.resolve(value);
   return null;
 }
