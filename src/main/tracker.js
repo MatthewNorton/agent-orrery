@@ -21,6 +21,7 @@ const {
   adaptLine,
 } = require('./provider-adapters');
 const { claudeRecordToSignals, claudeTool } = require('./transcripts/claude');
+const { codexParentSessionId } = require('./transcripts/codex');
 const { fnv1a, hex8, mulberry32 } = require('./shared/hash');
 const { writeFileAtomic } = require('./shared/atomic-write');
 const { relativeInside } = require('./path-safety');
@@ -1439,16 +1440,10 @@ function readCodexOwnMetadata(file, sessionId) {
       const session = codexRecordToSignals(record).find((item) => item.type === 'session');
       if (!session) continue;
       const recordSessionId = session.sessionId;
-      const source = payload.source;
-      const parentCandidate = payload.parent_thread_id || payload.forked_from_id ||
-        (source && typeof source === 'object' && (source.parent_thread_id || source.parent_id)) || null;
-      const parentSessionId = typeof parentCandidate === 'string' &&
-        parentCandidate.length <= 256 && /^[A-Za-z0-9:._-]+$/.test(parentCandidate)
-        ? parentCandidate : null;
       const result = {
         sessionId: recordSessionId,
         cwd: session.cwd,
-        parentSessionId,
+        parentSessionId: codexParentSessionId(payload),
         kind: session.kind,
         timestamp: session.ts || 0,
       };
