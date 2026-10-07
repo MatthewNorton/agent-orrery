@@ -3,6 +3,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
+const { boundedInteger } = require('./shared/values');
 
 const DEFAULT_TIMEOUT_MS = 4_000;
 const DEFAULT_MAX_OUTPUT_BYTES = 1024 * 1024;
@@ -15,10 +16,6 @@ const FAILURE_CODES = new Set([
   'TIMEOUT',
   'OUTPUT_LIMIT',
 ]);
-
-function boundedInteger(value, fallback, minimum, maximum) {
-  return Number.isSafeInteger(value) && value >= minimum && value <= maximum ? value : fallback;
-}
 
 function failure(code) {
   return Object.freeze({ ok: false, code: FAILURE_CODES.has(code) ? code : 'GIT_FAILED' });

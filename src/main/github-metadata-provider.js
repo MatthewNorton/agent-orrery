@@ -2,6 +2,7 @@
 
 const path = require('node:path');
 const { spawn } = require('node:child_process');
+const { boundedInteger } = require('./shared/values');
 
 const DEFAULT_CACHE_TTL_MS = 5 * 60_000;
 const DEFAULT_ERROR_TTL_MS = 30_000;
@@ -20,10 +21,6 @@ const FAILURE_CODES = new Set([
   'INVALID_RESPONSE',
   'REPOSITORY_UNAVAILABLE',
 ]);
-
-function boundedInteger(value, fallback, minimum, maximum) {
-  return Number.isSafeInteger(value) && value >= minimum && value <= maximum ? value : fallback;
-}
 
 function ownString(value, key) {
   if (!value || typeof value !== 'object' || Array.isArray(value) || !Object.hasOwn(value, key)) {
