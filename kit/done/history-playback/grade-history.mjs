@@ -69,14 +69,12 @@ if (!fs.existsSync(replayPath)) {
 // Baseline re-pinned 2026-09-04 to main after PR #24 (macOS support + security
 // hardening). Later kits legitimately moved these files; the hashes track the
 // state each subsequent kit must not regress from.
-// tracker.js re-pinned 2026-09-27 for the security follow-ups
-// (null project keys, planet lookup; docs/PUBLIC-RELEASE-TASKS.md Phase 1).
+// src/main/tracker.js and provider-adapters.js are no longer pinned: they were unfrozen to
+// give live and replay one transcript parser (CLAUDE.md, Frozen files).
 // All hashes re-pinned 2026-09-27 as LF-normalized digests (docs/PUBLIC-RELEASE-TASKS.md
 // item 5.6); file contents are unchanged from the previous pins.
 // package.json and package-lock.json re-pinned 2026-09-27 after Dependabot #27 (Babylon 9.28) and #30 (Electron 44).
 const frozen = new Map([
-  ['src/main/tracker.js', '600c950483280eb66dd2726849ef4643dd5b894d5cec175eddf75035449bf5fb'],
-  ['src/main/provider-adapters.js', 'e6930f483b6e52335b47ddccb34968d6a0e3d211aafe04cbaaa2e0aa31e5a037'],
   ['src/renderer/scene-universe.js', '61ff27fa53ea8ca6d3d944c29ece4f9f82aa46fea53321df0e01d1e82b1a5b3a'],
   ['src/renderer/scene-system.js', '1819bfc26082fd06f4035a98197821808d35c8826d29fb962764d65ed4a8968b'],
   ['src/renderer/scene-planet.js', '7c6bd48e4c90183b01b382e5fb4d7ed7e7ede3f14b88f0d8813fb0ea716575b3'],

@@ -42,7 +42,8 @@ function walk(dir) {
   }
   return out.sort();
 }
-const FROZEN_SIZES = { 'src/main/tracker.js': 1573, 'src/main/replay-source.js': 1420, 'src/main/provider-adapters.js': 570 };
+// Formerly frozen files may shrink but never grow past their size when they were unfrozen.
+const LEGACY_CAPS = { 'src/main/tracker.js': 1573, 'src/main/replay-source.js': 1420, 'src/main/provider-adapters.js': 570 };
 const mainSrc = read('src/main/main.js');
 
 // ---- stage A: flags + fixtures ----
@@ -115,11 +116,11 @@ else {
   for (const file of walk(MAIN)) {
     const r = rel(file);
     const n = lines(r);
-    if (r in FROZEN_SIZES) { if (n !== FROZEN_SIZES[r]) fail('T6', `${r} is ${n} lines; frozen at ${FROZEN_SIZES[r]}`); continue; }
+    if (r in LEGACY_CAPS) { if (n > LEGACY_CAPS[r]) fail('T6', `${r} is ${n} lines (cap ${LEGACY_CAPS[r]})`); continue; }
     if (r === 'src/main/main.js') continue; // capped at stage E
     if (n > 450) fail('T6', `${r} is ${n} lines (cap 450)`);
   }
-  if (failures === before) ok('T6', 'every src/main module within its cap; frozen sizes intact');
+  if (failures === before) ok('T6', 'every src/main module within its cap; formerly frozen files no larger than when unfrozen');
 }
 
 // ---- T7: no module-level let (always, main.js from stage E) ----
