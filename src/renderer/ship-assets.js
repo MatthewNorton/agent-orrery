@@ -1,3 +1,4 @@
+// @ts-check
 // ship-assets.js — manifest-backed original hull loading with procedural fallback.
 'use strict';
 

@@ -1,5 +1,8 @@
+// @ts-check
 // app-project-control.js — project card (folder/terminal actions) and planet card.
 'use strict';
+
+/** @import { OpenTerminalResult } from '../types/contract' */
 
 (function () {
   const AUR = window.AUR;
@@ -91,6 +94,7 @@
     A.renderProjectCard();
     A.renderAgentFocus();
 
+    /** @type {OpenTerminalResult} */
     let result;
     try {
       result = await AU.openTerminal(projectId);

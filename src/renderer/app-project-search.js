@@ -1,3 +1,4 @@
+// @ts-check
 // app-project-search.js — universe project search and the searchable all-projects directory.
 'use strict';
 
