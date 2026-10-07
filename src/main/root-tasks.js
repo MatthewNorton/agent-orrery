@@ -1,3 +1,4 @@
+// @ts-check
 'use strict';
 
 const crypto = require('node:crypto');
@@ -335,7 +336,7 @@ function invalidTransition(from, to) {
 }
 
 function storeError(message, code) {
-  const error = new Error(message);
+  const error = /** @type {NodeJS.ErrnoException} */ (new Error(message));
   error.code = code;
   return error;
 }

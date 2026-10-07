@@ -1,3 +1,4 @@
+// @ts-check
 'use strict';
 
 const { app, dialog } = require('electron');
@@ -8,6 +9,11 @@ const { scanProjectCandidates, isPathInside } = require('../project-paths');
 const guards = require('./guards');
 const { validProjectId } = guards;
 
+/**
+ * @import { Failure, ProjectPathFailureCode, ProjectPathRecoveryResult,
+ *   ProjectPathsScanResult } from '../../types/contract'
+ */
+
 function createProjectPathsIpc(ctx) {
   let projectPathDialogInFlight = false;
   let projectPathScanAbort = null;
@@ -15,6 +21,7 @@ function createProjectPathsIpc(ctx) {
   const PROJECT_PATH_CANDIDATE_TTL_MS = 10 * 60 * 1000;
   const trustedMainFrame = (event) => guards.trustedMainFrame(ctx, event);
 
+  /** @returns {Failure<ProjectPathFailureCode>} */
   function projectPathFailure(code) {
     const allowed = new Set([
       'INVALID', 'REPLAY', 'BUSY', 'NOT_FOUND', 'NOT_MISSING',
@@ -92,6 +99,7 @@ function createProjectPathsIpc(ctx) {
     return projectPathFailure(error && typeof error.code === 'string' ? error.code : 'FAILED');
   }
 
+  /** @returns {Promise<ProjectPathsScanResult>} */
   async function handleProjectPathsScan(event) {
     const denied = projectPathRequestAllowed(event);
     if (denied) return denied;
@@ -154,6 +162,7 @@ function createProjectPathsIpc(ctx) {
     }
   }
 
+  /** @returns {Promise<ProjectPathRecoveryResult>} */
   async function handleProjectPathLocate(event, projectId) {
     const denied = projectPathRequestAllowed(event);
     if (denied) return denied;
@@ -186,6 +195,7 @@ function createProjectPathsIpc(ctx) {
     }
   }
 
+  /** @returns {ProjectPathRecoveryResult} */
   function handleProjectPathApply(event, projectId, token) {
     const denied = projectPathRequestAllowed(event);
     if (denied) return denied;

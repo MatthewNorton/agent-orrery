@@ -12,16 +12,18 @@
     "ships:generate:fleet": "node scripts/generate-fleet-ships.mjs",
     "status:lab": "electron scripts/project-vcs-status-lab.js",
     "test": "node --test test/*.test.js",
+    "typecheck": "tsc -p tsconfig.json && tsc -p src/renderer/tsconfig.json",
     "postinstall": "install-electron"
   },
   "author": "matt",
   "license": "MIT",
   "devDependencies": {
-    "electron": "^44.5.1"
+    "electron": "^44.5.1",
+    "typescript": "7.0.2"
   },
   "dependencies": {
     "babylonjs": "^9.29.0",
-    "babylonjs-loaders": "9.29.0",
-    "babylonjs-gui": "^9.29.0"
+    "babylonjs-gui": "^9.29.0",
+    "babylonjs-loaders": "9.29.0"
   }
 }

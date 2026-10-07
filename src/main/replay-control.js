@@ -1,4 +1,10 @@
+// @ts-check
 'use strict';
+
+/**
+ * @import { BatchMeta, PlaybackStatus, ProjectVcsStatus, ReplayResult, ReplaySpeed,
+ *   ReplayStatePush, Snapshot, StreamMode, SystemData } from '../types/contract'
+ */
 
 function createReplayControl(ctx) {
   let replayOperation = 0;
@@ -7,6 +13,10 @@ function createReplayControl(ctx) {
   let replayStateLastSent = 0;
   let replayStateTimer = null;
 
+  /**
+   * @param {StreamMode | null} [mode]
+   * @returns {PlaybackStatus}
+   */
   function boundedReplayStatus(mode = null) {
     const raw = ctx.replaySource ? ctx.replaySource.status() : {};
     const minTs = Number.isFinite(raw.minTs) ? raw.minTs : null;
@@ -22,12 +32,15 @@ function createReplayControl(ctx) {
       maxTs,
       cursorTs,
       playing: visibleMode === 'replay' && Boolean(raw.playing),
-      speed: [1, 10, 100, 1000].includes(Number(raw.speed)) ? Number(raw.speed) : 1,
+      speed: /** @type {ReplaySpeed} */ (
+        [1, 10, 100, 1000].includes(Number(raw.speed)) ? Number(raw.speed) : 1
+      ),
       sourceCount: Number.isFinite(raw.sourceCount) ? raw.sourceCount : 0,
       truncated: Boolean(raw.truncated),
     };
   }
 
+  /** @returns {Snapshot} */
   function visibleSnapshot() {
     const source = ctx.activeSource || ctx.tracker;
     let snapshot = source ? source.snapshot() : {
@@ -43,6 +56,7 @@ function createReplayControl(ctx) {
     };
   }
 
+  /** @returns {SystemData | null} */
   function visibleSystem(projectId) {
     const source = ctx.activeSource || ctx.tracker;
     const system = source ? source.getSystem(projectId) : null;
@@ -51,14 +65,16 @@ function createReplayControl(ctx) {
       : system;
   }
 
+  /** @param {ProjectVcsStatus} status */
   function sendProjectVcsStatusChanged(status) {
     if (!status || ctx.activeSource !== ctx.tracker || !ctx.win || ctx.win.isDestroyed()) return;
-    ctx.win.webContents.send('au:project-vcs-status-changed', status, {
+    ctx.win.webContents.send('au:project-vcs-status-changed', status, /** @satisfies {BatchMeta} */ ({
       streamEpoch: ctx.streamEpoch,
       mode: 'live',
-    });
+    }));
   }
 
+  /** @returns {ReplayResult} */
   function replayResult(includeSnapshot = false) {
     const playback = boundedReplayStatus(ctx.activeSource === ctx.replaySource ? 'replay' : 'live');
     return {
@@ -82,10 +98,10 @@ function createReplayControl(ctx) {
       return;
     }
     replayStateLastSent = now;
-    ctx.win.webContents.send('au:replay-state', {
+    ctx.win.webContents.send('au:replay-state', /** @satisfies {ReplayStatePush} */ ({
       ...boundedReplayStatus(ctx.activeSource === ctx.replaySource ? 'replay' : 'live'),
       streamEpoch: ctx.streamEpoch,
-    });
+    }));
   }
 
   async function ensureReplayIndex(force = false) {
@@ -118,6 +134,7 @@ function createReplayControl(ctx) {
     return action;
   }
 
+  /** @returns {Promise<ReplayResult>} */
   async function handleReplayCommand(command) {
     const action = validateReplayCommand(command);
     const operation = ++replayOperation;

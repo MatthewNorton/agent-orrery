@@ -1,11 +1,18 @@
+// @ts-check
 'use strict';
 
 const guards = require('./guards');
 const { validProjectId } = guards;
 
+/**
+ * @import { Failure, RootTaskFailureCode, RootTaskResult, RootTasksChangedPush,
+ *   RootTasksSnapshot } from '../../types/contract'
+ */
+
 function createRootTasksIpc(ctx) {
   const trustedMainFrame = (event) => guards.trustedMainFrame(ctx, event);
 
+  /** @returns {Failure<RootTaskFailureCode>} */
   function rootTaskFailure(code) {
     const allowed = new Set([
       'INVALID', 'REPLAY', 'NOT_FOUND', 'LIMIT_REACHED', 'PROJECT_IMMUTABLE',
@@ -24,6 +31,7 @@ function createRootTasksIpc(ctx) {
     return null;
   }
 
+  /** @returns {RootTasksSnapshot} */
   function handleRootTasksGet(event) {
     if (!trustedMainFrame(event) || !ctx.rootTaskCoordinator) return { items: [] };
     try {
@@ -33,6 +41,7 @@ function createRootTasksIpc(ctx) {
     }
   }
 
+  /** @returns {RootTaskResult} */
   function handleRootTaskCreate(event, text) {
     const denied = rootTaskMutationDenied(event);
     if (denied) return denied;
@@ -43,6 +52,7 @@ function createRootTasksIpc(ctx) {
     }
   }
 
+  /** @returns {RootTaskResult} */
   function handleRootTaskRemove(event, taskId) {
     const denied = rootTaskMutationDenied(event);
     if (denied) return denied;
@@ -53,6 +63,7 @@ function createRootTasksIpc(ctx) {
     }
   }
 
+  /** @returns {Promise<RootTaskResult>} */
   async function handleRootTaskAssign(event, taskId, projectId) {
     const denied = rootTaskMutationDenied(event);
     if (denied) return denied;
@@ -63,6 +74,7 @@ function createRootTasksIpc(ctx) {
     }
   }
 
+  /** @returns {Promise<RootTaskResult>} */
   async function handleRootTaskRetry(event, taskId) {
     const denied = rootTaskMutationDenied(event);
     if (denied) return denied;
@@ -75,10 +87,10 @@ function createRootTasksIpc(ctx) {
 
   function sendRootTasksChanged(value, reason = null) {
     if (!ctx.win || ctx.win.isDestroyed() || !value || typeof value.id !== 'string') return;
-    ctx.win.webContents.send('au:root-tasks-changed', {
+    ctx.win.webContents.send('au:root-tasks-changed', /** @satisfies {RootTasksChangedPush} */ ({
       taskId: value.id,
       phase: reason === 'removed' ? null : (typeof value.phase === 'string' ? value.phase : null),
-    });
+    }));
   }
 
   function liveProjectShips(projectId) {

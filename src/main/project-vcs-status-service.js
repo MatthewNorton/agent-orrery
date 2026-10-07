@@ -1,6 +1,11 @@
+// @ts-check
 'use strict';
 
 const { boundedInteger, ownString } = require('./shared/values');
+
+/** @import { ProjectVcsStatus } from '../types/contract' */
+/** @import { createLocalGitStatusCollector } from './project-vcs-status' */
+/** @import { createGitHubMetadataProvider } from './github-metadata-provider' */
 
 const DEFAULT_TTL_MS = 15_000;
 const DEFAULT_MAX_CONCURRENCY = 4;
@@ -98,7 +103,22 @@ function mergeGithubMetadata(status, remote) {
   return Object.freeze({ ...status, github });
 }
 
+/** @typedef {ReturnType<typeof createProjectVcsStatusService>} ProjectVcsStatusService */
+
+/**
+ * @typedef {object} ProjectVcsStatusServiceOptions
+ * @property {ReturnType<typeof createLocalGitStatusCollector>} [collector]
+ * @property {ReturnType<typeof createGitHubMetadataProvider>} [githubProvider]
+ * @property {() => number} [clock]
+ * @property {(status: ProjectVcsStatus) => void} [onChange]
+ * @property {number} [ttlMs]
+ * @property {number} [maxConcurrency]
+ * @property {number} [maxProjects]
+ */
+
+/** @param {ProjectVcsStatusServiceOptions} [options] */
 function createProjectVcsStatusService(options = {}) {
+  /** @type {ProjectVcsStatusServiceOptions} */
   const settings = options && typeof options === 'object' && !Array.isArray(options) ? options : {};
   const collector = settings.collector;
   if (!collector || typeof collector.read !== 'function') {
