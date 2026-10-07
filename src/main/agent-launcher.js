@@ -9,8 +9,8 @@ const {
   isCanonicalPathFor,
   isInsidePath,
 } = require('./path-safety');
+const { validGoalId: validTaskId } = require('./shared/ids');
 
-const GOAL_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const FAILURE_CODES = new Set(['INVALID', 'UNAVAILABLE', 'FAILED']);
 const DEFAULT_CONFIRM_TIMEOUT_MS = 1_000;
 
@@ -310,10 +310,6 @@ function ownValue(object, key, fallback) {
   } catch {
     return fallback;
   }
-}
-
-function validTaskId(value) {
-  return typeof value === 'string' && GOAL_ID.test(value);
 }
 
 function validTaskText(value) {

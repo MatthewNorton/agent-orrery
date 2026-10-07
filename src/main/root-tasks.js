@@ -3,12 +3,13 @@
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
+const { writeFileAtomic } = require('./shared/atomic-write');
+const { hasControlChars, validProjectId } = require('./shared/ids');
 
 const STORE_VERSION = 1;
 const MAX_RECORDS = 1_000;
 const MAX_STATE_BYTES = 2 * 1024 * 1024;
 const MAX_TEXT_LENGTH = 10_000;
-const MAX_PROJECT_ID_LENGTH = 256;
 const PHASES = new Set([
   'idea',
   'prepared',
@@ -40,7 +41,6 @@ const RETRYABLE_PHASES = new Set([
   'agent-not-found',
 ]);
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const CONTROL_PATTERN = /[\u0000-\u001f\u007f-\u009f]/;
 const RESERVED_MARKER_PATTERN = /agent-universe:/i;
 
 class RootTaskStore {
@@ -257,32 +257,14 @@ class RootTaskStore {
     if (Buffer.byteLength(serialized, 'utf8') > MAX_STATE_BYTES) {
       throw storeError('Root task storage limit reached', 'LIMIT_REACHED');
     }
-    const directory = path.dirname(this.statePath);
-    this.fs.mkdirSync(directory, { recursive: true });
-    const tempPath = path.join(
-      directory,
-      `.${path.basename(this.statePath)}.${process.pid}.${Date.now()}.${Math.random().toString(16).slice(2)}.tmp`
-    );
-    try {
-      this.fs.writeFileSync(
-        tempPath,
-        serialized,
-        { encoding: 'utf8', flag: 'wx' }
-      );
-      this.fs.renameSync(tempPath, this.statePath);
-    } finally {
-      try {
-        this.fs.unlinkSync(tempPath);
-      } catch (error) {
-        if (!error || error.code !== 'ENOENT') throw error;
-      }
-    }
+    this.fs.mkdirSync(path.dirname(this.statePath), { recursive: true });
+    writeFileAtomic(this.statePath, serialized, { fsImpl: this.fs });
   }
 }
 
 function normalizeText(value) {
   if (typeof value !== 'string') throw new TypeError('Root task text must be a string');
-  if (CONTROL_PATTERN.test(value)) throw new TypeError('Invalid root task text');
+  if (hasControlChars(value)) throw new TypeError('Invalid root task text');
   const text = value.trim();
   if (text.length === 0 || text.length > MAX_TEXT_LENGTH || RESERVED_MARKER_PATTERN.test(text)) {
     throw new TypeError('Invalid root task text');
@@ -291,10 +273,7 @@ function normalizeText(value) {
 }
 
 function normalizeProjectId(value) {
-  if (typeof value !== 'string' || value.length === 0 || value.length > MAX_PROJECT_ID_LENGTH ||
-      value.trim().length === 0 || CONTROL_PATTERN.test(value)) {
-    throw new TypeError('Invalid project id');
-  }
+  if (!validProjectId(value)) throw new TypeError('Invalid project id');
   return value;
 }
 

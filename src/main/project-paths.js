@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { boundedInteger } = require('./shared/values');
 
 const DEFAULT_MAX_DEPTH = 6;
 const DEFAULT_MAX_DIRECTORIES = 12_000;
@@ -13,10 +14,6 @@ const SKIP_DIRECTORIES = new Set([
   'node_modules', '.next', '.venv', 'venv', '__pycache__',
   'dist', 'build', 'out', 'release', 'coverage', 'target', 'bin', 'obj',
 ]);
-
-function boundedInteger(value, fallback, min, max) {
-  return Number.isSafeInteger(value) && value >= min && value <= max ? value : fallback;
-}
 
 function normalizedName(value) {
   return typeof value === 'string' ? value.trim().toLocaleLowerCase() : '';

@@ -2,6 +2,7 @@
 
 const path = require('node:path');
 const { ensureAssignedGoal, validGoalId } = require('./goals');
+const { validProjectId } = require('./shared/ids');
 
 const ACTIVE_RUN_PHASES = new Set(['waiting-for-agent', 'running', 'completing']);
 const RETRYABLE_RUN_PHASES = new Set([
@@ -45,7 +46,6 @@ const PUBLIC_FAILURE_CODES = new Set([
   'LAUNCH_FAILED',
   'FAILED',
 ]);
-const CONTROL_PATTERN = /[\u0000-\u001f\u007f-\u009f]/;
 
 class RootTaskCoordinator {
   constructor(options = {}) {
@@ -337,11 +337,6 @@ function collectBaselineCodexShipIds(value, projectId) {
     if (ids.length === 1_000) break;
   }
   return ids;
-}
-
-function validProjectId(value) {
-  return typeof value === 'string' && value.length > 0 && value.length <= 256 &&
-    value.trim().length > 0 && !CONTROL_PATTERN.test(value);
 }
 
 function validStore(value) {
