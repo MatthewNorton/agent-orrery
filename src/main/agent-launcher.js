@@ -1,3 +1,4 @@
+// @ts-check
 'use strict';
 
 const fs = require('node:fs');
@@ -31,6 +32,26 @@ const NATIVE_TARGETS = Object.freeze({
   }),
 });
 
+/**
+ * @typedef {object} AgentLauncherOptions
+ * @property {string} [platform]
+ * @property {string} [arch]
+ * @property {NodeJS.ProcessEnv} [env]
+ * @property {typeof fs} [fsImpl]
+ * @property {typeof spawn} [spawnImpl]
+ * @property {number} [confirmTimeoutMs]
+ */
+
+/**
+ * @typedef {object} AgentLaunchRequest
+ * @property {string} [cwd]
+ * @property {string} [taskId]
+ * @property {string | null} [text]
+ * @property {string | null} [taskText]
+ * @property {string} [provider]
+ */
+
+/** @param {AgentLauncherOptions} [options] */
 function createAgentLauncher(options = {}) {
   const settings = options && typeof options === 'object' && !Array.isArray(options)
     ? options : {};
@@ -45,6 +66,7 @@ function createAgentLauncher(options = {}) {
     ? requestedTimeout : DEFAULT_CONFIRM_TIMEOUT_MS;
 
   return Object.freeze({
+    /** @param {AgentLaunchRequest} request */
     async launch(request) {
       const cwd = ownValue(request, 'cwd', null);
       const taskId = ownValue(request, 'taskId', null);
@@ -77,6 +99,10 @@ function createAgentLauncher(options = {}) {
   });
 }
 
+/**
+ * @param {{ executable?: string, cwd?: string, taskId?: string, text?: string | null,
+ *   taskText?: string | null }} [input]
+ */
 function buildAgentSpec({ executable, cwd, taskId, text = null, taskText = null } = {}) {
   const flavor = pathFlavor(cwd);
   if (!flavor || !isCodexExecutablePath(executable) || !isCanonicalPath(cwd) ||
@@ -102,6 +128,10 @@ function buildAgentSpec({ executable, cwd, taskId, text = null, taskText = null 
   };
 }
 
+/**
+ * @param {{ platform?: string, arch?: string, env?: NodeJS.ProcessEnv, fsImpl?: typeof fs,
+ *   cwd?: string }} [host]
+ */
 function resolveCodexExecutable({ platform, arch = process.arch, env, fsImpl = fs, cwd } = {}) {
   if (!supportedPlatform(platform)) throw launchError('UNAVAILABLE');
   if (!isCanonicalPathFor(cwd, platform)) throw launchError('INVALID');
@@ -346,7 +376,9 @@ function failure(code) {
 }
 
 function launchError(code) {
-  const error = new Error(code === 'INVALID' ? 'Invalid agent launch request' : 'Codex unavailable');
+  const error = /** @type {NodeJS.ErrnoException} */ (
+    new Error(code === 'INVALID' ? 'Invalid agent launch request' : 'Codex unavailable')
+  );
   error.code = code;
   return error;
 }

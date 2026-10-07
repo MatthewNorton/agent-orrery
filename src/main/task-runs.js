@@ -1,3 +1,4 @@
+// @ts-check
 'use strict';
 
 const fs = require('node:fs');
@@ -22,7 +23,19 @@ const CLAIM_CLOCK_SKEW_MS = 5_000;
 const WAITING_TIMEOUT_MS = 5 * 60 * 1000;
 const RUNNING_TIMEOUT_MS = 24 * 60 * 60 * 1000;
 
+/** @typedef {ReturnType<typeof publicRun>} PublicTaskRun */
+
+/**
+ * @typedef {object} TaskRunTrackerOptions
+ * @property {string} [statePath]
+ * @property {(projectId: string) => string | null} [resolveProjectRoot]
+ * @property {(change: { reason: string, run: PublicTaskRun }) => void} [onChange]
+ * @property {() => number} [now]
+ * @property {typeof fs} [fsImpl]
+ */
+
 class TaskRunTracker {
+  /** @param {TaskRunTrackerOptions} [options] */
   constructor(options = {}) {
     if (!options || typeof options !== 'object' || Array.isArray(options) ||
         typeof options.statePath !== 'string' || !path.isAbsolute(options.statePath) ||
@@ -41,15 +54,11 @@ class TaskRunTracker {
   start(input) {
     const run = normalizeStart(input, this.now());
     if (this.runs.some((entry) => entry.id === run.id && !RETRYABLE_PHASES.has(entry.phase))) {
-      const error = new Error('Task already has an active or completed run');
-      error.code = 'TASK_BUSY';
-      throw error;
+      throw runError('Task already has an active or completed run', 'TASK_BUSY');
     }
     if (this.runs.some((entry) => LOCKING_PHASES.has(entry.phase) &&
         entry.projectId === run.projectId)) {
-      const error = new Error('Project already has an active task run');
-      error.code = 'PROJECT_BUSY';
-      throw error;
+      throw runError('Project already has an active task run', 'PROJECT_BUSY');
     }
     const previousRuns = this.runs;
     this.runs = this.runs.filter((entry) => entry.id !== run.id);
@@ -290,9 +299,7 @@ class TaskRunTracker {
     const ordered = [...this.runs].sort((a, b) => b.updatedAt - a.updatedAt);
     const active = ordered.filter((run) => LOCKING_PHASES.has(run.phase));
     if (active.length > MAX_RUNS) {
-      const error = new Error('Task run limit reached');
-      error.code = 'LIMIT_REACHED';
-      throw error;
+      throw runError('Task run limit reached', 'LIMIT_REACHED');
     }
     const terminal = ordered.filter((run) => !LOCKING_PHASES.has(run.phase));
     this.runs = [...active, ...terminal.slice(0, MAX_RUNS - active.length)]
@@ -320,9 +327,7 @@ class TaskRunTracker {
   persist() {
     const serialized = JSON.stringify({ version: 1, runs: this.runs });
     if (Buffer.byteLength(serialized, 'utf8') > MAX_STATE_BYTES) {
-      const error = new Error('Task run storage limit reached');
-      error.code = 'LIMIT_REACHED';
-      throw error;
+      throw runError('Task run storage limit reached', 'LIMIT_REACHED');
     }
     this.fs.mkdirSync(path.dirname(this.statePath), { recursive: true });
     writeFileAtomic(this.statePath, serialized, { fsImpl: this.fs });
@@ -369,6 +374,12 @@ function normalizeStored(value) {
     updatedAt: value.updatedAt,
     completedAt: Number.isFinite(value.completedAt) ? value.completedAt : null,
   };
+}
+
+function runError(message, code) {
+  const error = /** @type {NodeJS.ErrnoException} */ (new Error(message));
+  error.code = code;
+  return error;
 }
 
 function publicRun(run) {

@@ -1,3 +1,4 @@
+// @ts-check
 'use strict';
 
 // C0 controls, DEL and C1 controls. path-safety.js checks C0 and DEL only, on purpose.

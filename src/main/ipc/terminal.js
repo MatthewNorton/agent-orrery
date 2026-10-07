@@ -1,3 +1,4 @@
+// @ts-check
 'use strict';
 
 const path = require('path');
@@ -5,6 +6,8 @@ const fs = require('fs');
 const { isLocalProjectPath } = require('../provider-adapters');
 const guards = require('./guards');
 const { validProjectId } = guards;
+
+/** @import { Failure, OpenTerminalResult, TerminalFailureCode } from '../../types/contract' */
 
 function createTerminalIpc(ctx) {
   let terminalLaunchInFlight = false;
@@ -30,11 +33,13 @@ function createTerminalIpc(ctx) {
     }
   }
 
+  /** @returns {Failure<TerminalFailureCode>} */
   function terminalFailure(code) {
     const allowed = new Set(['INVALID', 'REPLAY', 'NOT_FOUND', 'UNAVAILABLE', 'BUSY', 'FAILED']);
     return { ok: false, code: allowed.has(code) ? code : 'FAILED' };
   }
 
+  /** @returns {Promise<OpenTerminalResult>} */
   async function handleOpenTerminal(event, projectId) {
     if (!trustedMainFrame(event) || !validProjectId(projectId)) return terminalFailure('INVALID');
     if (ctx.activeSource !== ctx.tracker || ctx.replay.replayBoundaryOperations > 0) return terminalFailure('REPLAY');

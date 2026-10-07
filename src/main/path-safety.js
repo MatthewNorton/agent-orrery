@@ -1,3 +1,4 @@
+// @ts-check
 'use strict';
 
 // One shared local-path classifier for the main-process launchers (kit 13, task C).
