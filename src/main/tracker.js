@@ -1,3 +1,4 @@
+// @ts-check
 // Watches ~/.claude/projects transcript JSONL files and turns them into
 // universe events: projects (solar systems), sessions (ships), tool calls
 // (activity), file edits (planet growth). Zero-config: works with any
@@ -25,6 +26,24 @@ const { codexParentSessionId } = require('./transcripts/codex');
 const { fnv1a, hex8, mulberry32 } = require('./shared/hash');
 const { writeFileAtomic } = require('./shared/atomic-write');
 const { relativeInside } = require('./path-safety');
+
+/**
+ * @import { Attention, FeedEntry, PlanetData, Project, Ship, ShipStatus, SystemData }
+ *   from '../types/contract'
+ * @import { LiveProject, LiveShip } from '../types/live-model'
+ * @import { ClaudeMessage, ClaudeSession, ClaudeToolStart } from './transcripts/claude'
+ */
+
+/**
+ * A Signal watch entry. `extensions` is never set: readGenericWatchConfig does not pass it
+ * through, so every source watches the default extensions.
+ * @typedef {object} SignalSource
+ * @property {string} id
+ * @property {string} directory
+ * @property {string} projectPath
+ * @property {string | null} label
+ * @property {string[]} [extensions]
+ */
 
 const DEFAULT_CLAUDE_PROJECTS_DIR = path.join(os.homedir(), '.claude', 'projects');
 const DEFAULT_CODEX_SESSION_DIRS = [
@@ -65,6 +84,11 @@ const HOME_FOLDERS = new Map([
   ['downloads', 'Downloads'],
 ]);
 
+/**
+ * @param {Pick<LiveShip, 'kind' | 'pending' | 'turnDone' | 'lastEvent'>} ship
+ * @param {number} now
+ * @returns {Attention | null}
+ */
 function classifyAttention(ship, now) {
   if (ship.kind === 'drone') return null;
 
@@ -89,13 +113,14 @@ function classifyAttention(ship, now) {
 
 // Live reads a typed prompt, assistant blocks, or user blocks that answer no tool call as the
 // agent working again. History has its own rule (historicalClaudeSignals).
+/** @param {ClaudeMessage} message */
 function resumesTurn(message) {
   return (message.user && message.prompt) ||
     (message.blocks && (message.assistant || (message.user && !message.toolResult)));
 }
 
 function trackerPathError(code, message) {
-  const error = new Error(message);
+  const error = /** @type {NodeJS.ErrnoException} */ (new Error(message));
   error.code = code;
   return error;
 }
@@ -246,9 +271,12 @@ class Tracker extends EventEmitter {
     this.providerConfigPath = options.providerConfigPath ||
       process.env.AGENT_UNIVERSE_PROVIDER_CONFIG ||
       path.join(path.dirname(statePath), 'providers.json');
+    /** @type {Map<string, LiveProject>} */
     this.projects = new Map();   // slug -> project record
     this.files = new Map();      // abs jsonl path -> tail state
+    /** @type {Map<string, LiveShip>} */
     this.ships = new Map();      // shipId -> ship record
+    /** @type {FeedEntry[]} */
     this.feed = [];              // ring buffer of recent feed entries
     this.shipCounter = 0;
     this.persisted = this.loadState();
@@ -702,7 +730,7 @@ class Tracker extends EventEmitter {
       this.providerWarnings.add(warning);
       console.warn(`[providers] ${warning}`);
     }
-    const rawSources = (config.watch || []).map((item) => ({
+    const rawSources = (config.watch || []).map((item) => /** @type {SignalSource} */ ({
         id: `watch-${hex8(canonicalProjectPath(item.directory))}`,
         directory: item.directory,
         projectPath: item.projectPath,
@@ -1081,6 +1109,13 @@ class Tracker extends EventEmitter {
     }
   }
 
+  /**
+   * @param {LiveProject} project
+   * @param {{ project: string, session: string }} tail
+   * @param {ClaudeSession} session
+   * @param {number} ts
+   * @returns {LiveShip}
+   */
   applyClaudeSession(project, tail, session, ts) {
     if (!project.path && canonicalProjectPath(session.cwd)) {
       project.path = session.cwd;
@@ -1096,6 +1131,13 @@ class Tracker extends EventEmitter {
     return ship;
   }
 
+  /**
+   * @param {LiveProject} project
+   * @param {LiveShip} ship
+   * @param {ClaudeToolStart} signal
+   * @param {number} ts
+   * @param {boolean} catchup
+   */
   onToolUse(project, ship, signal, ts, catchup) {
     const tool = signal.tool || '?';
     const { status, build, spawn } = claudeTool(tool);
@@ -1141,6 +1183,7 @@ class Tracker extends EventEmitter {
     if (!toolUseId) return;
     const id = `drone:${toolUseId}`;
     if (this.ships.has(id)) return;
+    /** @type {LiveShip} */
     const drone = {
       id,
       name: `Claude-${++this.shipCounter}`,
@@ -1270,6 +1313,7 @@ class Tracker extends EventEmitter {
 
   // ---------- derived views ----------
 
+  /** @returns {{ projects: Project[], ships: Ship[], feed: FeedEntry[], eventSequence: number }} */
   snapshot() {
     return {
       projects: [...this.projects.values()].map(publicProject),
@@ -1282,6 +1326,10 @@ class Tracker extends EventEmitter {
   // Planets = top-level directories of the real project on disk, sized by a
   // shallow file count, enriched by accumulated build counts. Missing paths
   // (deleted/temp projects) get deterministic procedural planets instead.
+  /**
+   * @param {string} projectId
+   * @returns {SystemData | null}
+   */
   getSystem(projectId) {
     const project = this.projects.get(projectId);
     if (!project) return null;
@@ -1323,6 +1371,11 @@ class Tracker extends EventEmitter {
   }
 
   // Planet close-up stats: honest numbers under fantasy labels.
+  /**
+   * @param {string} projectId
+   * @param {string} planetName
+   * @returns {PlanetData | null}
+   */
   getPlanet(projectId, planetName) {
     const project = this.projects.get(projectId);
     if (!project) return null;
@@ -1478,6 +1531,10 @@ function shallowCount(dir) {
   return count;
 }
 
+/**
+ * @param {LiveProject} p
+ * @returns {Project}
+ */
 function publicProject(p) {
   return {
     id: p.id, path: p.path, name: p.name, exists: p.exists,
@@ -1487,11 +1544,15 @@ function publicProject(p) {
   };
 }
 
+/**
+ * @param {LiveShip} s
+ * @returns {Ship}
+ */
 function publicShip(s) {
   return {
     id: s.id, name: s.name, project: s.project, kind: s.kind,
     provider: normalizeProvider(s.provider || 'claude'),
-    status: s.status, detail: s.detail, lastEvent: s.lastEvent,
+    status: /** @type {ShipStatus} */ (s.status), detail: s.detail, lastEvent: s.lastEvent,
     attention: s.attention, attentionSince: s.attentionSince,
     taskId: typeof s.taskId === 'string' ? s.taskId : null,
     turnOutcome: typeof s.turnOutcome === 'string' ? s.turnOutcome : null,

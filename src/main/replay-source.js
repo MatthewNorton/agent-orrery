@@ -1,3 +1,4 @@
+// @ts-check
 'use strict';
 
 // Historical transcript playback. ReplaySource is deliberately independent of
@@ -23,6 +24,11 @@ const { fnv1a, hex8, mulberry32 } = require('./shared/hash');
 const { relativeInside } = require('./path-safety');
 const { safeId, safePath } = require('./transcripts/fields');
 const { codexParentSessionId } = require('./transcripts/codex');
+
+/**
+ * @import { FeedEntry, PlanetData, PlaybackStatus, Project, ReplaySpeed, Ship, SystemData }
+ *   from '../types/contract'
+ */
 
 const DEFAULT_CLAUDE_ROOT = path.join(os.homedir(), '.claude', 'projects');
 const DEFAULT_CODEX_ROOTS = [
@@ -101,6 +107,7 @@ class ReplaySource extends EventEmitter {
     this.tickMs = positiveInteger(options.tickMs, 100);
 
     this._phase = 'idle';
+    /** @type {ReplaySpeed} */
     this._speed = 1;
     this._cursorMs = null;
     this._minMs = null;
@@ -128,6 +135,7 @@ class ReplaySource extends EventEmitter {
     return this.status();
   }
 
+  /** @returns {PlaybackStatus} */
   status() {
     return {
       mode: 'replay',
@@ -233,11 +241,12 @@ class ReplaySource extends EventEmitter {
       this._playCursorStart = this._cursorMs === null ? (this._minMs || 0) : this._cursorMs;
       this._playWallStart = finiteNow(this.now);
     }
-    this._speed = speed;
+    this._speed = /** @type {ReplaySpeed} */ (speed);
     this._emitState();
     return this.status();
   }
 
+  /** @returns {{ projects: Project[], ships: Ship[], feed: FeedEntry[], eventSequence: number }} */
   snapshot() {
     return {
       projects: [...this._projects.values()].map(publicProject),
@@ -247,6 +256,10 @@ class ReplaySource extends EventEmitter {
     };
   }
 
+  /**
+   * @param {string} projectId
+   * @returns {SystemData | null}
+   */
   getSystem(projectId) {
     const project = this._projects.get(projectId);
     if (!project) return null;
@@ -258,6 +271,11 @@ class ReplaySource extends EventEmitter {
     return { project: publicProject(project), planets, beltDensity: 0 };
   }
 
+  /**
+   * @param {string} projectId
+   * @param {string} planetName
+   * @returns {PlanetData | null}
+   */
   getPlanet(projectId, planetName) {
     const project = this._projects.get(projectId);
     if (!project || typeof planetName !== 'string') return null;
@@ -1068,7 +1086,7 @@ class ReplaySource extends EventEmitter {
 
   _assertCurrent(token) {
     if (token !== this._epoch) {
-      const error = new Error('replay operation cancelled');
+      const error = /** @type {NodeJS.ErrnoException} */ (new Error('replay operation cancelled'));
       error.code = 'ERR_REPLAY_CANCELLED';
       throw error;
     }
@@ -1269,6 +1287,7 @@ function providerRank(provider) {
   return provider === 'claude' ? 0 : 1;
 }
 
+/** @returns {Project} */
 function publicProject(project) {
   return {
     id: project.id,
@@ -1285,6 +1304,7 @@ function publicProject(project) {
   };
 }
 
+/** @returns {Ship} */
 function publicShip(ship) {
   return {
     id: ship.id,

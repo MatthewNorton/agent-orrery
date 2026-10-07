@@ -1,3 +1,4 @@
+// @ts-check
 // Provider identity, host-independent project path keys, the shared tool vocabulary and
 // line adaptation. Each provider's record parser lives in transcripts/; this module has no
 // I/O beyond the watch config, and transcript content never crosses it.
@@ -10,6 +11,8 @@ const {
   codexRecordToSignals,
   adaptCodexRecord,
 } = require('./transcripts/codex');
+
+/** @import { Provider } from '../types/contract' */
 
 const PROVIDERS = new Set(['claude', 'codex', 'generic']);
 
@@ -67,11 +70,15 @@ const TOOL_CLASSES = Object.freeze({
 
 const UNKNOWN_TOOL = Object.freeze({ tool: 'Tool', status: 'Working', build: false });
 
-/** Normalize every externally supplied provider to the three public keys. */
+/**
+ * Normalize every externally supplied provider to the three public keys.
+ * @param {unknown} value
+ * @returns {Provider}
+ */
 function normalizeProvider(value) {
   const key = typeof value === 'string' ? value.trim().toLowerCase() : '';
   if (!key) return 'claude'; // Backward compatibility for legacy snapshots.
-  if (PROVIDERS.has(key)) return key;
+  if (PROVIDERS.has(key)) return /** @type {Provider} */ (key);
   if (key === 'anthropic' || key === 'claude-code') return 'claude';
   if (key === 'openai' || key === 'codex-cli') return 'codex';
   return 'generic';
