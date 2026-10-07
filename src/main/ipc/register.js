@@ -9,7 +9,7 @@ function registerIpc(ctx, handlers) {
   const trustedMainFrame = (event) => guards.trustedMainFrame(ctx, event);
   const { visibleSnapshot, visibleSystem, visibleProject, handleReplayCommand } = handlers.replay;
   const { handleOpenTerminal } = handlers.terminal;
-  const { handleTasksGet, handleTasksSave, handleTaskAdd, handleTaskSetDone, handleTaskRemove } = handlers.tasks;
+  const { handleTasksGet, handleTaskAdd, handleTaskSetDone, handleTaskRemove } = handlers.tasks;
   const {
     handleRootTasksGet, handleRootTaskCreate, handleRootTaskRemove, handleRootTaskAssign, handleRootTaskRetry,
   } = handlers.rootTasks;
@@ -38,7 +38,6 @@ function registerIpc(ctx, handlers) {
   ));
   ipcMain.handle('au:open-terminal', (event, projectId) => handleOpenTerminal(event, projectId));
   ipcMain.handle('au:tasks-get', (event, projectId) => handleTasksGet(event, projectId));
-  ipcMain.handle('au:tasks-save', (event, projectId, items) => handleTasksSave(event, projectId, items));
   ipcMain.handle('au:task-add', (event, projectId, text) => handleTaskAdd(event, projectId, text));
   ipcMain.handle('au:task-set-done', (event, projectId, request) => (
     handleTaskSetDone(event, projectId, request)

@@ -1,5 +1,5 @@
-// Mechanical grader for kit/todo/08-ship-assets-pack/CONTRACT.md (S0–S5).
-// Usage: node kit/todo/08-ship-assets-pack/grade-ships.mjs [--no-regression]
+// Gate for kit 08, manifest-backed ship hulls (S0–S5).
+// Usage: node kit/done/ship-assets-pack/grade-ships.mjs [--no-regression]
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -16,7 +16,7 @@ const manifestPath = path.join(ROOT, 'assets', 'ships', 'manifest.json');
 const inboxReady = fs.existsSync(inbox) && fs.readdirSync(inbox).length > 0;
 if (!inboxReady && !fs.existsSync(manifestPath)) {
   console.error('\n================ SHIPS GRADE ================');
-  console.error('FAIL  S0: awaiting Phase 0 sourcing — drop CC0 packs into assets/staging/ships-inbox/ (see CONTRACT.md Phase 0)');
+  console.error('FAIL  S0: awaiting Phase 0 sourcing — drop CC0 packs into assets/staging/ships-inbox/');
   process.exit(1);
 }
 ok('S0', inboxReady ? 'sourcing inbox populated' : 'final assets already present');

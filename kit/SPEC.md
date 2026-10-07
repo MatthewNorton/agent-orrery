@@ -83,7 +83,6 @@ AU.tasksGet(projectId)                 -> Promise<{exists, path, items} | null>
 AU.taskAdd(projectId, text)            -> Promise<{ok, items}>
 AU.taskSetDone(projectId, request)     -> Promise<{ok, items}>
 AU.taskRemove(projectId, request)      -> Promise<{ok, items}>
-AU.tasksSave(projectId, items)         -> Promise<{ok, items}>   // unused by the renderer
 AU.onTasksChanged(cb)                  // cb({projectId, taskId, phase})
 
 // Global IDEAS queue; assign/retry start Codex on a tagged GOALS.md item

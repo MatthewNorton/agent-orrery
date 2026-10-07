@@ -14,8 +14,7 @@ kit/
   repin.mjs            LIVE  re-pins hashed files after a deliberate edit (CI runs --check)
   ASSET-REQUESTS.md    LIVE  intake for missing-asset wants (never source ad hoc)
   EXECUTOR-HANDOFF.md  LIVE  copy-paste prompt for handing a kit to ANY agent (Codex etc.)
-  done/                executed kits, archived with their reports and logs
-    renderer-mvp/      PASS 2026-07-18 — the entire src/renderer (see its README)
+  done/                one gate per finished kit; contracts and reports are in git history
     attention/         PASS 2026-07-21 — needs-attention detection + UI
     polish-pass/       PASS 2026-07-21 — dense labels, backdrop, pointer flow
     packaging/         PASS 2026-07-21 — Windows Desktop/Start shortcuts
@@ -85,9 +84,10 @@ history gates also need `node kit/repin.mjs --note "<why>"` after an edit.
    output + precise visual notes. Max 5 iterations total; may escalate the
    executor to Fable (`claude-fable-5`) if iterations stall; `kit/BLOCKED.md`
    or a failed 5th iteration → stop and escalate to the user with artifacts.
-5. On pass: `kit/EXECUTOR-REPORT.md` (executor summary + runner verification),
-   then archive the kit's inputs + report + logs into `done/<kit-name>/` and
-   update this status board and `todo/README.md`.
+5. On pass: move the kit's gate into `done/<kit-name>/`, paste
+   `kit/EXECUTOR-REPORT.md` (executor summary + runner verification) into the PR
+   description and delete it with the contract, then update this status board
+   and `todo/README.md`.
 
 Asset rule: executors never generate/download art — procedural fallback in
 code + an entry in `ASSET-REQUESTS.md`.

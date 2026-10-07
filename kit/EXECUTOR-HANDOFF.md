@@ -53,8 +53,9 @@ you (or a Claude kit-runner session):
    (`npm start`) for the live check.
 3. On failure: feed back ONLY the failed check IDs + grader output + what's
    wrong in which screenshot. Cap the loop (5 iterations), then stop.
-4. On pass: archive the kit's contract + report + logs into `kit/done/<name>/`
-   and update the status board (`kit/README.md`) and `kit/todo/README.md`.
+4. On pass: move the kit's gate into `kit/done/<name>/`, put the executor
+   report in the PR description, delete the contract and report, and update the
+   status board (`kit/README.md`) and `kit/todo/README.md`.
 
 ## Current state (update when it changes)
 

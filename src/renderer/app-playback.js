@@ -519,5 +519,4 @@
     };
   }
   AUR.historyTestMetrics = historyTestMetrics;
-  AUR.historyStats = historyTestMetrics;
 })();
