@@ -136,8 +136,9 @@ Start here when you want to change something. Paths under "Main process" are rel
   `ipc/guards.js` first. Exception: `au:debug-ready` (renderer → main `send`, used only by
   `harness/modes/shots.js`) has no frame check.
 - Transcript content is **untrusted input**: the parsers in `transcripts/` reduce records to
-  structural signals, `isLocalProjectPath` rejects UNC / device paths before any `stat`, and
-  every spawn uses `shell: false`.
+  structural signals (a Claude tool call still carries its file path and up to 60 characters of
+  pattern or description, which live shows as `detail`), `isLocalProjectPath` rejects UNC /
+  device paths before any `stat`, and every spawn uses `shell: false`.
 
 ### IPC contract (all 26 bridge methods)
 
@@ -522,7 +523,8 @@ so they keep passing wherever code moves inside that folder.
 `polish-math.js`. Editing any of them means running `node kit/repin.mjs --note "<why>"`, or CI
 turns red. `preload.js` — which `CLAUDE.md` lists as frozen — is **not** hashed. `tracker.js`,
 `replay-source.js` and `provider-adapters.js` are no longer frozen or pinned; `grade-main-split.mjs`
-caps them at the size they had when they were unfrozen.
+caps `tracker.js` and `replay-source.js` at the size they had when they were unfrozen, and
+`provider-adapters.js` at the usual 450 lines.
 
 ---
 
