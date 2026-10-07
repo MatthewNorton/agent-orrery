@@ -25,7 +25,7 @@ test('validProjectId accepts 1 to 256 characters with something besides whitespa
   }
 });
 
-test('validGoalId accepts RFC 4122 versions 1-8 in either case', () => {
+test('validGoalId accepts UUID versions 1-8 in either case', () => {
   for (const version of '12345678') {
     assert.equal(validGoalId(`123e4567-e89b-${version}2d3-a456-426614174000`), true, version);
   }
