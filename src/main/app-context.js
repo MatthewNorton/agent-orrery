@@ -1,3 +1,4 @@
+// @ts-check
 'use strict';
 
 const { app } = require('electron');
@@ -15,6 +16,8 @@ const { createLocalGitStatusCollector } = require('./project-vcs-status');
 const { createGitHubMetadataProvider } = require('./github-metadata-provider');
 const { createProjectVcsStatusService } = require('./project-vcs-status-service');
 const { createProjectVcsStatusController } = require('./project-vcs-status-controller');
+
+/** @import { AUEvent, BatchMeta, TasksChangedPush } from '../types/contract' */
 
 function createAppContext({ flags, fixtures }) {
   let providerFixtureRoot = null;
@@ -85,11 +88,11 @@ function createAppContext({ flags, fixtures }) {
         }
         if (!rootObserved) ctx.ipc.rootTasks.sendRootTasksChanged(run);
         if (ctx.win && !ctx.win.isDestroyed()) {
-          ctx.win.webContents.send('au:tasks-changed', {
+          ctx.win.webContents.send('au:tasks-changed', /** @satisfies {TasksChangedPush} */ ({
             projectId: run.projectId,
             taskId: run.id,
             phase: run.phase,
-          });
+          }));
         }
       },
     });
@@ -126,7 +129,7 @@ function createAppContext({ flags, fixtures }) {
       : createTerminalLauncher();
     ctx.ipc.terminal.reset();
     ctx.activeSource = ctx.tracker;
-    ctx.tracker.on('events', (batch) => {
+    ctx.tracker.on('events', (/** @type {AUEvent[]} */ batch) => {
       if (ctx.projectVcsStatusController) ctx.projectVcsStatusController.observeEvents(batch);
       for (const event of Array.isArray(batch) ? batch : []) {
         if (event.type === 'project-updated' && event.project && event.project.exists === true) {
@@ -139,12 +142,14 @@ function createAppContext({ flags, fixtures }) {
         }
       }
       if (ctx.activeSource === ctx.tracker && ctx.win && !ctx.win.isDestroyed()) {
-        ctx.win.webContents.send('au:events', batch, { streamEpoch: ctx.streamEpoch, mode: 'live' });
+        ctx.win.webContents.send('au:events', batch,
+          /** @satisfies {BatchMeta} */ ({ streamEpoch: ctx.streamEpoch, mode: 'live' }));
       }
     });
-    ctx.replaySource.on('events', (batch) => {
+    ctx.replaySource.on('events', (/** @type {AUEvent[]} */ batch) => {
       if (ctx.activeSource === ctx.replaySource && ctx.win && !ctx.win.isDestroyed()) {
-        ctx.win.webContents.send('au:events', batch, { streamEpoch: ctx.streamEpoch, mode: 'replay' });
+        ctx.win.webContents.send('au:events', batch,
+          /** @satisfies {BatchMeta} */ ({ streamEpoch: ctx.streamEpoch, mode: 'replay' }));
       }
     });
     ctx.replaySource.on('state', ctx.replay.sendReplayState);

@@ -1,9 +1,12 @@
+// @ts-check
 'use strict';
 
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 const { boundedInteger, ownString, bufferValue } = require('./shared/values');
 const { runBoundedProcess } = require('./shared/bounded-process');
+
+/** @import { ProcessLimits } from './shared/bounded-process' */
 
 const DEFAULT_CACHE_TTL_MS = 5 * 60_000;
 const DEFAULT_ERROR_TTL_MS = 30_000;
@@ -141,7 +144,19 @@ function ghResult({ exitCode, stdout, stderr }) {
   return exitCode === 0 ? { ok: true, stdout } : { ok: false, code: runnerFailure(stderr) };
 }
 
+/**
+ * @typedef {object} GhReaderOptions
+ * @property {string} [ghCommand]
+ * @property {NodeJS.ProcessEnv} [env]
+ * @property {string} [cwd]
+ * @property {ProcessLimits['spawnImpl']} [spawnImpl]
+ * @property {number} [timeoutMs]
+ * @property {number} [maxOutputBytes]
+ */
+
+/** @param {GhReaderOptions} [options] */
 function createGhPullRequestReader(options = {}) {
+  /** @type {GhReaderOptions} */
   const settings = options && typeof options === 'object' && !Array.isArray(options) ? options : {};
   const ghCommand = ownString(settings, 'ghCommand') || 'gh';
   const env = settings.env && typeof settings.env === 'object' ? settings.env : process.env;
@@ -165,7 +180,20 @@ function createGhPullRequestReader(options = {}) {
   };
 }
 
+/**
+ * @typedef {GhReaderOptions & {
+ *   readBatch?: ReturnType<typeof createGhPullRequestReader>,
+ *   clock?: () => number,
+ *   cacheTtlMs?: number,
+ *   errorTtlMs?: number,
+ *   batchSize?: number,
+ *   maxRepositories?: number,
+ * }} GitHubMetadataProviderOptions
+ */
+
+/** @param {GitHubMetadataProviderOptions} [options] */
 function createGitHubMetadataProvider(options = {}) {
+  /** @type {GitHubMetadataProviderOptions} */
   const settings = options && typeof options === 'object' && !Array.isArray(options) ? options : {};
   const readBatch = typeof settings.readBatch === 'function'
     ? settings.readBatch : createGhPullRequestReader(settings);

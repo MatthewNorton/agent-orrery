@@ -1,8 +1,14 @@
+// @ts-check
 'use strict';
 
 const path = require('node:path');
 const { ensureAssignedGoal, validGoalId } = require('./goals');
 const { validProjectId } = require('./shared/ids');
+
+/** @import { RootTaskItem, Ship } from '../types/contract' */
+/** @import { createAgentLauncher } from './agent-launcher' */
+/** @typedef {InstanceType<typeof import('./root-tasks').RootTaskStore>} RootTaskStore */
+/** @typedef {InstanceType<typeof import('./task-runs').TaskRunTracker>} TaskRunTracker */
 
 const ACTIVE_RUN_PHASES = new Set(['waiting-for-agent', 'running', 'completing']);
 const RETRYABLE_RUN_PHASES = new Set([
@@ -47,7 +53,19 @@ const PUBLIC_FAILURE_CODES = new Set([
   'FAILED',
 ]);
 
+/**
+ * @typedef {object} RootTaskCoordinatorOptions
+ * @property {RootTaskStore} [store]
+ * @property {TaskRunTracker} [taskRuns]
+ * @property {ReturnType<typeof createAgentLauncher>} [launcher]
+ * @property {(projectId: string) => string | null} [resolveProjectRoot]
+ * @property {(projectId: string) => Pick<Ship, 'id' | 'provider' | 'project' | 'kind'>[]} [listShips]
+ * @property {typeof ensureAssignedGoal} [ensureGoal]
+ * @property {(change: { reason: string, item: RootTaskItem | null }) => void} [onChange]
+ */
+
 class RootTaskCoordinator {
+  /** @param {RootTaskCoordinatorOptions} [options] */
   constructor(options = {}) {
     if (!options || typeof options !== 'object' || Array.isArray(options) ||
         !validStore(options.store) || !validTaskRuns(options.taskRuns) ||

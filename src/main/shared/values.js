@@ -1,3 +1,4 @@
+// @ts-check
 'use strict';
 
 function boundedInteger(value, fallback, minimum, maximum) {

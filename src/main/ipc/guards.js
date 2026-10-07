@@ -1,3 +1,4 @@
+// @ts-check
 'use strict';
 
 const { trustedMainFrame: isTrustedMainFrame } = require('../window-security');

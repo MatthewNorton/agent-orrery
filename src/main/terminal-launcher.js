@@ -1,3 +1,4 @@
+// @ts-check
 'use strict';
 
 const fs = require('node:fs');
@@ -14,7 +15,18 @@ const MAC_OPEN_PATH = '/usr/bin/open';
 const MAC_TERMINAL_APP = 'Terminal';
 const VALID_FAILURES = new Set(['INVALID', 'UNAVAILABLE', 'FAILED']);
 
+/**
+ * @typedef {object} TerminalLauncherOptions
+ * @property {string} [platform]
+ * @property {NodeJS.ProcessEnv} [env]
+ * @property {{ accessSync(target: string, mode?: number): void, constants?: { F_OK: number } }} [fsImpl]
+ * @property {(command: string, args: string[], options: object) =>
+ *   { unref(): void, once?(event: string, listener: () => void): unknown }} [spawnImpl]
+ */
+
+/** @param {TerminalLauncherOptions} [options] */
 function createTerminalLauncher(options = {}) {
+  /** @type {TerminalLauncherOptions} */
   const settings = options && typeof options === 'object' && !Array.isArray(options)
     ? options : {};
   const platform = Object.hasOwn(settings, 'platform') ? settings.platform : process.platform;
@@ -23,6 +35,7 @@ function createTerminalLauncher(options = {}) {
   const spawnImpl = Object.hasOwn(settings, 'spawnImpl') ? settings.spawnImpl : spawn;
 
   return Object.freeze({
+    /** @param {{ cwd?: string }} request */
     async open(request) {
       const cwd = ownCwd(request);
       if (platform === 'darwin') return openMacTerminal({ cwd, fsImpl, spawnImpl });
@@ -81,6 +94,7 @@ function launchDetached(spawnImpl, spec) {
   return { ok: true };
 }
 
+/** @param {{ terminalPath?: string, cwd?: string }} [target] */
 function buildTerminalSpec({ terminalPath, cwd } = {}) {
   if (!isFixedAliasPath(terminalPath) || !isAbsoluteWindowsPath(cwd)) {
     throw launchError('INVALID');
@@ -99,6 +113,7 @@ function buildTerminalSpec({ terminalPath, cwd } = {}) {
   };
 }
 
+/** @param {{ cwd?: string }} [target] */
 function buildMacTerminalSpec({ cwd } = {}) {
   if (!isAbsolutePosixPath(cwd)) throw launchError('INVALID');
   return {
@@ -114,6 +129,10 @@ function buildMacTerminalSpec({ cwd } = {}) {
   };
 }
 
+/**
+ * @param {{ platform?: string, env?: NodeJS.ProcessEnv,
+ *   fsImpl?: TerminalLauncherOptions['fsImpl'] }} [host]
+ */
 function resolveWindowsTerminal({ platform, env, fsImpl = fs } = {}) {
   if (platform !== 'win32') throw launchError('UNAVAILABLE');
   if (!env || typeof env !== 'object' || !Object.hasOwn(env, 'LOCALAPPDATA')) {
@@ -171,7 +190,9 @@ function failure(code) {
 }
 
 function launchError(code) {
-  const error = new Error(code === 'INVALID' ? 'Invalid terminal request' : 'Terminal unavailable');
+  const error = /** @type {NodeJS.ErrnoException} */ (
+    new Error(code === 'INVALID' ? 'Invalid terminal request' : 'Terminal unavailable')
+  );
   error.code = code;
   return error;
 }

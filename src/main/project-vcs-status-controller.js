@@ -1,10 +1,26 @@
+// @ts-check
 'use strict';
 
 const { boundedInteger } = require('./shared/values');
 
+/** @typedef {InstanceType<typeof import('./tracker').Tracker>} Tracker */
+/** @import { ProjectVcsStatusService } from './project-vcs-status-service' */
+
 const DEFAULT_DEBOUNCE_MS = 400;
 
+/**
+ * @typedef {object} ProjectVcsStatusControllerOptions
+ * @property {Tracker} [tracker]
+ * @property {ProjectVcsStatusService} [service]
+ * @property {typeof setTimeout} [schedule]
+ * @property {typeof clearTimeout} [cancel]
+ * @property {number} [debounceMs]
+ * @property {(error: Error) => void} [onError]
+ */
+
+/** @param {ProjectVcsStatusControllerOptions} [options] */
 function createProjectVcsStatusController(options = {}) {
+  /** @type {ProjectVcsStatusControllerOptions} */
   const settings = options && typeof options === 'object' && !Array.isArray(options) ? options : {};
   const tracker = settings.tracker;
   const service = settings.service;

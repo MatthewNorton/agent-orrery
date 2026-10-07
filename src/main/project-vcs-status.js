@@ -1,3 +1,4 @@
+// @ts-check
 'use strict';
 
 const fs = require('node:fs');
@@ -5,6 +6,8 @@ const path = require('node:path');
 const { spawn } = require('node:child_process');
 const { boundedInteger, bufferValue } = require('./shared/values');
 const { runBoundedProcess } = require('./shared/bounded-process');
+
+/** @import { ProcessLimits } from './shared/bounded-process' */
 
 const DEFAULT_TIMEOUT_MS = 4_000;
 const DEFAULT_MAX_OUTPUT_BYTES = 1024 * 1024;
@@ -172,7 +175,18 @@ function gitResult({ exitCode, signal, stdout, stderr }) {
   };
 }
 
+/**
+ * @typedef {object} GitRunnerOptions
+ * @property {string} [gitCommand]
+ * @property {NodeJS.ProcessEnv} [env]
+ * @property {ProcessLimits['spawnImpl']} [spawnImpl]
+ * @property {number} [timeoutMs]
+ * @property {number} [maxOutputBytes]
+ */
+
+/** @param {GitRunnerOptions} [options] */
 function createGitRunner(options = {}) {
+  /** @type {GitRunnerOptions} */
   const settings = options && typeof options === 'object' && !Array.isArray(options) ? options : {};
   const gitCommand = stringValue(settings.gitCommand) || 'git';
   const env = settings.env && typeof settings.env === 'object' ? settings.env : process.env;
@@ -191,7 +205,16 @@ function createGitRunner(options = {}) {
   };
 }
 
+/**
+ * @typedef {GitRunnerOptions & {
+ *   fsImpl?: typeof fs,
+ *   runGit?: ReturnType<typeof createGitRunner>,
+ * }} GitStatusCollectorOptions
+ */
+
+/** @param {GitStatusCollectorOptions} [options] */
 function createLocalGitStatusCollector(options = {}) {
+  /** @type {GitStatusCollectorOptions} */
   const settings = options && typeof options === 'object' && !Array.isArray(options) ? options : {};
   const fsImpl = settings.fsImpl && typeof settings.fsImpl === 'object' ? settings.fsImpl : fs;
   const runGit = typeof settings.runGit === 'function' ? settings.runGit : createGitRunner(settings);
