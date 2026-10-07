@@ -264,6 +264,7 @@ class Tracker extends EventEmitter {
     /** @type {Map<string, LiveProject>} */
     this.projects = new Map();   // slug -> project record
     this.files = new Map();      // abs jsonl path -> tail state
+    this.claudeTails = new Map(); // abs Claude jsonl path -> its tail, kept while cold
     /** @type {Map<string, LiveShip>} */
     this.ships = new Map();      // shipId -> ship record
     /** @type {FeedEntry[]} */
@@ -431,27 +432,39 @@ class Tracker extends EventEmitter {
         }
       }
 
-      // Tail any file fresh enough to matter.
+      // Tail any file fresh enough to matter; at startup, note where every file ends.
       for (const { fp, st } of stats) {
-        if (now - st.mtimeMs > HOT_WINDOW_MS) continue;
-        if (!this.files.has(fp)) {
-          this.files.set(fp, {
-            provider: 'claude',
-            project: project.id,
-            session: path.basename(fp, '.jsonl'),
-            // Startup: don't replay history, just tail from the end. A file
-            // appearing while we run is a new session: replay it from zero
-            // (in catchup mode) so its ship materializes with correct state.
-            offset: isStartup ? st.size : 0,
-            catchup: !isStartup,
-            remainder: '',
-          });
-          if (isStartup && now - st.mtimeMs < ACTIVE_WINDOW_MS) {
-            this.ensureShip(project.id, path.basename(fp, '.jsonl'), false, st.mtimeMs);
-          }
+        const hot = now - st.mtimeMs <= HOT_WINDOW_MS;
+        if (this.files.has(fp) || !(hot || isStartup)) continue;
+        const tail = this.claudeTail(fp, project.id, st.size, isStartup);
+        if (!hot) continue;
+        this.files.set(fp, tail);
+        if (isStartup && now - st.mtimeMs < ACTIVE_WINDOW_MS) {
+          this.ensureShip(project.id, tail.session, false, st.mtimeMs);
         }
       }
     }
+  }
+
+  /**
+   * A transcript keeps one tail for the whole run, so a session that goes cold and resumes
+   * reads on from where it stopped. Startup doesn't replay history: it tails from the end. A
+   * file appearing while we run (or replacing a longer one) is a new session: replay it from
+   * zero in catchup mode so its ship materializes with correct state.
+   * @param {string} fp
+   * @param {string} projectId
+   * @param {number} size
+   * @param {boolean} isStartup
+   */
+  claudeTail(fp, projectId, size, isStartup) {
+    const known = this.claudeTails.get(fp);
+    if (known && known.offset <= size) return known;
+    const tail = {
+      provider: 'claude', project: projectId, session: path.basename(fp, '.jsonl'),
+      offset: isStartup ? size : 0, catchup: !isStartup, remainder: '',
+    };
+    this.claudeTails.set(fp, tail);
+    return tail;
   }
 
   indexProjectPath(project) {
@@ -790,6 +803,7 @@ class Tracker extends EventEmitter {
         st = fs.statSync(fp);
       } catch {
         this.files.delete(fp);
+        this.claudeTails.delete(fp);
         continue;
       }
       if (now - st.mtimeMs > HOT_WINDOW_MS) {
