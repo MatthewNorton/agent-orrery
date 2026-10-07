@@ -1,3 +1,4 @@
+// @ts-check
 'use strict';
 
 // Historical transcript playback. ReplaySource is deliberately independent of
@@ -18,6 +19,16 @@ const {
   codexSessionIdFromFilename,
   createAdapterState,
 } = require('./provider-adapters');
+const { claudeRecordToSignals } = require('./transcripts/claude');
+const { fnv1a, hex8, mulberry32 } = require('./shared/hash');
+const { relativeInside } = require('./path-safety');
+const { safeId, safePath } = require('./transcripts/fields');
+const { codexParentSessionId } = require('./transcripts/codex');
+
+/**
+ * @import { FeedEntry, PlanetData, PlaybackStatus, Project, ReplaySpeed, Ship, SystemData }
+ *   from '../types/contract'
+ */
 
 const DEFAULT_CLAUDE_ROOT = path.join(os.homedir(), '.claude', 'projects');
 const DEFAULT_CODEX_ROOTS = [
@@ -36,7 +47,6 @@ const ACTIVE_WINDOW_MS = 5 * 60 * 1000;
 const DRONE_WINDOW_MS = 15 * 60 * 1000;
 const MIN_TIMESTAMP_MS = Date.UTC(2000, 0, 1);
 const MAX_CLOCK_SKEW_MS = 24 * 60 * 60 * 1000;
-const SAFE_ID_RE = /^[A-Za-z0-9][A-Za-z0-9:._-]*$/;
 
 const DEFAULT_SCHEDULER = Object.freeze({
   setTimeout: (fn, delay) => setTimeout(fn, delay),
@@ -47,7 +57,7 @@ class ReplaySource extends EventEmitter {
   constructor(options = {}) {
     super();
     const roots = options.roots && typeof options.roots === 'object' ? options.roots : {};
-    this.claudeProjectsDir = firstString(
+    this.claudeProjectsDir = firstResolvedPath(
       options.claudeProjectsDir,
       options.claudeRoot,
       roots.claudeProjectsDir,
@@ -64,14 +74,14 @@ class ReplaySource extends EventEmitter {
     if (suppliedCodexRoots) {
       this.codexSessionDirs = suppliedCodexRoots.filter(isNonemptyString).map((item) => path.resolve(item));
     } else {
-      const active = firstString(
+      const active = firstResolvedPath(
         options.codexSessionsDir,
         options.codexSessionDir,
         options.codexActiveRoot,
         roots.codexSessionsDir,
         roots.codexActive
       );
-      const archived = firstString(
+      const archived = firstResolvedPath(
         options.codexArchivedSessionsDir,
         options.codexArchiveRoot,
         roots.codexArchivedSessionsDir,
@@ -97,6 +107,7 @@ class ReplaySource extends EventEmitter {
     this.tickMs = positiveInteger(options.tickMs, 100);
 
     this._phase = 'idle';
+    /** @type {ReplaySpeed} */
     this._speed = 1;
     this._cursorMs = null;
     this._minMs = null;
@@ -124,6 +135,7 @@ class ReplaySource extends EventEmitter {
     return this.status();
   }
 
+  /** @returns {PlaybackStatus} */
   status() {
     return {
       mode: 'replay',
@@ -229,11 +241,12 @@ class ReplaySource extends EventEmitter {
       this._playCursorStart = this._cursorMs === null ? (this._minMs || 0) : this._cursorMs;
       this._playWallStart = finiteNow(this.now);
     }
-    this._speed = speed;
+    this._speed = /** @type {ReplaySpeed} */ (speed);
     this._emitState();
     return this.status();
   }
 
+  /** @returns {{ projects: Project[], ships: Ship[], feed: FeedEntry[], eventSequence: number }} */
   snapshot() {
     return {
       projects: [...this._projects.values()].map(publicProject),
@@ -243,6 +256,10 @@ class ReplaySource extends EventEmitter {
     };
   }
 
+  /**
+   * @param {string} projectId
+   * @returns {SystemData | null}
+   */
   getSystem(projectId) {
     const project = this._projects.get(projectId);
     if (!project) return null;
@@ -254,6 +271,11 @@ class ReplaySource extends EventEmitter {
     return { project: publicProject(project), planets, beltDensity: 0 };
   }
 
+  /**
+   * @param {string} projectId
+   * @param {string} planetName
+   * @returns {PlanetData | null}
+   */
   getPlanet(projectId, planetName) {
     const project = this._projects.get(projectId);
     if (!project || typeof planetName !== 'string') return null;
@@ -411,16 +433,11 @@ class ReplaySource extends EventEmitter {
       const signal = codexRecordToSignals(record).find((item) => item.type === 'session');
       if (!signal) continue;
       if (filenameId && signal.sessionId.toLowerCase() !== filenameId.toLowerCase()) continue;
-      const payload = record.payload && typeof record.payload === 'object' ? record.payload : {};
       metadata = {
         sessionId: signal.sessionId,
         cwd: signal.cwd,
         kind: signal.kind,
-        parentSessionId: safeId(
-          payload.parent_thread_id || payload.forked_from_id ||
-          (payload.source && typeof payload.source === 'object'
-            ? payload.source.parent_thread_id || payload.source.forked_from_id : null)
-        ),
+        parentSessionId: codexParentSessionId(record.payload),
       };
       break;
     }
@@ -703,61 +720,12 @@ class ReplaySource extends EventEmitter {
         recordTs: ts,
       };
     }
-
-    const signals = [];
-    let sessionEmitted = claudeSessionEmitted;
-    if (!sessionEmitted) {
-      signals.push({
-        type: 'session', provider: 'claude', sessionId: entry.sessionId,
-        cwd: entry.projectPath, kind: record.isSidechain === true ? 'drone' : entry.kind, ts,
-      });
-      sessionEmitted = true;
-    }
-
-    if (record.type === 'system' && record.subtype === 'turn_duration') {
-      signals.push({ type: 'turn-end', provider: 'claude', sessionId: entry.sessionId, ts });
-    }
-    const message = record.message && typeof record.message === 'object' ? record.message : null;
-    if (!message) return {
-      signals, adapterState, claudeSessionEmitted: sessionEmitted, recordTs: ts,
+    return {
+      signals: historicalClaudeSignals(entry, record, lineOffset, ts, claudeSessionEmitted),
+      adapterState,
+      claudeSessionEmitted: true,
+      recordTs: ts,
     };
-    const assistant = record.type === 'assistant' || message.role === 'assistant';
-    const user = record.type === 'user' || message.role === 'user';
-    const content = message.content;
-    if ((user && typeof content === 'string') || assistant) {
-      signals.push({ type: 'turn-start', provider: 'claude', sessionId: entry.sessionId, ts });
-    }
-    if (!Array.isArray(content)) {
-      return { signals, adapterState, claudeSessionEmitted: sessionEmitted, recordTs: ts };
-    }
-    if (user && content.some((block) => block && block.type === 'text')) {
-      signals.push({ type: 'turn-start', provider: 'claude', sessionId: entry.sessionId, ts });
-    }
-    for (const block of content) {
-      if (!block || typeof block !== 'object') continue;
-      if (assistant && block.type === 'tool_use') {
-        const callId = safeId(block.id) || `line-${lineOffset.toString(16)}`;
-        const classified = classifyTool(block.name);
-        signals.push({
-          type: 'tool-start', provider: 'claude', sessionId: entry.sessionId,
-          callId, tool: classified.tool, status: classified.status, ts,
-        });
-        const input = block.input && typeof block.input === 'object' ? block.input : null;
-        const filePath = input && safePath(input.file_path);
-        if (classified.build && filePath) {
-          signals.push({
-            type: 'build', provider: 'claude', sessionId: entry.sessionId,
-            callId, files: [filePath], success: true, ts,
-          });
-        }
-      } else if (user && block.type === 'tool_result') {
-        const callId = safeId(block.tool_use_id);
-        if (callId) signals.push({
-          type: 'tool-end', provider: 'claude', sessionId: entry.sessionId, callId, ts,
-        });
-      }
-    }
-    return { signals, adapterState, claudeSessionEmitted: sessionEmitted, recordTs: ts };
   }
 
   _applyRecord(record, emit) {
@@ -880,7 +848,7 @@ class ReplaySource extends EventEmitter {
     let id = this._projectIdByPath.get(key);
     if (!id) {
       id = safeId(this._preferredProjectIds.get(key)) || safeId(projectIdHint) ||
-        `project:${fnv1a(key).toString(16).padStart(8, '0')}`;
+        `project:${hex8(key)}`;
       if (this._projects.has(id) && canonicalProjectPath(this._projects.get(id).path) !== key) {
         id = `${id}-${fnv1a(key).toString(16)}`;
       }
@@ -973,7 +941,8 @@ class ReplaySource extends EventEmitter {
     for (const value of files.slice(0, 256)) {
       const filePath = typeof value === 'string' ? value
         : value && typeof value === 'object' ? value.movePath || value.path : null;
-      const relative = relativeInside(project.path, filePath);
+      const relative = safePath(project.path) && safePath(filePath)
+        ? relativeInside(project.path, filePath, { separator: '/', requireAbsolute: true }) : null;
       if (!relative || seen.has(relative)) continue;
       seen.add(relative);
       const bucket = relative.includes('/') ? relative.split('/')[0] : '(root)';
@@ -1117,7 +1086,7 @@ class ReplaySource extends EventEmitter {
 
   _assertCurrent(token) {
     if (token !== this._epoch) {
-      const error = new Error('replay operation cancelled');
+      const error = /** @type {NodeJS.ErrnoException} */ (new Error('replay operation cancelled'));
       error.code = 'ERR_REPLAY_CANCELLED';
       throw error;
     }
@@ -1233,6 +1202,46 @@ function parseTimestamp(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+/**
+ * History's reading of one Claude record. The session is announced once per source, at its
+ * indexed project path. A prompt, any assistant message and user text each start a turn.
+ * Only assistant tool calls and user tool results count, named in the cross-provider
+ * vocabulary. The merge orders signals by position, so their order and count are part of
+ * the contract.
+ */
+function historicalClaudeSignals(entry, record, lineOffset, ts, sessionEmitted) {
+  const signal = (type, fields = {}) => ({ type, provider: 'claude', sessionId: entry.sessionId, ...fields, ts });
+  const signals = [];
+  let message = null;
+  for (const fact of claudeRecordToSignals(record)) {
+    if (fact.type === 'session') {
+      if (!sessionEmitted) {
+        signals.push(signal('session', {
+          cwd: entry.projectPath, kind: fact.kind === 'drone' ? 'drone' : entry.kind,
+        }));
+      }
+    } else if (fact.type === 'turn-end') {
+      signals.push(signal('turn-end'));
+    } else if (fact.type === 'message') {
+      message = fact;
+      if ((fact.user && fact.prompt) || fact.assistant) signals.push(signal('turn-start'));
+      if (fact.blocks && fact.user && fact.text) signals.push(signal('turn-start'));
+    } else if (fact.type === 'tool-start' && message.assistant) {
+      const callId = safeId(fact.callId) || `line-${lineOffset.toString(16)}`;
+      const classified = classifyTool(fact.tool);
+      signals.push(signal('tool-start', { callId, tool: classified.tool, status: classified.status }));
+      const filePath = safePath(fact.filePath);
+      if (classified.build && filePath) {
+        signals.push(signal('build', { callId, files: [filePath], success: true }));
+      }
+    } else if (fact.type === 'tool-end' && message.user) {
+      const callId = safeId(fact.callId);
+      if (callId) signals.push(signal('tool-end', { callId }));
+    }
+  }
+  return signals;
+}
+
 function compareIndexEntries(a, b) {
   return a.startMs - b.startMs || providerRank(a.provider) - providerRank(b.provider) ||
     a.sourceKey.localeCompare(b.sourceKey);
@@ -1278,6 +1287,7 @@ function providerRank(provider) {
   return provider === 'claude' ? 0 : 1;
 }
 
+/** @returns {Project} */
 function publicProject(project) {
   return {
     id: project.id,
@@ -1294,6 +1304,7 @@ function publicProject(project) {
   };
 }
 
+/** @returns {Ship} */
 function publicShip(ship) {
   return {
     id: ship.id,
@@ -1317,7 +1328,7 @@ function replayGalaxy(projectPath, exists) {
   const raw = canonical.slice(canonical.indexOf(':') + 1).replace(/\//g, flavor.sep);
   const parent = flavor.dirname(raw);
   const label = humanize(flavor.basename(parent)) || 'History';
-  return { key: `history:${fnv1a(parent).toString(16).padStart(8, '0')}`, label };
+  return { key: `history:${hex8(parent)}`, label };
 }
 
 function proceduralPlanets(projectId) {
@@ -1335,40 +1346,13 @@ function proceduralPlanets(projectId) {
   return planets;
 }
 
-function relativeInside(root, file) {
-  if (!safePath(root) || !safePath(file)) return null;
-  const windows = /^[A-Za-z]:[\\/]/.test(root) || root.includes('\\');
-  const flavor = windows ? path.win32 : path.posix;
-  if (!flavor.isAbsolute(root) || !flavor.isAbsolute(file)) return null;
-  const normalizedRoot = flavor.normalize(root);
-  const normalizedFile = flavor.normalize(file);
-  const comparableRoot = windows ? normalizedRoot.toLowerCase() : normalizedRoot;
-  const comparableFile = windows ? normalizedFile.toLowerCase() : normalizedFile;
-  const relative = flavor.relative(comparableRoot, comparableFile);
-  if (!relative || relative === '..' || relative.startsWith(`..${flavor.sep}`) ||
-      flavor.isAbsolute(relative)) return null;
-  return relative.replace(/[\\/]+/g, '/');
-}
-
-function safeId(value) {
-  if (typeof value !== 'string') return null;
-  const candidate = value.trim();
-  return candidate && candidate.length <= 256 && SAFE_ID_RE.test(candidate) ? candidate : null;
-}
-
-function safePath(value) {
-  if (typeof value !== 'string') return null;
-  const candidate = value.trim();
-  return candidate && candidate.length <= 4096 && !/[\0\r\n]/.test(candidate) ? candidate : null;
-}
-
 function safeExists(value) {
   // Security: never probe a UNC/device path derived from transcript content.
   if (!isLocalProjectPath(value)) return false;
   try { return fs.existsSync(value); } catch { return false; }
 }
 
-function firstString(...values) {
+function firstResolvedPath(...values) {
   for (const value of values) if (isNonemptyString(value)) return path.resolve(value);
   return null;
 }
@@ -1394,27 +1378,6 @@ function finiteNow(now) {
 function humanize(value) {
   return String(value || '').replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim()
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
-function fnv1a(value) {
-  const input = String(value);
-  let hash = 0x811c9dc5;
-  for (let index = 0; index < input.length; index++) {
-    hash ^= input.charCodeAt(index);
-    hash = Math.imul(hash, 0x01000193) >>> 0;
-  }
-  return hash >>> 0;
-}
-
-function mulberry32(seed) {
-  let state = seed >>> 0;
-  return function random() {
-    state |= 0;
-    state = (state + 0x6d2b79f5) | 0;
-    let value = Math.imul(state ^ (state >>> 15), 1 | state);
-    value = (value + Math.imul(value ^ (value >>> 7), 61 | value)) ^ value;
-    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
-  };
 }
 
 module.exports = { ReplaySource };

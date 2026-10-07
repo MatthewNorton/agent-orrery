@@ -2,7 +2,7 @@
 
 How the codebase is structured **today**, written for someone who finds it confusing.
 
-- Snapshot: `main` @ `39b547d`, analysed 2026-10-06. This includes PR #11, which split the old
+- Snapshot: `main` after the 2026-10-07 cleanup (PRs #14–#19). PR #11 had already split the old
   2,217-line `src/main/main.js` into small files. Older docs still quote line numbers in the old
   `main.js`; §5.3 maps those to where the code lives now.
 - Visual map: open [`architecture.html`](architecture.html) in a browser (works offline from disk).
@@ -80,7 +80,7 @@ or the record of how the app was built.
 
 | Folder | Files | Size | What it is | Part of the running app? |
 |---|---|---|---|---|
-| `src/main/` + `src/preload.js` | 40 | 9,450 lines JS (1,337 of it test harness) | Main process | **Yes** (harness runs only with test flags) |
+| `src/main/` + `src/preload.js` | 44 | 9,928 lines JS (1,337 of it test harness) | Main process | **Yes** (harness runs only with test flags) |
 | `src/renderer/` | 28 | 6,954 lines JS + 3,042 HTML/CSS | Renderer (UI + 3D) | **Yes** |
 | `assets/` | 331 | ~276 MB | Planet / skybox / asteroid textures, ship GLBs | Partly — see §8 |
 | `test/` | 23 | 4,295 lines | Unit tests (`npm test`, Node's runner, no Electron) | No |
@@ -135,9 +135,10 @@ Start here when you want to change something. Paths under "Main process" are rel
 - Every `ipcMain.handle` (all registered in `ipc/register.js`) checks `trustedMainFrame` from
   `ipc/guards.js` first. Exception: `au:debug-ready` (renderer → main `send`, used only by
   `harness/modes/shots.js`) has no frame check.
-- Transcript content is **untrusted input**: `provider-adapters.js` reduces records to
-  structural signals, `isLocalProjectPath` rejects UNC / device paths before any `stat`, and
-  every spawn uses `shell: false`.
+- Transcript content is **untrusted input**: the parsers in `transcripts/` reduce records to
+  structural signals (a Claude tool call still carries its file path and up to 60 characters of
+  pattern or description, which live shows as `detail`), `isLocalProjectPath` rejects UNC /
+  device paths before any `stat`, and every spawn uses `shell: false`.
 
 ### IPC contract (all 26 bridge methods)
 
@@ -189,9 +190,12 @@ in a closure, and anything shared is a field of `ctx`.
 
 | File | Lines | Shape | Job | Requires |
 |---|---|---|---|---|
-| `tracker.js` | 1,573 | `class Tracker extends EventEmitter` | Polls Claude / Codex / Signal sources, owns the live model, emits event batches, saves `universe-state.json` | `provider-adapters` |
-| `replay-source.js` | 1,420 | `class ReplaySource extends EventEmitter` | Indexes all history once at startup; rebuilds the universe at any timestamp | `provider-adapters` |
-| `provider-adapters.js` | 570 | pure functions | Codex record parsing, tool classification, path canonicalisation, Signal config | — |
+| `tracker.js` | 1,562 | `class Tracker extends EventEmitter` | Polls Claude / Codex / Signal sources, owns the live model, emits event batches, saves `universe-state.json` | `provider-adapters`, `transcripts/*`, `shared/*`, `path-safety` |
+| `replay-source.js` | 1,383 | `class ReplaySource extends EventEmitter` | Indexes all history once at startup; rebuilds the universe at any timestamp | `provider-adapters`, `transcripts/*`, `shared/hash`, `path-safety` |
+| `provider-adapters.js` | 348 | pure functions | Provider names, project path keys, the cross-provider tool vocabulary (`classifyTool`), Signal config, `adaptLine` | `transcripts/codex`, `transcripts/fields` |
+| `transcripts/codex.js` | 235 | pure functions | One Codex record → structural signals; rollout ownership; parent thread id | `transcripts/fields` |
+| `transcripts/claude.js` | 111 | pure functions | One Claude Code record → structural facts for both models; Claude's own tool vocabulary (`claudeTool`) | `transcripts/fields` |
+| `transcripts/fields.js` | 52 | functions | `safeId`, `safePath`, `plainObject`, `firstTrimmed` for transcript fields | — |
 | `task-runs.js` | 386 | `class TaskRunTracker` | Matches a launched Codex run to its ship; ticks the `GOALS.md` box when done | `goals` |
 | `root-task-coordinator.js` | 368 | `class RootTaskCoordinator` | Assign / retry flow: write goal → start run → launch Codex | `goals` |
 | `goals.js` | 351 | functions | Line-preserving `GOALS.md` parse / write (temp file + rename, refuses symlinks) | — |
@@ -203,10 +207,11 @@ in a closure, and anything shared is a field of `ctx`.
 | `terminal-launcher.js` | 185 | factory → `{open}` | `wt.exe -d <cwd>` (Windows) or `open -a Terminal` (macOS); Linux unsupported | `path-safety` |
 | `project-paths.js` | 161 | functions | Bounded folder search for a moved project (depth 6, 12k dirs, 8 s) | — |
 | `project-vcs-status-controller.js` | 111 | factory | Tracker events → debounced (400 ms) per-project git refresh | — |
-| `path-safety.js` | 84 | functions | Shared "is this a canonical local path / inside that path" checks | `provider-adapters` |
+| `path-safety.js` | 108 | functions | Shared "is this a canonical local path / inside that path" checks, `relativeInside` | `provider-adapters` |
 | `window-security.js` | 54 | functions | Navigation / pop-up / permission lockdown, trusted-frame check | — |
 | `shared/bounded-process.js` | 70 | function | One child-process runner with a timeout and output cap (git and gh) | `shared/values` |
-| `shared/atomic-write.js` | 27 | function | Temp file + rename write (`GOALS.md`, IDEAS and run stores) | — |
+| `shared/atomic-write.js` | 27 | function | Temp file + rename write (`GOALS.md`, IDEAS and run stores, `universe-state.json`) | — |
+| `shared/hash.js` | 47 | functions | `fnv1a`, `hex8`, `mulberry32` (the renderer keeps hash-pinned copies) | — |
 | `shared/values.js` | 24 | functions | `boundedInteger`, `ownString`, `bufferValue` | — |
 | `shared/ids.js` | 22 | functions | `validProjectId`, `validGoalId`, control-character check | — |
 
@@ -283,7 +288,7 @@ sequenceDiagram
   participant A as app.js
   participant V as active view
   T->>F: pollFiles every 1 s reads new bytes
-  T->>T: parseLine or adaptLine updates the model and queues events
+  T->>T: transcripts/claude.js or adaptLine turns lines into signals, the model applies them
   T-->>C: emit events batch
   C->>P: send au:events with streamEpoch and mode, only while LIVE
   P->>A: onEvents callback
@@ -294,8 +299,8 @@ sequenceDiagram
 
 **Project identity.** Claude: the project id is the `~/.claude/projects/<slug>` folder name
 (unless the canonical cwd is already known). Codex / Signal: canonical path key → known id, or
-`project:<fnv1a(key)>`. The renderer seeds all randomness from `fnv1a(project.id)` — the same
-hash is copied into `tracker.js`, `replay-source.js`, `util.js` and `galaxy-layout.js`.
+`project:<fnv1a(key)>`. The renderer seeds all randomness from `fnv1a(project.id)` — the main
+process has it in `shared/hash.js`; `util.js` and `galaxy-layout.js` keep hash-pinned copies.
 
 **Event vocabulary** (`au:events` batch; every event has `seq`):
 
@@ -514,10 +519,12 @@ Six of the older gates grep "the main process" by concatenating every `.js` file
 so they keep passing wherever code moves inside that folder.
 
 **How "frozen" is actually enforced.** The control and history gates store SHA-256 hashes of
-10 files: `tracker.js`, `provider-adapters.js`, `replay-source.js`, `index.html`, `util.js`,
-the three `scene-*.js`, `galaxy-layout.js`, `polish-math.js`. Editing any of them means
-running `node kit/repin.mjs --note "<why>"`, or CI turns red. `preload.js` — which `CLAUDE.md`
-lists as frozen — is **not** hashed.
+7 renderer files: `index.html`, `util.js`, the three `scene-*.js`, `galaxy-layout.js`,
+`polish-math.js`. Editing any of them means running `node kit/repin.mjs --note "<why>"`, or CI
+turns red. `preload.js` — which `CLAUDE.md` lists as frozen — is **not** hashed. `tracker.js`,
+`replay-source.js` and `provider-adapters.js` are no longer frozen or pinned; `grade-main-split.mjs`
+caps `tracker.js` and `replay-source.js` at the size they had when they were unfrozen, and
+`provider-adapters.js` at the usual 450 lines.
 
 ---
 
@@ -527,8 +534,8 @@ Facts only, grouped by why they hurt. Items marked *(by reading)* were found in 
 not reproduced.
 
 ### Too much in one place
-1. `tracker.js` (1,573) and `replay-source.js` (1,420) each contain a full transcript parser,
-   model and public-shape builder.
+1. `tracker.js` (1,562) and `replay-source.js` (1,383) each still contain a model and a
+   public-shape builder; their Claude and Codex parsing is shared (`transcripts/`).
 2. `scene-universe.js` is one 959-line function; `updateLabelLayout` alone is 157 lines.
 3. `style.css` is 2,110 lines in one file.
 4. `ctx` is a service locator: `app-context.js` `start()` calls into `ctx.ipc.*` and
@@ -536,13 +543,16 @@ not reproduced.
    service construction.
 
 ### The same logic written more than once
-5. **Two Claude parsers**: `tracker.js` `parseLine` (own tool tables) and `replay-source.js`
-   `_parseHistoricalLine` (uses `classifyTool`). This is why replay and live disagree (§5.5).
-6. `fnv1a` / `mulberry32` copied 4× (`tracker`, `replay-source`, `util`, `galaxy-layout`).
-7. "Is path inside folder": 5 variants that really do answer differently (`isInsidePath`,
+5. **One Claude parser, two readings**: `transcripts/claude.js` feeds both models, but live
+   (`resumesTurn`, `claudeTool`) and history (`historicalClaudeSignals`, `classifyTool`) still
+   read its facts differently; the `differs:` tests in `tracker-replay-parity.test.js` name each
+   difference (§5.5).
+6. `fnv1a` / `mulberry32`: one main-process copy (`shared/hash.js`) plus hash-pinned copies in
+   `util.js` and `galaxy-layout.js`.
+7. "Is path inside folder": 4 variants that really do answer differently (`isInsidePath`,
    `isPathInside` — which accepts UNC roots and long paths — `isInside`, which treats an equal
-   path as outside, and `relativeInside` ×2 with different separators).
-8. The atomic write in `tracker.js` still duplicates `shared/atomic-write.js` (pinned file).
+   path as outside, and `relativeInside`, whose callers choose the separator).
+8. *(resolved)* `tracker.js` now uses `shared/atomic-write.js`.
 9. Ship building / removal in all three scenes (3 copies that already differ); camera,
    skybox, starfield and dispose setup also ×3.
 10. "Question or permission" attention check hard-coded in 6 places.
@@ -570,9 +580,9 @@ not reproduced.
 ### Dead weight
 20. `assets/ships/fleet-scale-v2/` (123 MB), `assets/palettes/`, `assets/manifest.json`,
     the `aur-aster-kite` hull — not loaded at runtime.
-21. `kit/done/multi-provider/edge-validation.mjs` is run by nothing.
-22. Unused in hash-pinned files: `providerToolStatus`, `baseSignal`, `AUR.attentionLabel`,
-    `scene-system.js` `metadata.focusStats`.
+21. *(resolved)* `edge-validation.mjs` was folded into `test/tracker.test.js`.
+22. Unused by the app: `providerToolStatus` (only `grade-providers.mjs` calls it),
+    `AUR.attentionLabel`, `scene-system.js` `metadata.focusStats`.
 
 ### Stale documentation
 23. Older docs quote line numbers in the pre-split `main.js` (§5.3 maps them).
@@ -583,9 +593,10 @@ not reproduced.
     "Agent Universe Lite", most docs "Agent Universe".
 
 ### Test gaps
-27. No unit tests for `tracker.js`, `provider-adapters.js`, or any of the
-    wiring (`app-context.js`, `replay-control.js`, `ipc/*`); `goals.js` only indirectly. Every
-    `app-*.js` file is checked by source-text grep only.
+27. No unit tests for the wiring (`app-context.js`, `replay-control.js`, `ipc/*`); `goals.js` is
+    tested only indirectly. `tracker.js` and `replay-source.js` are covered by characterization
+    tests (`test/tracker*.test.js`, `test/replay-model.test.js`). Every `app-*.js` file is checked
+    by source-text grep only.
 28. `kit/grade.mjs` runs against **your real** `~/.claude` / `~/.codex` and userData, so it fails
     on a machine with no history and can't be reproduced in CI.
 

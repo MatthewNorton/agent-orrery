@@ -1,3 +1,4 @@
+// @ts-check
 // Watches ~/.claude/projects transcript JSONL files and turns them into
 // universe events: projects (solar systems), sessions (ships), tool calls
 // (activity), file edits (planet growth). Zero-config: works with any
@@ -20,6 +21,29 @@ const {
   splitCompleteLines,
   adaptLine,
 } = require('./provider-adapters');
+const { claudeRecordToSignals, claudeTool } = require('./transcripts/claude');
+const { codexParentSessionId } = require('./transcripts/codex');
+const { fnv1a, hex8, mulberry32 } = require('./shared/hash');
+const { writeFileAtomic } = require('./shared/atomic-write');
+const { relativeInside } = require('./path-safety');
+
+/**
+ * @import { Attention, FeedEntry, PlanetData, Project, Ship, ShipStatus, SystemData }
+ *   from '../types/contract'
+ * @import { LiveProject, LiveShip } from '../types/live-model'
+ * @import { ClaudeMessage, ClaudeSession, ClaudeToolStart } from './transcripts/claude'
+ */
+
+/**
+ * A Signal watch entry. `extensions` is never set: readGenericWatchConfig does not pass it
+ * through, so every source watches the default extensions.
+ * @typedef {object} SignalSource
+ * @property {string} id
+ * @property {string} directory
+ * @property {string} projectPath
+ * @property {string | null} label
+ * @property {string[]} [extensions]
+ */
 
 const DEFAULT_CLAUDE_PROJECTS_DIR = path.join(os.homedir(), '.claude', 'projects');
 const DEFAULT_CODEX_SESSION_DIRS = [
@@ -50,17 +74,6 @@ const IGNORE_DIRS = new Set([
   'release', 'coverage', 'target', '__pycache__', '.idea', '.vscode', 'bin', 'obj',
 ]);
 
-const TOOL_STATUS = {
-  Edit: 'Building', Write: 'Building', NotebookEdit: 'Building', MultiEdit: 'Building',
-  Read: 'Exploring', Grep: 'Exploring', Glob: 'Exploring', LSP: 'Exploring',
-  Bash: 'Gathering Resources', PowerShell: 'Gathering Resources', BashOutput: 'Gathering Resources',
-  WebSearch: 'Scanning', WebFetch: 'Scanning',
-  Agent: 'Delegating', Task: 'Delegating', Workflow: 'Delegating',
-  TodoWrite: 'Planning', TaskCreate: 'Planning', EnterPlanMode: 'Planning', ExitPlanMode: 'Planning',
-};
-const BUILD_TOOLS = new Set(['Edit', 'Write', 'NotebookEdit', 'MultiEdit']);
-const SPAWN_TOOLS = new Set(['Agent', 'Task']);
-
 const GENERIC_WORKSPACE_DIRS = new Set([
   'code', 'src', 'source', 'repos', 'repositories', 'projects', 'dev',
   'development', 'git', 'github',
@@ -71,6 +84,11 @@ const HOME_FOLDERS = new Map([
   ['downloads', 'Downloads'],
 ]);
 
+/**
+ * @param {Pick<LiveShip, 'kind' | 'pending' | 'turnDone' | 'lastEvent'>} ship
+ * @param {number} now
+ * @returns {Attention | null}
+ */
 function classifyAttention(ship, now) {
   if (ship.kind === 'drone') return null;
 
@@ -93,27 +111,16 @@ function classifyAttention(ship, now) {
   return null;
 }
 
-function fnv1a(str) {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < str.length; i++) {
-    h ^= str.charCodeAt(i);
-    h = Math.imul(h, 0x01000193) >>> 0;
-  }
-  return h >>> 0;
-}
-
-function mulberry32(seed) {
-  let a = seed >>> 0;
-  return function () {
-    a |= 0; a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
+// Live reads a typed prompt, assistant blocks, or user blocks that answer no tool call as the
+// agent working again. History has its own rule (historicalClaudeSignals).
+/** @param {ClaudeMessage} message */
+function resumesTurn(message) {
+  return (message.user && message.prompt) ||
+    (message.blocks && (message.assistant || (message.user && !message.toolResult)));
 }
 
 function trackerPathError(code, message) {
-  const error = new Error(message);
+  const error = /** @type {NodeJS.ErrnoException} */ (new Error(message));
   error.code = code;
   return error;
 }
@@ -219,7 +226,7 @@ function deriveGalaxyFromSlug(projectId) {
   const structural = deriveStructuralGalaxy(segments);
   if (structural) return structural;
   return {
-    key: `slug:${fnv1a(id).toString(16).padStart(8, '0')}`,
+    key: `slug:${hex8(id)}`,
     label: humanizeSegment(id).slice(0, 32) || 'Unknown',
   };
 }
@@ -264,9 +271,12 @@ class Tracker extends EventEmitter {
     this.providerConfigPath = options.providerConfigPath ||
       process.env.AGENT_UNIVERSE_PROVIDER_CONFIG ||
       path.join(path.dirname(statePath), 'providers.json');
+    /** @type {Map<string, LiveProject>} */
     this.projects = new Map();   // slug -> project record
     this.files = new Map();      // abs jsonl path -> tail state
+    /** @type {Map<string, LiveShip>} */
     this.ships = new Map();      // shipId -> ship record
+    /** @type {FeedEntry[]} */
     this.feed = [];              // ring buffer of recent feed entries
     this.shipCounter = 0;
     this.persisted = this.loadState();
@@ -323,21 +333,11 @@ class Tracker extends EventEmitter {
     for (const [slug, p] of this.projects) {
       out.projects[slug] = { buckets: p.buckets, totalBuilds: p.totalBuilds, firstSeen: p.firstSeen };
     }
-    let tempPath = null;
     try {
-      const stateDirectory = path.dirname(this.statePath);
-      fs.mkdirSync(stateDirectory, { recursive: true });
-      tempPath = path.join(
-        stateDirectory,
-        `${path.basename(this.statePath)}.${process.pid}.${Date.now()}.tmp`
-      );
-      fs.writeFileSync(tempPath, JSON.stringify(out));
-      fs.renameSync(tempPath, this.statePath);
+      fs.mkdirSync(path.dirname(this.statePath), { recursive: true });
+      writeFileAtomic(this.statePath, JSON.stringify(out));
       return true;
     } catch (e) {
-      if (tempPath) {
-        try { fs.unlinkSync(tempPath); } catch { /* best-effort temp cleanup */ }
-      }
       if (throwOnError) throw e;
       console.error('state save failed', e.message);
       return false;
@@ -569,9 +569,9 @@ class Tracker extends EventEmitter {
       }
     }
     if (!id) {
-      id = fallbackId || `project:${fnv1a(key).toString(16).padStart(8, '0')}`;
+      id = fallbackId || `project:${hex8(key)}`;
       if (this.projects.has(id) && canonicalProjectPath(this.projects.get(id).path) !== key) {
-        id = `${id}:${fnv1a(key).toString(16).padStart(8, '0')}`;
+        id = `${id}:${hex8(key)}`;
       }
     }
     let project = this.projects.get(id);
@@ -636,7 +636,7 @@ class Tracker extends EventEmitter {
       if (seenSessions.has(sessionId)) continue;
       seenSessions.add(sessionId);
 
-      const fallbackId = `project:${fnv1a(projectKey).toString(16).padStart(8, '0')}`;
+      const fallbackId = `project:${hex8(projectKey)}`;
       const project = this.ensureProjectForPath(meta.cwd, fallbackId, st.mtimeMs, 0);
       if (!project) continue;
       totals.set(project.id, (totals.get(project.id) || 0) + st.size);
@@ -730,8 +730,8 @@ class Tracker extends EventEmitter {
       this.providerWarnings.add(warning);
       console.warn(`[providers] ${warning}`);
     }
-    const rawSources = (config.watch || []).map((item) => ({
-        id: `watch-${fnv1a(canonicalProjectPath(item.directory)).toString(16).padStart(8, '0')}`,
+    const rawSources = (config.watch || []).map((item) => /** @type {SignalSource} */ ({
+        id: `watch-${hex8(canonicalProjectPath(item.directory))}`,
         directory: item.directory,
         projectPath: item.projectPath,
         label: item.label,
@@ -757,14 +757,14 @@ class Tracker extends EventEmitter {
         seenFiles.add(fp);
         const project = this.ensureProjectForPath(
           source.projectPath,
-          `project:${fnv1a(projectKey).toString(16).padStart(8, '0')}`,
+          `project:${hex8(projectKey)}`,
           st.mtimeMs,
           0
         );
         if (!project || now - st.mtimeMs > HOT_WINDOW_MS) continue;
         const previous = this.signalFiles.get(fp);
         // Security follow-up: a POSIX file name containing `\` has no canonical key; hash the raw path instead.
-        const sessionId = `${source.id}:${fnv1a(canonicalProjectPath(fp) || fp).toString(16).padStart(8, '0')}`;
+        const sessionId = `${source.id}:${hex8(canonicalProjectPath(fp) || fp)}`;
         const ship = this.ensureProviderShip('signal', project.id, sessionId, 'main', st.mtimeMs, null);
         if (!isStartup && (!previous || previous.size !== st.size || previous.mtimeMs !== st.mtimeMs)) {
           ship.lastEvent = Math.max(ship.lastEvent, st.mtimeMs);
@@ -943,7 +943,7 @@ class Tracker extends EventEmitter {
         if (projectKey) {
           const project = this.ensureProjectForPath(
             signal.cwd,
-            `project:${fnv1a(projectKey).toString(16).padStart(8, '0')}`,
+            `project:${hex8(projectKey)}`,
             ts,
             0
           );
@@ -993,16 +993,10 @@ class Tracker extends EventEmitter {
         const pendingId = `${provider}:${sessionId}:${signal.id || signal.callId || signal.key || ts}`;
         const classified = classifyTool(signal.tool);
         const tool = classified.tool;
-        ship.status = signal.status || classified.status || TOOL_STATUS[tool] || 'Working';
+        ship.status = signal.status || classified.status;
         ship.detail = null;
         ship.turnDone = false;
-        ship.pending.set(pendingId, { tool, ts });
-        this.pendingIndex.set(pendingId, ship.id);
-        while (ship.pending.size > 12) {
-          const oldestId = ship.pending.keys().next().value;
-          ship.pending.delete(oldestId);
-          if (this.pendingIndex.get(oldestId) === ship.id) this.pendingIndex.delete(oldestId);
-        }
+        this.addPending(ship, pendingId, tool, ts);
         this.queue({ type: 'ship-updated', ship: publicShip(ship) });
         if (!tail.catchup) {
           this.queue({
@@ -1050,122 +1044,117 @@ class Tracker extends EventEmitter {
       const rel = relativeInside(project.path, filePath);
       if (!rel || seen.has(rel)) continue;
       seen.add(rel);
-      const bucket = rel.includes(path.sep) ? rel.split(path.sep)[0] : '(root)';
-      const isNew = !(bucket in project.buckets);
-      project.buckets[bucket] = (project.buckets[bucket] || 0) + 1;
-      project.totalBuilds += 1;
-      this.systemCache.delete(project.id);
-      if (catchup) continue;
-      this.queue({
-        type: 'build', project: project.id, bucket, file: rel,
-        shipId: ship.id, isNew, ts,
-      });
-      if (isNew) this.pushFeed('form', `Planet formation started: ${bucket} in ${project.name}`, project.id);
-      this.pushFeed('build', `${ship.name} building ${rel} in ${project.name}`, project.id);
+      this.addBuild(project, ship, rel, ts, catchup);
+    }
+  }
+
+  // Counts an edit to a file inside the project; catchup counts it without announcing it.
+  addBuild(project, ship, rel, ts, catchup) {
+    const bucket = rel.includes(path.sep) ? rel.split(path.sep)[0] : '(root)';
+    const isNew = !(bucket in project.buckets);
+    project.buckets[bucket] = (project.buckets[bucket] || 0) + 1;
+    project.totalBuilds += 1;
+    this.systemCache.delete(project.id);
+    if (catchup) return;
+    this.queue({
+      type: 'build', project: project.id, bucket, file: rel,
+      shipId: ship.id, isNew, ts,
+    });
+    if (isNew) this.pushFeed('form', `Planet formation started: ${bucket} in ${project.name}`, project.id);
+    this.pushFeed('build', `${ship.name} building ${rel} in ${project.name}`, project.id);
+  }
+
+  addPending(ship, pendingId, tool, ts) {
+    ship.pending.set(pendingId, { tool, ts });
+    this.pendingIndex.set(pendingId, ship.id);
+    while (ship.pending.size > 12) {
+      const oldestId = ship.pending.keys().next().value;
+      ship.pending.delete(oldestId);
+      if (this.pendingIndex.get(oldestId) === ship.id) this.pendingIndex.delete(oldestId);
     }
   }
 
   parseLine(line, tail) {
-    let j;
-    try { j = JSON.parse(line); } catch { return; }
+    let record;
+    try { record = JSON.parse(line); } catch { return; }
     const project = this.projects.get(tail.project);
     if (!project) return;
-    const parsedTs = j.timestamp ? Date.parse(j.timestamp) : NaN;
+    // Live stamps an undated record with the time it was read.
+    const parsedTs = record.timestamp ? Date.parse(record.timestamp) : NaN;
     const ts = Number.isFinite(parsedTs) ? parsedTs : Date.now();
-    const sidechain = j.isSidechain === true;
+    let ship = null;
+    let message = null;
+    for (const signal of claudeRecordToSignals(record)) {
+      if (signal.type === 'session') {
+        ship = this.applyClaudeSession(project, tail, signal, ts);
+      } else if (signal.type === 'turn-end') {
+        ship.turnDone = true;
+      } else if (signal.type === 'message') {
+        message = signal;
+        if (resumesTurn(signal)) ship.turnDone = false;
+      } else if (signal.type === 'tool-start') {
+        if (message.assistant && signal.callId) {
+          // A tool_use id belongs to the ship that issued it last.
+          const previousOwnerId = this.pendingIndex.get(signal.callId);
+          if (previousOwnerId && previousOwnerId !== ship.id) {
+            const previousOwner = this.ships.get(previousOwnerId);
+            if (previousOwner) previousOwner.pending.delete(signal.callId);
+          }
+          this.addPending(ship, signal.callId, signal.tool, ts);
+        }
+        this.onToolUse(project, ship, signal, ts, tail.catchup);
+      } else if (signal.type === 'tool-end' && signal.callId) {
+        this.onToolResult(signal.callId, ts);
+      }
+    }
+  }
 
-    if (!project.path && typeof j.cwd === 'string' && canonicalProjectPath(j.cwd)) {
-      project.path = j.cwd;
-      project.name = path.basename(j.cwd);
-      project.exists = isProjectDirectory(j.cwd);
+  /**
+   * @param {LiveProject} project
+   * @param {{ project: string, session: string }} tail
+   * @param {ClaudeSession} session
+   * @param {number} ts
+   * @returns {LiveShip}
+   */
+  applyClaudeSession(project, tail, session, ts) {
+    if (!project.path && canonicalProjectPath(session.cwd)) {
+      project.path = session.cwd;
+      project.name = path.basename(session.cwd);
+      project.exists = isProjectDirectory(session.cwd);
       this.indexProjectPath(project);
       this.systemCache.delete(project.id);
       this.queue({ type: 'project-updated', project: publicProject(project) });
     }
     if (ts > project.lastActivity) project.lastActivity = ts;
-
-    const ship = this.ensureShip(tail.project, tail.session, sidechain, ts);
+    const ship = this.ensureShip(tail.project, tail.session, session.kind === 'drone', ts);
     ship.lastEvent = Math.max(ship.lastEvent, ts);
-
-    if (j.type === 'system' && j.subtype === 'turn_duration') {
-      ship.turnDone = true;
-    }
-
-    const msg = j.message;
-    const isAssistant = j.type === 'assistant' || (msg && msg.role === 'assistant');
-    const isUser = j.type === 'user' || (msg && msg.role === 'user');
-    if (msg && typeof msg.content === 'string' && isUser) ship.turnDone = false;
-    if (!msg || !Array.isArray(msg.content)) return;
-
-    if (isAssistant) ship.turnDone = false;
-    let hasToolResult = false;
-
-    for (const block of msg.content) {
-      if (block.type === 'tool_use') {
-        if (isAssistant && block.id) {
-          const previousOwnerId = this.pendingIndex.get(block.id);
-          if (previousOwnerId && previousOwnerId !== ship.id) {
-            const previousOwner = this.ships.get(previousOwnerId);
-            if (previousOwner) previousOwner.pending.delete(block.id);
-          }
-          ship.pending.set(block.id, { tool: block.name, ts });
-          this.pendingIndex.set(block.id, ship.id);
-          while (ship.pending.size > 12) {
-            const oldestId = ship.pending.keys().next().value;
-            ship.pending.delete(oldestId);
-            if (this.pendingIndex.get(oldestId) === ship.id) {
-              this.pendingIndex.delete(oldestId);
-            }
-          }
-        }
-        this.onToolUse(project, ship, block, ts, tail.catchup);
-      } else if (block.type === 'tool_result') {
-        hasToolResult = true;
-        if (block.tool_use_id) this.onToolResult(block.tool_use_id, ts);
-      }
-    }
-    if (isUser && !hasToolResult) ship.turnDone = false;
+    return ship;
   }
 
-  onToolUse(project, ship, block, ts, catchup) {
-    const tool = block.name || '?';
-    const input = block.input || {};
-    ship.status = TOOL_STATUS[tool] || 'Working';
-
-    let bucket = null;
-    let detail = null;
-    if (typeof input.file_path === 'string') {
-      const rel = relativeInside(project.path, input.file_path);
-      detail = rel ? rel : path.basename(input.file_path);
-      if (rel) bucket = rel.includes(path.sep) ? rel.split(path.sep)[0] : '(root)';
-    } else if (typeof input.pattern === 'string') {
-      detail = input.pattern.slice(0, 60);
-    } else if (typeof input.description === 'string') {
-      detail = input.description.slice(0, 60);
-    }
-    ship.detail = detail;
+  /**
+   * @param {LiveProject} project
+   * @param {LiveShip} ship
+   * @param {ClaudeToolStart} signal
+   * @param {number} ts
+   * @param {boolean} catchup
+   */
+  onToolUse(project, ship, signal, ts, catchup) {
+    const tool = signal.tool || '?';
+    const { status, build, spawn } = claudeTool(tool);
+    ship.status = status;
+    const rel = signal.filePath === null ? null : relativeInside(project.path, signal.filePath);
+    ship.detail = signal.filePath === null ? signal.detail : rel || path.basename(signal.filePath);
     this.queue({ type: 'ship-updated', ship: publicShip(ship) });
 
-    if (BUILD_TOOLS.has(tool) && bucket) {
-      const isNew = !(bucket in project.buckets);
-      project.buckets[bucket] = (project.buckets[bucket] || 0) + 1;
-      project.totalBuilds += 1;
-      this.systemCache.delete(project.id);
-      if (!catchup) {
-        this.queue({
-          type: 'build',
-          project: project.id, bucket, file: detail, shipId: ship.id, isNew, ts,
-        });
-        if (isNew) this.pushFeed('form', `Planet formation started: ${bucket} in ${project.name}`, project.id);
-        this.pushFeed('build', `${ship.name} building ${detail} in ${project.name}`, project.id);
-      }
+    if (build && rel) {
+      this.addBuild(project, ship, rel, ts, catchup);
     } else if (!catchup) {
       this.queue({
         type: 'activity',
-        project: project.id, shipId: ship.id, tool, status: ship.status, detail, ts,
+        project: project.id, shipId: ship.id, tool, status: ship.status, detail: ship.detail, ts,
       });
-      if (SPAWN_TOOLS.has(tool)) {
-        this.spawnDrone(project, ship, block.id, ts);
+      if (spawn) {
+        this.spawnDrone(project, ship, signal.callId, ts);
       } else if (Math.random() < 0.12) {
         // Sample non-build activity into the feed so it stays readable.
         this.pushFeed('info', `${ship.name} ${ship.status.toLowerCase()} in ${project.name}`, project.id);
@@ -1194,6 +1183,7 @@ class Tracker extends EventEmitter {
     if (!toolUseId) return;
     const id = `drone:${toolUseId}`;
     if (this.ships.has(id)) return;
+    /** @type {LiveShip} */
     const drone = {
       id,
       name: `Claude-${++this.shipCounter}`,
@@ -1323,6 +1313,7 @@ class Tracker extends EventEmitter {
 
   // ---------- derived views ----------
 
+  /** @returns {{ projects: Project[], ships: Ship[], feed: FeedEntry[], eventSequence: number }} */
   snapshot() {
     return {
       projects: [...this.projects.values()].map(publicProject),
@@ -1335,6 +1326,10 @@ class Tracker extends EventEmitter {
   // Planets = top-level directories of the real project on disk, sized by a
   // shallow file count, enriched by accumulated build counts. Missing paths
   // (deleted/temp projects) get deterministic procedural planets instead.
+  /**
+   * @param {string} projectId
+   * @returns {SystemData | null}
+   */
   getSystem(projectId) {
     const project = this.projects.get(projectId);
     if (!project) return null;
@@ -1376,6 +1371,11 @@ class Tracker extends EventEmitter {
   }
 
   // Planet close-up stats: honest numbers under fantasy labels.
+  /**
+   * @param {string} projectId
+   * @param {string} planetName
+   * @returns {PlanetData | null}
+   */
   getPlanet(projectId, planetName) {
     const project = this.projects.get(projectId);
     if (!project) return null;
@@ -1493,16 +1493,10 @@ function readCodexOwnMetadata(file, sessionId) {
       const session = codexRecordToSignals(record).find((item) => item.type === 'session');
       if (!session) continue;
       const recordSessionId = session.sessionId;
-      const source = payload.source;
-      const parentCandidate = payload.parent_thread_id || payload.forked_from_id ||
-        (source && typeof source === 'object' && (source.parent_thread_id || source.parent_id)) || null;
-      const parentSessionId = typeof parentCandidate === 'string' &&
-        parentCandidate.length <= 256 && /^[A-Za-z0-9:._-]+$/.test(parentCandidate)
-        ? parentCandidate : null;
       const result = {
         sessionId: recordSessionId,
         cwd: session.cwd,
-        parentSessionId,
+        parentSessionId: codexParentSessionId(payload),
         kind: session.kind,
         timestamp: session.ts || 0,
       };
@@ -1518,19 +1512,6 @@ function readCodexOwnMetadata(file, sessionId) {
 function isPlanetSegment(value) {
   return typeof value === 'string' && value.length > 0 && value.length <= 255 &&
     value !== '.' && value !== '..' && !/[\\/\0]/.test(value);
-}
-
-function relativeInside(root, file) {
-  if (!root || !file) return null;
-  const windows = /^[a-z]:[\\/]/i.test(root) || root.includes('\\');
-  const flavor = windows ? path.win32 : path.posix;
-  const normalizedRoot = flavor.normalize(root);
-  const normalizedFile = flavor.normalize(file);
-  const comparableRoot = windows ? normalizedRoot.toLowerCase() : normalizedRoot;
-  const comparableFile = windows ? normalizedFile.toLowerCase() : normalizedFile;
-  const rel = flavor.relative(comparableRoot, comparableFile);
-  if (!rel || rel === '..' || rel.startsWith(`..${flavor.sep}`) || flavor.isAbsolute(rel)) return null;
-  return rel.replace(/[\\/]+/g, path.sep);
 }
 
 function shallowCount(dir) {
@@ -1550,6 +1531,10 @@ function shallowCount(dir) {
   return count;
 }
 
+/**
+ * @param {LiveProject} p
+ * @returns {Project}
+ */
 function publicProject(p) {
   return {
     id: p.id, path: p.path, name: p.name, exists: p.exists,
@@ -1559,11 +1544,15 @@ function publicProject(p) {
   };
 }
 
+/**
+ * @param {LiveShip} s
+ * @returns {Ship}
+ */
 function publicShip(s) {
   return {
     id: s.id, name: s.name, project: s.project, kind: s.kind,
     provider: normalizeProvider(s.provider || 'claude'),
-    status: s.status, detail: s.detail, lastEvent: s.lastEvent,
+    status: /** @type {ShipStatus} */ (s.status), detail: s.detail, lastEvent: s.lastEvent,
     attention: s.attention, attentionSince: s.attentionSince,
     taskId: typeof s.taskId === 'string' ? s.taskId : null,
     turnOutcome: typeof s.turnOutcome === 'string' ? s.turnOutcome : null,
