@@ -1,5 +1,5 @@
 // Item 04 mechanical + rendered grader. Run from anywhere:
-//   node kit/todo/04-galaxy-grouping/grade-galaxies.mjs
+//   node kit/done/galaxy-grouping/grade-galaxies.mjs
 // Exit 0 = PASS, 1 = FAIL. This file remains unchanged when archived.
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';

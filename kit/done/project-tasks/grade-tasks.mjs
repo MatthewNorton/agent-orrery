@@ -1,5 +1,5 @@
-// Mechanical grader for kit/todo/10-project-tasks/CONTRACT.md (T1–T4).
-// Usage: node kit/todo/10-project-tasks/grade-tasks.mjs [--fixtures-only]
+// Gate for kit 10, per-project GOALS.md tasks (T1–T4).
+// Usage: node kit/done/project-tasks/grade-tasks.mjs [--fixtures-only]
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -82,9 +82,9 @@ const preloadSrc = fs.readFileSync(path.join(ROOT, 'src', 'preload.js'), 'utf8')
 const rendererDir = path.join(ROOT, 'src', 'renderer');
 const rendererSrc = fs.readdirSync(rendererDir).filter((f) => f.endsWith('.js') || f.endsWith('.html'))
   .map((f) => fs.readFileSync(path.join(rendererDir, f), 'utf8')).join('\n');
-if (!mainSrc.includes('au:tasks-get') || !mainSrc.includes('au:tasks-save')) fail('T3: tasks IPC handlers missing in main.js');
-if (!preloadSrc.includes('tasksGet') || !preloadSrc.includes('tasksSave')) fail('T3: tasksGet/tasksSave missing in preload.js');
-if (!/TASKS/.test(rendererSrc) || !/tasksSave|tasksGet/.test(rendererSrc)) fail('T3: TASKS panel not wired in renderer');
+if (!mainSrc.includes('au:tasks-get') || !mainSrc.includes('au:task-add')) fail('T3: tasks IPC handlers missing in main.js');
+if (!preloadSrc.includes('tasksGet') || !preloadSrc.includes('taskAdd')) fail('T3: tasksGet/taskAdd missing in preload.js');
+if (!/TASKS/.test(rendererSrc) || !/taskAdd|tasksGet/.test(rendererSrc)) fail('T3: TASKS panel not wired in renderer');
 console.log('T3 PASS  IPC + preload + renderer wiring present');
 
 // ---- T4 regression ----
@@ -97,4 +97,4 @@ if (process.argv.includes('--fixtures-only')) {
   console.log('T4 PASS  grade.mjs regression green');
 }
 
-console.log('\n================ TASKS GRADE ================\nPASS  all mechanical checks green\nNow run the live check in CONTRACT.md (UI <-> GOALS.md round-trip).');
+console.log('\n================ TASKS GRADE ================\nPASS  all mechanical checks green\nNow check it live: UI <-> GOALS.md round-trip.');

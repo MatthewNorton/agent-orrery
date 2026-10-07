@@ -10,7 +10,6 @@ contextBridge.exposeInMainWorld('AU', {
   openExternal: (url) => ipcRenderer.invoke('au:open-external', url),
   openTerminal: (projectId) => ipcRenderer.invoke('au:open-terminal', projectId),
   tasksGet: (projectId) => ipcRenderer.invoke('au:tasks-get', projectId),
-  tasksSave: (projectId, items) => ipcRenderer.invoke('au:tasks-save', projectId, items),
   taskAdd: (projectId, text) => ipcRenderer.invoke('au:task-add', projectId, text),
   taskSetDone: (projectId, request) => ipcRenderer.invoke('au:task-set-done', projectId, request),
   taskRemove: (projectId, request) => ipcRenderer.invoke('au:task-remove', projectId, request),

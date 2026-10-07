@@ -1,5 +1,5 @@
-// Mechanical grader for kit/todo/11-project-search/CONTRACT.md (P1–P4).
-// Usage: node kit/todo/11-project-search/grade-search.mjs [--fixtures-only]
+// Gate for kit 11, project search (P1–P4).
+// Usage: node kit/done/project-search/grade-search.mjs [--fixtures-only]
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -82,4 +82,4 @@ if (process.argv.includes('--fixtures-only')) {
   console.log('P4 PASS  grade.mjs regression green');
 }
 
-console.log('\n================ SEARCH GRADE ================\nPASS  all mechanical checks green\nNow run the live check in CONTRACT.md (type, navigate, Esc, dimming).');
+console.log('\n================ SEARCH GRADE ================\nPASS  all mechanical checks green\nNow check it live: type, navigate, Esc, dimming.');
