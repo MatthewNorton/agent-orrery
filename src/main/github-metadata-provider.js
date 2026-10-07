@@ -2,7 +2,8 @@
 
 const path = require('node:path');
 const { spawn } = require('node:child_process');
-const { boundedInteger } = require('./shared/values');
+const { boundedInteger, ownString, bufferValue } = require('./shared/values');
+const { runBoundedProcess } = require('./shared/bounded-process');
 
 const DEFAULT_CACHE_TTL_MS = 5 * 60_000;
 const DEFAULT_ERROR_TTL_MS = 30_000;
@@ -21,22 +22,6 @@ const FAILURE_CODES = new Set([
   'INVALID_RESPONSE',
   'REPOSITORY_UNAVAILABLE',
 ]);
-
-function ownString(value, key) {
-  if (!value || typeof value !== 'object' || Array.isArray(value) || !Object.hasOwn(value, key)) {
-    return '';
-  }
-  const descriptor = Object.getOwnPropertyDescriptor(value, key);
-  return descriptor && Object.hasOwn(descriptor, 'value') && typeof descriptor.value === 'string'
-    ? descriptor.value.trim() : '';
-}
-
-function bufferValue(value) {
-  if (Buffer.isBuffer(value)) return value;
-  if (typeof value === 'string') return Buffer.from(value, 'utf8');
-  if (value == null) return Buffer.alloc(0);
-  return Buffer.from(String(value), 'utf8');
-}
 
 function normalizeRepository(value) {
   const explicit = typeof value === 'string' ? value.trim() : ownString(value, 'nameWithOwner');
@@ -152,68 +137,31 @@ function runnerFailure(stderr) {
   return 'GH_FAILED';
 }
 
+function ghResult({ exitCode, stdout, stderr }) {
+  return exitCode === 0 ? { ok: true, stdout } : { ok: false, code: runnerFailure(stderr) };
+}
+
 function createGhPullRequestReader(options = {}) {
   const settings = options && typeof options === 'object' && !Array.isArray(options) ? options : {};
-  const spawnImpl = typeof settings.spawnImpl === 'function' ? settings.spawnImpl : spawn;
   const ghCommand = ownString(settings, 'ghCommand') || 'gh';
   const env = settings.env && typeof settings.env === 'object' ? settings.env : process.env;
   const cwd = ownString(settings, 'cwd') || path.parse(process.cwd()).root;
-  const timeoutMs = boundedInteger(settings.timeoutMs, DEFAULT_TIMEOUT_MS, 250, 60_000);
-  const maxOutputBytes = boundedInteger(
-    settings.maxOutputBytes, DEFAULT_MAX_OUTPUT_BYTES, 4_096, 4 * 1024 * 1024
-  );
+  const limits = Object.freeze({
+    spawnImpl: typeof settings.spawnImpl === 'function' ? settings.spawnImpl : spawn,
+    timeoutMs: boundedInteger(settings.timeoutMs, DEFAULT_TIMEOUT_MS, 250, 60_000),
+    maxOutputBytes: boundedInteger(
+      settings.maxOutputBytes, DEFAULT_MAX_OUTPUT_BYTES, 4_096, 4 * 1024 * 1024
+    ),
+    unavailableCode: 'GH_UNAVAILABLE',
+    onClose: ghResult,
+  });
 
   return async function readPullRequests(repositories) {
     const spec = buildGhSpec(ghCommand, repositories, env, cwd);
     if (!spec || Buffer.byteLength(spec.args[spec.args.length - 1], 'utf8') > 64 * 1024) {
       return { ok: false, code: 'INVALID_QUERY' };
     }
-    return new Promise((resolve) => {
-      let child;
-      try {
-        child = spawnImpl(spec.command, spec.args, spec.options);
-      } catch {
-        resolve({ ok: false, code: 'GH_UNAVAILABLE' });
-        return;
-      }
-      if (!child || !child.stdout || typeof child.stdout.on !== 'function' ||
-          !child.stderr || typeof child.stderr.on !== 'function' || typeof child.once !== 'function') {
-        resolve({ ok: false, code: 'GH_UNAVAILABLE' });
-        return;
-      }
-
-      const stdout = [];
-      const stderr = [];
-      let outputBytes = 0;
-      let settled = false;
-      let timeout = null;
-      const finish = (result) => {
-        if (settled) return;
-        settled = true;
-        if (timeout) clearTimeout(timeout);
-        resolve(result);
-      };
-      const stop = (code) => {
-        try { if (typeof child.kill === 'function') child.kill('SIGKILL'); } catch { /* bounded */ }
-        finish({ ok: false, code });
-      };
-      const collect = (target) => (chunk) => {
-        if (settled) return;
-        const data = bufferValue(chunk);
-        outputBytes += data.length;
-        if (outputBytes > maxOutputBytes) return stop('OUTPUT_LIMIT');
-        target.push(data);
-      };
-      child.stdout.on('data', collect(stdout));
-      child.stderr.on('data', collect(stderr));
-      child.once('error', () => finish({ ok: false, code: 'GH_UNAVAILABLE' }));
-      child.once('close', (exitCode) => {
-        if (exitCode !== 0) return finish({ ok: false, code: runnerFailure(Buffer.concat(stderr)) });
-        finish({ ok: true, stdout: Buffer.concat(stdout) });
-      });
-      timeout = setTimeout(() => stop('TIMEOUT'), timeoutMs);
-      if (typeof timeout.unref === 'function') timeout.unref();
-    });
+    return runBoundedProcess(spec, limits);
   };
 }
 
