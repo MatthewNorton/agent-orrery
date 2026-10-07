@@ -26,8 +26,8 @@ The script:
 5. deletes the throwaway directory.
 
 The universe is deterministic (seeded), so re-running produces the same layout apart
-from orbital positions. Edit the `GALAXIES` table at the top of the script to change
-the fictional projects.
+from orbital positions. Edit the `GALAXIES` table in `scripts/lib/synthetic-profile.mjs`
+to change the fictional projects; `node kit/grade.mjs` grades the app against the same universe.
 
 ## Video or GIF
 
