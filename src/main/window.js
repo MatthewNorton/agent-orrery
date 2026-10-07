@@ -1,14 +1,17 @@
 // @ts-check
 'use strict';
 
-const { app, BrowserWindow } = require('electron');
 const path = require('path');
 const { rendererUrl, hardenWebContents } = require('./window-security');
 
 const RENDERER_ENTRY_PATH = path.join(__dirname, '..', 'renderer', 'index.html');
 const RENDERER_ENTRY_URL = rendererUrl(RENDERER_ENTRY_PATH);
 
-function createWindow(ctx) {
+// Electron is resolved at call time: ipc/guards.js imports RENDERER_ENTRY_URL, and
+// unit tests load the ipc modules under plain Node, where the electron package throws.
+/** @param {Pick<typeof import('electron'), 'app' | 'BrowserWindow'>} [electron] */
+function createWindow(ctx, electron = require('electron')) {
+  const { app, BrowserWindow } = electron;
   const win = new BrowserWindow({
     width: ctx.flags.providerTest || ctx.flags.historyTest || ctx.flags.controlTest ? 1200 : 1680,
     height: ctx.flags.providerTest || ctx.flags.historyTest || ctx.flags.controlTest ? 720 : 980,

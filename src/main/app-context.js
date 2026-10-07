@@ -1,7 +1,6 @@
 // @ts-check
 'use strict';
 
-const { app } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -19,7 +18,13 @@ const { createProjectVcsStatusController } = require('./project-vcs-status-contr
 
 /** @import { AUEvent, BatchMeta, TasksChangedPush } from '../types/contract' */
 
-function createAppContext({ flags, fixtures }) {
+/**
+ * @param {{ flags: ReturnType<typeof import('./flags').readFlags>,
+ *   fixtures: typeof import('./harness/fixtures') }} options
+ * @param {Pick<typeof import('electron'), 'app'>} [electron]
+ */
+function createAppContext({ flags, fixtures }, electron = require('electron')) {
+  const { app } = electron;
   let providerFixtureRoot = null;
   let historyFixtureRoot = null;
   const ctx = {
@@ -45,7 +50,23 @@ function createAppContext({ flags, fixtures }) {
     cleanup,
   };
 
+  // main.js attaches ctx.replay and ctx.ipc after this factory returns. Name what is
+  // missing before any service is built instead of failing halfway through start().
+  function assertWired(caller) {
+    const ipc = ctx.ipc || {};
+    const missing = [
+      ['ctx.replay', ctx.replay],
+      ['ctx.ipc.terminal', ipc.terminal],
+      ['ctx.ipc.rootTasks', ipc.rootTasks],
+      ['ctx.ipc.projectPaths', ipc.projectPaths],
+    ].filter(([, value]) => !value).map(([name]) => name);
+    if (missing.length) {
+      throw new Error(`${caller}() needs ${missing.join(', ')}; attach them after createAppContext (see main.js)`);
+    }
+  }
+
   function start() {
+    assertWired('start');
     const providerFixture = ctx.flags.providerTest ? fixtures.createProviderFixture() : null;
     ctx.harness.controlFixture = ctx.flags.controlTest ? fixtures.createControlFixture() : null;
     ctx.harness.historyFixture = ctx.flags.controlTest
@@ -180,6 +201,7 @@ function createAppContext({ flags, fixtures }) {
   }
 
   function cleanup() {
+    assertWired('cleanup');
     ctx.replay.reset();
     ctx.ipc.projectPaths.reset();
     if (ctx.taskRunSweepTimer) clearInterval(ctx.taskRunSweepTimer);
