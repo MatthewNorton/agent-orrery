@@ -14,13 +14,13 @@ Electron + Babylon.js desktop app that passively visualizes Claude Code / Codex 
 - `node kit/grade.mjs` — mechanical renderer regression gate; run after ANY renderer change, must stay green
 - `npm run shots` — headless screenshot mode; writes `.shots/*.png` for visual comparison against the three mockup PNGs in the repo root (gold samples: `3.universe-map-view.png` → universe, `2.solar-system-view.png` → system, `1.planet-view.png` → planet)
 - `npm run ships:generate` — regenerate procedural ship GLB assets
-- No lint/typecheck tooling; plain JavaScript only.
+- `npm run typecheck` — type-checks the JSDoc in `src/` (`tsconfig.json`: main + preload; `src/renderer/tsconfig.json`: renderer; shared shapes in `src/types/`). Only files whose first line is `// @ts-check` are checked: every `src/` JS file except the hash-pinned ones, and every new file. Runs in CI; there is no lint tooling.
 
 ## Hard constraints (from kit/SPEC.md — read it before renderer work)
 
-- **Frozen files** — read but never modify unless an active kit contract explicitly unfreezes them: `src/main/tracker.js`, `src/main/replay-source.js`, `src/preload.js`, `package.json` (no new dependencies, no script changes), `assets/*`, the mockup PNGs. `main.js` is a bootstrap; concerns live in `app-context.js`, `window.js`, `replay-control.js`, `ipc/`, `harness/`.
+- **Frozen files** — read but never modify unless an active kit contract explicitly unfreezes them: `src/main/tracker.js`, `src/main/replay-source.js`, `src/preload.js`, `package.json` (no new runtime dependencies, no script changes; `typescript` is a dev-only checker), `assets/*`, the mockup PNGs. `main.js` is a bootstrap; concerns live in `app-context.js`, `window.js`, `replay-control.js`, `ipc/`, `harness/`.
   - Security exception: `src/main/main.js`, `src/main/tracker.js`, `src/main/replay-source.js`, and `src/main/provider-adapters.js` were edited under the security hardening PR #24 and its follow-ups (`docs/PUBLIC-RELEASE-TASKS.md` Phase 1). Security fixes are the one standing exception to the freeze; they must be minimal and carry a `// Security` comment at the edit site.
-- Renderer is plain JS with classic `<script>` tags — **no ES modules** (file:// CORS), no TypeScript, no bundler, no npm installs. Renderer code attaches to the single `window.AUR` namespace; script load order in `src/renderer/index.html` provides globals.
+- Renderer is plain JS with classic `<script>` tags — **no ES modules** (file:// CORS), no `.ts` files (types are JSDoc checked by `npm run typecheck`), no bundler, no npm installs. Renderer code attaches to the single `window.AUR` namespace; script load order in `src/renderer/index.html` provides globals.
 - Babylon loads from local UMD bundles in `node_modules` (`BABYLON`, `BABYLON.GUI` globals). Renderer is fully offline — zero network requests, system font stack only.
 - `contextIsolation` is on; the renderer's only channel to the main process is the `window.AU` bridge defined in `src/preload.js` and documented in `kit/SPEC.md` §3.
 - One `BABYLON.Engine` for the app lifetime; each view builds its own `BABYLON.Scene` and disposes it on view switch.

@@ -1,3 +1,4 @@
+// @ts-check
 'use strict';
 
 function searchProjects(projects, query, limit = 8) {

@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+    "strict": false,
+    "target": "es2022",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "types": ["node"],
+    "skipLibCheck": true
+  },
+  "include": ["src/main/**/*.js", "src/preload.js", "src/types/**/*.d.ts"],
+  "exclude": ["src/types/renderer-globals.d.ts"]
+}

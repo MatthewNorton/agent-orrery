@@ -1,3 +1,4 @@
+// @ts-check
 // app-chrome.js — collapsible command rail, recent strip, agents/feed/summary renderers, tab bar.
 'use strict';
 

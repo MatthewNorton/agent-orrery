@@ -1,9 +1,12 @@
+// @ts-check
 'use strict';
 
 const { ipcMain, shell } = require('electron');
 const { isLocalProjectPath } = require('../provider-adapters');
 const { githubIdentity } = require('../project-vcs-status');
 const guards = require('./guards');
+
+/** @import { OpenExternalResult } from '../../types/contract' */
 
 function registerIpc(ctx, handlers) {
   const trustedMainFrame = (event) => guards.trustedMainFrame(ctx, event);
@@ -16,7 +19,7 @@ function registerIpc(ctx, handlers) {
   const { handleProjectPathsScan, handleProjectPathLocate, handleProjectPathApply } = handlers.projectPaths;
 
   ipcMain.handle('au:snapshot', (event) => (trustedMainFrame(event) ? visibleSnapshot() : null));
-  ipcMain.handle('au:open-external', async (event, url) => {
+  ipcMain.handle('au:open-external', /** @returns {Promise<OpenExternalResult>} */ async (event, url) => {
     if (!trustedMainFrame(event)) return { ok: false, code: 'INVALID_URL' };
     const repository = githubIdentity(url);
     if (!repository) return { ok: false, code: 'INVALID_URL' };

@@ -1,12 +1,38 @@
+// @ts-check
 'use strict';
 
 const { bufferValue } = require('./values');
+
+/**
+ * @typedef {object} ProcessOutcome
+ * @property {boolean} ok
+ * @property {string | null} [code]
+ * @property {number | null} [exitCode]
+ * @property {string | null} [signal]
+ * @property {Buffer} [stdout]
+ * @property {Buffer} [stderr]
+ */
+
+/**
+ * @typedef {object} ProcessLimits
+ * @property {(command: string, args: readonly string[], options: object) =>
+ *   import('node:child_process').ChildProcess} spawnImpl
+ * @property {number} timeoutMs
+ * @property {number} maxOutputBytes
+ * @property {string} unavailableCode
+ * @property {(close: { exitCode: number | null, signal: string | null, stdout: Buffer,
+ *   stderr: Buffer }) => ProcessOutcome} onClose
+ */
 
 /**
  * Runs spec.command with a hard timeout and a cap on combined stdout + stderr bytes; on
  * either limit the child is SIGKILLed without waiting for it to close. Resolves
  * `{ ok: false, code }` with `unavailableCode`, 'TIMEOUT' or 'OUTPUT_LIMIT', otherwise
  * whatever `onClose({ exitCode, signal, stdout, stderr })` returns. Never rejects.
+ *
+ * @param {{ command: string, args: readonly string[], options: object }} spec
+ * @param {ProcessLimits} limits
+ * @returns {Promise<ProcessOutcome>}
  */
 function runBoundedProcess(spec, { spawnImpl, timeoutMs, maxOutputBytes, unavailableCode, onClose }) {
   return new Promise((resolve) => {

@@ -22,7 +22,8 @@ Frozen files: the **Frozen files** bullet in `CLAUDE.md` is the one authoritativ
 
 ## 1. Hard constraints
 
-1. Plain JavaScript only. No TypeScript, no JSX, no bundler, no `npm install`.
+1. Plain JavaScript only: no `.ts` files (types are JSDoc, checked by `npm run typecheck`),
+   no JSX, no bundler, no `npm install`.
 2. Classic `<script>` tags only — **no ES modules** (`file://` module loading is
    blocked by CORS in Electron). Load order gives you globals; attach your own
    code to a single `window.AUR` namespace object.
@@ -60,6 +61,8 @@ shared `store`. Views may expose extras the app layer probes for
 (`setSearchMatches`, `focusShip`, `planetData`).
 
 ## 3. The `window.AU` bridge (matches `src/preload.js`)
+
+`src/types/contract.d.ts` is the type-checked version of this section; where they differ, it wins.
 
 ```js
 AU.snapshot()  -> Promise<{ projects: Project[], ships: Ship[], feed: FeedEntry[],

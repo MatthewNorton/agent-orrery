@@ -1,12 +1,16 @@
+// @ts-check
 'use strict';
 
 const { appendGoal, readGoalsFile, removeGoal, setGoalDone } = require('../goals');
 const guards = require('./guards');
 const { validProjectId } = guards;
 
+/** @import { TaskMutationResult, TasksSnapshot } from '../../types/contract' */
+
 function createTasksIpc(ctx) {
   const trustedMainFrame = (event) => guards.trustedMainFrame(ctx, event);
 
+  /** @returns {TasksSnapshot | null} */
   function handleTasksGet(event, projectId) {
     if (!trustedMainFrame(event) || !validProjectId(projectId)) return null;
     if (ctx.activeSource !== ctx.tracker || ctx.replay.replayBoundaryOperations > 0) return null;
@@ -22,6 +26,7 @@ function createTasksIpc(ctx) {
     }
   }
 
+  /** @returns {TaskMutationResult} */
   function handleTaskAdd(event, projectId, text) {
     if (!trustedMainFrame(event) || !validProjectId(projectId) ||
         ctx.activeSource !== ctx.tracker || ctx.replay.replayBoundaryOperations > 0) {
@@ -36,6 +41,7 @@ function createTasksIpc(ctx) {
     }
   }
 
+  /** @returns {TaskMutationResult} */
   function handleTaskSetDone(event, projectId, request) {
     if (!trustedMainFrame(event) || !validProjectId(projectId) ||
         ctx.activeSource !== ctx.tracker || ctx.replay.replayBoundaryOperations > 0) {
@@ -50,6 +56,7 @@ function createTasksIpc(ctx) {
     }
   }
 
+  /** @returns {TaskMutationResult} */
   function handleTaskRemove(event, projectId, request) {
     if (!trustedMainFrame(event) || !validProjectId(projectId) ||
         ctx.activeSource !== ctx.tracker || ctx.replay.replayBoundaryOperations > 0) {
@@ -64,6 +71,7 @@ function createTasksIpc(ctx) {
     }
   }
 
+  /** @returns {TaskMutationResult} */
   function taskMutationResult(projectId, result, ok) {
     const items = result && Array.isArray(result.items) ? result.items : [];
     if (ok && ctx.taskRuns) ctx.taskRuns.reconcile(projectId, items);

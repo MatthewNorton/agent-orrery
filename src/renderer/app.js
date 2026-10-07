@@ -1,5 +1,11 @@
+// @ts-check
 // app.js — boot, view stack, event routing, overlay DOM chrome, debug hooks.
 'use strict';
+
+/**
+ * @import { AUEvent, BatchMeta, DebugView, PlanetData, ProjectVcsStatus, ProjectVcsStatusEvent,
+ *   SystemData } from '../types/contract'
+ */
 
 (function () {
   const AUR = window.AUR;
@@ -78,6 +84,10 @@
     AU.onDebugView(handleDebugView);
   }
 
+  /**
+   * @param {AUEvent[]} batch
+   * @param {BatchMeta} meta
+   */
   function routeEvents(batch, meta) {
     if (S.booting) S.bootEventQueue.push({ batch, meta });
     else if (S.replayTransitionPending) S.transitionEventQueue.push({ batch, meta });
@@ -93,6 +103,10 @@
     );
   }
 
+  /**
+   * @param {ProjectVcsStatus} status
+   * @param {BatchMeta} meta
+   */
   function routeProjectVcsStatus(status, meta) {
     if (!status || typeof status.projectId !== 'string' ||
         (meta && meta.mode && meta.mode !== 'live')) return;
@@ -106,6 +120,7 @@
     const project = S.store.projects.get(status.projectId);
     if (!project || vcsFreshness(project.vcs) > vcsFreshness(status)) return;
     S.store.projects.set(status.projectId, { ...project, vcs: status });
+    /** @type {ProjectVcsStatusEvent} */
     const event = { type: 'project-vcs-status', projectId: status.projectId, status };
     if (S.activeView && typeof S.activeView.update === 'function') {
       try { S.activeView.update([event]); } catch (error) { AUR.log('VCS view update failed'); }
@@ -113,6 +128,10 @@
     scheduleChrome(CHROME_PROJECT | CHROME_SEARCH | CHROME_DIRECTORY);
   }
 
+  /**
+   * @param {AUEvent[]} batch
+   * @param {BatchMeta} meta
+   */
   A.handleSequencedEvents = function handleSequencedEvents(batch, meta) {
     if (!Array.isArray(batch)) return;
     const incomingEpoch = A.epochOf(meta);
@@ -135,6 +154,7 @@
   };
 
   // ---------- event routing ----------
+  /** @param {AUEvent[]} batch */
   function handleEvents(batch) {
     if (!Array.isArray(batch) || batch.length === 0) return;
     let chromeMask = 0;
@@ -156,7 +176,8 @@
         ? S.store.projects.get(ev.project.id) : null;
       applyEvent(ev);
       chromeMask |= chromeMaskFor(ev);
-      if (previous && previous.exists === false && ev.project.exists === true &&
+      if (previous && ev.type === 'project-updated' && previous.exists === false &&
+          ev.project.exists === true &&
           S.current.view !== 'universe' && S.current.projectId === ev.project.id) {
         recoveredRoute = { ...S.current };
       }
@@ -187,6 +208,7 @@
   const CHROME_FOCUS = 1 << 10;
   const CHROME_HISTORY = 1 << 11;
 
+  /** @param {AUEvent} ev */
   function chromeMaskFor(ev) {
     if (ev.type === 'ship-spawned' || ev.type === 'ship-updated' || ev.type === 'ship-departed') {
       return CHROME_AGENTS | CHROME_SUMMARY | CHROME_PROJECT | CHROME_PLANET |
@@ -202,6 +224,7 @@
     return 0;
   }
 
+  /** @param {AUEvent} ev */
   function applyEvent(ev) {
     switch (ev.type) {
       case 'project-added':
@@ -321,6 +344,7 @@
     A.clearProjectSearch();
     const request = ++S.routeRequestGeneration;
     const requestedEpoch = S.streamEpoch;
+    /** @type {SystemData} */
     let data = null;
     try { data = await AU.getSystem(projectId); } catch (e) { AUR.log('getSystem err', e && e.message); }
     if (request !== S.routeRequestGeneration || !A.sameEpoch(requestedEpoch, S.streamEpoch)) return;
@@ -333,6 +357,7 @@
   A.openPlanet = async function openPlanet(projectId, name) {
     const request = ++S.routeRequestGeneration;
     const requestedEpoch = S.streamEpoch;
+    /** @type {PlanetData} */
     let data = null;
     try { data = await AU.getPlanet(projectId, name); } catch (e) { AUR.log('getPlanet err', e && e.message); }
     if (request !== S.routeRequestGeneration || !A.sameEpoch(requestedEpoch, S.streamEpoch)) return;
@@ -384,6 +409,7 @@
     return best;
   }
 
+  /** @param {DebugView} view */
   async function handleDebugView(view) {
     try {
       if (view === 'system') {
@@ -392,6 +418,7 @@
       } else if (view === 'planet') {
         const p = pickDemoProject();
         if (p) {
+          /** @type {SystemData} */
           let sys = null;
           try { sys = await AU.getSystem(p.id); } catch (e) { /* fall through */ }
           const planet = sys ? largestPlanet(sys.planets) : null;

@@ -1,5 +1,10 @@
+// @ts-check
 // app-project-settings.js — project path settings (missing-folder recovery).
 'use strict';
+
+/**
+ * @import { ProjectPathRecoveryResult, ProjectPathsScanResult } from '../types/contract'
+ */
 
 (function () {
   const AUR = window.AUR;
@@ -143,6 +148,7 @@
     setProjectSettingsStatus('Choose a parent folder to scan.');
     A.renderProjectSettings();
     S.projectSettings.els.close.focus();
+    /** @type {ProjectPathsScanResult} */
     let result;
     try {
       result = await AU.projectPathsScan();
@@ -194,6 +200,7 @@
     setProjectSettingsStatus('Choose the project folder.');
     A.renderProjectSettings();
     S.projectSettings.els.close.focus();
+    /** @type {ProjectPathRecoveryResult} */
     let result;
     try {
       result = await AU.projectPathLocate(projectId);
@@ -224,6 +231,7 @@
     setProjectSettingsStatus('Applying the selected project folder…');
     A.renderProjectSettings();
     S.projectSettings.els.close.focus();
+    /** @type {ProjectPathRecoveryResult} */
     let result;
     try {
       result = await AU.projectPathApply(projectId, token);

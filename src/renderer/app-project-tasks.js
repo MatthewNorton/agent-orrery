@@ -1,5 +1,8 @@
+// @ts-check
 // app-project-tasks.js — per-project GOALS.md task panel.
 'use strict';
+
+/** @import { TaskMutationResult, TasksChangedPush, TasksSnapshot } from '../types/contract' */
 
 (function () {
   const AUR = window.AUR;
@@ -9,6 +12,7 @@
   const S = A.state, C = A.const;
 
   // ---------- project tasks ----------
+  /** @param {TasksChangedPush} update */
   A.handleTasksChanged = function handleTasksChanged(update) {
     if (!update || update.projectId !== S.taskPanel.projectId ||
         S.current.view !== 'system' || S.playback.mode !== 'live') return;
@@ -72,6 +76,7 @@
       S.current.projectId === projectId && S.taskPanel.projectId === projectId;
   }
 
+  /** @param {TasksSnapshot | TaskMutationResult} result */
   function taskItemsFrom(result) {
     if (!result || !Array.isArray(result.items)) return [];
     return result.items.filter((item) => item && typeof item.text === 'string' &&
@@ -90,6 +95,7 @@
     const projectId = S.taskPanel.projectId;
     if (!taskOwnerIsActive(owner, projectId) || S.taskPanel.saving) return;
     const request = ++S.taskPanel.request;
+    /** @type {TasksSnapshot} */
     let result = null;
     try { result = await AU.tasksGet(projectId); } catch (error) { /* hidden on trust/read failure */ }
     if (!taskOwnerIsActive(owner, projectId) || request !== S.taskPanel.request) return;
@@ -128,6 +134,7 @@
     });
   }
 
+  /** @param {() => Promise<TaskMutationResult>} operation */
   async function mutateTasks(operation, clearInput, options = {}) {
     const owner = S.taskPanel.owner;
     const projectId = S.taskPanel.projectId;
@@ -138,6 +145,7 @@
     S.taskPanel.error = false;
     const request = ++S.taskPanel.request;
     renderTasksPanel();
+    /** @type {TaskMutationResult} */
     let result = null;
     try { result = await operation(); } catch (error) { /* refresh below */ }
     if (!taskOwnerIsActive(owner, projectId) || request !== S.taskPanel.request) return;
@@ -172,7 +180,7 @@
   function taskFocusState(list) {
     const active = document.activeElement;
     if (!active || !list.contains(active)) return null;
-    const row = active.closest('.task-row');
+    const row = /** @type {HTMLElement | null} */ (active.closest('.task-row'));
     const index = row ? Number.parseInt(row.dataset.taskIndex, 10) : Number.NaN;
     if (!Number.isSafeInteger(index)) return null;
     return {

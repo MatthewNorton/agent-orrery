@@ -1,5 +1,10 @@
+// @ts-check
 // app-playback.js — epoch/playback/replay helpers, live/history controls, history test metrics.
 'use strict';
+
+/**
+ * @import { ReplayCommand, ReplayResult, ReplayStatePush, Snapshot } from '../types/contract'
+ */
 
 (function () {
   const AUR = window.AUR;
@@ -28,6 +33,7 @@
     while (S.retiredEpochs.size > 64) S.retiredEpochs.delete(S.retiredEpochs.values().next().value);
   }
 
+  /** @param {Snapshot} snap */
   A.seedStore = function seedStore(snap) {
     S.store.projects.clear();
     S.store.ships.clear();
@@ -91,6 +97,7 @@
     }
   };
 
+  /** @param {ReplayStatePush} next */
   A.handleReplayState = function handleReplayState(next) {
     if (S.replayTransitionPending) return;
     const nextEpoch = A.epochOf(next);
@@ -103,6 +110,7 @@
       ? S.playback.cursorTs : Date.now();
   };
 
+  /** @param {ReplayResult} result */
   function adoptReplayResult(result, forceReset) {
     if (!result || typeof result !== 'object') return;
     const snap = result.snapshot && typeof result.snapshot === 'object' ? result.snapshot : null;
@@ -164,6 +172,7 @@
     }
   }
 
+  /** @param {ReplayCommand} command */
   async function issueReplay(command) {
     const request = ++S.replayRequest;
     const modeBoundary = command.action === 'seek' || command.action === 'live';

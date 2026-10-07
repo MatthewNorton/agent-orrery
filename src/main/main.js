@@ -1,3 +1,4 @@
+// @ts-check
 'use strict';
 
 const { app } = require('electron');
@@ -34,9 +35,9 @@ const metrics = createMetrics(ctx, driver);
 ctx.harness.runTestMode = () => {
   if (flags.controlTest) control.run(ctx, driver, metrics);
   else if (flags.historyTest) history.run(ctx, driver, metrics);
-  else if (flags.providerTest) provider.run(ctx, driver, metrics);
-  else if (flags.polishTest) polish.run(ctx, driver, metrics);
-  else shots.run(ctx, driver, metrics);
+  else if (flags.providerTest) provider.run(ctx, driver);
+  else if (flags.polishTest) polish.run(ctx, driver);
+  else shots.run(ctx, driver);
 };
 
 app.whenReady().then(() => {

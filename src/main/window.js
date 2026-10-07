@@ -1,3 +1,4 @@
+// @ts-check
 'use strict';
 
 const { app, BrowserWindow } = require('electron');
@@ -33,8 +34,12 @@ function createWindow(ctx) {
     // finish loading while the synchronous tracker setup (ctx.start) is still
     // running; attaching these after loadFile() can miss did-finish-load and
     // leave the visual harness waiting forever.
+    // Newer Electron puts level and message on the first argument; older builds pass
+    // them only positionally (event, level, message).
     win.webContents.on('console-message', (...args) => {
-      const d = args.find((a) => a && typeof a === 'object' && 'message' in a);
+      const d = /** @type {{ level?: string | number, message: string } | undefined} */ (
+        args.find((a) => a && typeof a === 'object' && 'message' in a)
+      );
       const msg = d ? `${d.level ?? ''} ${d.message}` : `${args[1] ?? ''} ${args[2] ?? ''}`;
       console.log(`[renderer] ${msg}`);
       if (/Uncaught|ReferenceError|TypeError|SyntaxError|is not defined|Failed to load resource|boot-failure/i.test(msg)) {
