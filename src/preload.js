@@ -1,8 +1,9 @@
+// @ts-check
 'use strict';
 
 const { contextBridge, ipcRenderer } = require('electron');
 
-contextBridge.exposeInMainWorld('AU', {
+contextBridge.exposeInMainWorld('AU', /** @satisfies {import('./types/contract').AUBridge} */ ({
   snapshot: () => ipcRenderer.invoke('au:snapshot'),
   getSystem: (id) => ipcRenderer.invoke('au:system', id),
   getPlanet: (id, name) => ipcRenderer.invoke('au:planet', id, name),
@@ -37,4 +38,4 @@ contextBridge.exposeInMainWorld('AU', {
   onReplayState: (cb) => ipcRenderer.on('au:replay-state', (e, playback) => cb(playback)),
   onDebugView: (cb) => ipcRenderer.on('au:debug-view', (e, view) => cb(view)),
   debugReady: () => ipcRenderer.send('au:debug-ready'),
-});
+}));

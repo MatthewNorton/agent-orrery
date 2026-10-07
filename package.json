@@ -12,6 +12,7 @@
     "ships:generate:fleet": "node scripts/generate-fleet-ships.mjs",
     "status:lab": "electron scripts/project-vcs-status-lab.js",
     "test": "node --test test/*.test.js",
+    "typecheck": "tsc -p tsconfig.json && tsc -p src/renderer/tsconfig.json",
     "postinstall": "install-electron"
   },
   "author": "matt",

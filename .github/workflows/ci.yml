@@ -34,4 +34,5 @@ jobs:
       # that edits a frozen file turns red here with the file named, instead of failing
       # a local gate run later.
       - run: node kit/repin.mjs --check
+      - run: npm run typecheck
       - run: npm test
