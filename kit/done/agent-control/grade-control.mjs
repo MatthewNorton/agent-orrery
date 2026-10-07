@@ -110,7 +110,7 @@ for (const [rel, expected] of frozen) {
 // the dependency NAMES are pinned instead: version bumps pass, an added package fails.
 // package-lock.json needs no pin of its own: `npm ci` refuses a lockfile that disagrees
 // with package.json.
-const FROZEN_DEPENDENCY_NAMES = ['babylonjs', 'babylonjs-gui', 'babylonjs-loaders', 'electron'];
+const FROZEN_DEPENDENCY_NAMES = ['babylonjs', 'babylonjs-gui', 'babylonjs-loaders', 'electron', 'typescript'];
 {
   const pkg = JSON.parse(read('package.json') || '{}');
   const names = Object.keys(pkg.dependencies || {}).concat(Object.keys(pkg.devDependencies || {})).sort();
