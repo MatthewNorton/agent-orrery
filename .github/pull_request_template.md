@@ -9,6 +9,6 @@
 - [ ] Manual smoke (`npm start`)
 
 ## Frozen files
-List any edits to frozen files (`src/main/main.js`, `tracker.js`, `replay-source.js`, `src/preload.js`, `package.json`, `assets/*`) and why they were unavoidable. See `kit/SPEC.md`.
+List any edits to frozen files (see the **Frozen files** bullet in `CLAUDE.md`) and why they were unavoidable. Hash-pinned files also need `node kit/repin.mjs --note "<why>"`.
 
 ## Screenshots (if renderer)
