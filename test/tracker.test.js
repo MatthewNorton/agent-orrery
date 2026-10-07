@@ -837,20 +837,36 @@ test('signal config: extensions keep the supported ones listed; absent or unusab
   }
 });
 
-test('signal: ships for files idle 5-15 min are swept every sweep and respawned every scan',
-  { todo: 'suspected bug (.docs/architecture.md §10 #30): Signal ships flap and are renamed on every scan' },
-  (t) => {
-    const { world } = signalWorld(t, { mtime: T0 - 7 * MIN });
-    const session = { world, ...world.live() };
-    const spawned = [];
-    for (let round = 0; round < 2; round++) {
-      session.tracker.scan(false);
-      const events = session.take();
-      spawned.push(...ofType(events, 'ship-spawned').map((event) => event.ship.name));
-      assert.deepEqual(ofType(sweepAt(session, T0), 'ship-departed').length, 1, `round ${round}`);
-    }
-    assert.deepEqual(spawned, ['Signal-1', 'Signal-2']);
-  });
+test('signal: a file idle 5-15 min docks no ship, so no sweep warps one out and no scan respawns it', (t) => {
+  const { world } = signalWorld(t, { mtime: T0 - 7 * MIN });
+  const session = { world, ...world.live() };
+  for (const [round, expected] of [[0, ['project-added']], [1, []]]) {
+    session.tracker.scan(false);
+    assert.deepEqual(session.take().map((event) => event.type), expected, `scan ${round}`);
+    assert.deepEqual(sweepAt(session, T0), [], `sweep ${round}`);
+  }
+});
+
+test('signal: an idle Signal ship warps out once and returns, renamed, only when its file changes', (t) => {
+  const { world, signalFile, shipId } = signalWorld(t);
+  const session = { world, ...world.live() };
+  session.tracker.scan(true);
+  session.take();
+
+  const gone = sweepAt(session, T0 + 5 * MIN + 1);
+  assert.deepEqual(gone.map((event) => [event.type, event.shipId || event.entry.text]),
+    [['ship-departed', shipId], ['feed', 'Signal-1 warped out']]);
+  session.tracker.scan(false);
+  assert.deepEqual(session.take(), [], 'an unchanged idle file stays undocked');
+
+  world.clock.set(T0 + 6 * MIN);
+  fs.appendFileSync(signalFile, 'MORE_PRIVATE_BYTES');
+  setMtime(signalFile, T0 + 6 * MIN);
+  session.tracker.scan(false);
+  const back = session.take();
+  assert.deepEqual(back.map((event) => event.type), ['ship-spawned', 'feed', 'ship-updated', 'activity']);
+  assert.deepEqual(pick(['id', 'name'])(back[0].ship), { id: shipId, name: 'Signal-2' });
+});
 
 // ---------- Derived views and persistence ----------
 

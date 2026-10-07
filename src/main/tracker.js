@@ -751,8 +751,12 @@ class Tracker extends EventEmitter {
         const previous = this.signalFiles.get(fp);
         // Security follow-up: a POSIX file name containing `\` has no canonical key; hash the raw path instead.
         const sessionId = `${source.id}:${hex8(canonicalProjectPath(fp) || fp)}`;
+        const changed = !previous || previous.size !== st.size || previous.mtimeMs !== st.mtimeMs;
+        this.signalFiles.set(fp, { size: st.size, mtimeMs: st.mtimeMs, sessionId });
+        // sweepShips departs a ship idle past the active window; docking one here would flap.
+        if (now - st.mtimeMs > ACTIVE_WINDOW_MS) continue;
         const ship = this.ensureProviderShip('signal', project.id, sessionId, 'main', st.mtimeMs, null);
-        if (!isStartup && (!previous || previous.size !== st.size || previous.mtimeMs !== st.mtimeMs)) {
+        if (!isStartup && changed) {
           ship.lastEvent = Math.max(ship.lastEvent, st.mtimeMs);
           ship.status = 'Working';
           ship.detail = null;
@@ -762,7 +766,6 @@ class Tracker extends EventEmitter {
             tool: 'signal', status: 'Working', detail: null, ts: st.mtimeMs,
           });
         }
-        this.signalFiles.set(fp, { size: st.size, mtimeMs: st.mtimeMs, sessionId });
       }
     }
     for (const [fp, previous] of this.signalFiles) {
