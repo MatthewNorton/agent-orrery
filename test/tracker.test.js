@@ -31,8 +31,13 @@ const SHIP_KEYS = [
 
 // A Claude session whose first line was on disk at startup (so it is tailed
 // from EOF and its ship is docked), with startup events already drained.
-function startClaude(t, { mtime = T0 } = {}) {
+// `saved` is the projects map of a universe-state.json left by an earlier run.
+function startClaude(t, { mtime = T0, saved } = {}) {
   const world = createWorld(t);
+  if (saved) {
+    fs.mkdirSync(path.dirname(world.statePath), { recursive: true });
+    fs.writeFileSync(world.statePath, JSON.stringify({ projects: saved }));
+  }
   const file = world.claudeFile();
   appendJsonl(file, [claude.prompt(world.projectDir, mtime)], mtime);
   const live = world.live();
@@ -240,35 +245,48 @@ test('claude: in-project edits emit build events and grow buckets; out-of-projec
   ]);
 });
 
+const WINDOWS_ROOT = 'C:\\Orrery-Fixture-Missing\\Demo';
+const WINDOWS_SLUG = 'C--Orrery-Fixture-Missing-Demo';
+
 // Builds for a Windows-style project root (missing on disk, so any host works).
-function windowsRootBuilds(t) {
-  const root = 'C:\\Orrery-Fixture-Missing\\Demo';
-  const session = startClaude(t);
-  const file = session.world.claudeFile('C--Orrery-Fixture-Missing-Demo');
-  appendJsonl(file, [claude.prompt(root, T0)], T0);
+function windowsRootBuilds(t, saved) {
+  const session = startClaude(t, { saved });
+  const file = session.world.claudeFile(WINDOWS_SLUG);
+  appendJsonl(file, [claude.prompt(WINDOWS_ROOT, T0)], T0);
   session.tracker.scan(false);
   session.tracker.pollFiles(); // catch up, so the appended edits are live
   session.take();
-  return ofType(appendAndPoll({ ...session, file }, [
-    claude.tool(root, T0 + 1 * SEC, 'toolu_w1', 'Edit', { file_path: `${root}\\Docs\\Guide.md` }),
-    claude.tool(root, T0 + 2 * SEC, 'toolu_w2', 'Edit', { file_path: 'c:/orrery-fixture-missing/demo/Src/A.js' }),
+  const builds = ofType(appendAndPoll({ ...session, file }, [
+    claude.tool(WINDOWS_ROOT, T0 + 1 * SEC, 'toolu_w1', 'Edit', { file_path: `${WINDOWS_ROOT}\\Docs\\Guide.md` }),
+    claude.tool(WINDOWS_ROOT, T0 + 2 * SEC, 'toolu_w2', 'Edit', { file_path: 'c:/orrery-fixture-missing/demo/Src/A.js' }),
   ], T0 + 2 * SEC), 'build');
+  return { ...session, builds };
 }
 
-test('claude: build buckets under a Windows-style root are case-folded on any host (see the Windows planet todo)', (t) => {
-  assert.deepEqual(windowsRootBuilds(t).map((event) => event.bucket), ['docs', 'src']);
+test('claude: build buckets under a Windows-style root keep the folder\'s own casing on any host', (t) => {
+  assert.deepEqual(windowsRootBuilds(t).builds.map((event) => event.bucket), ['Docs', 'Src']);
 });
 
-test('claude: build file paths under a Windows-style root are lower-cased for display', {
-  todo: 'suspected bug: relativeInside returns the lower-cased relative path (same root cause as the Windows planet todo)',
-}, (t) => {
-  assert.deepEqual(windowsRootBuilds(t).map((event) => event.file),
-    [path.join('docs', 'guide.md'), path.join('src', 'a.js')]);
+test('claude: build file paths under a Windows-style root keep their own casing', (t) => {
+  assert.deepEqual(windowsRootBuilds(t).builds.map((event) => event.file),
+    [path.join('Docs', 'Guide.md'), path.join('Src', 'A.js')]);
 });
 
-test('claude: a mixed-case top-level folder never shows its builds on its planet (Windows host)', {
+test('claude: under a Windows-style root, builds merge into the lower-cased buckets earlier versions saved', (t) => {
+  const { world, tracker, builds } = windowsRootBuilds(t, {
+    [WINDOWS_SLUG]: { buckets: { docs: 2 }, totalBuilds: 2, firstSeen: T0 - MIN },
+  });
+  assert.deepEqual(builds.map(pick(['bucket', 'isNew'])),
+    [{ bucket: 'Docs', isNew: false }, { bucket: 'Src', isNew: true }]);
+  assert.deepEqual(['Docs', 'docs', 'DOCS'].map((name) => tracker.getPlanet(WINDOWS_SLUG, name).builds), [3, 3, 3]);
+  tracker.saveState();
+  const saved = JSON.parse(fs.readFileSync(world.statePath, 'utf8')).projects[WINDOWS_SLUG];
+  assert.deepEqual(pick(['buckets', 'totalBuilds'])(saved), { buckets: { docs: 3, Src: 1 }, totalBuilds: 4 },
+    'one bucket per folder: the saved key is kept, not split');
+});
+
+test('claude: a mixed-case top-level folder shows its builds on its planet (Windows host)', {
   skip: process.platform !== 'win32' && 'needs a Windows-rooted project on disk',
-  todo: 'suspected bug: relativeInside returns the lower-cased relative path, so bucket "docs" never matches planet "Docs"',
 }, (t) => {
   const session = startClaude(t);
   fs.mkdirSync(path.join(session.dir, 'Docs'));
@@ -277,7 +295,22 @@ test('claude: a mixed-case top-level folder never shows its builds on its planet
   ], T0 + 1 * SEC);
   assert.equal(session.tracker.snapshot().projects[0].totalBuilds, 1);
   assert.deepEqual(session.tracker.getSystem(SLUG).planets.find((planet) => planet.name === 'Docs'),
-    { name: 'Docs', files: 0, builds: 0 });
+    { name: 'Docs', files: 0, builds: 1 });
+});
+
+test('claude: a lower-cased saved bucket and new builds share the folder\'s on-disk planet (Windows host)', {
+  skip: process.platform !== 'win32' && 'needs a Windows-rooted project on disk',
+}, (t) => {
+  const session = startClaude(t, { saved: { [SLUG]: { buckets: { docs: 2 }, totalBuilds: 2, firstSeen: T0 - MIN } } });
+  fs.mkdirSync(path.join(session.dir, 'Docs'));
+  const events = appendAndPoll(session, [
+    claude.tool(session.dir, T0 + 1 * SEC, 'toolu_d', 'Write', { file_path: path.join(session.dir, 'Docs', 'guide.md') }),
+  ], T0 + 1 * SEC);
+  assert.deepEqual(ofType(events, 'build').map(pick(['bucket', 'file', 'isNew'])),
+    [{ bucket: 'Docs', file: path.join('Docs', 'guide.md'), isNew: false }]);
+  assert.deepEqual(session.tracker.getSystem(SLUG).planets.filter((planet) => planet.name.toLowerCase() === 'docs'),
+    [{ name: 'Docs', files: 0, builds: 3 }]);
+  assert.equal(session.tracker.getPlanet(SLUG, 'Docs').builds, 3);
 });
 
 test('claude: Task and Agent tool_use launch drones that dock again on tool_result', (t) => {

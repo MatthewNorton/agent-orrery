@@ -27,6 +27,7 @@ const { fnv1a, hex8, mulberry32 } = require('./shared/hash');
 const { writeFileAtomic } = require('./shared/atomic-write');
 const { relativeInside } = require('./path-safety');
 const { signalSources, watchedFiles } = require('./signal-sources');
+const { bucketOf, countBuild, bucketBuilds } = require('./build-buckets');
 
 /**
  * @import { Attention, FeedEntry, PlanetData, Project, Ship, ShipStatus, SystemData }
@@ -1040,9 +1041,8 @@ class Tracker extends EventEmitter {
 
   // Counts an edit to a file inside the project; catchup counts it without announcing it.
   addBuild(project, ship, rel, ts, catchup) {
-    const bucket = rel.includes(path.sep) ? rel.split(path.sep)[0] : '(root)';
-    const isNew = !(bucket in project.buckets);
-    project.buckets[bucket] = (project.buckets[bucket] || 0) + 1;
+    const bucket = bucketOf(rel, path.sep);
+    const isNew = countBuild(project, bucket);
     project.totalBuilds += 1;
     this.systemCache.delete(project.id);
     if (catchup) return;
@@ -1338,7 +1338,7 @@ class Tracker extends EventEmitter {
         planets = dirs.map((d) => ({
           name: d.name,
           files: shallowCount(path.join(project.path, d.name)),
-          builds: project.buckets[d.name] || 0,
+          builds: bucketBuilds(project, d.name),
         }));
         if (project.buckets['(root)']) {
           planets.push({ name: '(root)', files: beltDensity, builds: project.buckets['(root)'] });
@@ -1373,7 +1373,7 @@ class Tracker extends EventEmitter {
       name: planetName,
       project: publicProject(project),
       // Security follow-up: own keys only; 'constructor'/'__proto__' must not return a non-cloneable prototype value.
-      builds: Object.hasOwn(project.buckets, planetName) ? project.buckets[planetName] : 0,
+      builds: bucketBuilds(project, planetName),
     };
     if (!project.path || !project.exists || planetName.startsWith('Sector-')) {
       const rand = mulberry32(fnv1a(projectId + planetName));
