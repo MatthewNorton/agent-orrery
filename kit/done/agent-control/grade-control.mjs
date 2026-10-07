@@ -75,8 +75,8 @@ if (!fs.existsSync(launcherPath)) {
 // Baseline re-pinned 2026-09-04 to main after PR #24 (macOS support + security
 // hardening). Later kits legitimately moved these files; the hashes track the
 // state each subsequent kit must not regress from.
-// tracker.js and replay-source.js re-pinned 2026-09-27 for the security follow-ups
-// (null project keys, planet lookup; docs/PUBLIC-RELEASE-TASKS.md Phase 1).
+// src/main/tracker.js, replay-source.js and provider-adapters.js are no longer pinned: they
+// were unfrozen to give live and replay one transcript parser (CLAUDE.md, Frozen files).
 // All hashes re-pinned 2026-09-27 as LF-normalized digests (docs/PUBLIC-RELEASE-TASKS.md
 // item 5.6); file contents are unchanged from the previous pins.
 // package.json and package-lock.json re-pinned 2026-09-27 after Dependabot #27 (Babylon 9.28) and #30 (Electron 44).
@@ -89,9 +89,6 @@ if (!fs.existsSync(launcherPath)) {
 // 2026-09-28 re-pinned: src/renderer/index.html — kit 13 task B: app-ideas split
 // 2026-09-28 re-pinned: src/renderer/index.html — kit 13 task B: app-project-tasks split
 const frozen = new Map([
-  ['src/main/tracker.js', '600c950483280eb66dd2726849ef4643dd5b894d5cec175eddf75035449bf5fb'],
-  ['src/main/provider-adapters.js', 'e6930f483b6e52335b47ddccb34968d6a0e3d211aafe04cbaaa2e0aa31e5a037'],
-  ['src/main/replay-source.js', 'd3f16564970e7500ac54a135936a75eb3b10ba03a466fa78ba3c75b38f493f36'],
   ['src/renderer/index.html', '5f871aab64e18bfbd9e827a201d149495d3f82c69daa6deae8ee1ffd6e234ca8'],
   ['src/renderer/util.js', 'c8f49b054033d95be89846359a8bf065a07a26e37284775f3970afc49cf3bf2c'],
   ['src/renderer/scene-universe.js', '61ff27fa53ea8ca6d3d944c29ece4f9f82aa46fea53321df0e01d1e82b1a5b3a'],

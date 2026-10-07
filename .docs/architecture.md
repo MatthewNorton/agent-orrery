@@ -514,10 +514,11 @@ Six of the older gates grep "the main process" by concatenating every `.js` file
 so they keep passing wherever code moves inside that folder.
 
 **How "frozen" is actually enforced.** The control and history gates store SHA-256 hashes of
-10 files: `tracker.js`, `provider-adapters.js`, `replay-source.js`, `index.html`, `util.js`,
-the three `scene-*.js`, `galaxy-layout.js`, `polish-math.js`. Editing any of them means
-running `node kit/repin.mjs --note "<why>"`, or CI turns red. `preload.js` — which `CLAUDE.md`
-lists as frozen — is **not** hashed.
+7 renderer files: `index.html`, `util.js`, the three `scene-*.js`, `galaxy-layout.js`,
+`polish-math.js`. Editing any of them means running `node kit/repin.mjs --note "<why>"`, or CI
+turns red. `preload.js` — which `CLAUDE.md` lists as frozen — is **not** hashed. `tracker.js`,
+`replay-source.js` and `provider-adapters.js` are no longer frozen or pinned; `grade-main-split.mjs`
+caps them at the size they had when they were unfrozen.
 
 ---
 
