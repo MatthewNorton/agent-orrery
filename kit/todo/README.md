@@ -10,42 +10,8 @@
 Feed a ready kit to an executor via `kit/EXECUTOR-HANDOFF.md` with its
 CONTRACT.md path.
 
-Completed:
-
-- 01 needs-attention detection + UI — **PASS 2026-07-21**; archived under
-  `../done/attention/` with its contract, grader, and executor report.
-- 02 renderer polish pass — **PASS 2026-07-21**; archived under
-  `../done/polish-pass/` with its contract, grader, report, metrics, and images.
-- 03 Windows launch shortcuts — **PASS 2026-07-21**; archived under
-  `../done/packaging/` with its contract, grader, icon, and live-launch proof.
-- 04 galaxy grouping — **PASS 2026-07-21**; archived under
-  `../done/galaxy-grouping/` with its contract, grader, rendered metrics,
-  screenshots, and restart-stability proof.
-- 05 passive multi-provider agents — **PASS 2026-07-21**; archived under
-  `../done/multi-provider/` with its contract, grader, edge validation,
-  minimum-size rendered proof, and count-only real-profile evidence.
-- 06 history playback — **PASS 2026-07-21**; archived under
-  `../done/history-playback/` with its frozen contract, deterministic replay
-  gate, four minimum-size screenshots, and count-only real-profile proof.
-- 07 safe terminal action — **PASS 2026-07-21**; archived under
-  `../done/agent-control/` with its frozen contract, isolated no-shell gate,
-  two minimum-size screenshots, and bounded real Windows Terminal smoke proof.
-- 08 realistic CC0 provider ship hulls — **PASS 2026-07-26**; archived under `../done/ship-assets-pack/` with its frozen contract, grader, executor report, ten curated hulls, and manifest-backed fallback integration.
-- 10 per-project task lists — **PASS 2026-07-22**; archived under
-  `../done/project-tasks/` with its frozen contract, grader, executor report,
-  and real UI-to-`GOALS.md` polling/prose-preservation proof.
-- 11 project search — **PASS 2026-07-22**; archived under
-  `../done/project-search/` with its frozen contract, grader, executor report,
-  and real minimum-size keyboard/navigation/dimming proof.
-- 13 structural cleanup — **PASS 2026-09-28**; archived under
-  `../done/structural-cleanup/` with its contract (§2.6 reversed during
-  execution), staged gate, and executor report: `app.js` split into `AUR.app`
-  modules, shared `src/main/path-safety.js`, `kit/repin.mjs`.
-- 14 main-process split — **PASS 2026-10-01**; archived under
-  `../done/main-split/` with its contract (§2.3 amended: six archived gates
-  widened, project-tasks added during execution), staged gate, and executor
-  report: `main.js` is a bootstrap over `app-context.js`, `window.js`,
-  `replay-control.js`, `ipc/*` and `harness/*`, with no module-level state.
+Completed kits and their gates are listed in `../README.md`. Their contracts and
+executor reports were removed once the kits shipped; `git log -- kit/done` finds them.
 
 A **stub** is a parked idea with goal + seed notes — not executable. To
 activate one: run `/distill` on the stub file to produce a full kit (contract +

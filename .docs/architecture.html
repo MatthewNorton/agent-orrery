@@ -362,7 +362,7 @@ const NODES = {
   ipcterm: { label: 'ipc/terminal.js', lines: 76, note: 'Open Terminal', layer: 'main', path: 'src/main/ipc/terminal.js',
     job: 'Open Terminal checks (LIVE, single-flight, 750 ms cooldown, platform) and liveProjectCwd, which the tasks and IDEAS code also use.' },
   ipctasks: { label: 'ipc/tasks.js', lines: 131, note: 'GOALS.md', layer: 'main', path: 'src/main/ipc/tasks.js',
-    job: 'TASKS panel handlers: tasks-get, task-add, task-set-done, task-remove, and the unused tasks-save.' },
+    job: 'TASKS panel handlers: tasks-get, task-add, task-set-done, task-remove.' },
   ipcroot: { label: 'ipc/root-tasks.js', lines: 100, note: 'IDEAS', layer: 'main', path: 'src/main/ipc/root-tasks.js',
     job: 'IDEAS handlers and the root-tasks-changed push.' },
   ipcpaths: { label: 'ipc/project-paths.js', lines: 233, note: 'moved projects', layer: 'main', path: 'src/main/ipc/project-paths.js',
@@ -381,8 +381,7 @@ const NODES = {
   'br.open': { label: 'open-terminal · open', sub: 'invoke · + open-external', layer: 'bridge', anchor: 'ipcterm',
     job: 'Open Terminal (LIVE only), open the project folder, open a github.com repository URL.' },
   'br.tasks': { label: 'tasks-get · task-*', sub: 'invoke · + tasks-changed ↑', layer: 'bridge', anchor: 'ipctasks',
-    job: 'Read and edit the checkbox lines in a project’s GOALS.md.',
-    issues: ['tasksSave / au:tasks-save is exposed but no renderer code calls it; grade-tasks.mjs requires it to exist'] },
+    job: 'Read and edit the checkbox lines in a project’s GOALS.md.' },
   'br.ideas': { label: 'root-task-*', sub: 'invoke · + root-tasks-changed ↑', layer: 'bridge', anchor: 'ipcroot',
     job: 'List, create, remove, assign and retry IDEAS items; phase changes are pushed.' },
   'br.paths': { label: 'project-path-*', sub: 'scan · locate · apply', layer: 'bridge', anchor: 'ipcpaths',
@@ -466,7 +465,7 @@ const NODES = {
 };
 
 // The boxes outlined by "Show hotspots"; every box still lists all of its issues when selected.
-const HOT = new Set(['mctx', 'hmodes', 'tracker', 'replay', 'taskruns', 'pathsafety', 'projpaths', 'br.tasks', 'appstate', 'shell',
+const HOT = new Set(['mctx', 'hmodes', 'tracker', 'replay', 'taskruns', 'pathsafety', 'projpaths', 'appstate', 'shell',
   'vuni', 'vsys', 'util', 'asunused']);
 
 const STRIPES = [

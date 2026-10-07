@@ -19,7 +19,7 @@ draws it as a universe. It never controls the agents (two narrow exceptions in �
   already write to disk, turns them into a model (projects, ships, planets), and pushes small
   **event batches** to the window.
 - The **preload** (`src/preload.js`) is the only door between the two halves: it exposes
-  27 methods on `window.AU`, each a named IPC channel `au:*`.
+  26 methods on `window.AU`, each a named IPC channel `au:*`.
 - The **renderer** (browser, `src/renderer/`) keeps a copy of the model in one shared state
   object and draws it with Babylon.js in one of three views: universe → solar system → planet.
 
@@ -46,7 +46,7 @@ flowchart LR
     SV["services<br/>IDEAS queue · GOALS.md · git/GitHub · launchers"]
     WR["wiring<br/>app-context · replay-control · ipc/* · window"]
   end
-  BR["preload.js<br/>window.AU — 27 methods"]
+  BR["preload.js<br/>window.AU — 26 methods"]
   subgraph Ren["Renderer — src/renderer (browser)"]
     APP["app.js + app-*.js<br/>shared state · panels · routing"]
     VW["scene-universe / system / planet<br/>Babylon.js views"]
@@ -84,7 +84,7 @@ or the record of how the app was built.
 | `src/renderer/` | 28 | 6,954 lines JS + 3,042 HTML/CSS | Renderer (UI + 3D) | **Yes** |
 | `assets/` | 331 | ~276 MB | Planet / skybox / asteroid textures, ship GLBs | Partly — see §8 |
 | `test/` | 23 | 4,295 lines | Unit tests (`npm test`, Node's runner, no Electron) | No |
-| `kit/` | 63 | — | Build-process records **and** 13 regression gate scripts | No (gates matter, see §9) |
+| `kit/` | 23 | — | Kit tooling, two stubs **and** 13 regression gate scripts | No (gates matter, see §9) |
 | `scripts/` | 7 | — | Ship generators, launcher shortcuts, demo screenshots, a VCS UI lab | No |
 | `docs/` | 16 | — | Feature notes and plans; four of them are also gate fixtures | No |
 | root | 11 | — | README, CLAUDE.md, SECURITY, LICENSE, `package.json` + lockfile, git config, 3 mockup PNGs | Mockups are the visual "gold samples" |
@@ -139,7 +139,7 @@ Start here when you want to change something. Paths under "Main process" are rel
   structural signals, `isLocalProjectPath` rejects UNC / device paths before any `stat`, and
   every spawn uses `shell: false`.
 
-### IPC contract (all 27 bridge methods)
+### IPC contract (all 26 bridge methods)
 
 | `window.AU` method | Channel | Kind | Main-process handler | Used by (renderer) |
 |---|---|---|---|---|
@@ -148,7 +148,6 @@ Start here when you want to change something. Paths under "Main process" are rel
 | `openProject` / `openExternal` | `au:open` / `au:open-external` | invoke | `ipc/register.js` | `app-project-control.js`, `app-agent-focus.js` |
 | `openTerminal` | `au:open-terminal` | invoke | `ipc/terminal.js` | `app-project-control.js` |
 | `tasksGet`, `taskAdd`, `taskSetDone`, `taskRemove` | `au:tasks-get`, `au:task-*` | invoke | `ipc/tasks.js` | `app-project-tasks.js` |
-| `tasksSave` | `au:tasks-save` | invoke | `ipc/tasks.js` | **nobody** — kept alive only because `grade-tasks.mjs` requires it |
 | `rootTasksGet`, `rootTaskCreate/Remove/Assign/Retry` | `au:root-task*` | invoke | `ipc/root-tasks.js` | `app-ideas.js` |
 | `projectPathsScan/Locate/Apply` | `au:project-path*` | invoke | `ipc/project-paths.js` | `app-project-settings.js` |
 | `replay` | `au:replay` | invoke | `replay-control.js` | `app-playback.js` |
@@ -548,7 +547,7 @@ not reproduced.
     `util.js` are pinned though editable, `preload.js` is frozen but not pinned.
 15. Line caps in `grade-structure.mjs` equal the current sizes (971 / 618): adding one line to
     either scene fails the gate.
-16. `tasksSave` is unused but required by a gate.
+16. `kit/grade.mjs` deletes all of `.shots/`, including the run folders other gates left there.
 
 ### Live and replay drift apart
 17. Different galaxy keys (projects regroup while scrubbing), different drone ids, no attention,
@@ -560,10 +559,9 @@ not reproduced.
 ### Dead weight
 20. `assets/ships/fleet-scale-v2/` (123 MB), `assets/palettes/`, `assets/manifest.json`,
     the `aur-aster-kite` hull — not loaded at runtime.
-21. `kit/EXECUTOR-REPORT.md` is a byte-identical copy of `kit/done/ship-assets-pack/EXECUTOR-REPORT.md`.
-    `kit/done/multi-provider/edge-validation.mjs` is run by nothing.
-22. Unused exports: `providerToolStatus`, `baseSignal`, `projectMatchNames`,
-    `AUR.attentionLabel`, `AUR.agentFocusStats`, `ctx.back` (renderer view context).
+21. `kit/done/multi-provider/edge-validation.mjs` is run by nothing.
+22. Unused in hash-pinned files: `providerToolStatus`, `baseSignal`, `AUR.attentionLabel`,
+    `scene-system.js` `metadata.focusStats`.
 
 ### Stale documentation
 23. Older docs quote line numbers in the pre-split `main.js` (§5.3 maps them).
@@ -595,7 +593,7 @@ not reproduced.
 
 | Term | Means |
 |---|---|
-| Kit | A contract + grading script handed to an agent to build one feature. Finished ones are archived in `kit/done/`. |
+| Kit | A contract + grading script handed to an agent to build one feature. Finished ones keep only their gate, in `kit/done/`. |
 | Gate | A `grade-*.mjs` script that exits 0 / 1. |
 | Frozen / pinned | A file whose SHA-256 is stored in a gate; edits need `kit/repin.mjs`. |
 | `ctx` | The one shared object in the main process (`app-context.js`); holds the window, sources and services. |

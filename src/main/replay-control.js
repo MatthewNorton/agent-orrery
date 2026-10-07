@@ -9,27 +9,22 @@ function createReplayControl(ctx) {
 
   function boundedReplayStatus(mode = null) {
     const raw = ctx.replaySource ? ctx.replaySource.status() : {};
-    const minTs = Number.isFinite(raw.minTs) ? raw.minTs :
-      (Number.isFinite(raw.minMs) ? raw.minMs : null);
-    const maxTs = Number.isFinite(raw.maxTs) ? raw.maxTs :
-      (Number.isFinite(raw.maxMs) ? raw.maxMs : null);
-    let cursorTs = Number.isFinite(raw.cursorTs) ? raw.cursorTs :
-      (Number.isFinite(raw.cursorMs) ? raw.cursorMs : null);
+    const minTs = Number.isFinite(raw.minTs) ? raw.minTs : null;
+    const maxTs = Number.isFinite(raw.maxTs) ? raw.maxTs : null;
+    let cursorTs = Number.isFinite(raw.cursorTs) ? raw.cursorTs : null;
     const visibleMode = mode || (ctx.activeSource === ctx.replaySource ? 'replay' : 'live');
     if (visibleMode === 'live' && Number.isFinite(maxTs)) cursorTs = maxTs;
     return {
       mode: visibleMode,
-      available: typeof raw.available === 'boolean'
-        ? raw.available : Boolean(Number.isFinite(minTs) && Number.isFinite(maxTs)),
-      indexing: typeof raw.indexing === 'boolean' ? raw.indexing : raw.phase === 'indexing',
+      available: Boolean(raw.available),
+      indexing: Boolean(raw.indexing),
       minTs,
       maxTs,
       cursorTs,
       playing: visibleMode === 'replay' && Boolean(raw.playing),
       speed: [1, 10, 100, 1000].includes(Number(raw.speed)) ? Number(raw.speed) : 1,
-      sourceCount: Number.isFinite(raw.sourceCount) ? raw.sourceCount :
-        (Number.isFinite(raw.sessionCount) ? raw.sessionCount : 0),
-      truncated: typeof raw.truncated === 'boolean' ? raw.truncated : Boolean(raw.partial),
+      sourceCount: Number.isFinite(raw.sourceCount) ? raw.sourceCount : 0,
+      truncated: Boolean(raw.truncated),
     };
   }
 

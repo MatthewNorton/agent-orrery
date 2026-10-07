@@ -22,58 +22,6 @@ function createTasksIpc(ctx) {
     }
   }
 
-  function handleTasksSave(event, projectId, items) {
-    if (!trustedMainFrame(event) || !validProjectId(projectId)) {
-      return { ok: false, items: [] };
-    }
-    if (ctx.activeSource !== ctx.tracker || ctx.replay.replayBoundaryOperations > 0) {
-      return { ok: false, items: [] };
-    }
-    const cwd = ctx.ipc.terminal.liveProjectCwd(projectId);
-    if (!cwd) return { ok: false, items: [] };
-    try {
-      const current = readGoalsFile(cwd);
-      if (!Array.isArray(items) || items.length > 10_000) return taskMutationResult(projectId, current, false);
-      const additions = [];
-      const changes = [];
-      const seen = new Set();
-      for (const item of items) {
-        if (!item || typeof item !== 'object' || typeof item.text !== 'string' ||
-            typeof item.done !== 'boolean') return taskMutationResult(projectId, current, false);
-        const existing = typeof item.id === 'string'
-          ? current.items.find((goal) => goal.id === item.id.toLowerCase())
-          : Number.isSafeInteger(item.line)
-            ? current.items.find((goal) => goal.line === item.line)
-            : null;
-        if (!existing) {
-          if (item.id != null || item.line != null) return taskMutationResult(projectId, current, false);
-          additions.push(item);
-          continue;
-        }
-        const key = existing.id || `line:${existing.line}`;
-        if (seen.has(key) || existing.text !== item.text) {
-          return taskMutationResult(projectId, current, false);
-        }
-        seen.add(key);
-        if (existing.done !== item.done) changes.push({ existing, done: item.done });
-      }
-      if (changes.length === 1 && additions.length === 0) {
-        const change = changes[0];
-        return taskMutationResult(projectId, setGoalDone(cwd, {
-          ...(change.existing.id ? { id: change.existing.id } : { line: change.existing.line }),
-          text: change.existing.text,
-          done: change.done,
-        }), true);
-      }
-      if (changes.length === 0 && additions.length === 1) {
-        return taskMutationResult(projectId, appendGoal(cwd, additions[0].text), true);
-      }
-      return taskMutationResult(projectId, current, changes.length === 0 && additions.length === 0);
-    } catch {
-      return { ok: false, items: [] };
-    }
-  }
-
   function handleTaskAdd(event, projectId, text) {
     if (!trustedMainFrame(event) || !validProjectId(projectId) ||
         ctx.activeSource !== ctx.tracker || ctx.replay.replayBoundaryOperations > 0) {
@@ -125,7 +73,7 @@ function createTasksIpc(ctx) {
     };
   }
 
-  return { handleTasksGet, handleTasksSave, handleTaskAdd, handleTaskSetDone, handleTaskRemove };
+  return { handleTasksGet, handleTaskAdd, handleTaskSetDone, handleTaskRemove };
 }
 
 module.exports = { createTasksIpc };

@@ -370,5 +370,4 @@ function failure(code) {
 
 module.exports = {
   RootTaskCoordinator,
-  collectBaselineCodexShipIds,
 };

@@ -257,7 +257,7 @@
 
   // ---------- view switching ----------
   function makeCtx() {
-    return { store: S.store, openSystem: A.openSystem, openPlanet: A.openPlanet, back };
+    return { store: S.store, openSystem: A.openSystem, openPlanet: A.openPlanet };
   }
 
   function setView(name, data) {
