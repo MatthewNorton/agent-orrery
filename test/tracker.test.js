@@ -432,29 +432,73 @@ test('claude: question or permission attention keeps a ship docked for up to an 
   assert.deepEqual(sweepAt(session, last + 60 * MIN + 1).map((event) => event.type), ['ship-departed', 'feed']);
 });
 
-test('claude: a session resumed after 15 min idle is re-read from offset 0 and re-counts its old edits',
-  { todo: 'suspected bug (.docs/architecture.md §10 #29): old edits are counted into persisted totals again, and the resumed session\'s new edit emits no build event' },
-  (t) => {
-    const session = startClaude(t);
-    const { dir, tracker } = session;
-    appendAndPoll(session, [
-      claude.tool(dir, T0 + 1 * SEC, 'toolu_e1', 'Edit', { file_path: path.join(dir, 'src', 'a.js') }),
-    ], T0 + 1 * SEC);
-    assert.equal(tracker.snapshot().projects[0].totalBuilds, 1);
+// Edits src/a.js, lets the transcript go cold (> 15 min), then resumes it at T0 + 20 min with
+// an edit to src/b.js; also writes `alongside` with that time, then scans and polls once.
+function resumeAfterIdle(t, alongside = () => {}) {
+  const session = startClaude(t);
+  const { dir, tracker } = session;
+  appendAndPoll(session, [
+    claude.tool(dir, T0 + 1 * SEC, 'toolu_e1', 'Edit', { file_path: path.join(dir, 'src', 'a.js') }),
+  ], T0 + 1 * SEC);
+  assert.equal(tracker.snapshot().projects[0].totalBuilds, 1);
 
-    pollAt(session, T0 + 1 * SEC + 15 * MIN + 1);
-    const resumedAt = T0 + 20 * MIN;
-    session.world.clock.set(resumedAt);
-    appendJsonl(session.file, [
-      claude.tool(dir, resumedAt, 'toolu_e2', 'Edit', { file_path: path.join(dir, 'src', 'b.js') }),
-    ], resumedAt);
-    tracker.scan(false);
-    tracker.pollFiles();
-    const events = session.take();
+  pollAt(session, T0 + 1 * SEC + 15 * MIN + 1);
+  const resumedAt = T0 + 20 * MIN;
+  session.world.clock.set(resumedAt);
+  appendJsonl(session.file, [
+    claude.tool(dir, resumedAt, 'toolu_e2', 'Edit', { file_path: path.join(dir, 'src', 'b.js') }),
+  ], resumedAt);
+  alongside(session, resumedAt);
+  tracker.scan(false);
+  tracker.pollFiles();
+  return { ...session, events: session.take() };
+}
 
-    assert.equal(tracker.snapshot().projects[0].totalBuilds, 3, 'one old edit counted twice plus the new one');
-    assert.deepEqual(ofType(events, 'build'), [], 'the whole file is replayed in catchup mode');
+test('claude: a session resumed after 15 min idle continues from its previous offset (no re-count)', (t) => {
+  const { tracker, events } = resumeAfterIdle(t);
+  assert.deepEqual(ofType(events, 'build').map(pick(['shipId', 'file', 'isNew'])),
+    [{ shipId: SHIP_ID, file: path.join('src', 'b.js'), isNew: false }]);
+  assert.equal(tracker.snapshot().projects[0].totalBuilds, 2);
+});
+
+test('claude: a transcript that first appears while running is still replayed from zero and counts its edits', (t) => {
+  const newSession = '7c0d5f8e-1111-4222-8333-777788889999';
+  const { tracker, events } = resumeAfterIdle(t, ({ world, dir }, at) => {
+    appendJsonl(world.claudeFile(SLUG, newSession), [
+      claude.prompt(dir, at - 2 * SEC),
+      claude.tool(dir, at - 1 * SEC, 'toolu_n1', 'Edit', { file_path: path.join(dir, 'src', 'c.js') }),
+      claude.tool(dir, at, 'toolu_n2', 'Write', { file_path: path.join(dir, 'notes.md') }),
+    ], at);
   });
+  assert.deepEqual(ofType(events, 'build').map(pick(['shipId', 'file'])),
+    [{ shipId: SHIP_ID, file: path.join('src', 'b.js') }], 'the new transcript is caught up silently');
+  assert.deepEqual(ofType(events, 'ship-spawned').map((event) => event.ship.id), [`ship:${SLUG}:${newSession}`]);
+  assert.equal(tracker.snapshot().projects[0].totalBuilds, 4, 'a.js and b.js once each, plus both new-transcript edits');
+});
+
+test('claude: a transcript already idle over 15 min at startup resumes from its end (no re-count)', (t) => {
+  const world = createWorld(t);
+  const dir = world.projectDir;
+  const file = world.claudeFile();
+  appendJsonl(file, [
+    claude.prompt(dir, T0 - 60 * MIN),
+    claude.tool(dir, T0 - 59 * MIN, 'toolu_old', 'Edit', { file_path: path.join(dir, 'src', 'a.js') }),
+  ], T0 - 59 * MIN);
+  const { tracker, take } = world.live();
+  tracker.scan(true);
+  assert.deepEqual(take().map((event) => event.type), ['project-added']);
+
+  world.clock.set(T0 + 1 * MIN);
+  appendJsonl(file, [
+    claude.tool(dir, T0 + 1 * MIN, 'toolu_new', 'Edit', { file_path: path.join(dir, 'src', 'b.js') }),
+  ], T0 + 1 * MIN);
+  tracker.scan(false);
+  tracker.pollFiles();
+  const events = take();
+  assert.deepEqual(ofType(events, 'ship-spawned').map((event) => event.ship.id), [SHIP_ID]);
+  assert.deepEqual(ofType(events, 'build').map(pick(['file', 'isNew'])), [{ file: path.join('src', 'b.js'), isNew: true }]);
+  assert.equal(tracker.snapshot().projects[0].totalBuilds, 1);
+});
 
 // ---------- Codex ----------
 
