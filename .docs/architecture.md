@@ -80,7 +80,7 @@ or the record of how the app was built.
 
 | Folder | Files | Size | What it is | Part of the running app? |
 |---|---|---|---|---|
-| `src/main/` + `src/preload.js` | 36 | 9,561 lines JS (1,337 of it test harness) | Main process | **Yes** (harness runs only with test flags) |
+| `src/main/` + `src/preload.js` | 40 | 9,450 lines JS (1,337 of it test harness) | Main process | **Yes** (harness runs only with test flags) |
 | `src/renderer/` | 28 | 6,954 lines JS + 3,042 HTML/CSS | Renderer (UI + 3D) | **Yes** |
 | `assets/` | 331 | ~276 MB | Planet / skybox / asteroid textures, ship GLBs | Partly — see §8 |
 | `test/` | 23 | 4,295 lines | Unit tests (`npm test`, Node's runner, no Electron) | No |
@@ -192,19 +192,23 @@ in a closure, and anything shared is a field of `ctx`.
 | `tracker.js` | 1,573 | `class Tracker extends EventEmitter` | Polls Claude / Codex / Signal sources, owns the live model, emits event batches, saves `universe-state.json` | `provider-adapters` |
 | `replay-source.js` | 1,420 | `class ReplaySource extends EventEmitter` | Indexes all history once at startup; rebuilds the universe at any timestamp | `provider-adapters` |
 | `provider-adapters.js` | 570 | pure functions | Codex record parsing, tool classification, path canonicalisation, Signal config | — |
-| `task-runs.js` | 399 | `class TaskRunTracker` | Matches a launched Codex run to its ship; ticks the `GOALS.md` box when done | `goals` |
-| `root-task-coordinator.js` | 374 | `class RootTaskCoordinator` | Assign / retry flow: write goal → start run → launch Codex | `goals` |
-| `goals.js` | 371 | functions | Line-preserving `GOALS.md` parse / write (temp file + rename, refuses symlinks) | — |
-| `root-tasks.js` | 364 | `class RootTaskStore` | IDEAS queue records and phase transitions → `root-tasks.json` | — |
-| `agent-launcher.js` | 363 | factory → `{launch}` | Finds the native `codex` binary on PATH, spawns `codex exec` detached | `path-safety` |
-| `github-metadata-provider.js` | 328 | factory | Open-PR counts via `gh api graphql` (batches of 25, 5 min cache) | — |
-| `project-vcs-status.js` | 316 | factories | Runs `git status --porcelain=v2` + remote lookup (4 s timeout) | — |
-| `project-vcs-status-service.js` | 298 | factory | 15 s cache, ≤4 concurrent reads, merges GitHub data | — |
+| `task-runs.js` | 386 | `class TaskRunTracker` | Matches a launched Codex run to its ship; ticks the `GOALS.md` box when done | `goals` |
+| `root-task-coordinator.js` | 368 | `class RootTaskCoordinator` | Assign / retry flow: write goal → start run → launch Codex | `goals` |
+| `goals.js` | 351 | functions | Line-preserving `GOALS.md` parse / write (temp file + rename, refuses symlinks) | — |
+| `root-tasks.js` | 343 | `class RootTaskStore` | IDEAS queue records and phase transitions → `root-tasks.json` | — |
+| `agent-launcher.js` | 359 | factory → `{launch}` | Finds the native `codex` binary on PATH, spawns `codex exec` detached | `path-safety` |
+| `github-metadata-provider.js` | 273 | factory | Open-PR counts via `gh api graphql` (batches of 25, 5 min cache) | — |
+| `project-vcs-status.js` | 261 | factories | Runs `git status --porcelain=v2` + remote lookup (4 s timeout) | — |
+| `project-vcs-status-service.js` | 287 | factory | 15 s cache, ≤4 concurrent reads, merges GitHub data | — |
 | `terminal-launcher.js` | 185 | factory → `{open}` | `wt.exe -d <cwd>` (Windows) or `open -a Terminal` (macOS); Linux unsupported | `path-safety` |
-| `project-paths.js` | 165 | functions | Bounded folder search for a moved project (depth 6, 12k dirs, 8 s) | — |
-| `project-vcs-status-controller.js` | 113 | factory | Tracker events → debounced (400 ms) per-project git refresh | — |
+| `project-paths.js` | 161 | functions | Bounded folder search for a moved project (depth 6, 12k dirs, 8 s) | — |
+| `project-vcs-status-controller.js` | 111 | factory | Tracker events → debounced (400 ms) per-project git refresh | — |
 | `path-safety.js` | 84 | functions | Shared "is this a canonical local path / inside that path" checks | `provider-adapters` |
 | `window-security.js` | 54 | functions | Navigation / pop-up / permission lockdown, trusted-frame check | — |
+| `shared/bounded-process.js` | 70 | function | One child-process runner with a timeout and output cap (git and gh) | `shared/values` |
+| `shared/atomic-write.js` | 27 | function | Temp file + rename write (`GOALS.md`, IDEAS and run stores) | — |
+| `shared/values.js` | 24 | functions | `boundedInteger`, `ownString`, `bufferValue` | — |
+| `shared/ids.js` | 22 | functions | `validProjectId`, `validGoalId`, control-character check | — |
 
 **Wiring** — connects the services to the window:
 
@@ -528,10 +532,10 @@ not reproduced.
 5. **Two Claude parsers**: `tracker.js` `parseLine` (own tool tables) and `replay-source.js`
    `_parseHistoricalLine` (uses `classifyTool`). This is why replay and live disagree (§5.5).
 6. `fnv1a` / `mulberry32` copied 4× (`tracker`, `replay-source`, `util`, `galaxy-layout`).
-7. "Is path inside folder": 5 variants (`isInsidePath`, `isPathInside`, `isInside` — which treats
-   an equal path as outside — and `relativeInside` ×2, with different separators).
-8. Atomic temp-file + rename write: 5 copies. `boundedInteger`: 5 copies. The bounded
-   `spawn` runner: 2 near-identical copies (git and gh).
+7. "Is path inside folder": 5 variants that really do answer differently (`isInsidePath`,
+   `isPathInside` — which accepts UNC roots and long paths — `isInside`, which treats an equal
+   path as outside, and `relativeInside` ×2 with different separators).
+8. The atomic write in `tracker.js` still duplicates `shared/atomic-write.js` (pinned file).
 9. Ship building / removal in all three scenes (3 copies that already differ); camera,
    skybox, starfield and dispose setup also ×3.
 10. "Question or permission" attention check hard-coded in 6 places.
@@ -572,7 +576,7 @@ not reproduced.
     "Agent Universe Lite", most docs "Agent Universe".
 
 ### Test gaps
-27. No unit tests for `tracker.js`, `provider-adapters.js`, `project-paths.js`, or any of the
+27. No unit tests for `tracker.js`, `provider-adapters.js`, or any of the
     wiring (`app-context.js`, `replay-control.js`, `ipc/*`); `goals.js` only indirectly. Every
     `app-*.js` file is checked by source-text grep only.
 28. `kit/grade.mjs` runs against **your real** `~/.claude` / `~/.codex` and userData, so it fails
