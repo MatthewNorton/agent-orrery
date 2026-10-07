@@ -2,7 +2,7 @@
 
 How the codebase is structured **today**, written for someone who finds it confusing.
 
-- Snapshot: `main` @ `39b547d`, analysed 2026-10-06. This includes PR #11, which split the old
+- Snapshot: `main` after the 2026-10-07 cleanup (PRs #14–#19). PR #11 had already split the old
   2,217-line `src/main/main.js` into small files. Older docs still quote line numbers in the old
   `main.js`; §5.3 maps those to where the code lives now.
 - Visual map: open [`architecture.html`](architecture.html) in a browser (works offline from disk).
@@ -580,7 +580,7 @@ not reproduced.
 ### Dead weight
 20. `assets/ships/fleet-scale-v2/` (123 MB), `assets/palettes/`, `assets/manifest.json`,
     the `aur-aster-kite` hull — not loaded at runtime.
-21. `kit/done/multi-provider/edge-validation.mjs` is run by nothing.
+21. *(resolved)* `edge-validation.mjs` was folded into `test/tracker.test.js`.
 22. Unused by the app: `providerToolStatus` (only `grade-providers.mjs` calls it),
     `AUR.attentionLabel`, `scene-system.js` `metadata.focusStats`.
 
@@ -593,9 +593,10 @@ not reproduced.
     "Agent Universe Lite", most docs "Agent Universe".
 
 ### Test gaps
-27. No unit tests for `tracker.js`, `provider-adapters.js`, or any of the
-    wiring (`app-context.js`, `replay-control.js`, `ipc/*`); `goals.js` only indirectly. Every
-    `app-*.js` file is checked by source-text grep only.
+27. No unit tests for the wiring (`app-context.js`, `replay-control.js`, `ipc/*`); `goals.js` is
+    tested only indirectly. `tracker.js` and `replay-source.js` are covered by characterization
+    tests (`test/tracker*.test.js`, `test/replay-model.test.js`). Every `app-*.js` file is checked
+    by source-text grep only.
 28. `kit/grade.mjs` runs against **your real** `~/.claude` / `~/.codex` and userData, so it fails
     on a machine with no history and can't be reproduced in CI.
 
