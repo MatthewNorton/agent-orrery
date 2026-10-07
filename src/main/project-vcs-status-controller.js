@@ -1,10 +1,8 @@
 'use strict';
 
-const DEFAULT_DEBOUNCE_MS = 400;
+const { boundedInteger } = require('./shared/values');
 
-function boundedInteger(value, fallback, minimum, maximum) {
-  return Number.isSafeInteger(value) && value >= minimum && value <= maximum ? value : fallback;
-}
+const DEFAULT_DEBOUNCE_MS = 400;
 
 function createProjectVcsStatusController(options = {}) {
   const settings = options && typeof options === 'object' && !Array.isArray(options) ? options : {};

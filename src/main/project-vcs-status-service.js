@@ -1,5 +1,7 @@
 'use strict';
 
+const { boundedInteger } = require('./shared/values');
+
 const DEFAULT_TTL_MS = 15_000;
 const DEFAULT_MAX_CONCURRENCY = 4;
 const DEFAULT_MAX_PROJECTS = 500;
@@ -7,10 +9,6 @@ const GITHUB_FAILURE_CODES = new Set([
   'AUTH_REQUIRED', 'RATE_LIMITED', 'GH_UNAVAILABLE', 'GH_FAILED', 'TIMEOUT',
   'OUTPUT_LIMIT', 'INVALID_QUERY', 'INVALID_RESPONSE', 'REPOSITORY_UNAVAILABLE',
 ]);
-
-function boundedInteger(value, fallback, minimum, maximum) {
-  return Number.isSafeInteger(value) && value >= minimum && value <= maximum ? value : fallback;
-}
 
 function ownString(value, key) {
   if (!value || typeof value !== 'object' || Array.isArray(value) || !Object.hasOwn(value, key)) {
