@@ -1,6 +1,6 @@
 'use strict';
 
-const { boundedInteger } = require('./shared/values');
+const { boundedInteger, ownString } = require('./shared/values');
 
 const DEFAULT_TTL_MS = 15_000;
 const DEFAULT_MAX_CONCURRENCY = 4;
@@ -9,15 +9,6 @@ const GITHUB_FAILURE_CODES = new Set([
   'AUTH_REQUIRED', 'RATE_LIMITED', 'GH_UNAVAILABLE', 'GH_FAILED', 'TIMEOUT',
   'OUTPUT_LIMIT', 'INVALID_QUERY', 'INVALID_RESPONSE', 'REPOSITORY_UNAVAILABLE',
 ]);
-
-function ownString(value, key) {
-  if (!value || typeof value !== 'object' || Array.isArray(value) || !Object.hasOwn(value, key)) {
-    return '';
-  }
-  const descriptor = Object.getOwnPropertyDescriptor(value, key);
-  return descriptor && Object.hasOwn(descriptor, 'value') && typeof descriptor.value === 'string'
-    ? descriptor.value.trim() : '';
-}
 
 function normalizedProject(project) {
   const projectId = ownString(project, 'id');

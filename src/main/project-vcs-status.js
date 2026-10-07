@@ -3,7 +3,8 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
-const { boundedInteger } = require('./shared/values');
+const { boundedInteger, bufferValue } = require('./shared/values');
+const { runBoundedProcess } = require('./shared/bounded-process');
 
 const DEFAULT_TIMEOUT_MS = 4_000;
 const DEFAULT_MAX_OUTPUT_BYTES = 1024 * 1024;
@@ -23,13 +24,6 @@ function failure(code) {
 
 function stringValue(value) {
   return typeof value === 'string' ? value.trim() : '';
-}
-
-function bufferValue(value) {
-  if (Buffer.isBuffer(value)) return value;
-  if (typeof value === 'string') return Buffer.from(value, 'utf8');
-  if (value == null) return Buffer.alloc(0);
-  return Buffer.from(String(value), 'utf8');
 }
 
 function normalizedProjectPath(value) {
@@ -167,79 +161,33 @@ function buildGitSpec(gitCommand, projectPath, commandArgs, env) {
   });
 }
 
+function gitResult({ exitCode, signal, stdout, stderr }) {
+  return {
+    ok: exitCode === 0,
+    code: exitCode === 0 ? null : 'GIT_FAILED',
+    exitCode: Number.isInteger(exitCode) ? exitCode : null,
+    signal: typeof signal === 'string' ? signal : null,
+    stdout,
+    stderr,
+  };
+}
+
 function createGitRunner(options = {}) {
   const settings = options && typeof options === 'object' && !Array.isArray(options) ? options : {};
-  const spawnImpl = typeof settings.spawnImpl === 'function' ? settings.spawnImpl : spawn;
   const gitCommand = stringValue(settings.gitCommand) || 'git';
   const env = settings.env && typeof settings.env === 'object' ? settings.env : process.env;
-  const timeoutMs = boundedInteger(settings.timeoutMs, DEFAULT_TIMEOUT_MS, 250, 30_000);
-  const maxOutputBytes = boundedInteger(
-    settings.maxOutputBytes, DEFAULT_MAX_OUTPUT_BYTES, 4_096, 4 * 1024 * 1024
-  );
+  const limits = Object.freeze({
+    spawnImpl: typeof settings.spawnImpl === 'function' ? settings.spawnImpl : spawn,
+    timeoutMs: boundedInteger(settings.timeoutMs, DEFAULT_TIMEOUT_MS, 250, 30_000),
+    maxOutputBytes: boundedInteger(
+      settings.maxOutputBytes, DEFAULT_MAX_OUTPUT_BYTES, 4_096, 4 * 1024 * 1024
+    ),
+    unavailableCode: 'GIT_UNAVAILABLE',
+    onClose: gitResult,
+  });
 
   return async function runGit(projectPath, commandArgs) {
-    const spec = buildGitSpec(gitCommand, projectPath, commandArgs, env);
-    return new Promise((resolve) => {
-      let child;
-      try {
-        child = spawnImpl(spec.command, spec.args, spec.options);
-      } catch {
-        resolve({ ok: false, code: 'GIT_UNAVAILABLE' });
-        return;
-      }
-      if (!child || !child.stdout || typeof child.stdout.on !== 'function' ||
-          !child.stderr || typeof child.stderr.on !== 'function' || typeof child.once !== 'function') {
-        resolve({ ok: false, code: 'GIT_UNAVAILABLE' });
-        return;
-      }
-
-      const stdout = [];
-      const stderr = [];
-      let outputBytes = 0;
-      let settled = false;
-      let timeout = null;
-
-      const finish = (result) => {
-        if (settled) return;
-        settled = true;
-        if (timeout) clearTimeout(timeout);
-        resolve(result);
-      };
-      const stop = (code) => {
-        try {
-          if (typeof child.kill === 'function') child.kill('SIGKILL');
-        } catch {
-          // The bounded failure is still authoritative if the child exited first.
-        }
-        finish({ ok: false, code });
-      };
-      const collect = (target) => (chunk) => {
-        if (settled) return;
-        const data = bufferValue(chunk);
-        outputBytes += data.length;
-        if (outputBytes > maxOutputBytes) {
-          stop('OUTPUT_LIMIT');
-          return;
-        }
-        target.push(data);
-      };
-
-      child.stdout.on('data', collect(stdout));
-      child.stderr.on('data', collect(stderr));
-      child.once('error', () => finish({ ok: false, code: 'GIT_UNAVAILABLE' }));
-      child.once('close', (exitCode, signal) => {
-        finish({
-          ok: exitCode === 0,
-          code: exitCode === 0 ? null : 'GIT_FAILED',
-          exitCode: Number.isInteger(exitCode) ? exitCode : null,
-          signal: typeof signal === 'string' ? signal : null,
-          stdout: Buffer.concat(stdout),
-          stderr: Buffer.concat(stderr),
-        });
-      });
-      timeout = setTimeout(() => stop('TIMEOUT'), timeoutMs);
-      if (timeout && typeof timeout.unref === 'function') timeout.unref();
-    });
+    return runBoundedProcess(buildGitSpec(gitCommand, projectPath, commandArgs, env), limits);
   };
 }
 
