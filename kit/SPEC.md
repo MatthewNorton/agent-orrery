@@ -17,16 +17,8 @@ Gold samples (visual ground truth, in repo root):
 - `2.solar-system-view.png` — one project: sun, orbits, planets, asteroid belt, ships
 - `1.planet-view.png` — one planet close-up with status panels
 
-Frozen files — read them, never modify them unless an active kit contract
-explicitly unfreezes a named test or product surface:
-
-- `src/main/tracker.js` — transcript tailing, ship/planet/event derivation
-- `src/main/replay-source.js` — bounded, read-only Claude/Codex history source
-- `src/preload.js` — the `window.AU` bridge (exact API below)
-- `package.json` — no new dependencies, no script changes
-
-`main.js` is a bootstrap; concerns live in `app-context.js`, `window.js`,
-`replay-control.js`, `ipc/`, `harness/`.
+Frozen files: the **Frozen files** bullet in `CLAUDE.md` is the one authoritative list. The main-process layout is described in
+`.docs/architecture.md`.
 
 ## 1. Hard constraints
 
@@ -42,31 +34,30 @@ explicitly unfreezes a named test or product surface:
    the web. Use the `system-ui, 'Segoe UI', sans-serif` stack.
 5. `contextIsolation` is on. The ONLY way to reach the main process is
    `window.AU` (documented below). No `require`, no `process`.
-6. New renderer files live under `src/renderer/`. Keep each file under ~600 lines
-   by default. `scene-universe.js` may remain under ~900 while galaxy region
-   lifecycle, shared GUI declutter, and live mesh-derived proof stay co-located;
-   further growth requires a kit that explicitly unfreezes a renderer-specific
-   helper rather than weakening the pure `galaxy-layout.js` boundary.
+6. New renderer files live under `src/renderer/`. Keep each file under 600 lines.
+   `scene-universe.js` (971) and `scene-system.js` (618) are capped at their
+   current size by `grade-structure.mjs`; growth means extracting a helper.
 7. One `BABYLON.Engine` for the whole app lifetime. Views may each build their
    own `BABYLON.Scene`; dispose the old scene on view switch.
 
-## 2. Files to create
+## 2. Renderer files
 
-| File | Responsibility |
+`index.html` loads, in order: the three Babylon UMD bundles (core, GUI,
+loaders), then:
+
+| Layer | Files |
 |---|---|
-| `src/renderer/index.html` | canvas + overlay DOM skeleton + script tags in order: babylon.js, babylon.gui.min.js, `util.js`, `polish-math.js`, `galaxy-layout.js`, `scene-universe.js`, `scene-system.js`, `scene-planet.js`, `app.js` |
-| `src/renderer/style.css` | design tokens + all overlay chrome styling |
-| `src/renderer/util.js` | `window.AUR` bootstrap: `fnv1a`, `mulberry32` (copy the exact algorithms from `src/main/tracker.js` so seeds agree), palettes, relative-time formatter, shared helpers |
-| `src/renderer/polish-math.js` | pure UMD/Node helpers for deterministic label collision selection and non-accumulating sun pulse color |
-| `src/renderer/galaxy-layout.js` | pure UMD/Node helpers for deterministic galaxy colors, member placement, and separated region packing |
-| `src/renderer/scene-universe.js` | universe map view |
-| `src/renderer/scene-system.js` | solar system view |
-| `src/renderer/scene-planet.js` | planet close-up view |
-| `src/renderer/app.js` | boot, view stack, event routing, overlay DOM rendering, debug hooks |
+| Shared libraries | `util.js` (creates `window.AUR`; `fnv1a`/`mulberry32` copied from `src/main/tracker.js` so seeds agree), `procedural-worlds.js`, `ship-assets.js`, `polish-math.js` and `galaxy-layout.js` (pure UMD), `search-core.js`, `components/project-vcs-status.js` |
+| Views | `scene-universe.js`, `scene-system.js`, `scene-planet.js` |
+| App state | `app-state.js` — the only file that assigns `AUR.app` (`state`, `const`) |
+| App modules | `app-agent-focus.js`, `app-chrome.js`, `app-ideas.js`, `app-playback.js`, `app-project-control.js`, `app-project-search.js`, `app-project-settings.js`, `app-project-tasks.js` |
+| Boot | `app.js` — boot, event routing, view switching, debug hooks |
 
-Suggested view contract (you may adjust internally, keep it consistent):
-each `scene-*.js` registers `AUR.views.<name> = (engine, data, ctx) => ({ scene, update(eventBatch), dispose() })`
-where `ctx` provides callbacks like `openSystem(projectId)`, `openPlanet(projectId, name)`, `back()`.
+View contract: each `scene-*.js` registers
+`AUR.views.<name> = (engine, data, ctx) => ({ scene, update(eventBatch), dispose() })`
+where `ctx` provides `openSystem(projectId)`, `openPlanet(projectId, name)` and the
+shared `store`. Views may expose extras the app layer probes for
+(`setSearchMatches`, `focusShip`, `planetData`).
 
 ## 3. The `window.AU` bridge (matches `src/preload.js`)
 
@@ -77,13 +68,36 @@ AU.snapshot()  -> Promise<{ projects: Project[], ships: Ship[], feed: FeedEntry[
 AU.getSystem(projectId)          -> Promise<SystemData | null>
 AU.getPlanet(projectId, name)    -> Promise<PlanetData | null>
 AU.openProject(projectId)        -> Promise<void>   // opens folder in Explorer
+AU.openExternal(url)             -> Promise          // only https://github.com/<owner>/<repo>
 AU.openTerminal(projectId)       -> Promise<{ok:Boolean, code?:String}>
                                    // LIVE-only host terminal request (win32/darwin)
 AU.onEvents(cb)                  // cb(eventBatch: Event[], {streamEpoch, mode})
 AU.replay({ action, ts?, speed? }) -> Promise<{playback, streamEpoch, snapshot?}>
 AU.onReplayState(cb)             // bounded playback progress/status updates
+AU.onProjectVcsStatusChanged(cb) // cb(status, {streamEpoch, mode}) — LIVE only
 AU.onDebugView(cb)               // cb('universe'|'system'|'planet') — shots mode
 AU.debugReady()                  // call after requested view has rendered a frame
+
+// Per-project GOALS.md checklist (TASKS panel), LIVE only
+AU.tasksGet(projectId)                 -> Promise<{exists, path, items} | null>
+AU.taskAdd(projectId, text)            -> Promise<{ok, items}>
+AU.taskSetDone(projectId, request)     -> Promise<{ok, items}>
+AU.taskRemove(projectId, request)      -> Promise<{ok, items}>
+AU.tasksSave(projectId, items)         -> Promise<{ok, items}>   // unused by the renderer
+AU.onTasksChanged(cb)                  // cb({projectId, taskId, phase})
+
+// Global IDEAS queue; assign/retry start Codex on a tagged GOALS.md item
+AU.rootTasksGet()                      -> Promise<{items}>
+AU.rootTaskCreate(text)                -> Promise<{ok, …} | {ok:false, code}>
+AU.rootTaskRemove(taskId)              -> Promise<…>
+AU.rootTaskAssign(taskId, projectId)   -> Promise<…>
+AU.rootTaskRetry(taskId)               -> Promise<…>
+AU.onRootTasksChanged(cb)              // cb({taskId, phase})
+
+// Moved-project recovery (settings dialog), LIVE only
+AU.projectPathsScan()                  -> Promise<{ok, root, matches, truncated, …}>
+AU.projectPathLocate(projectId)        -> Promise<…>
+AU.projectPathApply(projectId, token)  -> Promise<…>   // token from scan/locate
 ```
 
 ```js
@@ -97,8 +111,8 @@ PlaybackStatus = {
 Shapes (all fields always present unless marked `?`):
 
 ```js
-Project = { id, path, name, exists, lastActivity, totalBytes, totalBuilds, seed,
-            galaxy: { key, label } }
+Project = { id, path, name, exists, firstSeen, lastActivity, totalBytes, totalBuilds,
+            seed, galaxy: { key, label }, vcs? }   // vcs: LIVE snapshot/system only
 // id: slug string; path: absolute dir or null; exists: bool (false = deleted/temp
 // project -> render as dim "derelict" system); lastActivity: ms epoch;
 // totalBytes: transcript bytes (proxy for historical activity); seed: uint32;
@@ -106,7 +120,7 @@ Project = { id, path, name, exists, lastActivity, totalBytes, totalBuilds, seed,
 // deleted paths use key `graveyard` with label `Graveyard`.
 
 Ship = { id, name, provider, project, kind, status, detail, lastEvent,
-         attention, attentionSince }
+         attention, attentionSince, taskId?, turnOutcome? }   // ?: LIVE only
 // provider: 'claude'|'codex'|'generic'; names use Claude-/Codex-/Signal-.
 // kind: 'main' | 'drone' (drone = subagent, render smaller);
 // status: 'Building'|'Exploring'|'Gathering Resources'|'Scanning'|'Delegating'|
@@ -143,9 +157,11 @@ within its source stream. The renderer reconciles `(streamEpoch, seq)` with the
 snapshot boundary so live/replay transitions and events racing an invoke are
 neither mixed, lost, nor applied twice.
 
-Maintain a renderer-side store (in `app.js`): `projects` Map, `ships` Map, feed
-array (cap 60). Apply every batch to the store first, then hand the batch to the
-active view's `update()`, then re-render the affected overlay DOM.
+The renderer-side store lives in `AUR.app.state.store` (`app-state.js`):
+`projects` Map, `ships` Map, feed array (cap 60). `app.js` applies every batch to
+the store first, then hands the batch to the active view's `update()`, then
+re-renders the affected overlay DOM. The renderer also synthesizes one event of
+its own, `{ type: 'project-vcs-status' }`, when a git status push arrives.
 
 ## 4. Shared chrome (all three views — copy the mockups)
 
