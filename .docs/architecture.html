@@ -1,0 +1,1128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orrery Architecture Map</title>
+<meta name="description" content="How Agent Universe Lite is structured today: processes, modules, IPC channels, data flows and hotspots.">
+<style>
+:root {
+  --bg: #f6f6f3; --surface: #ffffff; --fg: #1b1d22; --muted: #5b616d; --rule: #dcdde2;
+  --edge: #a4a9b4; --hi: #2459d6; --trace: #c2410c; --warn: #c2410c; --pin: #8a5a00;
+  --lane: #ebebe6; --lane-fg: #6b707b;
+  --ext-f: #eef0f3; --ext-s: #8a93a3;
+  --main-f: #e7effd; --main-s: #4a6fd1;
+  --harn-f: #ededed; --harn-s: #9a9a9a; --harn-l: #c9c9c9;
+  --br-f: #f1eafd; --br-s: #7c4dce;
+  --app-f: #e3f5ef; --app-s: #2f8f73;
+  --view-f: #ecf6e1; --view-s: #5b8f2a;
+  --asset-f: #fbf0e1; --asset-s: #b7791f;
+  --tip-bg: #1b1d22; --tip-fg: #f6f6f3;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1115; --surface: #171a21; --fg: #e6e8ee; --muted: #9aa1ae; --rule: #2a2f3a;
+    --edge: #4f5768; --hi: #74a7ff; --trace: #ff8a4c; --warn: #ff7a45; --pin: #e0b04a;
+    --lane: #14171d; --lane-fg: #808897;
+    --ext-f: #1c2028; --ext-s: #6b7486;
+    --main-f: #142036; --main-s: #6f93ef;
+    --harn-f: #1c1e23; --harn-s: #6c6f77; --harn-l: #2c2f36;
+    --br-f: #221a35; --br-s: #a585ec;
+    --app-f: #10261f; --app-s: #45b08f;
+    --view-f: #17240f; --view-s: #7fb84a;
+    --asset-f: #2a2112; --asset-s: #d39b45;
+    --tip-bg: #e6e8ee; --tip-fg: #0f1115;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1115; --surface: #171a21; --fg: #e6e8ee; --muted: #9aa1ae; --rule: #2a2f3a;
+  --edge: #4f5768; --hi: #74a7ff; --trace: #ff8a4c; --warn: #ff7a45; --pin: #e0b04a;
+  --lane: #14171d; --lane-fg: #808897;
+  --ext-f: #1c2028; --ext-s: #6b7486;
+  --main-f: #142036; --main-s: #6f93ef;
+  --harn-f: #1c1e23; --harn-s: #6c6f77; --harn-l: #2c2f36;
+  --br-f: #221a35; --br-s: #a585ec;
+  --app-f: #10261f; --app-s: #45b08f;
+  --view-f: #17240f; --view-s: #7fb84a;
+  --asset-f: #2a2112; --asset-s: #d39b45;
+  --tip-bg: #e6e8ee; --tip-fg: #0f1115;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--fg);
+  font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+code, .mono { font-family: ui-monospace, "Cascadia Mono", Consolas, "SF Mono", Menlo, monospace; font-size: 0.92em; }
+.wrap { max-width: 1600px; margin: 0 auto; padding: 24px 16px 64px; }
+header h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -0.01em; }
+header p { margin: 0; color: var(--muted); max-width: 900px; }
+.topline { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+h2 { font-size: 17px; margin: 40px 0 6px; }
+.lede { color: var(--muted); margin: 0 0 14px; max-width: 900px; }
+
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 18px 0 10px; }
+.controls .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; margin-right: 2px; }
+button {
+  font: inherit; font-size: 13px; color: var(--fg); background: var(--surface);
+  border: 1px solid var(--rule); border-radius: 999px; padding: 5px 12px; cursor: pointer;
+}
+button:hover { border-color: var(--muted); }
+button[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+button:focus-visible, .node:focus-visible { outline: 2px solid var(--hi); outline-offset: 2px; }
+.sep { width: 1px; height: 22px; background: var(--rule); margin: 0 4px; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--muted); margin: 4px 0 10px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 14px; height: 10px; border-radius: 3px; border: 1.5px solid; display: inline-block; }
+
+.figure { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 8px; position: relative; }
+.scroller { overflow-x: auto; }
+svg.map { display: block; width: 100%; min-width: 1180px; height: auto; }
+figcaption { color: var(--muted); font-size: 12.5px; padding: 6px 8px 2px; }
+
+/* map */
+.lane-bg { fill: var(--lane); }
+.lane-title { fill: var(--lane-fg); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 600; }
+.col-title { fill: var(--fg); font-size: 12.5px; font-weight: 600; }
+.grp-title { fill: var(--muted); font-size: 11px; }
+.node rect.box { stroke-width: 1.4; transition: opacity .15s; }
+.node { cursor: pointer; transition: opacity .15s; }
+.n-label { fill: var(--fg); font-size: 12px; font-family: ui-monospace, "Cascadia Mono", Consolas, "SF Mono", Menlo, monospace; }
+.n-sub { fill: var(--muted); font-size: 10.5px; }
+.layer-ext rect.box { fill: var(--ext-f); stroke: var(--ext-s); }
+.layer-main rect.box { fill: var(--main-f); stroke: var(--main-s); }
+.layer-harness rect.box { fill: url(#hatch); stroke: var(--harn-s); }
+.layer-bridge rect.box { fill: var(--br-f); stroke: var(--br-s); }
+.layer-app rect.box { fill: var(--app-f); stroke: var(--app-s); }
+.layer-view rect.box { fill: var(--view-f); stroke: var(--view-s); }
+.layer-asset rect.box { fill: var(--asset-f); stroke: var(--asset-s); }
+.unused rect.box { fill: transparent; stroke-dasharray: 4 3; }
+.bar { fill: var(--muted); opacity: .55; }
+.bar.over { fill: var(--warn); opacity: .9; }
+.pin { fill: var(--pin); }
+
+.edge { fill: none; stroke: var(--edge); stroke-width: 1.2; opacity: 0; transition: opacity .15s; pointer-events: none; }
+.edge.bb, .show-all .edge { opacity: .55; }
+.edge.req { stroke-dasharray: 1 0; }
+.edge.io { stroke-dasharray: 5 3; }
+.edge.hi { stroke: var(--hi); opacity: 1; stroke-width: 1.8; }
+.edge.tr { stroke: var(--trace); opacity: 1; stroke-width: 2.2; }
+.focused .edge:not(.hi):not(.tr) { opacity: .08; }
+.focused .node:not(.lit) { opacity: .28; }
+.node.lit rect.box { stroke-width: 2.2; }
+.node.sel rect.box { stroke: var(--hi); stroke-width: 2.6; }
+.node.hot rect.box { stroke: var(--warn); stroke-width: 2.4; }
+.badge circle { fill: var(--trace); }
+.badge text { fill: #fff; font-size: 10.5px; font-weight: 700; }
+
+/* panels */
+.panels { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; margin-top: 16px; }
+@media (max-width: 900px) { .panels { grid-template-columns: 1fr; } }
+.card { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 16px 18px; min-height: 140px; }
+.card h3 { margin: 0 0 2px; font-size: 15px; }
+.card .meta { color: var(--muted); font-size: 12.5px; margin-bottom: 10px; }
+.card h4 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 14px 0 4px; }
+.card ul, .card ol { margin: 0; padding-left: 20px; }
+.card li { margin: 3px 0; }
+.empty { color: var(--muted); }
+.tag { display: inline-block; font-size: 11px; border: 1px solid var(--rule); border-radius: 999px; padding: 0 8px; margin: 0 4px 4px 0; color: var(--muted); }
+.tag.warn { color: var(--warn); border-color: var(--warn); }
+.issues li { color: var(--fg); }
+.issues li::marker { color: var(--warn); }
+ol.steps li { margin: 6px 0; }
+ol.steps li::marker { color: var(--trace); font-weight: 700; }
+
+.tip {
+  position: absolute; pointer-events: none; z-index: 5; max-width: 300px;
+  background: var(--tip-bg); color: var(--tip-fg); border-radius: 8px; padding: 8px 10px;
+  font-size: 12px; line-height: 1.4; opacity: 0; transition: opacity .1s;
+}
+.tip b { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-weight: 600; }
+
+/* main.js table */
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--rule); vertical-align: middle; }
+th { font-size: 11.5px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+.split { display: flex; height: 26px; border-radius: 6px; overflow: hidden; border: 1px solid var(--rule); margin: 6px 0 14px; }
+.split div { height: 100%; }
+.cell-bar { display: flex; align-items: center; gap: 8px; min-width: 160px; }
+.cell-bar i { display: block; height: 10px; border-radius: 3px; }
+.k-app { background: var(--main-s); }
+.k-harness { background: repeating-linear-gradient(45deg, var(--harn-s) 0 3px, transparent 3px 6px); border: 1px solid var(--harn-s); }
+.num { font-variant-numeric: tabular-nums; color: var(--muted); }
+.tablewrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 8px 10px; }
+
+/* size chart */
+.sizes { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+@media (max-width: 900px) { .sizes { grid-template-columns: 1fr; } }
+.chart { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 14px 16px; }
+.chart h3 { margin: 0 0 10px; font-size: 14px; }
+.row { display: grid; grid-template-columns: 250px minmax(0, 1fr) 56px; gap: 8px; align-items: center; font-size: 12px; margin: 3px 0; }
+.row .name { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .track { position: relative; height: 12px; }
+.row .fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; }
+.row .cap { position: absolute; top: -3px; bottom: -3px; width: 0; border-left: 1.5px dashed var(--warn); }
+.row .n { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+.fill.main { background: var(--main-s); }
+.fill.app { background: var(--app-s); }
+.fill.view { background: var(--view-s); }
+.fill.shell { background: var(--muted); }
+.fill.harness { background: repeating-linear-gradient(45deg, var(--harn-s) 0 3px, transparent 3px 6px); border: 1px solid var(--harn-s); }
+.fill.over { background: var(--warn); }
+.pinmark { color: var(--pin); font-size: 11px; margin-left: 4px; }
+.note { font-size: 12px; color: var(--muted); margin-top: 10px; }
+@media (max-width: 520px) { .row { grid-template-columns: 140px minmax(0, 1fr) 44px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="topline">
+    <div>
+      <h1>Agent Universe Lite — architecture map</h1>
+      <p>How the code is structured on <code>main</code> @ <code>39b547d</code> (analysed 6 Oct 2026, after the PR #11 split of
+        <code>main.js</code>). The written companion is
+        <code>architecture.md</code> in this folder. Hover a box to see what it talks to; click to pin it; use the buttons to
+        follow one flow end to end.</p>
+    </div>
+    <button id="btn-theme" type="button" aria-label="Switch colour theme">Theme: auto</button>
+  </header>
+
+  <div class="controls" role="toolbar" aria-label="Map views">
+    <span class="label">Follow a flow</span>
+    <button type="button" data-trace="live">Transcript line → pixels</button>
+    <button type="button" data-trace="replay">Scrub history</button>
+    <button type="button" data-trace="ideas">IDEAS item → Codex</button>
+    <button type="button" data-trace="terminal">Open Terminal</button>
+    <button type="button" data-trace="git">Git status markers</button>
+    <span class="sep" aria-hidden="true"></span>
+    <button type="button" id="btn-hot" aria-pressed="false">Show hotspots</button>
+    <button type="button" id="btn-all" aria-pressed="false">Show every connection</button>
+    <button type="button" id="btn-clear">Clear</button>
+  </div>
+
+  <div class="legend" aria-hidden="true">
+    <span><i class="sw" style="background:var(--ext-f);border-color:var(--ext-s)"></i>outside the app</span>
+    <span><i class="sw" style="background:var(--main-f);border-color:var(--main-s)"></i>main process</span>
+    <span><i class="sw" style="background:repeating-linear-gradient(45deg,var(--harn-l) 0 3px,var(--harn-f) 3px 6px);border-color:var(--harn-s)"></i>test harness (runs only with test flags)</span>
+    <span><i class="sw" style="background:var(--br-f);border-color:var(--br-s)"></i>IPC bridge</span>
+    <span><i class="sw" style="background:var(--app-f);border-color:var(--app-s)"></i>renderer app layer</span>
+    <span><i class="sw" style="background:var(--view-f);border-color:var(--view-s)"></i>views + libraries</span>
+    <span><i class="sw" style="background:var(--asset-f);border-color:var(--asset-s)"></i>assets</span>
+    <span><svg width="12" height="12" viewBox="0 0 12 12"><path d="M6 1 L11 6 L6 11 L1 6 Z" fill="var(--pin)"/></svg>hash-pinned (edits need <code>kit/repin.mjs</code>)</span>
+    <span><svg width="40" height="8" viewBox="0 0 40 8"><rect x="0" y="2" width="26" height="3" fill="var(--warn)"/></svg>size bar (red: over 600 lines)</span>
+    <span><svg width="34" height="8" viewBox="0 0 34 8"><line x1="0" y1="4" x2="34" y2="4" stroke="var(--edge)" stroke-width="1.5" stroke-dasharray="5 3"/></svg>reads / writes / spawns</span>
+    <span><svg width="34" height="8" viewBox="0 0 34 8"><line x1="0" y1="4" x2="34" y2="4" stroke="var(--edge)" stroke-width="1.5"/></svg>calls / data flow</span>
+  </div>
+
+  <figure class="figure" id="fig-map" style="margin:0">
+    <div class="scroller">
+      <svg class="map" id="map" role="img" aria-labelledby="map-cap"></svg>
+    </div>
+    <div class="tip" id="tip" role="tooltip"></div>
+    <figcaption id="map-cap">Data enters on the left (transcripts on disk), is modelled in the main process, crosses the
+      <code>window.AU</code> bridge as <code>au:*</code> IPC, and is drawn by the renderer on the right. Faint lines are the
+      main data path; everything else appears on hover.</figcaption>
+  </figure>
+
+  <div class="panels">
+    <section class="card" id="details" aria-live="polite">
+      <h3>Pick a box</h3>
+      <p class="empty">Hover or click any box in the map to see its job, size, what it talks to and what is awkward about it.</p>
+    </section>
+    <section class="card" id="story" aria-live="polite">
+      <h3>Follow a flow</h3>
+      <p class="empty">Choose one of the flows above to see the numbered path through the code, or “Show hotspots” to see
+        where the mess is concentrated.</p>
+    </section>
+  </div>
+
+  <h2>Where the old <code>main.js</code> went</h2>
+  <p class="lede">Until PR #11 (merged 6 Oct 2026) the main process lived in one 2,217-line <code>main.js</code>, over half of it headless
+    test harness. Older docs still quote line numbers in that file; this table tells you where each block lives now.</p>
+  <div class="tablewrap">
+    <div class="split" id="split" role="img" aria-label="The old main.js: about 45 percent app code, 55 percent test harness"></div>
+    <table id="mainjs-table">
+      <thead><tr><th>Block</th><th>Old main.js lines</th><th>Size</th><th>Now in</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <h2>File sizes</h2>
+  <p class="lede">Every source file on one scale (hatched: test harness). The dashed mark is the 600-line renderer rule; the two scene files are capped
+    at exactly their current size, so they cannot grow by a single line without failing <code>grade-structure.mjs</code>.</p>
+  <div class="sizes">
+    <div class="chart"><h3>Main process (<code>src/main</code> + preload)</h3><div id="sz-main"></div></div>
+    <div class="chart"><h3>Renderer (<code>src/renderer</code>)</h3><div id="sz-ren"></div>
+      <p class="note"><span class="pinmark">◆</span> hash-pinned by the control / history gates.</p></div>
+  </div>
+</div>
+
+<script>
+(() => {
+'use strict';
+
+const MAXL = 2217;
+
+const NODES = {
+  'ext.claude': { label: 'Claude transcripts', sub: '~/.claude/projects/*/*.jsonl', layer: 'ext',
+    job: 'Session logs Claude Code already writes. Files changed in the last 15 min are tailed live; all of them are indexed for playback.' },
+  'ext.codex': { label: 'Codex transcripts', sub: '~/.codex/sessions/**/*.jsonl', layer: 'ext',
+    job: 'Rollout logs Codex writes (plus archived_sessions). Same treatment as Claude.' },
+  'ext.signal': { label: 'Signal folders', sub: 'listed in providers.json', layer: 'ext',
+    job: 'Folders you list in providers.json. Only file sizes and times are read, never contents; each changing file shows as a generic ship.' },
+  'ext.projects': { label: 'Project folders', sub: 'dirs → planets · GOALS.md', layer: 'ext',
+    job: 'The working directories agents run in. Top-level folders become planets; GOALS.md holds the TASKS checkboxes.' },
+  'ext.state': { label: 'universe-state.json', sub: 'userData · every 60 s', layer: 'ext',
+    job: 'Build counts per folder, canonical path → project id map, and moved-project overrides.' },
+  'ext.ideasjson': { label: 'root-tasks / task-runs', sub: 'userData · .json', layer: 'ext',
+    job: 'IDEAS queue records (capped at 1,000) and the bindings between launched Codex runs and ships.' },
+  'ext.git': { label: 'git', sub: 'status --porcelain=v2', layer: 'ext',
+    job: 'Run per project with a 4 s timeout and 1 MiB output cap; lock files, prompts and fsmonitor disabled.' },
+  'ext.gh': { label: 'gh', sub: 'api graphql · open PRs', layer: 'ext',
+    job: 'GitHub CLI. Batches of 25 repositories, 10 s timeout, 5 min cache. GH tokens are scrubbed from its environment.' },
+  'ext.term': { label: 'wt.exe / Terminal', sub: 'Open Terminal · LIVE only', layer: 'ext',
+    job: 'Windows Terminal (wt.exe -d <cwd>) or macOS Terminal. Linux has no terminal action.' },
+  'ext.codexcli': { label: 'codex', sub: 'codex exec · IDEAS only', layer: 'ext',
+    job: 'Started detached with --sandbox workspace-write for an IDEAS item. The only place the app starts an agent.' },
+
+  tracker: { label: 'tracker.js', lines: 1573, note: 'class Tracker', layer: 'main', pinned: true, path: 'src/main/tracker.js',
+    job: 'Polls every source (scan 3 s, poll 1 s, sweep 5 s), owns the live model of projects, ships and planets, classifies attention, emits event batches and saves universe-state.json.',
+    issues: ['Has its own Claude parser, separate from the one in replay-source.js', 'No unit-test file; covered by gates and partly by path-safety.test.js',
+      'By reading: a Claude session that goes quiet for 15 min and resumes is re-read from offset 0 and re-counts old edits (lines 822, 455, 1149)',
+      'Every 3 s it stats every transcript and lists all Codex history'] },
+  adapters: { label: 'provider-adapters.js', lines: 570, note: 'pure functions', layer: 'main', pinned: true, path: 'src/main/provider-adapters.js',
+    job: 'Codex record → structural signals, tool classification, canonical path keys, rejection of UNC / device paths, Signal config parsing.',
+    issues: ['No unit-test file of its own'] },
+  replay: { label: 'replay-source.js', lines: 1420, note: 'class ReplaySource', layer: 'main', pinned: true, path: 'src/main/replay-source.js',
+    job: 'Indexes all history once at launch, then rebuilds the universe at any timestamp with a k-way merge over files (64 open handles max).',
+    issues: ['Second Claude parser (_parseHistoricalLine), which is why replay and live disagree',
+      'Different galaxy keys and drone ids from live; attention always empty', 'Index built once: the scrubber end time is frozen until restart'] },
+  coord: { label: 'root-task-coordinator.js', lines: 374, note: 'class', layer: 'main', path: 'src/main/root-task-coordinator.js',
+    job: 'Assign / retry for an IDEAS item: append the goal to GOALS.md, start a run record, launch Codex.',
+    issues: ['run() is 116 lines', 'completion-failed has no retry path'] },
+  roottasks: { label: 'root-tasks.js', lines: 364, note: 'class RootTaskStore', layer: 'main', path: 'src/main/root-tasks.js',
+    job: 'IDEAS records and their phase transitions, saved to root-tasks.json.',
+    issues: ['Its UUID regex accepts versions 1–5; the three other copies accept 1–8'] },
+  taskruns: { label: 'task-runs.js', lines: 399, note: 'class TaskRunTracker', layer: 'main', path: 'src/main/task-runs.js',
+    job: 'Binds a launched run to the Codex ship that echoes its marker, ticks the GOALS.md box when the ship is done, expires lost runs (30 s sweep).',
+    issues: ['Keeps running during playback, so it can write GOALS.md while you scrub'] },
+  goals: { label: 'goals.js', lines: 371, note: 'functions', layer: 'main', path: 'src/main/goals.js',
+    job: 'Parses and rewrites GOALS.md line by line: temp file + rename, refuses symlinks, rejects a write if the file changed underneath.',
+    issues: ['Tested only indirectly (task-runs and coordinator tests, grade-tasks)'] },
+  agentl: { label: 'agent-launcher.js', lines: 363, note: 'factory', layer: 'main', path: 'src/main/agent-launcher.js',
+    job: 'Finds the native codex binary on PATH (never inside the project) and spawns codex exec detached.',
+    issues: ['The task-text prompt path never runs in production: the coordinator does not pass text'] },
+  terml: { label: 'terminal-launcher.js', lines: 185, note: 'factory', layer: 'main', path: 'src/main/terminal-launcher.js',
+    job: 'Builds and spawns the terminal command for a project folder; shell:false, detached, unref.',
+    issues: ['Unit tests cover macOS and Linux only; Windows only via grade-control'] },
+  pathsafety: { label: 'path-safety.js', lines: 84, note: 'functions', layer: 'main', path: 'src/main/path-safety.js',
+    job: 'Shared canonical-path checks used by both launchers.',
+    issues: ['One of five different “is this path inside that folder” implementations'] },
+  projpaths: { label: 'project-paths.js', lines: 165, note: 'functions', layer: 'main', path: 'src/main/project-paths.js',
+    job: 'Bounded search for a project folder that moved: depth 6, 12k folders, 8 s, no symlinks.',
+    issues: ['No tests at all', 'Its own isPathInside sits next to path-safety’s isInsidePath'] },
+  vcsctl: { label: 'project-vcs-status-controller.js', lines: 113, note: 'factory', layer: 'main', path: 'src/main/project-vcs-status-controller.js',
+    job: 'Turns tracker events into debounced (400 ms) per-project refreshes; refreshes all on window focus.',
+    issues: ['Every build event forces a git status for that project'] },
+  vcssvc: { label: 'project-vcs-status-service.js', lines: 298, note: 'factory', layer: 'main', path: 'src/main/project-vcs-status-service.js',
+    job: '15 s cache, at most 4 reads at once, generation checks, merges GitHub data into local status.',
+    issues: ['One 178-line closure'] },
+  vcsgit: { label: 'project-vcs-status.js', lines: 316, note: 'collector', layer: 'main', path: 'src/main/project-vcs-status.js',
+    job: 'Runs git status and the remote lookup, parses porcelain v2.',
+    issues: ['Its bounded spawn runner is duplicated in github-metadata-provider.js',
+      'Tested by test/project-vcs-status-collector.test.js; test/project-vcs-status.test.js tests the renderer component instead'] },
+  ghmeta: { label: 'github-metadata-provider.js', lines: 328, note: 'factory', layer: 'main', path: 'src/main/github-metadata-provider.js',
+    job: 'Open-PR counts through gh api graphql; maps AGENT_UNIVERSE_GITHUB_TOKEN to GH_TOKEN and scrubs other tokens.' },
+  winsec: { label: 'window-security.js', lines: 54, note: 'functions', layer: 'main', path: 'src/main/window-security.js',
+    job: 'Blocks navigation and pop-ups, allows only the notifications permission, and checks that IPC comes from the trusted main frame.' },
+
+  mjs: { label: 'main.js', lines: 47, note: 'bootstrap', layer: 'main', path: 'src/main/main.js',
+    job: 'Reads flags, creates ctx, attaches replay control and the IPC handler factories, registers every au:* handler, then on ready creates the window and calls ctx.start().' },
+  mflags: { label: 'flags.js', lines: 44, note: 'argv → frozen flags', layer: 'main', path: 'src/main/flags.js',
+    job: 'Parses --shots, --polish-test, --provider-test, --history-test, --control-test and their output paths into a frozen object.' },
+  mctx: { label: 'app-context.js', lines: 217, note: 'ctx · start · cleanup', layer: 'main', path: 'src/main/app-context.js',
+    job: 'Creates ctx, the one shared object (window, tracker, replay source, active source, stream epoch, services, harness state). start() builds every service and forwards tracker / replay events to the window; cleanup() tears it down on quit.',
+    issues: ['Service locator: start() calls into ctx.ipc.* and ctx.replay.*, which main.js must attach before start() runs',
+      'Test-fixture branches (provider / history / control) are mixed into service construction',
+      'For --provider-test it writes straight into tracker internals (ship.pending)'] },
+  mrc: { label: 'replay-control.js', lines: 215, note: 'LIVE ↔ REPLAY', layer: 'main', path: 'src/main/replay-control.js',
+    job: 'Switches the active source, handles au:replay commands, bumps streamEpoch, builds the visible snapshot, throttles replay-state pushes and sends git-status pushes (LIVE only).',
+    issues: ['The history index is built once; the renderer never asks for a rebuild'] },
+  mwin: { label: 'window.js', lines: 54, note: 'BrowserWindow', layer: 'main', path: 'src/main/window.js',
+    job: 'Creates the window (contextIsolation, sandbox, no Node), hardens it and loads index.html.' },
+  ipcreg: { label: 'ipc/register.js', lines: 74, note: '20 handlers', layer: 'main', path: 'src/main/ipc/register.js',
+    job: 'The single table of ipcMain.handle registrations. Snapshot, system, planet, open and open-external are handled inline.' },
+  ipcguards: { label: 'ipc/guards.js', lines: 15, note: 'guards', layer: 'main', path: 'src/main/ipc/guards.js',
+    job: 'validProjectId and trustedMainFrame(ctx, event), used by every handler.' },
+  ipcterm: { label: 'ipc/terminal.js', lines: 76, note: 'Open Terminal', layer: 'main', path: 'src/main/ipc/terminal.js',
+    job: 'Open Terminal checks (LIVE, single-flight, 750 ms cooldown, platform) and liveProjectCwd, which the tasks and IDEAS code also use.' },
+  ipctasks: { label: 'ipc/tasks.js', lines: 131, note: 'GOALS.md', layer: 'main', path: 'src/main/ipc/tasks.js',
+    job: 'TASKS panel handlers: tasks-get, task-add, task-set-done, task-remove, and the unused tasks-save.' },
+  ipcroot: { label: 'ipc/root-tasks.js', lines: 100, note: 'IDEAS', layer: 'main', path: 'src/main/ipc/root-tasks.js',
+    job: 'IDEAS handlers and the root-tasks-changed push.' },
+  ipcpaths: { label: 'ipc/project-paths.js', lines: 233, note: 'moved projects', layer: 'main', path: 'src/main/ipc/project-paths.js',
+    job: 'Moved-project scan, locate and apply, with one-time tokens and a native folder dialog.' },
+  hfix: { label: 'harness/fixtures.js', lines: 178, layer: 'harness', path: 'src/main/harness/fixtures.js',
+    job: 'Temporary transcript and state fixtures for the provider, history and control test modes.' },
+  hdrv: { label: 'harness/driver.js', lines: 262, note: '+ metrics.js 189', layer: 'harness', path: 'src/main/harness/',
+    job: 'Drives the renderer from the main process: evaluate JS, wait for views, send real pointer input, capture frames; metrics.js reads results back.' },
+  hmodes: { label: 'harness/modes/*.js', lines: 708, note: '5 files', layer: 'harness', path: 'src/main/harness/modes/',
+    job: 'One runner per test mode — shots, control, history, provider, polish. Each writes result.json and exits; the kit gates launch them.',
+    issues: ['Drives the renderer through DOM ids, mesh metadata keys and camera names — rename one and a gate fails',
+      'shots and polish run against your real transcripts and userData'] },
+
+  'br.replay': { label: 'replay', sub: 'invoke · + replay-state ↑', layer: 'bridge', anchor: 'mrc',
+    job: 'Play, pause, speed, seek, live. The reply carries a new stream epoch and snapshot; replay state is pushed at most every 100 ms.' },
+  'br.open': { label: 'open-terminal · open', sub: 'invoke · + open-external', layer: 'bridge', anchor: 'ipcterm',
+    job: 'Open Terminal (LIVE only), open the project folder, open a github.com repository URL.' },
+  'br.tasks': { label: 'tasks-get · task-*', sub: 'invoke · + tasks-changed ↑', layer: 'bridge', anchor: 'ipctasks',
+    job: 'Read and edit the checkbox lines in a project’s GOALS.md.',
+    issues: ['tasksSave / au:tasks-save is exposed but no renderer code calls it; grade-tasks.mjs requires it to exist'] },
+  'br.ideas': { label: 'root-task-*', sub: 'invoke · + root-tasks-changed ↑', layer: 'bridge', anchor: 'ipcroot',
+    job: 'List, create, remove, assign and retry IDEAS items; phase changes are pushed.' },
+  'br.paths': { label: 'project-path-*', sub: 'scan · locate · apply', layer: 'bridge', anchor: 'ipcpaths',
+    job: 'Find and re-attach a project whose folder moved; apply requires a one-time token from scan or locate.' },
+  'br.events': { label: 'events ↑', sub: 'push · batch + {epoch, mode}', layer: 'bridge', anchor: 'mctx',
+    job: 'The main data stream. Batches come only from the active source (Tracker in LIVE, ReplaySource in REPLAY).' },
+  'br.vcs': { label: 'project-vcs-status-changed ↑', sub: 'push · LIVE only', layer: 'bridge', anchor: 'mrc',
+    job: 'Git / GitHub status updates for one project.' },
+  'br.snapshot': { label: 'snapshot · system · planet', sub: 'invoke', layer: 'bridge', anchor: 'ipcreg',
+    job: 'Full state at boot or after a seek; one project’s planets; one planet’s files.' },
+  'br.debug': { label: 'debug-view ↑ · debug-ready', sub: 'test modes only', layer: 'bridge', anchor: 'hmodes',
+    job: 'Lets the --shots harness switch views and wait for a rendered frame.',
+    issues: ['debug-ready is the one channel without a trusted-frame check'] },
+
+  aplay: { label: 'app-playback.js', lines: 523, layer: 'app', path: 'src/renderer/app-playback.js',
+    job: 'Stream epochs, store seeding, replay commands and the history bar. After a seek it rebuilds the whole scene.',
+    issues: ['Largest app module'] },
+  actl: { label: 'app-project-control.js', lines: 240, layer: 'app', path: 'src/renderer/app-project-control.js',
+    job: 'Project card, the Open Terminal button state machine, planet card.' },
+  atasks: { label: 'app-project-tasks.js', lines: 278, layer: 'app', path: 'src/renderer/app-project-tasks.js',
+    job: 'TASKS panel for GOALS.md; polls every 10 s.',
+    issues: ['Does not check playback mode before editing; relies on main.js to refuse'] },
+  aideas: { label: 'app-ideas.js', lines: 401, layer: 'app', path: 'src/renderer/app-ideas.js',
+    job: 'IDEAS panel; polls every 5 s.', issues: ['renderIdeas is 145 lines', 'The generic confirmRemoval lives here and the tasks panel borrows it'] },
+  asettings: { label: 'app-project-settings.js', lines: 332, layer: 'app', path: 'src/renderer/app-project-settings.js',
+    job: 'The moved-project recovery dialog.' },
+  asearch: { label: 'app-project-search.js', lines: 482, layer: 'app', path: 'src/renderer/app-project-search.js',
+    job: 'Top-bar search with the GitHub filter, and the ALL PROJECTS dialog.',
+    issues: ['Search and the directory dialog are near-copies (debounce, keyboard navigation, ranking)'] },
+  achrome: { label: 'app-chrome.js', lines: 368, layer: 'app', path: 'src/renderer/app-chrome.js',
+    job: 'Command rail, RECENT strip, agent list, feed, summary card, tab bar, back-button text.',
+    issues: ['Re-queries the DOM and rebuilds whole lists on every render'] },
+  afocus: { label: 'app-agent-focus.js', lines: 346, layer: 'app', path: 'src/renderer/app-agent-focus.js',
+    job: 'First-person cockpit overlay, hologram mini-map, environments and vantages.' },
+  appjs: { label: 'app.js', lines: 467, note: 'boot · routing', layer: 'app', path: 'src/renderer/app.js',
+    job: 'Boot, event routing (epoch + seq checks), view switching, the once-per-frame chrome scheduler, desktop notifications, debug hooks.',
+    issues: ['The hub: calls into every other module', 'Its fnv1a self-check only ever tests the first project'] },
+  appstate: { label: 'app-state.js', lines: 162, note: 'AUR.app.state', layer: 'app', path: 'src/renderer/app-state.js',
+    job: 'Creates AUR.app.state (one shared mutable object: store, view, epochs, replay flags, per-panel state) and AUR.app.const.',
+    issues: ['Every module reads and writes the same object; ownership is by convention only'] },
+  shell: { label: 'index.html + style.css', lines: 2466, note: '356 + 2,110', layer: 'app', pinned: true, path: 'src/renderer/',
+    job: 'Every panel exists in the HTML from the start; modules show and hide them. style.css holds every style.',
+    issues: ['style.css is 2,110 lines in one file', 'index.html is hash-pinned although the docs call renderer files editable',
+      'The test harness drives the app through its element ids'] },
+
+  vuni: { label: 'scene-universe.js', lines: 971, note: 'galaxy map', layer: 'view', pinned: true, path: 'src/renderer/scene-universe.js',
+    job: 'Galaxy map: one glyph per project, galaxy discs, ships orbiting suns, label de-cluttering, search dimming, git markers.',
+    issues: ['One 959-line function', 'At its line cap: one more line fails grade-structure', 'A live project add resets your camera zoom',
+      'Ship-building code is duplicated in all three scenes'] },
+  vsys: { label: 'scene-system.js', lines: 618, note: 'solar system', layer: 'view', pinned: true, path: 'src/renderer/scene-system.js',
+    job: 'Planets, asteroid belt (thin instances), ships that fly to the planet they edit, first-person focus camera.',
+    issues: ['At its line cap', 'By reading: refetchPlanets can build meshes into an already-disposed scene', 'Calls window.AU directly'] },
+  vplan: { label: 'scene-planet.js', lines: 196, note: 'planet close-up', layer: 'view', pinned: true, path: 'src/renderer/scene-planet.js',
+    job: 'Planet close-up with atmosphere, moons and the project’s ships.' },
+  util: { label: 'util.js', lines: 408, note: 'creates window.AUR', layer: 'view', pinned: true, path: 'src/renderer/util.js',
+    job: 'Creates window.AUR: hashes, colours, provider metadata, motion tuning, asset paths, DOM and Babylon helpers.',
+    issues: ['Holds a copy of fnv1a / mulberry32 from tracker.js (4 copies in total)', 'Hash-pinned although the docs call it editable'] },
+  procw: { label: 'procedural-worlds.js', lines: 328, layer: 'view', path: 'src/renderer/procedural-worlds.js',
+    job: 'Planet and asteroid surfaces: authored textures plus generated normal maps.' },
+  ships: { label: 'ship-assets.js', lines: 300, layer: 'view', path: 'src/renderer/ship-assets.js',
+    job: 'Fetches assets/ships/manifest.json at load, loads GLB hulls per scene, falls back to a procedural dart, tints per provider.' },
+  galaxy: { label: 'galaxy-layout.js', lines: 178, note: 'UMD · pure', layer: 'view', pinned: true, path: 'src/renderer/galaxy-layout.js',
+    job: 'Galaxy grouping and placement; publishes window.AUR_GALAXY (outside the AUR namespace).' },
+  polish: { label: 'polish-math.js', lines: 56, note: 'UMD · pure', layer: 'view', pinned: true, path: 'src/renderer/polish-math.js',
+    job: 'Label overlap and sun pulse; publishes window.AUR_POLISH.' },
+  searchc: { label: 'search-core.js', lines: 33, note: 'UMD · pure', layer: 'view', path: 'src/renderer/search-core.js',
+    job: 'Ranks projects by name prefix, name substring, then path.', issues: ['Also leaks a bare global searchProjects'] },
+  vcscomp: { label: 'components/project-vcs-status', lines: 267, note: 'js + css', layer: 'view', path: 'src/renderer/components/',
+    job: 'Presentation for git / GitHub markers and the repository details panel.' },
+  babylon: { label: 'Babylon.js · GUI · loaders', sub: 'UMD bundles from node_modules', layer: 'view',
+    job: 'Loaded as classic script tags. One engine for the app lifetime; each view builds and disposes its own scene.' },
+  astex: { label: 'planets · skyboxes · asteroids', sub: 'assets/ · 144 MB', layer: 'asset',
+    job: '31 planet textures and 12 skyboxes picked by hash, plus asteroid textures.' },
+  asships: { label: 'ships/*.glb + manifest', sub: 'assets/ships · ~9 MB', layer: 'asset',
+    job: 'A six-hull shared fleet used by both Claude and Codex; regenerated with npm run ships:generate.' },
+  ascockpit: { label: 'cockpit backdrops', sub: 'src/renderer/assets · 6 MB', layer: 'asset',
+    job: 'Four painted first-person backdrops.', issues: ['No provenance or licence file'] },
+  asunused: { label: 'not loaded at runtime', sub: 'fleet-scale-v2 123 MB · palettes', layer: 'asset', unused: true,
+    job: 'assets/ships/fleet-scale-v2 (Blender sources, FBX, build scripts), assets/palettes, assets/manifest.json and the aur-aster-kite hull.',
+    issues: ['About 45 % of the assets folder is never read by the app'] },
+};
+
+// The boxes outlined by "Show hotspots"; every box still lists all of its issues when selected.
+const HOT = new Set(['mctx', 'hmodes', 'tracker', 'replay', 'taskruns', 'pathsafety', 'projpaths', 'br.tasks', 'appstate', 'shell',
+  'vuni', 'vsys', 'util', 'asunused']);
+
+const STRIPES = [
+  { id: 'm.flags', label: 'flags + 25 file-scope lets', from: 28, to: 82, kind: 'app', after: 'flags.js + app-context.js' },
+  { id: 'm.fixtures', label: 'test fixtures', from: 84, to: 242, kind: 'harness', after: 'harness/fixtures.js' },
+  { id: 'm.cleanup', label: 'quit cleanup', from: 244, to: 286, kind: 'app', after: 'app-context.js (ctx.cleanup)' },
+  { id: 'm.replay', label: 'playback plumbing', from: 288, to: 461, kind: 'app', after: 'replay-control.js' },
+  { id: 'm.terminal', label: 'guards + Open Terminal', from: 463, to: 533, kind: 'app', after: 'ipc/guards.js + ipc/terminal.js' },
+  { id: 'm.tasks', label: 'GOALS.md handlers', from: 535, to: 651, kind: 'app', after: 'ipc/tasks.js' },
+  { id: 'm.ideas', label: 'IDEAS handlers', from: 653, to: 731, kind: 'app', after: 'ipc/root-tasks.js' },
+  { id: 'm.paths', label: 'moved-project recovery', from: 733, to: 930, kind: 'app', after: 'ipc/project-paths.js' },
+  { id: 'm.window', label: 'createWindow: window + all services', from: 932, to: 1107, kind: 'app', after: 'window.js + app-context.js (ctx.start)' },
+  { id: 'm.register', label: 'ipcMain.handle × 20', from: 1109, to: 1162, kind: 'app', after: 'ipc/register.js' },
+  { id: 'm.shots', label: '--shots mode', from: 1164, to: 1270, kind: 'harness', after: 'harness/modes/shots.js' },
+  { id: 'm.helpers', label: 'harness helpers', from: 1272, to: 1668, kind: 'harness', after: 'harness/driver.js + harness/metrics.js' },
+  { id: 'm.modes', label: '4 more test modes', from: 1670, to: 2213, kind: 'harness', after: 'harness/modes/{control,history,provider,polish}.js' },
+];
+
+const COLUMNS = [
+  { id: 'ext', title: 'Outside the app', x: 16, w: 206, groups: [
+    ['Transcripts (read-only)', ['ext.claude', 'ext.codex', 'ext.signal']],
+    ['Project folders', ['ext.projects']],
+    ['Saved state (userData)', ['ext.state', 'ext.ideasjson']],
+    ['Programs it starts', ['ext.git', 'ext.gh', 'ext.term', 'ext.codexcli']],
+  ] },
+  { id: 'svc', title: 'Services', x: 270, w: 244, groups: [
+    ['Live model', ['tracker', 'adapters']],
+    ['History playback', ['replay']],
+    ['Terminal + paths', ['terml', 'pathsafety', 'projpaths']],
+    ['IDEAS queue → Codex runs', ['coord', 'roottasks', 'taskruns', 'goals', 'agentl']],
+    ['Git / GitHub status', ['vcsctl', 'vcssvc', 'vcsgit', 'ghmeta']],
+    ['Window security', ['winsec']],
+  ] },
+  { id: 'wiring', title: 'Wiring', x: 562, w: 196, groups: [
+    ['Bootstrap', ['mjs', 'mflags']],
+    ['Shared context', ['mctx', 'mrc', 'mwin']],
+    ['IPC handlers (ipc/)', ['ipcreg', 'ipcguards', 'ipcterm', 'ipctasks', 'ipcroot', 'ipcpaths']],
+    ['Test harness (harness/)', ['hfix', 'hdrv', 'hmodes']],
+  ] },
+  { id: 'bridge', title: 'preload.js → window.AU', x: 806, w: 214 },
+  { id: 'app', title: 'App layer', x: 1068, w: 214, groups: [
+    ['Feature modules (app-*.js)', ['aplay', 'actl', 'atasks', 'aideas', 'asettings', 'asearch', 'achrome', 'afocus']],
+    ['Boot + shared state', ['appjs', 'appstate']],
+    ['Page shell', ['shell']],
+  ] },
+  { id: 'views', title: 'Views · libraries · assets', x: 1330, w: 224, groups: [
+    ['Views (one Babylon scene each)', ['vuni', 'vsys', 'vplan']],
+    ['Shared libraries', ['util', 'procw', 'ships', 'galaxy', 'polish', 'searchc', 'vcscomp']],
+    ['Vendor', ['babylon']],
+    ['Assets', ['astex', 'asships', 'ascockpit', 'asunused']],
+  ] },
+];
+
+const LANES = [
+  { title: 'Your machine', cols: ['ext'] },
+  { title: 'Main process · Node · src/main', cols: ['svc', 'wiring'] },
+  { title: 'Preload', cols: ['bridge'] },
+  { title: 'Renderer · sandboxed browser · src/renderer', cols: ['app', 'views'] },
+];
+
+// [from, to, label, kind (data | req | io | ipc), backbone]
+const EDGES = [
+  ['ext.claude', 'tracker', 'tailed every 1 s', 'io', 1],
+  ['ext.codex', 'tracker', 'tailed every 1 s', 'io', 1],
+  ['ext.signal', 'tracker', 'stat only, every 3 s', 'io', 1],
+  ['ext.projects', 'tracker', 'folders → planets', 'io', 0],
+  ['ext.claude', 'replay', 'indexed once at launch', 'io', 1],
+  ['ext.codex', 'replay', 'indexed once at launch', 'io', 1],
+  ['tracker', 'ext.state', 'saves every 60 s', 'io', 0],
+  ['goals', 'ext.projects', 'reads / writes GOALS.md', 'io', 0],
+  ['projpaths', 'ext.projects', 'searches for moved folders', 'io', 0],
+  ['roottasks', 'ext.ideasjson', 'root-tasks.json', 'io', 0],
+  ['taskruns', 'ext.ideasjson', 'task-runs.json', 'io', 0],
+  ['vcsgit', 'ext.git', 'spawns git', 'io', 0],
+  ['ghmeta', 'ext.gh', 'spawns gh', 'io', 0],
+  ['terml', 'ext.term', 'spawns, detached', 'io', 0],
+  ['agentl', 'ext.codexcli', 'spawns codex exec', 'io', 0],
+
+  ['tracker', 'adapters', 'require', 'req', 0],
+  ['replay', 'adapters', 'require', 'req', 0],
+  ['pathsafety', 'adapters', 'require', 'req', 0],
+  ['terml', 'pathsafety', 'require', 'req', 0],
+  ['agentl', 'pathsafety', 'require', 'req', 0],
+  ['taskruns', 'goals', 'require', 'req', 0],
+  ['coord', 'goals', 'writes the goal line', 'req', 0],
+  ['coord', 'roottasks', 'updates the phase', 'req', 0],
+  ['coord', 'taskruns', 'starts the run', 'req', 0],
+  ['coord', 'agentl', 'launches', 'req', 0],
+  ['tracker', 'taskruns', 'ship events: task-claim, done', 'data', 0],
+  ['tracker', 'vcsctl', 'project + build events', 'data', 0],
+  ['vcsctl', 'vcssvc', 'refresh, 400 ms debounce', 'req', 0],
+  ['vcssvc', 'vcsgit', 'read, 15 s cache', 'req', 0],
+  ['vcssvc', 'ghmeta', 'open PR counts', 'req', 0],
+
+  ['tracker', 'mctx', 'built in start(); events forwarded', 'data', 1],
+  ['replay', 'mctx', 'built in start(); events forwarded in REPLAY', 'data', 1],
+  ['replay', 'mrc', 'seek / play / live', 'data', 1],
+  ['vcsctl', 'mctx', 'built + started in start()', 'req', 0],
+  ['vcssvc', 'mrc', 'onChange → git-status push', 'data', 0],
+  ['coord', 'mctx', 'built in start()', 'req', 0],
+  ['taskruns', 'mctx', 'onChange → tasks-changed push', 'data', 0],
+  ['terml', 'ipcterm', 'open({cwd})', 'req', 0],
+  ['adapters', 'ipcterm', 'isLocalProjectPath', 'req', 0],
+  ['goals', 'ipctasks', 'require: GOALS.md edits', 'req', 0],
+  ['coord', 'ipcroot', 'assign / retry', 'req', 0],
+  ['roottasks', 'ipcroot', 'create / remove / list', 'req', 0],
+  ['projpaths', 'ipcpaths', 'require: scan for candidates', 'req', 0],
+  ['vcsgit', 'ipcreg', 'githubIdentity for open-external', 'req', 0],
+  ['winsec', 'mwin', 'hardens the window', 'req', 0],
+  ['winsec', 'ipcguards', 'trusted-frame check', 'req', 0],
+  ['hfix', 'terml', 'recording launcher for --control-test', 'req', 0],
+
+  ['mjs', 'mflags', 'readFlags(argv)', 'req', 0],
+  ['mjs', 'mctx', 'createAppContext → ctx.start()', 'req', 0],
+  ['mjs', 'mrc', 'ctx.replay', 'req', 0],
+  ['mjs', 'mwin', 'createWindow on ready', 'req', 0],
+  ['mjs', 'ipcreg', 'registerIpc(ctx, …)', 'req', 0],
+  ['mjs', 'hmodes', 'runs the mode for the test flag', 'req', 0],
+  ['mctx', 'ipcterm', 'reaches into ctx.ipc: liveProjectCwd', 'req', 0],
+  ['mctx', 'ipcroot', 'reaches into ctx.ipc: sendRootTasksChanged', 'req', 0],
+  ['mctx', 'mrc', 'reaches into ctx.replay', 'req', 0],
+  ['ipcterm', 'ipcguards', 'require', 'req', 0],
+  ['ipctasks', 'ipcguards', 'require', 'req', 0],
+  ['ipcroot', 'ipcguards', 'require', 'req', 0],
+  ['ipcpaths', 'ipcguards', 'require', 'req', 0],
+  ['ipcreg', 'ipcguards', 'require', 'req', 0],
+  ['hmodes', 'hdrv', 'require', 'req', 0],
+  ['hmodes', 'hfix', 'history fixture', 'req', 0],
+
+  ['mrc', 'br.replay', 'handles au:replay', 'ipc', 1],
+  ['ipcterm', 'br.open', 'handles au:open-terminal', 'ipc', 0],
+  ['ipcreg', 'br.open', 'au:open · open-external inline', 'ipc', 0],
+  ['ipctasks', 'br.tasks', 'handles au:tasks-* · task-*', 'ipc', 0],
+  ['mctx', 'br.tasks', 'pushes au:tasks-changed', 'ipc', 0],
+  ['ipcroot', 'br.ideas', 'handles au:root-task*, pushes changes', 'ipc', 0],
+  ['ipcpaths', 'br.paths', 'handles au:project-path*', 'ipc', 0],
+  ['mctx', 'br.events', 'send au:events (active source only)', 'ipc', 1],
+  ['mrc', 'br.events', 'pushes au:replay-state', 'ipc', 0],
+  ['mrc', 'br.vcs', 'LIVE only', 'ipc', 0],
+  ['ipcreg', 'br.snapshot', 'au:snapshot · system · planet', 'ipc', 1],
+  ['hmodes', 'br.debug', 'switch view, wait for a frame', 'ipc', 0],
+
+  ['br.replay', 'aplay', 'AU.replay()', 'ipc', 1],
+  ['br.open', 'actl', 'openTerminal · openProject', 'ipc', 0],
+  ['br.open', 'afocus', 'openProject', 'ipc', 0],
+  ['br.tasks', 'atasks', 'tasksGet · taskAdd …', 'ipc', 0],
+  ['br.ideas', 'aideas', 'rootTask*', 'ipc', 0],
+  ['br.paths', 'asettings', 'projectPath*', 'ipc', 0],
+  ['br.events', 'appjs', 'onEvents · onReplayState', 'ipc', 1],
+  ['br.vcs', 'appjs', 'onProjectVcsStatusChanged', 'ipc', 0],
+  ['br.tasks', 'appjs', 'onTasksChanged', 'ipc', 0],
+  ['br.ideas', 'appjs', 'onRootTasksChanged', 'ipc', 0],
+  ['br.snapshot', 'appjs', 'boot · open system / planet', 'ipc', 1],
+  ['br.snapshot', 'vsys', 'getSystem for new planets', 'ipc', 0],
+  ['br.debug', 'appjs', 'onDebugView · debugReady', 'ipc', 0],
+
+  ['appjs', 'appstate', 'applyEvent → S.store', 'data', 1],
+  ['appjs', 'vuni', 'update(batch)', 'data', 1],
+  ['appjs', 'vsys', 'update(batch)', 'data', 0],
+  ['appjs', 'vplan', 'update(batch)', 'data', 0],
+  ['appjs', 'achrome', 'redraw panels next frame', 'data', 0],
+  ['aplay', 'appjs', 'epochs ⇄ rebuildRoute', 'req', 0],
+  ['achrome', 'afocus', 'agent list ⇄ cockpit', 'req', 0],
+  ['asearch', 'asettings', 'open settings ⇄ clear search', 'req', 0],
+  ['atasks', 'actl', 'panel position ⇄ card', 'req', 0],
+  ['atasks', 'aideas', 'borrows confirmRemoval', 'req', 0],
+  ['aplay', 'appstate', 'reads / writes S', 'req', 0],
+  ['actl', 'appstate', 'reads / writes S', 'req', 0],
+  ['atasks', 'appstate', 'reads / writes S', 'req', 0],
+  ['aideas', 'appstate', 'reads / writes S', 'req', 0],
+  ['asettings', 'appstate', 'reads / writes S', 'req', 0],
+  ['asearch', 'appstate', 'reads / writes S', 'req', 0],
+  ['achrome', 'appstate', 'reads / writes S', 'req', 0],
+  ['afocus', 'appstate', 'reads / writes S', 'req', 0],
+  ['asearch', 'searchc', 'rank projects', 'req', 0],
+  ['asearch', 'vcscomp', 'GitHub filter', 'req', 0],
+  ['actl', 'vcscomp', 'repository details', 'req', 0],
+  ['afocus', 'vsys', 'focusShip · vantage', 'req', 0],
+  ['afocus', 'ascockpit', 'backdrop images', 'io', 0],
+  ['vuni', 'galaxy', 'layout', 'req', 0],
+  ['vuni', 'polish', 'label layout', 'req', 0],
+  ['vuni', 'vcscomp', 'git markers', 'req', 0],
+  ['vsys', 'polish', 'sun pulse', 'req', 0],
+  ['vuni', 'util', 'helpers', 'req', 0],
+  ['vsys', 'util', 'helpers', 'req', 0],
+  ['vplan', 'util', 'helpers', 'req', 0],
+  ['vsys', 'procw', 'planet surfaces', 'req', 0],
+  ['vplan', 'procw', 'planet surfaces', 'req', 0],
+  ['vuni', 'ships', 'hulls', 'req', 0],
+  ['vsys', 'ships', 'hulls', 'req', 0],
+  ['vplan', 'ships', 'hulls', 'req', 0],
+  ['ships', 'asships', 'manifest + GLB', 'io', 0],
+  ['util', 'astex', 'skybox + planet paths', 'io', 0],
+  ['procw', 'astex', 'textures', 'io', 0],
+  ['util', 'babylon', 'scene helpers', 'req', 0],
+  ['ships', 'babylon', 'SceneLoader', 'req', 0],
+];
+
+const TRACES = {
+  live: { title: 'A transcript line becomes pixels (LIVE)', steps: [
+    ['ext.claude', 'tracker', 'Claude Code appends a line. pollFiles reads the new bytes every second, but only for files touched in the last 15 minutes.'],
+    ['tracker', 'mctx', 'The Tracker parses the line, updates its model and emits an event batch. ctx.start() in app-context.js subscribed to it.'],
+    ['mctx', 'br.events', 'app-context.js sends au:events with {streamEpoch, mode}, but only while the Tracker is the active source.'],
+    ['br.events', 'appjs', 'The preload hands the batch to app.js, which drops batches from old epochs and events it has already seen (seq).'],
+    ['appjs', 'appstate', 'applyEvent updates the shared store (projects, ships, feed). An attention change can raise a desktop notification here.'],
+    ['appjs', 'vuni', 'The active view gets update(batch) once per batch.'],
+    ['appjs', 'achrome', 'Panels whose bit is set in the chrome mask redraw on the next animation frame.'],
+  ] },
+  replay: { title: 'Scrubbing history (REPLAY)', steps: [
+    ['br.replay', 'aplay', 'Dragging the scrubber calls AU.replay({action: "seek", ts}).'],
+    ['mrc', 'br.replay', 'replay-control.js validates the command. While a seek is in flight, LIVE-only actions answer “REPLAY”.'],
+    ['replay', 'mrc', 'Forward seeks advance in place; backward seeks reset the model and replay from the first record.'],
+    ['ext.claude', 'replay', 'The ReplaySource streams records from every transcript in time order.'],
+    ['mrc', 'br.events', 'streamEpoch goes up and the reply carries a fresh snapshot; replay-state pushes follow.'],
+    ['replay', 'mctx', 'ReplaySource batches reach the listener in ctx.start()…'],
+    ['mctx', 'br.events', '…which forwards them as au:events tagged mode: replay, because the ReplaySource is now the active source.'],
+    ['br.events', 'appjs', 'app-playback retires the old epoch, reseeds the store and rebuilds the whole scene.'],
+    ['tracker', 'mctx', 'Meanwhile the Tracker keeps running. Its batches are simply not forwarded, but IDEAS runs and git refreshes continue.'],
+  ] },
+  ideas: { title: 'An IDEAS item starts Codex', steps: [
+    ['br.ideas', 'aideas', 'Assigning an idea to a live project calls AU.rootTaskAssign(taskId, projectId).'],
+    ['ipcroot', 'br.ideas', 'ipc/root-tasks.js checks the frame, that you are in LIVE mode, and the project folder.'],
+    ['coord', 'ipcroot', 'RootTaskCoordinator.run takes a task lock and a project lock.'],
+    ['coord', 'goals', 'It appends “- [ ] text <!-- agent-universe:<uuid> -->” to the project’s GOALS.md…'],
+    ['goals', 'ext.projects', '…with a temp-file + rename write that refuses symlinks.'],
+    ['coord', 'taskruns', 'A run record remembers which Codex ships already exist, so the new one can be recognised.'],
+    ['coord', 'agentl', 'The launch intent is saved first, then the launcher is called.'],
+    ['agentl', 'ext.codexcli', 'codex exec starts detached in the project folder; its prompt carries the uuid marker.'],
+    ['ext.codex', 'tracker', 'The new Codex transcript echoes the marker; the adapter turns it into a task-claim signal on that ship.'],
+    ['tracker', 'taskruns', 'The run binds to the ship. When the ship reports done, the GOALS.md box is ticked → “ready for review”.'],
+    ['br.ideas', 'appjs', 'Every phase change is pushed to the IDEAS and TASKS panels.'],
+  ] },
+  terminal: { title: 'Open Terminal (LIVE only)', steps: [
+    ['br.open', 'actl', 'The project card button calls AU.openTerminal(projectId).'],
+    ['ipcterm', 'br.open', 'ipc/terminal.js checks, in order: trusted frame, valid id, LIVE with no seek in flight, one at a time with a 750 ms cooldown, Windows or macOS.'],
+    ['terml', 'ipcterm', 'liveProjectCwd re-resolves the real folder path, then the launcher is called.'],
+    ['terml', 'pathsafety', 'Canonical-path checks on the folder and on the terminal binary.'],
+    ['terml', 'ext.term', 'wt.exe -d <cwd> (or open -a Terminal) is spawned with shell:false, detached and unref’d.'],
+  ] },
+  git: { title: 'Git status markers', steps: [
+    ['tracker', 'vcsctl', 'project-added, project-updated and every build event schedule a refresh for that project (400 ms debounce).'],
+    ['vcsctl', 'vcssvc', 'The service answers from a 15 s cache or queues a read (at most 4 at once).'],
+    ['vcssvc', 'vcsgit', 'The collector runs git status --porcelain=v2 and reads the remote URL (4 s timeout).'],
+    ['vcsgit', 'ext.git', 'git runs with locks, prompts and fsmonitor disabled.'],
+    ['vcssvc', 'ghmeta', 'Open PR counts come from gh (5 min cache, 30 s after an error).'],
+    ['ghmeta', 'ext.gh', 'gh api graphql, 25 repositories per call.'],
+    ['vcssvc', 'mrc', 'The service reports changes to replay-control.js…'],
+    ['mrc', 'br.vcs', '…which pushes them only while LIVE.'],
+    ['br.vcs', 'appjs', 'app.js merges project.vcs into the store and injects a project-vcs-status event.'],
+    ['appjs', 'vuni', 'The universe view redraws the markers…'],
+    ['vuni', 'vcscomp', '…using the shared VCS component.'],
+  ] },
+};
+
+// ---------- layout ----------
+const NS = 'http://www.w3.org/2000/svg';
+const NODE_H = 40, GAP = 6, GROUP_H = 20, GROUP_GAP = 12, TOP = 66;
+const svg = document.getElementById('map');
+const colIndex = {};
+COLUMNS.forEach((c, i) => { colIndex[c.id] = i; });
+const box = {};
+
+function mk(tag, attrs, parent, text) {
+  const n = document.createElementNS(NS, tag);
+  for (const k in attrs) n.setAttribute(k, attrs[k]);
+  if (text != null) n.textContent = text;
+  if (parent) parent.appendChild(n);
+  return n;
+}
+
+const groupLabels = [];
+for (const col of COLUMNS) {
+  if (!col.groups) continue;
+  let y = TOP;
+  for (const [title, ids] of col.groups) {
+    groupLabels.push({ x: col.x + 2, y: y + 13, title });
+    y += GROUP_H;
+    for (const id of ids) {
+      box[id] = { id, col: col.id, x: col.x, y, w: col.w, h: NODE_H };
+      y += NODE_H + GAP;
+    }
+    y += GROUP_GAP;
+  }
+  col.bottom = y;
+}
+
+const bcol = COLUMNS[colIndex.bridge];
+const bridgeIds = Object.keys(NODES).filter((id) => NODES[id].layer === 'bridge');
+bridgeIds.sort((a, b) => center(NODES[a].anchor) - center(NODES[b].anchor));
+let by = TOP + GROUP_H;
+groupLabels.push({ x: bcol.x + 2, y: TOP + 13, title: 'IPC channels (au:*) · ↑ = pushed' });
+for (const id of bridgeIds) {
+  const want = center(NODES[id].anchor) - NODE_H / 2;
+  const y = Math.max(want, by);
+  box[id] = { id, col: 'bridge', x: bcol.x, y, w: bcol.w, h: NODE_H };
+  by = y + NODE_H + GAP;
+}
+bcol.bottom = by;
+
+function center(id) { const b = box[id]; return b.y + b.h / 2; }
+
+const H = Math.max(...COLUMNS.map((c) => c.bottom)) + 16;
+const W = COLUMNS[COLUMNS.length - 1].x + COLUMNS[COLUMNS.length - 1].w + 16;
+svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+
+// ---------- draw ----------
+const defs = mk('defs', {}, svg);
+const pat = mk('pattern', { id: 'hatch', width: 6, height: 6, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)' }, defs);
+mk('rect', { width: 6, height: 6, style: 'fill:var(--harn-f)' }, pat);
+mk('line', { x1: 0, y1: 0, x2: 0, y2: 6, style: 'stroke:var(--harn-l);stroke-width:3' }, pat);
+for (const [id, color] of [['a-base', 'var(--edge)'], ['a-hi', 'var(--hi)'], ['a-tr', 'var(--trace)']]) {
+  const m = mk('marker', { id, viewBox: '0 0 8 8', refX: 7, refY: 4, markerWidth: 7, markerHeight: 7, orient: 'auto-start-reverse' }, defs);
+  mk('path', { d: 'M0,0 L8,4 L0,8 Z', style: `fill:${color}` }, m);
+}
+
+const gLanes = mk('g', {}, svg);
+for (const lane of LANES) {
+  const cs = lane.cols.map((id) => COLUMNS[colIndex[id]]);
+  const x = cs[0].x - 8, x2 = cs[cs.length - 1].x + cs[cs.length - 1].w + 8;
+  mk('rect', { class: 'lane-bg', x, y: 6, width: x2 - x, height: H - 12, rx: 10 }, gLanes);
+  mk('text', { class: 'lane-title', x: x + 10, y: 24 }, gLanes, lane.title);
+}
+for (const col of COLUMNS) mk('text', { class: 'col-title', x: col.x + 2, y: 50 }, gLanes, col.title);
+for (const g of groupLabels) mk('text', { class: 'grp-title', x: g.x, y: g.y }, gLanes, g.title);
+
+const gEdges = mk('g', {}, svg);
+const gNodes = mk('g', {}, svg);
+const gLabels = mk('g', {}, svg);
+
+const nodeEls = {};
+function drawNode(id) {
+  const b = box[id];
+  const n = NODES[id];
+  const g = mk('g', { class: `node layer-${n.layer}${n.unused ? ' unused' : ''}`, 'data-id': id, tabindex: 0, role: 'button',
+    'aria-label': `${n.label}${n.lines ? `, ${n.lines} lines` : ''}` }, gNodes);
+  mk('rect', { class: 'box', x: b.x, y: b.y, width: b.w, height: b.h, rx: 6 }, g);
+  const pad = n.pinned ? 22 : 10;
+  fit(mk('text', { class: 'n-label', x: b.x + 9, y: b.y + 17 }, g, n.label), b.w - 9 - pad);
+  const sub = n.sub || [n.lines ? `${n.lines.toLocaleString('en-US')} lines` : '', n.note || ''].filter(Boolean).join(' · ');
+  fit(mk('text', { class: 'n-sub', x: b.x + 9, y: b.y + 31 }, g, sub), b.w - 18);
+  if (n.lines) {
+    const frac = Math.min(n.lines / MAXL, 1);
+    mk('rect', { class: `bar${n.lines > 600 ? ' over' : ''}`, x: b.x + 1.5, y: b.y + b.h - 4.5, width: Math.max(2, (b.w - 3) * frac), height: 3, rx: 1.5 }, g);
+  }
+  if (n.pinned) {
+    const cx = b.x + b.w - 12, cy = b.y + 13;
+    mk('path', { class: 'pin', d: `M${cx} ${cy - 5} L${cx + 5} ${cy} L${cx} ${cy + 5} L${cx - 5} ${cy} Z` }, g);
+  }
+  nodeEls[id] = g;
+}
+
+function fit(t, max) {
+  let size = parseFloat(getComputedStyle(t).fontSize);
+  while (t.getComputedTextLength() > max && size > 9) { size -= 0.5; t.style.fontSize = size + 'px'; }
+  if (t.getComputedTextLength() > max) {
+    let s = t.textContent;
+    while (s.length > 4 && t.getComputedTextLength() > max) { s = s.slice(0, -1); t.textContent = s + '…'; }
+  }
+}
+
+Object.keys(box).forEach(drawNode);
+
+// ---------- edges ----------
+const edges = EDGES.map(([from, to, label, kind, bb], i) => ({ id: 'e' + i, from, to, label, kind, bb: !!bb }));
+const sides = {};
+function side(nodeId, s) { const k = nodeId + ':' + s; return (sides[k] = sides[k] || []); }
+for (const e of edges) {
+  const a = box[e.from], b = box[e.to];
+  const ca = colIndex[a.col], cb = colIndex[b.col];
+  if (ca < cb) { e.sa = 'R'; e.sb = 'L'; } else if (ca > cb) { e.sa = 'L'; e.sb = 'R'; } else { e.sa = 'L'; e.sb = 'L'; }
+  side(e.from, e.sa).push({ e, end: 'a', other: center(e.to) });
+  side(e.to, e.sb).push({ e, end: 'b', other: center(e.from) });
+}
+for (const k in sides) {
+  const list = sides[k].sort((p, q) => p.other - q.other);
+  const b = box[k.split(':')[0]];
+  const inset = b.h > 30 ? 6 : 1;
+  list.forEach((p, i) => {
+    const y = b.y + inset + (b.h - 2 * inset) * (i + 1) / (list.length + 1);
+    p.e[p.end === 'a' ? 'ya' : 'yb'] = y;
+  });
+}
+const edgeEls = {};
+for (const e of edges) {
+  const a = box[e.from], b = box[e.to];
+  const x1 = e.sa === 'R' ? a.x + a.w : a.x;
+  const x2 = e.sb === 'R' ? b.x + b.w : b.x;
+  const y1 = e.ya, y2 = e.yb;
+  let p;
+  if (e.sa === 'L' && e.sb === 'L') {
+    const bulge = Math.min(40, 14 + Math.abs(y2 - y1) * 0.1);
+    p = [[x1, y1], [x1 - bulge, y1], [x2 - bulge, y2], [x2, y2]];
+  } else {
+    const dir = x2 > x1 ? 1 : -1;
+    const c = Math.max(26, Math.abs(x2 - x1) * 0.45);
+    p = [[x1, y1], [x1 + dir * c, y1], [x2 - dir * c, y2], [x2, y2]];
+  }
+  const d = `M${p[0][0]},${p[0][1]} C${p[1][0]},${p[1][1]} ${p[2][0]},${p[2][1]} ${p[3][0]},${p[3][1]}`;
+  e.mid = [(p[0][0] + 3 * p[1][0] + 3 * p[2][0] + p[3][0]) / 8, (p[0][1] + 3 * p[1][1] + 3 * p[2][1] + p[3][1]) / 8];
+  edgeEls[e.id] = mk('path', { class: `edge ${e.kind}${e.bb ? ' bb' : ''}`, d, 'marker-end': 'url(#a-base)' }, gEdges);
+}
+
+// ---------- interaction ----------
+const state = { hover: null, selected: null, trace: null, hot: false };
+const details = document.getElementById('details');
+const story = document.getElementById('story');
+const tip = document.getElementById('tip');
+const fig = document.getElementById('fig-map');
+
+function edgesOf(id) { return edges.filter((e) => e.from === id || e.to === id); }
+function findEdge(a, b) { return edges.find((e) => (e.from === a && e.to === b) || (e.from === b && e.to === a)); }
+function info(id) { return NODES[id]; }
+
+function clearMarks() {
+  svg.classList.remove('focused');
+  for (const id in nodeEls) nodeEls[id].classList.remove('lit', 'sel', 'hot');
+  for (const e of edges) {
+    const el = edgeEls[e.id];
+    el.classList.remove('hi', 'tr');
+    el.setAttribute('marker-end', 'url(#a-base)');
+  }
+  gLabels.textContent = '';
+  placed.length = 0;
+}
+
+// Nudge a label or badge up/down until it no longer overlaps one already placed.
+const placed = [];
+function place(g) {
+  const bb = g.getBBox();
+  const hits = (dy) => placed.some((p) => !(bb.x > p.x + p.w || bb.x + bb.width < p.x || bb.y + dy > p.y + p.h || bb.y + dy + bb.height < p.y));
+  let dy = 0;
+  for (let i = 1; i < 16 && hits(dy); i++) dy = Math.ceil(i / 2) * (bb.height + 1) * (i % 2 ? 1 : -1);
+  if (dy) g.setAttribute('transform', `translate(0,${dy})`);
+  placed.push({ x: bb.x, y: bb.y + dy, w: bb.width, h: bb.height });
+}
+
+function badge(e, n) {
+  const g = mk('g', { class: 'badge' }, gLabels);
+  mk('circle', { cx: e.mid[0], cy: e.mid[1], r: 8.5 }, g);
+  mk('text', { x: e.mid[0], y: e.mid[1] + 3.6, 'text-anchor': 'middle' }, g, String(n));
+  place(g);
+}
+
+function apply() {
+  clearMarks();
+  const focus = state.hover || state.selected;
+  if (state.trace) {
+    svg.classList.add('focused');
+    TRACES[state.trace].steps.forEach(([a, b], i) => {
+      const e = findEdge(a, b);
+      if (!e) return;
+      edgeEls[e.id].classList.add('tr');
+      edgeEls[e.id].setAttribute('marker-end', 'url(#a-tr)');
+      nodeEls[a].classList.add('lit');
+      nodeEls[b].classList.add('lit');
+      badge(e, i + 1);
+    });
+  } else if (state.hot) {
+    svg.classList.add('focused');
+    for (const id in nodeEls) if (HOT.has(id)) nodeEls[id].classList.add('lit', 'hot');
+  }
+  if (focus) {
+    svg.classList.add('focused');
+    nodeEls[focus].classList.add('lit', 'sel');
+    for (const e of edgesOf(focus)) {
+      if (edgeEls[e.id].classList.contains('tr')) continue;
+      edgeEls[e.id].classList.add('hi');
+      edgeEls[e.id].setAttribute('marker-end', 'url(#a-hi)');
+      nodeEls[e.from === focus ? e.to : e.from].classList.add('lit');
+    }
+  }
+}
+
+function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]); }
+function code(s) { return `<code>${esc(s)}</code>`; }
+function nameOf(id) { return info(id).label; }
+
+function showDetails(id) {
+  const n = info(id);
+  let h = `<h3>${code(n.label)}</h3>`;
+  const meta = [];
+  if (n.path) meta.push(esc(n.path));
+  if (n.lines) meta.push(`${n.lines.toLocaleString('en-US')} lines`);
+  if (n.layer === 'harness') meta.push('test harness — runs only with a test flag');
+  h += `<div class="meta">${meta.join(' · ')}</div>`;
+  const tags = [];
+  if (n.pinned) tags.push('<span class="tag">hash-pinned</span>');
+  if (n.lines > 600 && n.layer !== 'main') tags.push('<span class="tag warn">over the 600-line rule</span>');
+  if (n.unused) tags.push('<span class="tag warn">unused at runtime</span>');
+  if (tags.length) h += `<div>${tags.join('')}</div>`;
+  if (n.job) h += `<p>${esc(n.job)}</p>`;
+  const out = edges.filter((e) => e.from === id), inc = edges.filter((e) => e.to === id);
+  if (out.length) h += `<h4>Sends to / uses</h4><ul>${out.map((e) => `<li>${code(nameOf(e.to))} — ${esc(e.label)}</li>`).join('')}</ul>`;
+  if (inc.length) h += `<h4>Receives from / used by</h4><ul>${inc.map((e) => `<li>${code(nameOf(e.from))} — ${esc(e.label)}</li>`).join('')}</ul>`;
+  if (n.issues) h += `<h4>Watch out</h4><ul class="issues">${n.issues.map((s) => `<li>${esc(s)}</li>`).join('')}</ul>`;
+  details.innerHTML = h;
+}
+
+function showStory() {
+  if (state.trace) {
+    const t = TRACES[state.trace];
+    story.innerHTML = `<h3>${esc(t.title)}</h3><div class="meta">${t.steps.length} steps · numbered on the map</div>` +
+      `<ol class="steps">${t.steps.map(([a, b, s]) => `<li>${esc(s)} <span class="meta">(${code(nameOf(a))} ↔ ${code(nameOf(b))})</span></li>`).join('')}</ol>`;
+  } else if (state.hot) {
+    const hot = [...HOT];
+    story.innerHTML = `<h3>Hotspots</h3><div class="meta">The ${hot.length} boxes a newcomer most needs to know about, outlined on the map; click any box for its full list.</div>` +
+      `<ul class="issues">${hot.map((id) => `<li>${code(nameOf(id))}: ${esc(info(id).issues[0])}${info(id).issues.length > 1 ? ` <span class="meta">(+${info(id).issues.length - 1} more)</span>` : ''}</li>`).join('')}</ul>`;
+  } else {
+    story.innerHTML = '<h3>Follow a flow</h3><p class="empty">Choose one of the flows above to see the numbered path through the code, or “Show hotspots” to see where the mess is concentrated.</p>';
+  }
+}
+
+function setTrace(name) {
+  state.trace = state.trace === name ? null : name;
+  if (state.trace) state.hot = false;
+  syncButtons();
+  apply();
+  showStory();
+}
+function syncButtons() {
+  document.querySelectorAll('[data-trace]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.trace === state.trace)));
+  document.getElementById('btn-hot').setAttribute('aria-pressed', String(state.hot));
+}
+
+gNodes.addEventListener('pointerover', (ev) => {
+  const g = ev.target.closest('.node');
+  if (!g) return;
+  state.hover = g.dataset.id;
+  apply();
+  const n = info(state.hover);
+  tip.innerHTML = `<b>${esc(n.label)}</b>${n.lines ? ` · ${n.lines.toLocaleString('en-US')} lines` : ''}<br>${esc((n.job || '').split('. ')[0])}`;
+  tip.style.opacity = 1;
+});
+gNodes.addEventListener('pointermove', (ev) => {
+  const r = fig.getBoundingClientRect();
+  let x = ev.clientX - r.left + 14, y = ev.clientY - r.top + 14;
+  if (x + 310 > r.width) x = ev.clientX - r.left - 310;
+  tip.style.left = x + 'px';
+  tip.style.top = y + 'px';
+});
+gNodes.addEventListener('pointerout', (ev) => {
+  if (ev.relatedTarget && ev.relatedTarget.closest && ev.relatedTarget.closest('.node') === ev.target.closest('.node')) return;
+  state.hover = null;
+  tip.style.opacity = 0;
+  apply();
+});
+function select(id) {
+  state.selected = state.selected === id ? null : id;
+  apply();
+  if (state.selected) showDetails(id);
+}
+gNodes.addEventListener('click', (ev) => { const g = ev.target.closest('.node'); if (g) select(g.dataset.id); });
+gNodes.addEventListener('keydown', (ev) => {
+  const g = ev.target.closest('.node');
+  if (g && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); select(g.dataset.id); }
+});
+gNodes.addEventListener('focusin', (ev) => { const g = ev.target.closest('.node'); if (g) showDetails(g.dataset.id); });
+document.querySelectorAll('[data-trace]').forEach((b) => b.addEventListener('click', () => setTrace(b.dataset.trace)));
+document.getElementById('btn-hot').addEventListener('click', () => {
+  state.hot = !state.hot;
+  if (state.hot) state.trace = null;
+  syncButtons(); apply(); showStory();
+});
+document.getElementById('btn-all').addEventListener('click', (ev) => {
+  const on = svg.classList.toggle('show-all');
+  ev.currentTarget.setAttribute('aria-pressed', String(on));
+});
+function clearAll() {
+  state.selected = null; state.trace = null; state.hot = false;
+  syncButtons(); apply(); showStory();
+  details.innerHTML = '<h3>Pick a box</h3><p class="empty">Hover or click any box in the map to see its job, size, what it talks to and what is awkward about it.</p>';
+}
+document.getElementById('btn-clear').addEventListener('click', clearAll);
+document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') clearAll(); });
+gNodes.addEventListener('mouseover', (ev) => { const g = ev.target.closest('.node'); if (g && !state.selected) showDetails(g.dataset.id); });
+
+// ---------- theme ----------
+const themeBtn = document.getElementById('btn-theme');
+const modes = ['auto', 'light', 'dark'];
+let mode = 'auto';
+try { mode = localStorage.getItem('orrery-arch-theme') || 'auto'; } catch (_) { /* storage blocked */ }
+function setMode(m, persist = true) {
+  mode = m;
+  if (m === 'auto') document.documentElement.removeAttribute('data-theme');
+  else document.documentElement.setAttribute('data-theme', m);
+  themeBtn.textContent = 'Theme: ' + m;
+  if (persist) try { localStorage.setItem('orrery-arch-theme', m); } catch (_) { /* storage blocked */ }
+}
+themeBtn.addEventListener('click', () => setMode(modes[(modes.indexOf(mode) + 1) % modes.length]));
+setMode(mode);
+
+// ---------- main.js table ----------
+const split = document.getElementById('split');
+const tbody = document.querySelector('#mainjs-table tbody');
+const total = STRIPES.reduce((s, st) => s + st.to - st.from + 1, 0);
+const maxStripe = Math.max(...STRIPES.map((s) => s.to - s.from + 1));
+for (const st of STRIPES) {
+  const n = st.to - st.from + 1;
+  const d = document.createElement('div');
+  d.className = st.kind === 'harness' ? 'k-harness' : 'k-app';
+  d.style.width = (100 * n / total) + '%';
+  d.title = `${st.label}: ${n} lines`;
+  split.appendChild(d);
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td>${esc(st.label)}${st.kind === 'harness' ? ' <span class="tag">test harness</span>' : ''}</td>` +
+    `<td class="num">${st.from}–${st.to}</td>` +
+    `<td><div class="cell-bar"><i class="${st.kind === 'harness' ? 'k-harness' : 'k-app'}" style="width:${Math.max(4, 120 * n / maxStripe)}px"></i><span class="num">${n}</span></div></td>` +
+    `<td>${code(st.after)}</td>`;
+  tbody.appendChild(tr);
+}
+
+// ---------- size charts ----------
+const SIZES_MAIN = [
+  ['tracker.js', 1573, 1], ['replay-source.js', 1420, 1], ['provider-adapters.js', 570, 1], ['task-runs.js', 399],
+  ['root-task-coordinator.js', 374], ['goals.js', 371], ['root-tasks.js', 364], ['agent-launcher.js', 363],
+  ['github-metadata-provider.js', 328], ['project-vcs-status.js', 316], ['project-vcs-status-service.js', 298],
+  ['harness/driver.js', 262, 0, 'harness'], ['ipc/project-paths.js', 233], ['app-context.js', 217], ['replay-control.js', 215],
+  ['harness/modes/history.js', 204, 0, 'harness'], ['harness/metrics.js', 189, 0, 'harness'], ['terminal-launcher.js', 185],
+  ['harness/fixtures.js', 178, 0, 'harness'], ['project-paths.js', 165], ['harness/modes/control.js', 152, 0, 'harness'],
+  ['harness/modes/polish.js', 139, 0, 'harness'], ['ipc/tasks.js', 131], ['harness/modes/shots.js', 116, 0, 'harness'],
+  ['project-vcs-status-controller.js', 113], ['ipc/root-tasks.js', 100], ['harness/modes/provider.js', 97, 0, 'harness'],
+  ['path-safety.js', 84], ['ipc/terminal.js', 76], ['ipc/register.js', 74], ['window-security.js', 54], ['window.js', 54],
+  ['main.js', 47], ['flags.js', 44], ['preload.js', 41], ['ipc/guards.js', 15],
+];
+const SIZES_REN = [
+  ['style.css', 2110, 0, 'shell'], ['scene-universe.js', 971, 1, 'view'], ['scene-system.js', 618, 1, 'view'], ['app-playback.js', 523, 0, 'app'],
+  ['app-project-search.js', 482, 0, 'app'], ['app.js', 467, 0, 'app'], ['util.js', 408, 1, 'view'], ['app-ideas.js', 401, 0, 'app'],
+  ['app-chrome.js', 368, 0, 'app'], ['index.html', 356, 1, 'shell'], ['app-agent-focus.js', 346, 0, 'app'],
+  ['app-project-settings.js', 332, 0, 'app'], ['procedural-worlds.js', 328, 0, 'view'], ['ship-assets.js', 300, 0, 'view'],
+  ['app-project-tasks.js', 278, 0, 'app'], ['components/project-vcs-status.js', 267, 0, 'view'], ['app-project-control.js', 240, 0, 'app'],
+  ['scene-planet.js', 196, 1, 'view'], ['galaxy-layout.js', 178, 1, 'view'], ['app-state.js', 162, 0, 'app'],
+  ['polish-math.js', 56, 1, 'view'], ['search-core.js', 33, 0, 'view'],
+];
+function chart(el, rows, layerDefault, withCap) {
+  for (const [name, n, pin, layer] of rows) {
+    const row = document.createElement('div');
+    row.className = 'row';
+    const js = /\.js/.test(name);
+    const over = withCap && js && n > 600;
+    row.innerHTML = `<div class="name" title="${esc(name)}">${esc(name)}${pin ? '<span class="pinmark" title="hash-pinned">◆</span>' : ''}</div>` +
+      `<div class="track"><div class="fill ${over ? 'over' : (layer || layerDefault)}" style="width:${100 * n / MAXL}%"></div>` +
+      `${withCap ? `<div class="cap" style="left:${100 * 600 / MAXL}%" title="600-line renderer rule"></div>` : ''}</div>` +
+      `<div class="n">${n.toLocaleString('en-US')}</div>`;
+    el.appendChild(row);
+  }
+}
+chart(document.getElementById('sz-main'), SIZES_MAIN, 'main', false);
+chart(document.getElementById('sz-ren'), SIZES_REN, 'app', true);
+
+// Deep links: #trace=ideas, #node=tracker, #hot, #theme=light
+const params = new URLSearchParams(location.hash.slice(1));
+if (modes.includes(params.get('theme'))) setMode(params.get('theme'), false);
+if (params.has('hot')) document.getElementById('btn-hot').click();
+if (TRACES[params.get('trace')]) setTrace(params.get('trace'));
+if (nodeEls[params.get('node')]) { select(params.get('node')); showDetails(params.get('node')); }
+})();
+</script>
+</body>
+</html>

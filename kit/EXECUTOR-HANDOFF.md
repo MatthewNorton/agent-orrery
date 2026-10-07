@@ -7,7 +7,7 @@ disk and the agent reads the rest itself.
 
 ## The prompt (fill in the one blank)
 
-> Work in C:\workspace\code\experimental\agent-universe-lite.
+> Work in the repository root (`agent-orrery`).
 > First read `kit/README.md` (the "How the app works" section and the frozen-
 > files rules), then execute the kit contract at **`<KIT_CONTRACT_PATH>`**,
 > following it exactly. Hard rules:
@@ -29,7 +29,7 @@ has been distilled.
 
 Codex CLI, interactive (recommended first time — you watch it work):
 ```
-cd C:\workspace\code\experimental\agent-universe-lite
+cd <repo root>
 codex        # then paste the prompt above
 ```
 Codex CLI, headless (flag names vary by version — check `codex --help`):
@@ -38,7 +38,7 @@ codex exec --full-auto "<the prompt above>"
 ```
 Claude Code equivalent (what kit-runner does):
 ```
-claude --model claude-opus-4-8 --permission-mode acceptEdits -p "<the prompt above>"
+claude --model claude-opus-5-5 --permission-mode acceptEdits -p "<the prompt above>"
 ```
 
 ## Division of labor — what the fed agent does NOT cover
@@ -58,8 +58,8 @@ you (or a Claude kit-runner session):
 
 ## Current state (update when it changes)
 
-Nothing is feedable today — `renderer-mvp`, `attention`, `polish-pass`,
-`packaging`, `galaxy-grouping`, and `multi-provider` are DONE;
-`kit/todo/06..07` are stubs. To make the next feedable kit, run `/distill` on
-the next stub (`kit/todo/06-history-playback.md`) to produce its contract and
-grader, then use this handoff.
+Nothing is feedable today. Kits 01–08, 10, 11, 13 and 14 are done (see
+`kit/README.md`); `kit/todo/09-ship-assets-gen.md` is a stub and
+`kit/todo/12-standalone-installer.md` is parked. To make the next feedable
+kit, run `/distill` on a stub to produce its contract and grader, then use
+this handoff.

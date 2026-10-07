@@ -102,26 +102,29 @@ Everything the fresh repo's single commit must not contain.
 Order matters. Steps 4.1–4.3 are the last window where history rewrites are
 free.
 
-- [ ] **4.1 Merge Phases 1–3** into this repo so the archive matches the
+- [x] **4.1 Merge Phases 1–3** into this repo so the archive matches the
       snapshot exactly.
-- [ ] **4.2 Decide Dependabot PRs #27 (Babylon group) and #30 (Electron
+- [x] **4.2 Decide Dependabot PRs #27 (Babylon group) and #30 (Electron
       43→44 major).** `package.json` is kit-frozen; either merge both now and
       re-run `node kit/grade.mjs` + all `kit/done/*/grade-*.mjs`, or close
       them and let Dependabot re-open on the new repo. Recommendation: merge
       the Babylon group, hold Electron 44 until after the snapshot.
-- [ ] **4.3 Delete stale branches**: local `chore/public-readiness` and 23
+      Done: both merged before the snapshot.
+- [-] **4.3 Delete stale branches**: local `chore/public-readiness` and 23
       merged local branches; remote `feat/cross-platform-and-security-hardening`
       and `feat/point-of-view-improvements` (three gmail-authored commits).
-- [ ] **4.4 Archive this repo.** Move the local `.git` to a sibling folder
+      Moot: the fresh repository carries none of them.
+- [-] **4.4 Archive this repo.** Move the local `.git` to a sibling folder
       (keeps all local branch history). On GitHub: rename to
       `agent-universe-lite-archive`, then mark archived (read-only).
-- [ ] **4.5 Create the fresh repo.** Confirm `git config user.email` is the
+      Skipped by choice: the old repository stays private and writable.
+- [x] **4.5 Create the fresh repo.** Confirm `git config user.email` is the
       noreply address. `git init`, add exactly the tracked file set, one
-      commit, push to a new **private** `agent-universe-lite`.
-- [ ] **4.6 Verify in a clean clone**: `npm ci` (see
+      commit, push to a new **private** repository (created as `agent-orrery`).
+- [x] **4.6 Verify in a clean clone**: `npm ci` (see
       `launch-shortcut-fragility` memory: needs `install-electron`),
       `npm test`, `node kit/grade.mjs`, every `kit/done/*/grade-*.mjs`.
-- [ ] **4.7 Re-apply GitHub settings** after the first CI run on the new
+- [x] **4.7 Re-apply GitHub settings** after the first CI run on the new
       repo: delete-branch-on-merge, auto-merge, update-branch, the
       "main protection" ruleset with both `test (…)` checks and admin bypass.
       Settings do not travel with the code; CI and Dependabot files do.
@@ -144,7 +147,8 @@ None of these block release. Each is a kit-sized job.
       `agent-launcher.js:324`, `provider-adapters.js` (`isLocalProjectPath`),
       `tracker.js` (`relativeInside`) / `replay-source.js` (`safeRelative`).
       Export `classifyPath` / `isCanonicalPath` / `isInsidePath` from
-      `provider-adapters.js` and delete the copies. ~2 h.
+      `provider-adapters.js` and delete the copies. ~2 h. Landed as
+      `src/main/path-safety.js` (kit 13).
 - [-] **5.3 Replace scene-dispose polling.** `src/renderer/app.js:640`
       polls every 50 ms for up to 4 s holding two scenes live. Use the BRDF
       texture's `onLoadObservable.addOnce` (or `scene.executeWhenReady`) with

@@ -6,15 +6,14 @@ unit of effort. The guiding test for every item: **does it move the app from
 app beats a one-line statusline is ambient glanceability — every hour invested
 should serve that.
 
-## 1. Needs-attention detection — IN PROGRESS (assigned to Codex)
+## 1. Needs-attention detection — DONE (2026-07-21)
 
 The single highest-value change. A ship blocked on a permission prompt or a
 question should flash; a ship that finished its turn should show "task
 complete". Turns the visualizer into something you park on a second display:
 glance up, see a flashing ship, go answer it.
 
-Fully specced: `kit/ADDENDUM-ATTENTION.md` (contract + executor prompt in §8).
-Kill-switch: `node kit/grade-attention.mjs`. Do not re-derive — the detection
+Shipped as kit 01; gate: `node kit/done/attention/grade-attention.mjs`. Do not re-derive — the detection
 signals were verified against live transcripts (pending `tool_use` = blocked;
 `type:'system', subtype:'turn_duration'` line = turn complete).
 
@@ -66,12 +65,11 @@ this: dim/fade systems untouched for N days ("derelict drift"), sort/label by
 - **Label crowding**: with 25+ real projects the universe labels overlap in
   dense clusters. Fade labels below a zoom threshold or declutter by
   priority (online > recent > dormant).
-- **Filter/search box**: 27 systems is already past comfortable visual
-  scanning. A single text filter that dims non-matching systems is enough.
+- ~~**Filter/search box**~~ — shipped 2026-07-22 as project search (kit 11).
 - **`Color3` aliasing in `scene-system.js`**: same bug class that blacked out
   the universe suns (shared object mutated by `scaleInPlace` per frame) exists
   there, currently masked because the scale factor stays ≈1. Fix is one
-  `.clone()`. Documented in `kit/EXECUTOR-REPORT.md`.
+  `.clone()`.
 
 ## 7. Content use (zero work, available today)
 

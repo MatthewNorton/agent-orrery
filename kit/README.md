@@ -11,6 +11,7 @@ kit/
   SPEC.md              LIVE  renderer contract — update it when the app evolves
   RUBRIC.md            LIVE  visual/functional acceptance reference
   grade.mjs            LIVE  mechanical regression gate — run after ANY renderer change
+  repin.mjs            LIVE  re-pins hashed files after a deliberate edit (CI runs --check)
   ASSET-REQUESTS.md    LIVE  intake for missing-asset wants (never source ad hoc)
   EXECUTOR-HANDOFF.md  LIVE  copy-paste prompt for handing a kit to ANY agent (Codex etc.)
   done/                executed kits, archived with their reports and logs
@@ -68,10 +69,8 @@ a to-do, assign it to a live project, and start Codex on the exact tagged
 clustered galaxy universe map → solar system → planet, matching the three
 mockup PNGs in the repo root.
 
-Frozen for executors: `src/main/*` (except where a kit contract explicitly
-unfreezes it, e.g. 01-attention and `tracker.js`), `src/preload.js`,
-`package.json`, `assets/*`, mockups. Renderer files under `src/renderer/` are
-fair game per the active kit's contract.
+Frozen for executors: the **Frozen files** bullet in `CLAUDE.md` is the one authoritative list. Files hash-pinned by the control and
+history gates also need `node kit/repin.mjs --note "<why>"` after an edit.
 
 ## Runner loop (kit-runner, applies to any kit here)
 
