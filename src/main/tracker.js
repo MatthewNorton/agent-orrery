@@ -23,6 +23,7 @@ const {
 const { claudeRecordToSignals, claudeTool } = require('./transcripts/claude');
 const { fnv1a, hex8, mulberry32 } = require('./shared/hash');
 const { writeFileAtomic } = require('./shared/atomic-write');
+const { relativeInside } = require('./path-safety');
 
 const DEFAULT_CLAUDE_PROJECTS_DIR = path.join(os.homedir(), '.claude', 'projects');
 const DEFAULT_CODEX_SESSION_DIRS = [
@@ -1463,19 +1464,6 @@ function readCodexOwnMetadata(file, sessionId) {
 function isPlanetSegment(value) {
   return typeof value === 'string' && value.length > 0 && value.length <= 255 &&
     value !== '.' && value !== '..' && !/[\\/\0]/.test(value);
-}
-
-function relativeInside(root, file) {
-  if (!root || !file) return null;
-  const windows = /^[a-z]:[\\/]/i.test(root) || root.includes('\\');
-  const flavor = windows ? path.win32 : path.posix;
-  const normalizedRoot = flavor.normalize(root);
-  const normalizedFile = flavor.normalize(file);
-  const comparableRoot = windows ? normalizedRoot.toLowerCase() : normalizedRoot;
-  const comparableFile = windows ? normalizedFile.toLowerCase() : normalizedFile;
-  const rel = flavor.relative(comparableRoot, comparableFile);
-  if (!rel || rel === '..' || rel.startsWith(`..${flavor.sep}`) || flavor.isAbsolute(rel)) return null;
-  return rel.replace(/[\\/]+/g, path.sep);
 }
 
 function shallowCount(dir) {

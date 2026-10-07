@@ -1,9 +1,8 @@
 // @ts-check
 'use strict';
 
-// One shared local-path classifier for the main-process launchers (kit 13, task C).
+// One shared local-path classifier for the main process (kit 13, task C).
 // Where the launchers' former private copies disagreed, the stricter rule wins.
-// tracker.js and replay-source.js keep their own relativeInside (frozen files).
 
 const path = require('node:path');
 const { isLocalProjectPath, canonicalProjectPath } = require('./provider-adapters');
@@ -72,6 +71,29 @@ function isInsidePath(root, candidate) {
     !relative.startsWith(`..${flavor.sep}`));
 }
 
+/**
+ * file relative to root, joined with `separator`, or null unless it lies strictly beneath
+ * root. The flavor, and Windows case folding, come from root's syntax, so every host agrees.
+ * Without `requireAbsolute` a relative file resolves against the process cwd.
+ * @param {string | null | undefined} root
+ * @param {string | null | undefined} file
+ * @param {{ separator?: string, requireAbsolute?: boolean }} [options]
+ * @returns {string | null}
+ */
+function relativeInside(root, file, { separator = path.sep, requireAbsolute = false } = {}) {
+  if (!root || !file) return null;
+  const windows = /^[a-z]:[\\/]/i.test(root) || root.includes('\\');
+  const flavor = windows ? path.win32 : path.posix;
+  if (requireAbsolute && (!flavor.isAbsolute(root) || !flavor.isAbsolute(file))) return null;
+  const normalizedRoot = flavor.normalize(root);
+  const normalizedFile = flavor.normalize(file);
+  const comparableRoot = windows ? normalizedRoot.toLowerCase() : normalizedRoot;
+  const comparableFile = windows ? normalizedFile.toLowerCase() : normalizedFile;
+  const rel = flavor.relative(comparableRoot, comparableFile);
+  if (!rel || rel === '..' || rel.startsWith(`..${flavor.sep}`) || flavor.isAbsolute(rel)) return null;
+  return rel.replace(/[\\/]+/g, separator);
+}
+
 module.exports = {
   pathFlavor,
   validPathString,
@@ -79,7 +101,8 @@ module.exports = {
   isCanonicalPathFor,
   isAbsolutePosixPath,
   isInsidePath,
-  // Re-exported unchanged; provider-adapters.js is frozen.
+  relativeInside,
+  // Re-exported unchanged from provider-adapters.js, which owns them.
   isLocalProjectPath,
   canonicalProjectPath,
 };

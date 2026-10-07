@@ -20,6 +20,7 @@ const {
 } = require('./provider-adapters');
 const { claudeRecordToSignals } = require('./transcripts/claude');
 const { fnv1a, hex8, mulberry32 } = require('./shared/hash');
+const { relativeInside } = require('./path-safety');
 
 const DEFAULT_CLAUDE_ROOT = path.join(os.homedir(), '.claude', 'projects');
 const DEFAULT_CODEX_ROOTS = [
@@ -926,7 +927,8 @@ class ReplaySource extends EventEmitter {
     for (const value of files.slice(0, 256)) {
       const filePath = typeof value === 'string' ? value
         : value && typeof value === 'object' ? value.movePath || value.path : null;
-      const relative = relativeInside(project.path, filePath);
+      const relative = safePath(project.path) && safePath(filePath)
+        ? relativeInside(project.path, filePath, { separator: '/', requireAbsolute: true }) : null;
       if (!relative || seen.has(relative)) continue;
       seen.add(relative);
       const bucket = relative.includes('/') ? relative.split('/')[0] : '(root)';
@@ -1326,21 +1328,6 @@ function proceduralPlanets(projectId) {
     });
   }
   return planets;
-}
-
-function relativeInside(root, file) {
-  if (!safePath(root) || !safePath(file)) return null;
-  const windows = /^[A-Za-z]:[\\/]/.test(root) || root.includes('\\');
-  const flavor = windows ? path.win32 : path.posix;
-  if (!flavor.isAbsolute(root) || !flavor.isAbsolute(file)) return null;
-  const normalizedRoot = flavor.normalize(root);
-  const normalizedFile = flavor.normalize(file);
-  const comparableRoot = windows ? normalizedRoot.toLowerCase() : normalizedRoot;
-  const comparableFile = windows ? normalizedFile.toLowerCase() : normalizedFile;
-  const relative = flavor.relative(comparableRoot, comparableFile);
-  if (!relative || relative === '..' || relative.startsWith(`..${flavor.sep}`) ||
-      flavor.isAbsolute(relative)) return null;
-  return relative.replace(/[\\/]+/g, '/');
 }
 
 function safeId(value) {
