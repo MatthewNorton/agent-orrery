@@ -184,8 +184,7 @@ th { font-size: 11.5px; color: var(--muted); font-weight: 600; text-transform: u
   <header class="topline">
     <div>
       <h1>Agent Universe Lite — architecture map</h1>
-      <p>How the code is structured on <code>main</code> @ <code>39b547d</code> (analysed 6 Oct 2026, after the PR #11 split of
-        <code>main.js</code>). The written companion is
+      <p>How the code is structured on <code>main</code> after the 7 Oct 2026 cleanup (PRs #14–#19). The written companion is
         <code>architecture.md</code> in this folder. Hover a box to see what it talks to; click to pin it; use the buttons to
         follow one flow end to end.</p>
     </div>
@@ -290,18 +289,20 @@ const NODES = {
   'ext.codexcli': { label: 'codex', sub: 'codex exec · IDEAS only', layer: 'ext',
     job: 'Started detached with --sandbox workspace-write for an IDEAS item. The only place the app starts an agent.' },
 
-  tracker: { label: 'tracker.js', lines: 1573, note: 'class Tracker', layer: 'main', pinned: true, path: 'src/main/tracker.js',
+  tracker: { label: 'tracker.js', lines: 1562, note: 'class Tracker', layer: 'main', path: 'src/main/tracker.js',
     job: 'Polls every source (scan 3 s, poll 1 s, sweep 5 s), owns the live model of projects, ships and planets, classifies attention, emits event batches and saves universe-state.json.',
-    issues: ['Has its own Claude parser, separate from the one in replay-source.js', 'No unit-test file; covered by gates and partly by path-safety.test.js',
-      'By reading: a Claude session that goes quiet for 15 min and resumes is re-read from offset 0 and re-counts old edits (lines 822, 455, 1149)',
+    issues: ['Still one 1,562-line class: scanning, live model, attention, persistence and planet walks',
+      'A Claude session that resumes after 15 idle minutes re-counts its old edits (pinned as a todo test)',
+      'On Windows a mixed-case top-level folder never shows its builds on its planet (todo test)',
+      'The providers.json extensions setting for Signal folders is ignored',
       'Every 3 s it stats every transcript and lists all Codex history'] },
-  adapters: { label: 'provider-adapters.js', lines: 570, note: 'pure functions', layer: 'main', pinned: true, path: 'src/main/provider-adapters.js',
-    job: 'Codex record → structural signals, tool classification, canonical path keys, rejection of UNC / device paths, Signal config parsing.',
-    issues: ['No unit-test file of its own'] },
-  replay: { label: 'replay-source.js', lines: 1420, note: 'class ReplaySource', layer: 'main', pinned: true, path: 'src/main/replay-source.js',
+  adapters: { label: 'provider-adapters.js', lines: 348, note: 'pure functions', layer: 'main', path: 'src/main/provider-adapters.js',
+    job: 'Provider names, canonical path keys, rejection of UNC / device paths, the cross-provider tool vocabulary (classifyTool), Signal config, and adaptLine.' },
+  transcripts: { label: 'transcripts/*.js', lines: 398, note: 'claude · codex · fields', layer: 'main', path: 'src/main/transcripts/',
+    job: 'The one parser per provider: a transcript record becomes structural signals (session, turn end, message shape, tool start / end). Live and replay both read through it and each applies the signals with its own named rules.' },
+  replay: { label: 'replay-source.js', lines: 1383, note: 'class ReplaySource', layer: 'main', path: 'src/main/replay-source.js',
     job: 'Indexes all history once at launch, then rebuilds the universe at any timestamp with a k-way merge over files (64 open handles max).',
-    issues: ['Second Claude parser (_parseHistoricalLine), which is why replay and live disagree',
-      'Different galaxy keys and drone ids from live; attention always empty', 'Index built once: the scrubber end time is frozen until restart'] },
+    issues: ['20 deliberate differences from live (galaxy keys, drone ids, no attention…), each named in the parity tests', 'Index built once: the scrubber end time is frozen until restart'] },
   coord: { label: 'root-task-coordinator.js', lines: 368, note: 'class', layer: 'main', path: 'src/main/root-task-coordinator.js',
     job: 'Assign / retry for an IDEAS item: append the goal to GOALS.md, start a run record, launch Codex.',
     issues: ['run() is 116 lines', 'completion-failed has no retry path'] },
@@ -320,7 +321,7 @@ const NODES = {
   terml: { label: 'terminal-launcher.js', lines: 185, note: 'factory', layer: 'main', path: 'src/main/terminal-launcher.js',
     job: 'Builds and spawns the terminal command for a project folder; shell:false, detached, unref.',
     issues: ['Unit tests cover macOS and Linux only; Windows only via grade-control'] },
-  pathsafety: { label: 'path-safety.js', lines: 84, note: 'functions', layer: 'main', path: 'src/main/path-safety.js',
+  pathsafety: { label: 'path-safety.js', lines: 108, note: 'functions', layer: 'main', path: 'src/main/path-safety.js',
     job: 'Shared canonical-path checks used by both launchers.',
     issues: ['One of five different “is this path inside that folder” implementations'] },
   projpaths: { label: 'project-paths.js', lines: 161, note: 'functions', layer: 'main', path: 'src/main/project-paths.js',
@@ -337,8 +338,8 @@ const NODES = {
     issues: ['Tested by test/project-vcs-status-collector.test.js; test/project-vcs-status.test.js tests the renderer component instead'] },
   ghmeta: { label: 'github-metadata-provider.js', lines: 273, note: 'factory', layer: 'main', path: 'src/main/github-metadata-provider.js',
     job: 'Open-PR counts through gh api graphql; maps AGENT_UNIVERSE_GITHUB_TOKEN to GH_TOKEN and scrubs other tokens.' },
-  shared: { label: 'shared/*.js', lines: 143, note: '4 small modules', layer: 'main', path: 'src/main/shared/',
-    job: 'bounded-process (git and gh runner with timeout and output cap), atomic-write (temp file + rename), values (boundedInteger, ownString, bufferValue) and ids (project and goal id checks).' },
+  shared: { label: 'shared/*.js', lines: 190, note: '5 small modules', layer: 'main', path: 'src/main/shared/',
+    job: 'bounded-process (git and gh runner with timeout and output cap), atomic-write (temp file + rename), values (boundedInteger, ownString, bufferValue), ids (project and goal id checks) and hash (fnv1a / mulberry32 seeds).' },
   winsec: { label: 'window-security.js', lines: 54, note: 'functions', layer: 'main', path: 'src/main/window-security.js',
     job: 'Blocks navigation and pop-ups, allows only the notifications permission, and checks that IPC comes from the trusted main frame.' },
 
@@ -493,7 +494,7 @@ const COLUMNS = [
     ['Programs it starts', ['ext.git', 'ext.gh', 'ext.term', 'ext.codexcli']],
   ] },
   { id: 'svc', title: 'Services', x: 270, w: 244, groups: [
-    ['Live model', ['tracker', 'adapters']],
+    ['Live model', ['tracker', 'transcripts', 'adapters']],
     ['History playback', ['replay']],
     ['Terminal + paths', ['terml', 'pathsafety', 'projpaths']],
     ['IDEAS queue → Codex runs', ['coord', 'roottasks', 'taskruns', 'goals', 'agentl']],
@@ -546,8 +547,12 @@ const EDGES = [
   ['terml', 'ext.term', 'spawns, detached', 'io', 0],
   ['agentl', 'ext.codexcli', 'spawns codex exec', 'io', 0],
 
+  ['tracker', 'transcripts', 'Claude + Codex records → signals', 'req', 1],
+  ['replay', 'transcripts', 'Claude + Codex records → signals', 'req', 1],
   ['tracker', 'adapters', 'require', 'req', 0],
   ['replay', 'adapters', 'require', 'req', 0],
+  ['tracker', 'shared', 'hash · atomic write', 'req', 0],
+  ['replay', 'shared', 'hash', 'req', 0],
   ['pathsafety', 'adapters', 'require', 'req', 0],
   ['terml', 'pathsafety', 'require', 'req', 0],
   ['agentl', 'pathsafety', 'require', 'req', 0],
@@ -677,7 +682,8 @@ const EDGES = [
 const TRACES = {
   live: { title: 'A transcript line becomes pixels (LIVE)', steps: [
     ['ext.claude', 'tracker', 'Claude Code appends a line. pollFiles reads the new bytes every second, but only for files touched in the last 15 minutes.'],
-    ['tracker', 'mctx', 'The Tracker parses the line, updates its model and emits an event batch. ctx.start() in app-context.js subscribed to it.'],
+    ['tracker', 'transcripts', 'transcripts/claude.js turns the record into structural signals — the same parser the history view uses.'],
+    ['tracker', 'mctx', 'The Tracker applies the signals to its model and emits an event batch. ctx.start() in app-context.js subscribed to it.'],
     ['mctx', 'br.events', 'app-context.js sends au:events with {streamEpoch, mode}, but only while the Tracker is the active source.'],
     ['br.events', 'appjs', 'The preload hands the batch to app.js, which drops batches from old epochs and events it has already seen (seq).'],
     ['appjs', 'appstate', 'applyEvent updates the shared store (projects, ships, feed). An attention change can raise a desktop notification here.'],
@@ -1089,7 +1095,8 @@ for (const st of STRIPES) {
 
 // ---------- size charts ----------
 const SIZES_MAIN = [
-  ['tracker.js', 1573, 1], ['replay-source.js', 1420, 1], ['provider-adapters.js', 570, 1], ['task-runs.js', 386],
+  ['tracker.js', 1562], ['replay-source.js', 1383], ['provider-adapters.js', 348], ['transcripts/codex.js', 235],
+  ['transcripts/claude.js', 111], ['transcripts/fields.js', 52], ['shared/hash.js', 47], ['task-runs.js', 386],
   ['root-task-coordinator.js', 368], ['goals.js', 351], ['root-tasks.js', 343], ['agent-launcher.js', 359],
   ['github-metadata-provider.js', 273], ['project-vcs-status.js', 261], ['project-vcs-status-service.js', 287],
   ['harness/driver.js', 262, 0, 'harness'], ['ipc/project-paths.js', 233], ['app-context.js', 217], ['replay-control.js', 215],
@@ -1097,7 +1104,7 @@ const SIZES_MAIN = [
   ['harness/fixtures.js', 178, 0, 'harness'], ['project-paths.js', 161], ['shared/bounded-process.js', 70], ['harness/modes/control.js', 152, 0, 'harness'],
   ['harness/modes/polish.js', 139, 0, 'harness'], ['ipc/tasks.js', 131], ['harness/modes/shots.js', 116, 0, 'harness'],
   ['project-vcs-status-controller.js', 111], ['ipc/root-tasks.js', 100], ['harness/modes/provider.js', 97, 0, 'harness'],
-  ['path-safety.js', 84], ['ipc/terminal.js', 76], ['ipc/register.js', 74], ['window-security.js', 54], ['window.js', 54],
+  ['path-safety.js', 108], ['ipc/terminal.js', 76], ['ipc/register.js', 74], ['window-security.js', 54], ['window.js', 54],
   ['main.js', 47], ['flags.js', 44], ['preload.js', 41], ['ipc/guards.js', 15],
   ['shared/atomic-write.js', 27], ['shared/values.js', 24], ['shared/ids.js', 22],
 ];
