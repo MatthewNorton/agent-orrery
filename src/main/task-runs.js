@@ -3,6 +3,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { completeAssignedGoal, validGoalId } = require('./goals');
+const { writeFileAtomic } = require('./shared/atomic-write');
 
 const ACTIVE_PHASES = new Set(['waiting-for-agent', 'running']);
 const LOCKING_PHASES = new Set([...ACTIVE_PHASES, 'completing']);
@@ -323,22 +324,8 @@ class TaskRunTracker {
       error.code = 'LIMIT_REACHED';
       throw error;
     }
-    const directory = path.dirname(this.statePath);
-    this.fs.mkdirSync(directory, { recursive: true });
-    const temp = path.join(
-      directory,
-      `.${path.basename(this.statePath)}.${process.pid}.${Date.now()}.${Math.random().toString(16).slice(2)}.tmp`
-    );
-    try {
-      this.fs.writeFileSync(temp, serialized, {
-        encoding: 'utf8', flag: 'wx',
-      });
-      this.fs.renameSync(temp, this.statePath);
-    } finally {
-      try { this.fs.unlinkSync(temp); } catch (error) {
-        if (!error || error.code !== 'ENOENT') throw error;
-      }
-    }
+    this.fs.mkdirSync(path.dirname(this.statePath), { recursive: true });
+    writeFileAtomic(this.statePath, serialized, { fsImpl: this.fs });
   }
 }
 

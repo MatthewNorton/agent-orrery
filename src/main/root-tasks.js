@@ -3,6 +3,7 @@
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
+const { writeFileAtomic } = require('./shared/atomic-write');
 
 const STORE_VERSION = 1;
 const MAX_RECORDS = 1_000;
@@ -257,26 +258,8 @@ class RootTaskStore {
     if (Buffer.byteLength(serialized, 'utf8') > MAX_STATE_BYTES) {
       throw storeError('Root task storage limit reached', 'LIMIT_REACHED');
     }
-    const directory = path.dirname(this.statePath);
-    this.fs.mkdirSync(directory, { recursive: true });
-    const tempPath = path.join(
-      directory,
-      `.${path.basename(this.statePath)}.${process.pid}.${Date.now()}.${Math.random().toString(16).slice(2)}.tmp`
-    );
-    try {
-      this.fs.writeFileSync(
-        tempPath,
-        serialized,
-        { encoding: 'utf8', flag: 'wx' }
-      );
-      this.fs.renameSync(tempPath, this.statePath);
-    } finally {
-      try {
-        this.fs.unlinkSync(tempPath);
-      } catch (error) {
-        if (!error || error.code !== 'ENOENT') throw error;
-      }
-    }
+    this.fs.mkdirSync(path.dirname(this.statePath), { recursive: true });
+    writeFileAtomic(this.statePath, serialized, { fsImpl: this.fs });
   }
 }
 
