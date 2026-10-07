@@ -3,10 +3,10 @@
 const fs = require('fs');
 const path = require('path');
 const { writeFileAtomic } = require('./shared/atomic-write');
+const { validGoalId } = require('./shared/ids');
 
 const TASK_LINE = /^(\s*)([-*])([ \t]+)\[([ xX])\]([ \t]+)(.*)$/;
 const ASSIGNED_GOAL_SUFFIX = /^(.*?)([ \t]+<!--\s*agent-universe:([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\s*-->[ \t]*)$/i;
-const GOAL_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function splitSourceLines(text) {
   const source = String(text);
@@ -191,10 +191,6 @@ function normalizeGoalItems(items) {
     }
     return normalized;
   });
-}
-
-function validGoalId(value) {
-  return typeof value === 'string' && GOAL_ID.test(value);
 }
 
 function writeGoalsFile(projectRoot, items) {
