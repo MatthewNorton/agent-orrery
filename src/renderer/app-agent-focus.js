@@ -322,25 +322,4 @@
       ? String(flight.target).toUpperCase() : 'SYSTEM PATROL';
     if (els.target.textContent !== target) els.target.textContent = target;
   };
-
-  function agentFocusStats() {
-    const sceneStats = S.activeScene && S.activeScene.metadata &&
-      typeof S.activeScene.metadata.focusStats === 'function'
-      ? S.activeScene.metadata.focusStats() : null;
-    return {
-      active: Boolean(S.agentFocus.shipId),
-      shipId: S.agentFocus.shipId,
-      pendingShipId: S.agentFocus.pendingShipId,
-      environment: S.agentFocus.environment,
-      vantage: S.agentFocus.vantage,
-      view: S.current.view,
-      bodyClass: document.body.classList.contains('agent-focus-active'),
-      overlayVisible: Boolean(S.agentFocus.els && S.agentFocus.els.root &&
-        !S.agentFocus.els.root.classList.contains('hidden')),
-      hologramBodies: S.agentFocus.els && S.agentFocus.els.hologramSystem
-        ? S.agentFocus.els.hologramSystem.querySelectorAll('.agent-focus-hologram-orbit').length : 0,
-      scene: sceneStats,
-    };
-  }
-  AUR.agentFocusStats = agentFocusStats;
 })();

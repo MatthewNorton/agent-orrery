@@ -155,7 +155,6 @@ async function scanProjectCandidates(rootPath, projects, options = {}) {
 
 module.exports = {
   scanProjectCandidates,
-  projectMatchNames,
   isPathInside,
   DEFAULT_MAX_DEPTH,
   DEFAULT_MAX_DIRECTORIES,

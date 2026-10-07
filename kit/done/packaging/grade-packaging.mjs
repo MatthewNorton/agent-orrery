@@ -1,5 +1,5 @@
 // Item 03 Windows shortcut grader. Run from anywhere:
-//   node kit/todo/03-packaging/grade-packaging.mjs
+//   node kit/done/packaging/grade-packaging.mjs
 // Exit 0 = PASS, 1 = FAIL.
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';

@@ -1,5 +1,5 @@
-// Mechanical grader for kit/todo/01-attention/ADDENDUM-ATTENTION.md.
-// Usage: node kit/todo/01-attention/grade-attention.mjs [--fixtures-only]
+// Gate for kit 01, needs-attention detection.
+// Usage: node kit/done/attention/grade-attention.mjs [--fixtures-only]
 // A1: classifyAttention exported. A2: fixture table. A3: grade.mjs regression.
 import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
@@ -92,6 +92,6 @@ function fail(msg) {
   process.exit(1);
 }
 function done() {
-  console.log('\n================ ATTENTION GRADE ================\nPASS  all mechanical checks green\nNow run the staged live check in ADDENDUM-ATTENTION.md §7.');
+  console.log('\n================ ATTENTION GRADE ================\nPASS  all mechanical checks green\nNow check a live session that waits on a question or permission.');
   process.exit(0);
 }
