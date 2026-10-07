@@ -43,7 +43,7 @@ function walk(dir) {
   return out.sort();
 }
 // Formerly frozen files may shrink but never grow past their size when they were unfrozen.
-const LEGACY_CAPS = { 'src/main/tracker.js': 1573, 'src/main/replay-source.js': 1420, 'src/main/provider-adapters.js': 570 };
+const LEGACY_CAPS = { 'src/main/tracker.js': 1573, 'src/main/replay-source.js': 1420 };
 const mainSrc = read('src/main/main.js');
 
 // ---- stage A: flags + fixtures ----
