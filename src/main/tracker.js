@@ -26,23 +26,13 @@ const { codexParentSessionId } = require('./transcripts/codex');
 const { fnv1a, hex8, mulberry32 } = require('./shared/hash');
 const { writeFileAtomic } = require('./shared/atomic-write');
 const { relativeInside } = require('./path-safety');
+const { signalSources, watchedFiles } = require('./signal-sources');
 
 /**
  * @import { Attention, FeedEntry, PlanetData, Project, Ship, ShipStatus, SystemData }
  *   from '../types/contract'
  * @import { LiveProject, LiveShip } from '../types/live-model'
  * @import { ClaudeMessage, ClaudeSession, ClaudeToolStart } from './transcripts/claude'
- */
-
-/**
- * A Signal watch entry. `extensions` is never set: readGenericWatchConfig does not pass it
- * through, so every source watches the default extensions.
- * @typedef {object} SignalSource
- * @property {string} id
- * @property {string} directory
- * @property {string} projectPath
- * @property {string | null} label
- * @property {string[]} [extensions]
  */
 
 const DEFAULT_CLAUDE_PROJECTS_DIR = path.join(os.homedir(), '.claude', 'projects');
@@ -730,30 +720,13 @@ class Tracker extends EventEmitter {
       this.providerWarnings.add(warning);
       console.warn(`[providers] ${warning}`);
     }
-    const rawSources = (config.watch || []).map((item) => /** @type {SignalSource} */ ({
-        id: `watch-${hex8(canonicalProjectPath(item.directory))}`,
-        directory: item.directory,
-        projectPath: item.projectPath,
-        label: item.label,
-      }));
     const now = Date.now();
     const seenFiles = new Set();
-    for (const source of rawSources) {
-      if (!source || !/^[a-z0-9][a-z0-9-]{0,47}$/i.test(source.id || '') ||
-          !(path.win32.isAbsolute(source.directory || '') || path.posix.isAbsolute(source.directory || '')) ||
-          !(path.win32.isAbsolute(source.projectPath || '') || path.posix.isAbsolute(source.projectPath || ''))) continue;
+    for (const source of signalSources(config.watch || [])) {
       // Security follow-up: a UNC/device projectPath has no project key; skip it instead of fnv1a(null).
       const projectKey = canonicalProjectPath(source.projectPath);
       if (!projectKey) continue;
-      const extensions = new Set((Array.isArray(source.extensions) && source.extensions.length
-        ? source.extensions : ['.json', '.jsonl', '.log', '.txt'])
-        .map((ext) => String(ext).toLowerCase())
-        .filter((ext) => ['.json', '.jsonl', '.log', '.txt'].includes(ext)));
-      const candidates = listRegularFilesRecursive(source.directory)
-        .filter(({ fp }) => extensions.has(path.extname(fp).toLowerCase()))
-        .sort((a, b) => b.st.mtimeMs - a.st.mtimeMs || a.fp.localeCompare(b.fp))
-        .slice(0, 256);
-      for (const { fp, st } of candidates) {
+      for (const { fp, st } of watchedFiles(source)) {
         seenFiles.add(fp);
         const project = this.ensureProjectForPath(
           source.projectPath,
@@ -1453,24 +1426,6 @@ function listFilesRecursive(root, extension) {
       const fp = path.join(dir, entry.name);
       if (entry.isDirectory()) queue.push(fp);
       else if (entry.isFile() && entry.name.toLowerCase().endsWith(extension)) out.push(fp);
-    }
-  }
-  return out;
-}
-
-function listRegularFilesRecursive(root) {
-  const out = [];
-  const queue = [root];
-  while (queue.length) {
-    const dir = queue.pop();
-    let entries;
-    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { continue; }
-    for (const entry of entries) {
-      const fp = path.join(dir, entry.name);
-      if (entry.isDirectory()) queue.push(fp);
-      else if (entry.isFile()) {
-        try { out.push({ fp, st: fs.statSync(fp) }); } catch { /* raced with deletion */ }
-      }
     }
   }
   return out;

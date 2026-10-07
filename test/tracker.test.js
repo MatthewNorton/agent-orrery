@@ -7,10 +7,11 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const { classifyAttention } = require('../src/main/tracker');
 const {
-  adaptLine, createAdapterState, classifyTool, canonicalProjectPath,
+  adaptLine, createAdapterState, classifyTool, canonicalProjectPath, readGenericWatchConfig,
 } = require('../src/main/provider-adapters');
 const {
   SEC, MIN, T0, SLUG, CLAUDE_SESSION, CODEX_SESSION, TASK_ID,
@@ -674,7 +675,7 @@ test('classifyTool maps Codex tool names onto the shared status vocabulary', () 
 
 // ---------- Signal ----------
 
-function signalWorld(t, { mtime = T0 } = {}) {
+function signalWorld(t, { mtime = T0, extensions } = {}) {
   const world = createWorld(t);
   const signalDir = path.join(world.root, 'signals');
   const signalFile = path.join(signalDir, 'private.log');
@@ -683,11 +684,11 @@ function signalWorld(t, { mtime = T0 } = {}) {
   setMtime(signalFile, mtime);
   fs.mkdirSync(path.dirname(world.providerConfigPath), { recursive: true });
   fs.writeFileSync(world.providerConfigPath, JSON.stringify({
-    watch: [{ directory: signalDir, projectPath: world.projectDir, label: 'Fixture' }],
+    watch: [{ directory: signalDir, projectPath: world.projectDir, label: 'Fixture', extensions }],
   }));
   const sourceId = `watch-${hex8(canonicalProjectPath(signalDir))}`;
-  const shipId = `ship:generic:${sourceId}:${hex8(canonicalProjectPath(signalFile))}`;
-  return { world, signalDir, signalFile, shipId };
+  const shipIdOf = (file) => `ship:generic:${sourceId}:${hex8(canonicalProjectPath(file))}`;
+  return { world, signalDir, signalFile, shipId: shipIdOf(signalFile), shipIdOf };
 }
 
 // Records (rather than throws, which the tracker would swallow) any read of watched files.
@@ -752,6 +753,44 @@ test('signal: a watched file docks a generic ship from stat alone; its contents 
   assert.equal(gone[1].entry.text, 'Signal-1 signal disappeared');
 
   assert.deepEqual(reads, []);
+});
+
+// Docks a fresh .log and a fresh .txt file under `extensions`; returns which got a ship.
+function dockedSignalFiles(t, extensions) {
+  const { world, signalDir, signalFile, shipIdOf } = signalWorld(t, { extensions });
+  const notes = path.join(signalDir, 'notes.txt');
+  fs.writeFileSync(notes, 'PRIVATE_GENERIC_BYTES');
+  setMtime(notes, T0);
+  const { tracker } = world.live();
+  tracker.scan(true);
+  const docked = new Set(tracker.snapshot().ships.map((ship) => ship.id));
+  return [signalFile, notes].filter((file) => docked.has(shipIdOf(file))).map((file) => path.basename(file));
+}
+
+test('signal: a watch entry\'s configured extensions choose which files dock a ship', (t) => {
+  assert.deepEqual(dockedSignalFiles(t, ['.txt']), ['notes.txt']);
+});
+
+test('signal: a watch entry without a usable extensions list watches every default extension', (t) => {
+  assert.deepEqual(dockedSignalFiles(t, ['.exe']), ['private.log', 'notes.txt']);
+});
+
+test('signal config: extensions keep the supported ones listed; absent or unusable lists mean all four', (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'au-signal-config-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const file = path.join(root, 'providers.json');
+  const parse = (extensions) => {
+    fs.writeFileSync(file, JSON.stringify({ watch: [{ directory: root, extensions }] }));
+    const { watch, warnings } = readGenericWatchConfig(file);
+    return [watch[0].extensions, warnings];
+  };
+  const all = ['.json', '.jsonl', '.log', '.txt'];
+  const warning = 'provider config lists no supported watch extensions; using .json, .jsonl, .log and .txt';
+  assert.deepEqual(parse([' .TXT ', '.log', '.exe', 7, '.log']), [['.log', '.txt'], []]);
+  assert.deepEqual(parse(undefined), [all, []]);
+  for (const unusable of [[], ['.exe', 'log'], '.log', null]) {
+    assert.deepEqual(parse(unusable), [all, [warning]], JSON.stringify(unusable));
+  }
 });
 
 test('signal: ships for files idle 5-15 min are swept every sweep and respawned every scan',
