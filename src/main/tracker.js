@@ -21,6 +21,7 @@ const {
   adaptLine,
 } = require('./provider-adapters');
 const { claudeRecordToSignals, claudeTool } = require('./transcripts/claude');
+const { fnv1a, hex8, mulberry32 } = require('./shared/hash');
 
 const DEFAULT_CLAUDE_PROJECTS_DIR = path.join(os.homedir(), '.claude', 'projects');
 const DEFAULT_CODEX_SESSION_DIRS = [
@@ -88,25 +89,6 @@ function classifyAttention(ship, now) {
 function resumesTurn(message) {
   return (message.user && message.prompt) ||
     (message.blocks && (message.assistant || (message.user && !message.toolResult)));
-}
-
-function fnv1a(str) {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < str.length; i++) {
-    h ^= str.charCodeAt(i);
-    h = Math.imul(h, 0x01000193) >>> 0;
-  }
-  return h >>> 0;
-}
-
-function mulberry32(seed) {
-  let a = seed >>> 0;
-  return function () {
-    a |= 0; a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
 }
 
 function trackerPathError(code, message) {
@@ -216,7 +198,7 @@ function deriveGalaxyFromSlug(projectId) {
   const structural = deriveStructuralGalaxy(segments);
   if (structural) return structural;
   return {
-    key: `slug:${fnv1a(id).toString(16).padStart(8, '0')}`,
+    key: `slug:${hex8(id)}`,
     label: humanizeSegment(id).slice(0, 32) || 'Unknown',
   };
 }
@@ -566,9 +548,9 @@ class Tracker extends EventEmitter {
       }
     }
     if (!id) {
-      id = fallbackId || `project:${fnv1a(key).toString(16).padStart(8, '0')}`;
+      id = fallbackId || `project:${hex8(key)}`;
       if (this.projects.has(id) && canonicalProjectPath(this.projects.get(id).path) !== key) {
-        id = `${id}:${fnv1a(key).toString(16).padStart(8, '0')}`;
+        id = `${id}:${hex8(key)}`;
       }
     }
     let project = this.projects.get(id);
@@ -633,7 +615,7 @@ class Tracker extends EventEmitter {
       if (seenSessions.has(sessionId)) continue;
       seenSessions.add(sessionId);
 
-      const fallbackId = `project:${fnv1a(projectKey).toString(16).padStart(8, '0')}`;
+      const fallbackId = `project:${hex8(projectKey)}`;
       const project = this.ensureProjectForPath(meta.cwd, fallbackId, st.mtimeMs, 0);
       if (!project) continue;
       totals.set(project.id, (totals.get(project.id) || 0) + st.size);
@@ -728,7 +710,7 @@ class Tracker extends EventEmitter {
       console.warn(`[providers] ${warning}`);
     }
     const rawSources = (config.watch || []).map((item) => ({
-        id: `watch-${fnv1a(canonicalProjectPath(item.directory)).toString(16).padStart(8, '0')}`,
+        id: `watch-${hex8(canonicalProjectPath(item.directory))}`,
         directory: item.directory,
         projectPath: item.projectPath,
         label: item.label,
@@ -754,14 +736,14 @@ class Tracker extends EventEmitter {
         seenFiles.add(fp);
         const project = this.ensureProjectForPath(
           source.projectPath,
-          `project:${fnv1a(projectKey).toString(16).padStart(8, '0')}`,
+          `project:${hex8(projectKey)}`,
           st.mtimeMs,
           0
         );
         if (!project || now - st.mtimeMs > HOT_WINDOW_MS) continue;
         const previous = this.signalFiles.get(fp);
         // Security follow-up: a POSIX file name containing `\` has no canonical key; hash the raw path instead.
-        const sessionId = `${source.id}:${fnv1a(canonicalProjectPath(fp) || fp).toString(16).padStart(8, '0')}`;
+        const sessionId = `${source.id}:${hex8(canonicalProjectPath(fp) || fp)}`;
         const ship = this.ensureProviderShip('signal', project.id, sessionId, 'main', st.mtimeMs, null);
         if (!isStartup && (!previous || previous.size !== st.size || previous.mtimeMs !== st.mtimeMs)) {
           ship.lastEvent = Math.max(ship.lastEvent, st.mtimeMs);
@@ -940,7 +922,7 @@ class Tracker extends EventEmitter {
         if (projectKey) {
           const project = this.ensureProjectForPath(
             signal.cwd,
-            `project:${fnv1a(projectKey).toString(16).padStart(8, '0')}`,
+            `project:${hex8(projectKey)}`,
             ts,
             0
           );

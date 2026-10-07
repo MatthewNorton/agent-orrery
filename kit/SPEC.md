@@ -48,7 +48,7 @@ loaders), then:
 
 | Layer | Files |
 |---|---|
-| Shared libraries | `util.js` (creates `window.AUR`; `fnv1a`/`mulberry32` copied from `src/main/tracker.js` so seeds agree), `procedural-worlds.js`, `ship-assets.js`, `polish-math.js` and `galaxy-layout.js` (pure UMD), `search-core.js`, `components/project-vcs-status.js` |
+| Shared libraries | `util.js` (creates `window.AUR`; `fnv1a`/`mulberry32` copied from `src/main/shared/hash.js` so seeds agree), `procedural-worlds.js`, `ship-assets.js`, `polish-math.js` and `galaxy-layout.js` (pure UMD), `search-core.js`, `components/project-vcs-status.js` |
 | Views | `scene-universe.js`, `scene-system.js`, `scene-planet.js` |
 | App state | `app-state.js` — the only file that assigns `AUR.app` (`state`, `const`) |
 | App modules | `app-agent-focus.js`, `app-chrome.js`, `app-ideas.js`, `app-playback.js`, `app-project-control.js`, `app-project-search.js`, `app-project-settings.js`, `app-project-tasks.js` |

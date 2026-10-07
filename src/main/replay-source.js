@@ -19,6 +19,7 @@ const {
   createAdapterState,
 } = require('./provider-adapters');
 const { claudeRecordToSignals } = require('./transcripts/claude');
+const { fnv1a, hex8, mulberry32 } = require('./shared/hash');
 
 const DEFAULT_CLAUDE_ROOT = path.join(os.homedir(), '.claude', 'projects');
 const DEFAULT_CODEX_ROOTS = [
@@ -832,7 +833,7 @@ class ReplaySource extends EventEmitter {
     let id = this._projectIdByPath.get(key);
     if (!id) {
       id = safeId(this._preferredProjectIds.get(key)) || safeId(projectIdHint) ||
-        `project:${fnv1a(key).toString(16).padStart(8, '0')}`;
+        `project:${hex8(key)}`;
       if (this._projects.has(id) && canonicalProjectPath(this._projects.get(id).path) !== key) {
         id = `${id}-${fnv1a(key).toString(16)}`;
       }
@@ -1309,7 +1310,7 @@ function replayGalaxy(projectPath, exists) {
   const raw = canonical.slice(canonical.indexOf(':') + 1).replace(/\//g, flavor.sep);
   const parent = flavor.dirname(raw);
   const label = humanize(flavor.basename(parent)) || 'History';
-  return { key: `history:${fnv1a(parent).toString(16).padStart(8, '0')}`, label };
+  return { key: `history:${hex8(parent)}`, label };
 }
 
 function proceduralPlanets(projectId) {
@@ -1386,27 +1387,6 @@ function finiteNow(now) {
 function humanize(value) {
   return String(value || '').replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim()
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
-function fnv1a(value) {
-  const input = String(value);
-  let hash = 0x811c9dc5;
-  for (let index = 0; index < input.length; index++) {
-    hash ^= input.charCodeAt(index);
-    hash = Math.imul(hash, 0x01000193) >>> 0;
-  }
-  return hash >>> 0;
-}
-
-function mulberry32(seed) {
-  let state = seed >>> 0;
-  return function random() {
-    state |= 0;
-    state = (state + 0x6d2b79f5) | 0;
-    let value = Math.imul(state ^ (state >>> 15), 1 | state);
-    value = (value + Math.imul(value ^ (value >>> 7), 61 | value)) ^ value;
-    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
-  };
 }
 
 module.exports = { ReplaySource };
