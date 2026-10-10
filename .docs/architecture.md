@@ -2,9 +2,9 @@
 
 How the codebase is structured **today**, written for someone who finds it confusing.
 
-- Snapshot: `main` after the 2026-10-07 cleanup (PRs #14–#19). PR #11 had already split the old
-  2,217-line `src/main/main.js` into small files. Older docs still quote line numbers in the old
-  `main.js`; §5.3 maps those to where the code lives now.
+- Snapshot: `main` after the 2026-10-07 cleanup (PRs #14–#22) and the fleet-v2 ships (2026-10-10).
+  PR #11 had already split the old 2,217-line `src/main/main.js` into small files. Older docs
+  still quote line numbers in the old `main.js`; §5.3 maps those to where the code lives now.
 - Visual map: open [`architecture.html`](architecture.html) in a browser (works offline from disk).
   Deep links: `#trace=live|replay|ideas|terminal|git`, `#node=<id>` (e.g. `#node=tracker`), `#hot`, `#theme=light|dark`.
 
@@ -27,7 +27,7 @@ draws it as a universe. It never controls the agents (two narrow exceptions in �
 |---|---|
 | Solar system (sun) | A project folder (one per working directory) |
 | Galaxy | A group of projects that share a parent folder |
-| Starship | A live Claude / Codex session |
+| Starship | A live Claude / Codex session; its hull class rises with the edits it has made |
 | Drone | A Claude subagent (`Task`/`Agent` tool call) |
 | Planet | A top-level folder inside the project; it grows as the agent edits files in it |
 | Halo / "needs you" | A ship waiting on a question or permission |
@@ -80,12 +80,12 @@ or the record of how the app was built.
 
 | Folder | Files | Size | What it is | Part of the running app? |
 |---|---|---|---|---|
-| `src/main/` + `src/preload.js` | 44 | 9,928 lines JS (1,337 of it test harness) | Main process | **Yes** (harness runs only with test flags) |
-| `src/renderer/` | 28 | 6,954 lines JS + 3,042 HTML/CSS | Renderer (UI + 3D) | **Yes** |
-| `assets/` | 331 | ~276 MB | Planet / skybox / asteroid textures, ship GLBs | Partly — see §8 |
-| `test/` | 23 | 4,295 lines | Unit tests (`npm test`, Node's runner, no Electron) | No |
+| `src/main/` + `src/preload.js` | 46 | 10,099 lines JS (1,345 of it test harness) | Main process | **Yes** (harness runs only with test flags) |
+| `src/renderer/` | 29 | 7,280 lines JS + 3,042 HTML/CSS | Renderer (UI + 3D) | **Yes** |
+| `assets/` | 347 | ~280 MB | Planet / skybox / asteroid textures, ship GLBs | Partly — see §8 |
+| `test/` | 45 | 9,019 lines | Unit tests (`npm test`, Node's runner, no Electron) | No |
 | `kit/` | 23 | — | Kit tooling, two stubs **and** 13 regression gate scripts | No (gates matter, see §9) |
-| `scripts/` | 7 | — | Ship generators, launcher shortcuts, demo screenshots, a VCS UI lab | No |
+| `scripts/` | 9 | — | Ship generators, the fleet-v2 LOD build, launcher shortcuts, demo screenshots and their synthetic profile, a VCS UI lab | No |
 | `docs/` | 16 | — | Feature notes and plans; four of them are also gate fixtures | No |
 | root | 11 | — | README, CLAUDE.md, SECURITY, LICENSE, `package.json` + lockfile, git config, 3 mockup PNGs | Mockups are the visual "gold samples" |
 | `.github/` | 4 | — | CI (Ubuntu + Windows), Dependabot, CODEOWNERS, PR template | No |
@@ -115,7 +115,7 @@ Start here when you want to change something. Paths under "Main process" are rel
 | **Git / GitHub status markers** | `project-vcs-status.js` (git), `github-metadata-provider.js` (`gh`), `-service.js` (cache), `-controller.js` (wiring) | push `project-vcs-status-changed` (from `replay-control.js`), `vcs` field in snapshot | `components/project-vcs-status.js` + `.css` | memory only | 5 `project-vcs-status*` tests |
 | **Find a moved project** (settings dialog) | `ipc/project-paths.js` → `project-paths.js` | `project-paths-scan`, `project-path-locate`, `project-path-apply` | `app-project-settings.js` | `universe-state.json` `pathOverrides` | **none** |
 | **First-person ship cockpit** | — | — | `app-agent-focus.js`, `scene-system.js` `focusShip`, `assets/*.png` | `localStorage` | `agent-focus-hologram.test.js` (source text) |
-| **Ship 3D models** | — | — | `ship-assets.js` + `assets/ships/manifest.json` + GLBs | — | ship tests, `grade-ships.mjs` |
+| **Ship 3D models** | `tracker.js`, `replay-source.js` (each ship's `builds` count) | `builds` on every ship | `ship-assets.js` (rank → hull, far / near file per view, in-place `refresh`) + `assets/ships/manifest.json` + GLBs; `app.js` `refreshShipHulls` | — | ship tests, `grade-ships.mjs` |
 | **Headless test modes** (`--shots`, `--polish-test`, …) | `flags.js`, `harness/fixtures.js`, `harness/driver.js`, `harness/metrics.js`, `harness/modes/*.js` | `debug-view`, `debug-ready` | `app.js` `handleDebugView` | `.shots/`, `result.json` | every dynamic gate |
 
 ---
@@ -190,51 +190,51 @@ in a closure, and anything shared is a field of `ctx`.
 
 | File | Lines | Shape | Job | Requires |
 |---|---|---|---|---|
-| `tracker.js` | 1,562 | `class Tracker extends EventEmitter` | Polls Claude / Codex / Signal sources, owns the live model, emits event batches, saves `universe-state.json` | `provider-adapters`, `transcripts/*`, `shared/*`, `path-safety` |
-| `replay-source.js` | 1,383 | `class ReplaySource extends EventEmitter` | Indexes all history once at startup; rebuilds the universe at any timestamp | `provider-adapters`, `transcripts/*`, `shared/hash`, `path-safety` |
-| `provider-adapters.js` | 348 | pure functions | Provider names, project path keys, the cross-provider tool vocabulary (`classifyTool`), Signal config, `adaptLine` | `transcripts/codex`, `transcripts/fields` |
+| `tracker.js` | 1,538 | `class Tracker extends EventEmitter` | Polls Claude / Codex / Signal sources, owns the live model, emits event batches, saves `universe-state.json` | `provider-adapters`, `transcripts/*`, `shared/*`, `path-safety` |
+| `replay-source.js` | 1,387 | `class ReplaySource extends EventEmitter` | Indexes all history once at startup; rebuilds the universe at any timestamp | `provider-adapters`, `transcripts/*`, `shared/hash`, `path-safety` |
+| `provider-adapters.js` | 368 | pure functions | Provider names, project path keys, the cross-provider tool vocabulary (`classifyTool`), Signal config, `adaptLine` | `transcripts/codex`, `transcripts/fields` |
 | `transcripts/codex.js` | 235 | pure functions | One Codex record → structural signals; rollout ownership; parent thread id | `transcripts/fields` |
 | `transcripts/claude.js` | 111 | pure functions | One Claude Code record → structural facts for both models; Claude's own tool vocabulary (`claudeTool`) | `transcripts/fields` |
 | `transcripts/fields.js` | 52 | functions | `safeId`, `safePath`, `plainObject`, `firstTrimmed` for transcript fields | — |
-| `task-runs.js` | 386 | `class TaskRunTracker` | Matches a launched Codex run to its ship; ticks the `GOALS.md` box when done | `goals` |
-| `root-task-coordinator.js` | 368 | `class RootTaskCoordinator` | Assign / retry flow: write goal → start run → launch Codex | `goals` |
-| `goals.js` | 351 | functions | Line-preserving `GOALS.md` parse / write (temp file + rename, refuses symlinks) | — |
-| `root-tasks.js` | 343 | `class RootTaskStore` | IDEAS queue records and phase transitions → `root-tasks.json` | — |
-| `agent-launcher.js` | 359 | factory → `{launch}` | Finds the native `codex` binary on PATH, spawns `codex exec` detached | `path-safety` |
-| `github-metadata-provider.js` | 273 | factory | Open-PR counts via `gh api graphql` (batches of 25, 5 min cache) | — |
-| `project-vcs-status.js` | 261 | factories | Runs `git status --porcelain=v2` + remote lookup (4 s timeout) | — |
-| `project-vcs-status-service.js` | 287 | factory | 15 s cache, ≤4 concurrent reads, merges GitHub data | — |
-| `terminal-launcher.js` | 185 | factory → `{open}` | `wt.exe -d <cwd>` (Windows) or `open -a Terminal` (macOS); Linux unsupported | `path-safety` |
-| `project-paths.js` | 161 | functions | Bounded folder search for a moved project (depth 6, 12k dirs, 8 s) | — |
-| `project-vcs-status-controller.js` | 111 | factory | Tracker events → debounced (400 ms) per-project git refresh | — |
-| `path-safety.js` | 108 | functions | Shared "is this a canonical local path / inside that path" checks, `relativeInside` | `provider-adapters` |
-| `window-security.js` | 54 | functions | Navigation / pop-up / permission lockdown, trusted-frame check | — |
-| `shared/bounded-process.js` | 70 | function | One child-process runner with a timeout and output cap (git and gh) | `shared/values` |
-| `shared/atomic-write.js` | 27 | function | Temp file + rename write (`GOALS.md`, IDEAS and run stores, `universe-state.json`) | — |
+| `task-runs.js` | 397 | `class TaskRunTracker` | Matches a launched Codex run to its ship; ticks the `GOALS.md` box when done | `goals` |
+| `root-task-coordinator.js` | 386 | `class RootTaskCoordinator` | Assign / retry flow: write goal → start run → launch Codex | `goals` |
+| `goals.js` | 352 | functions | Line-preserving `GOALS.md` parse / write (temp file + rename, refuses symlinks) | — |
+| `root-tasks.js` | 344 | `class RootTaskStore` | IDEAS queue records and phase transitions → `root-tasks.json` | — |
+| `agent-launcher.js` | 391 | factory → `{launch}` | Finds the native `codex` binary on PATH, spawns `codex exec` detached | `path-safety` |
+| `github-metadata-provider.js` | 301 | factory | Open-PR counts via `gh api graphql` (batches of 25, 5 min cache) | — |
+| `project-vcs-status.js` | 284 | factories | Runs `git status --porcelain=v2` + remote lookup (4 s timeout) | — |
+| `project-vcs-status-service.js` | 307 | factory | 15 s cache, ≤4 concurrent reads, merges GitHub data | — |
+| `terminal-launcher.js` | 206 | factory → `{open}` | `wt.exe -d <cwd>` (Windows) or `open -a Terminal` (macOS); Linux unsupported | `path-safety` |
+| `project-paths.js` | 162 | functions | Bounded folder search for a moved project (depth 6, 12k dirs, 8 s) | — |
+| `project-vcs-status-controller.js` | 127 | factory | Tracker events → debounced (400 ms) per-project git refresh | — |
+| `path-safety.js` | 121 | functions | Shared "is this a canonical local path / inside that path" checks, `relativeInside` | `provider-adapters` |
+| `window-security.js` | 55 | functions | Navigation / pop-up / permission lockdown, trusted-frame check | — |
+| `shared/bounded-process.js` | 96 | function | One child-process runner with a timeout and output cap (git and gh) | `shared/values` |
+| `shared/atomic-write.js` | 28 | function | Temp file + rename write (`GOALS.md`, IDEAS and run stores, `universe-state.json`) | — |
 | `shared/hash.js` | 47 | functions | `fnv1a`, `hex8`, `mulberry32` (the renderer keeps hash-pinned copies) | — |
-| `shared/values.js` | 24 | functions | `boundedInteger`, `ownString`, `bufferValue` | — |
-| `shared/ids.js` | 22 | functions | `validProjectId`, `validGoalId`, control-character check | — |
+| `shared/values.js` | 25 | functions | `boundedInteger`, `ownString`, `bufferValue` | — |
+| `shared/ids.js` | 23 | functions | `validProjectId`, `validGoalId`, control-character check | — |
 
 **Wiring** — connects the services to the window:
 
 | File | Lines | Job |
 |---|---|---|
-| `main.js` | 47 | Bootstrap (§5.1) |
-| `flags.js` | 44 | Parses `argv` into a frozen flags object |
-| `app-context.js` | 217 | Creates `ctx`; `start()` builds and wires every service; `cleanup()` tears down on quit |
-| `replay-control.js` | 215 | LIVE ↔ REPLAY switching, `au:replay` commands, `streamEpoch`, replay-state and git-status pushes, visible snapshot |
-| `window.js` | 54 | Creates and hardens the `BrowserWindow`, loads `index.html` |
-| `ipc/register.js` | 74 | The one table of `ipcMain.handle` registrations; small handlers inline |
-| `ipc/guards.js` | 15 | `validProjectId`, `trustedMainFrame` |
-| `ipc/terminal.js` | 76 | Open Terminal checks, `liveProjectCwd` (also used by tasks and IDEAS) |
-| `ipc/tasks.js` | 131 | `GOALS.md` handlers |
-| `ipc/root-tasks.js` | 100 | IDEAS handlers, `root-tasks-changed` push |
-| `ipc/project-paths.js` | 233 | Moved-project scan / locate / apply, one-time tokens, folder dialog |
+| `main.js` | 48 | Bootstrap (§5.1) |
+| `flags.js` | 45 | Parses `argv` into a frozen flags object |
+| `app-context.js` | 244 | Creates `ctx`; `start()` builds and wires every service; `cleanup()` tears down on quit |
+| `replay-control.js` | 227 | LIVE ↔ REPLAY switching, `au:replay` commands, `streamEpoch`, replay-state and git-status pushes, visible snapshot |
+| `window.js` | 62 | Creates and hardens the `BrowserWindow`, loads `index.html` |
+| `ipc/register.js` | 77 | The one table of `ipcMain.handle` registrations; small handlers inline |
+| `ipc/guards.js` | 12 | `validProjectId`, `trustedMainFrame` |
+| `ipc/terminal.js` | 81 | Open Terminal checks, `liveProjectCwd` (also used by tasks and IDEAS) |
+| `ipc/tasks.js` | 87 | `GOALS.md` handlers |
+| `ipc/root-tasks.js` | 112 | IDEAS handlers, `root-tasks-changed` push |
+| `ipc/project-paths.js` | 244 | Moved-project scan / locate / apply, one-time tokens, folder dialog |
 | `preload.js` | 41 | `window.AU` bridge |
 
-**Test harness** — only runs with a test flag (1,337 lines): `harness/fixtures.js` (178),
-`harness/driver.js` (262), `harness/metrics.js` (189), `harness/modes/{shots,control,history,provider,polish}.js`
-(116 / 152 / 204 / 97 / 139).
+**Test harness** — only runs with a test flag (1,345 lines): `harness/fixtures.js` (179),
+`harness/driver.js` (263), `harness/metrics.js` (190), `harness/modes/{shots,control,history,provider,polish}.js`
+(117 / 153 / 205 / 98 / 140).
 
 **Types** — `src/types/contract.d.ts` declares the shapes that cross the bridge (`AUBridge`, `Project`,
 `Ship`, the event union, every result); `preload.js`, the IPC handlers and the renderer's `AU`
@@ -330,8 +330,10 @@ Two event sources run side by side; `app-context.js` forwards only the active on
 - The **Tracker never stops** during playback. Only the `au:events` send is gated, so IDEAS
   runs, git refreshes and `GOALS.md` ticks keep happening while you scrub.
 - Replay is not a faithful copy of live: different galaxy keys, different drone ids, no
-  attention, no `vcs`, `files: 0` in systems. The index is built once at launch, so the
-  scrubber's end time does not advance until restart.
+  attention, no `vcs`, `files: 0` in systems. Ship `builds` can differ too: live reads a session
+  that was already running at launch from the end of its transcript, so it restarts at 0 (an
+  interceptor) while replay counts from the session's first edit. The index is built once at
+  launch, so the scrubber's end time does not advance until restart.
 
 ### 5.6 IDEAS queue: from an idea to a Codex run
 
@@ -400,25 +402,25 @@ contract), `AUR`, `AUR_POLISH` and `AUR_GALAXY` (all `any` for now).
 | File | Lines | Job |
 |---|---|---|
 | `util.js` | 408 | Creates `AUR`; hashes, colours, provider metadata, motion tuning, asset paths, DOM and Babylon helpers |
-| `procedural-worlds.js` | 328 | Planet and asteroid surfaces (authored textures + generated normal maps) |
-| `ship-assets.js` | 300 | Loads GLB hulls from `assets/ships/manifest.json`; procedural dart fallback |
+| `procedural-worlds.js` | 329 | Planet and asteroid surfaces (authored textures + generated normal maps) |
+| `ship-assets.js` | 545 | Picks a hull by rank (`builds` against the manifest ladder), loads its far file on the universe map and its near file in system / planet views within a 100k-triangle budget, swaps it in place on promotion (`AUR.ships.refresh`); procedural dart fallback |
 | `galaxy-layout.js` | 178 | Pure: galaxy grouping, spiral placement, Graveyard |
 | `polish-math.js` | 56 | Pure: label overlap, sun pulse |
-| `search-core.js` | 33 | Pure: project ranking |
-| `components/project-vcs-status.js` | 267 | Pure presentation for git / GitHub markers and details |
+| `search-core.js` | 34 | Pure: project ranking |
+| `components/project-vcs-status.js` | 268 | Pure presentation for git / GitHub markers and details |
 | `scene-universe.js` | **971** | Galaxy map — one 959-line factory function |
 | `scene-system.js` | **618** | Solar system + first-person focus camera |
 | `scene-planet.js` | 196 | Planet close-up |
-| `app-state.js` | 162 | Shared state and constants |
-| `app-playback.js` | 523 | Epochs, store seeding, replay commands, history bar |
-| `app-project-search.js` | 482 | Search box, GitHub filter, ALL PROJECTS dialog |
-| `app.js` | 467 | Boot, routing, view switching |
-| `app-ideas.js` | 401 | IDEAS panel |
-| `app-chrome.js` | 368 | Command rail, RECENT strip, agent list, feed, summary, tabs |
-| `app-agent-focus.js` | 346 | Cockpit overlay, hologram mini-map |
-| `app-project-settings.js` | 332 | Moved-project dialog |
-| `app-project-tasks.js` | 278 | TASKS panel |
-| `app-project-control.js` | 240 | Project card, Open Terminal button, planet card |
+| `app-state.js` | 163 | Shared state and constants |
+| `app-playback.js` | 531 | Epochs, store seeding, replay commands, history bar |
+| `app-project-search.js` | 483 | Search box, GitHub filter, ALL PROJECTS dialog |
+| `app.js` | 526 | Boot, routing, view switching, hull refresh when a ship is promoted |
+| `app-ideas.js` | 408 | IDEAS panel |
+| `app-chrome.js` | 369 | Command rail, RECENT strip, agent list, feed, summary, tabs |
+| `app-agent-focus.js` | 327 | Cockpit overlay, hologram mini-map |
+| `app-project-settings.js` | 340 | Moved-project dialog |
+| `app-project-tasks.js` | 286 | TASKS panel |
+| `app-project-control.js` | 244 | Project card, Open Terminal button, planet card |
 | `index.html` | 356 | All panels exist in the HTML up front; modules show / hide them |
 | `style.css` | 2,110 | All styles; ~470 lines are the cockpit |
 
@@ -476,13 +478,16 @@ Nothing is stored for history playback; it re-reads the transcripts.
 | `assets/planets/` | 81 MB | `util.js`, `procedural-worlds.js` | 31 textures, picked by hash |
 | `assets/skyboxes/` | 59 MB | `util.js` (PhotoDome) | 12 equirectangular images |
 | `assets/asteroids/` | 4 MB | `procedural-worlds.js` | `-bump` files unused |
-| `assets/ships/*.glb`, `manifest.json`, `textures/` | ~9 MB | `ship-assets.js` | 6-hull shared fleet for Claude and Codex; `aur-aster-kite` is unmapped |
-| `assets/ships/fleet-scale-v2/` | **123 MB** | **nothing** | Blender sources, FBX, build scripts, QA renders |
+| `assets/ships/fleet-v2/` | 5.9 MB | `ship-assets.js` | The Claude and Codex fleet: a far and a near GLB for each of 8 hulls, a 7-rank ladder (interceptor at 0 builds → carrier at 200) plus the wisp drone, which is reserved |
+| `assets/ships/*.glb`, `manifest.json`, `textures/` | ~9 MB | `ship-assets.js` (manifest only) | The 6-hull shared fleet and `aur-aster-kite` are still in the manifest but no provider maps to them |
+| `assets/ships/fleet-scale-v2/` | **123 MB** | **nothing** | Blender sources, FBX, build scripts, QA renders; the source the `fleet-v2/` files are built from |
 | `assets/palettes/`, `assets/manifest.json` | 48 KB | **nothing** (one test reads the manifest) | Colours are hard-coded in `util.js` |
 | `src/renderer/assets/*.png` | 6 MB | `app-agent-focus.js` | Cockpit backdrops; no provenance file |
 | root `1.planet-view.png`, `2.…`, `3.…` | 5 MB | nobody at runtime | Mockups the renderer is graded against |
 
-Ship GLBs are regenerated by `npm run ships:generate` (`scripts/generate-*.mjs`).
+The older ship GLBs are regenerated by `npm run ships:generate` (`scripts/generate-*.mjs`); the
+`fleet-v2/` files by `node scripts/build-fleet-v2-runtime.mjs`, which runs `@gltf-transform/cli`
+through `npx` (fetched on first run, not a dependency).
 
 ---
 
@@ -534,7 +539,7 @@ Facts only, grouped by why they hurt. Items marked *(by reading)* were found in 
 not reproduced.
 
 ### Too much in one place
-1. `tracker.js` (1,562) and `replay-source.js` (1,383) each still contain a model and a
+1. `tracker.js` (1,538) and `replay-source.js` (1,387) each still contain a model and a
    public-shape builder; their Claude and Codex parsing is shared (`transcripts/`).
 2. `scene-universe.js` is one 959-line function; `updateLabelLayout` alone is 157 lines.
 3. `style.css` is 2,110 lines in one file.
@@ -568,42 +573,43 @@ not reproduced.
     `util.js` are pinned though editable, `preload.js` is frozen but not pinned.
 15. Line caps in `grade-structure.mjs` equal the current sizes (971 / 618): adding one line to
     either scene fails the gate.
-16. `kit/grade.mjs` deletes all of `.shots/`, including the run folders other gates left there.
+16. *(resolved)* `kit/grade.mjs` replaces only its own files in `.shots/`.
 
 ### Live and replay drift apart
 17. Different galaxy keys (projects regroup while scrubbing), different drone ids, no attention,
-    no git status in replay.
+    no git status in replay; a session running before launch has fewer live `builds` (a smaller
+    hull) than replay gives it.
 18. IDEAS runs can tick `GOALS.md` while you are in playback; `tasks-changed` pushes are not
     gated on mode while `vcs` pushes are.
 19. The replay index is built once at launch; the scrubber's end time is frozen until restart.
 
 ### Dead weight
-20. `assets/ships/fleet-scale-v2/` (123 MB), `assets/palettes/`, `assets/manifest.json`,
-    the `aur-aster-kite` hull — not loaded at runtime.
+20. `assets/ships/fleet-scale-v2/` (123 MB, now only the source of `fleet-v2/`),
+    `assets/palettes/`, `assets/manifest.json`, the `aur-aster-kite` hull and the 6-hull shared
+    fleet — not loaded at runtime.
 21. *(resolved)* `edge-validation.mjs` was folded into `test/tracker.test.js`.
 22. Unused by the app: `providerToolStatus` (only `grade-providers.mjs` calls it),
     `AUR.attentionLabel`, `scene-system.js` `metadata.focusStats`.
 
 ### Stale documentation
 23. Older docs quote line numbers in the pre-split `main.js` (§5.3 maps them).
-24. Most kit gates still print usage paths under `kit/todo/` from before they were archived.
+24. *(resolved)* Every archived gate prints its `kit/done/` usage path.
 25. No single backlog: `ROADMAP`, `UX-IMPROVEMENTS`, `DESIGN-DIRECTION`, `TIMELINE-SLIDER`,
     `PUBLIC-RELEASE-TASKS` Phase 5 and `kit/todo/` overlap.
 26. Names drift: repo `agent-orrery`, package / userData `agent-universe-lite`, product
     "Agent Universe Lite", most docs "Agent Universe".
 
 ### Test gaps
-27. No unit tests for the wiring (`app-context.js`, `replay-control.js`, `ipc/*`); `goals.js` is
-    tested only indirectly. `tracker.js` and `replay-source.js` are covered by characterization
-    tests (`test/tracker*.test.js`, `test/replay-model.test.js`). Every `app-*.js` file is checked
-    by source-text grep only.
-28. `kit/grade.mjs` runs against **your real** `~/.claude` / `~/.codex` and userData, so it fails
-    on a machine with no history and can't be reproduced in CI.
+27. *(mostly resolved)* The wiring has unit tests (`app-context`, `replay-control`, `ipc-*`), and
+    `tracker.js` / `replay-source.js` have characterization tests. Still open: `goals.js` is tested
+    only indirectly, and every `app-*.js` file is checked by source-text grep only.
+28. *(resolved)* `kit/grade.mjs` runs against a synthetic profile (`scripts/lib/synthetic-profile.mjs`);
+    `--real` uses your own transcripts and userData.
 
 ### Possible bugs *(by reading)*
-29. A Claude session that goes quiet for 15 min and resumes is re-read from offset 0, and its
-    old edits are counted into the persisted build totals again (`tracker.js` 822, 455, 1149).
-30. Signal ships for files 5–15 min old are departed every sweep and recreated every scan.
+29. *(resolved)* A Claude session that resumes after 15 quiet minutes no longer re-counts its
+    old edits.
+30. *(resolved)* Signal ships for files 5–15 min old no longer depart and respawn every scan.
 31. `scene-system.js` `refetchPlanets` can add meshes to a scene that has already been
     disposed after a quick view switch.
 32. Every scan stats every Claude transcript and lists all Codex history (all years) every
