@@ -171,6 +171,18 @@ test('path-safety exports the shared classifier and re-exports the project-path 
   assert.equal(pathSafety.canonicalProjectPath, canonicalProjectPath);
 });
 
+test('relativeInside ignores case only under a Windows-style root and keeps the file\'s casing', () => {
+  const { relativeInside, ignoresCase } = pathSafety;
+  assert.equal(relativeInside('C:\\Work\\Demo', 'c:/work/demo/Docs/Guide.md', { separator: '/' }), 'Docs/Guide.md');
+  assert.equal(relativeInside('c:\\work\\demo', 'C:\\WORK\\DEMO\\Src\\A.js', { separator: '\\' }), 'Src\\A.js');
+  assert.equal(relativeInside('C:\\Work\\Demo', 'C:\\WORK\\Other\\x.js'), null);
+  assert.equal(relativeInside('C:\\Work\\Demo', 'c:\\work\\demo'), null);
+  assert.equal(relativeInside('/Work/Demo', '/Work/Demo/Docs/Guide.md', { separator: '/' }), 'Docs/Guide.md');
+  assert.equal(relativeInside('/Work/Demo', '/work/demo/Docs/Guide.md'), null);
+  assert.deepEqual(['C:\\Work', 'c:/work', 'relative\\dir', '/Work', null].map(ignoresCase),
+    [true, true, true, false, false]);
+});
+
 test('pathFlavor names drive-rooted and POSIX paths and rejects UNC and //host/share', () => {
   const { pathFlavor } = pathSafety;
   assert.equal(pathFlavor('C:\\Work\\proj'), 'win32');

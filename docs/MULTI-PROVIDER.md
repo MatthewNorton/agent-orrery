@@ -31,6 +31,8 @@ An unrecognized local tool can appear as a metadata-only Signal ship. Create
 `directory` must be absolute. `projectPath` defaults to that directory, and
 `label` is optional. Configuration changes take effect after an app restart.
 Agent Universe recursively stats regular `.json`, `.jsonl`, `.log`, and `.txt`
-files but never reads their contents. A fresh or changed file produces a
+files but never reads their contents. An optional `extensions` array, such as
+`[".log"]`, narrows that list; one that names none of the four is ignored with a
+warning. A fresh or changed file produces a
 content-free activity signal; generic sources never infer builds, prompts,
 subagents, or attention state.
