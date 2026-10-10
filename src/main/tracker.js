@@ -1044,6 +1044,7 @@ class Tracker extends EventEmitter {
     const bucket = bucketOf(rel, path.sep);
     const isNew = countBuild(project, bucket);
     project.totalBuilds += 1;
+    ship.builds += 1;
     this.systemCache.delete(project.id);
     if (catchup) return;
     this.queue({
@@ -1188,6 +1189,7 @@ class Tracker extends EventEmitter {
       turnDone: false,
       attention: null,
       attentionSince: null,
+      builds: 0,
     };
     this.ships.set(id, drone);
     this.queue({ type: 'ship-spawned', ship: publicShip(drone) });
@@ -1212,6 +1214,7 @@ class Tracker extends EventEmitter {
         turnDone: false,
         attention: null,
         attentionSince: null,
+        builds: 0,
       };
       this.ships.set(id, ship);
       this.queue({ type: 'ship-spawned', ship: publicShip(ship) });
@@ -1244,6 +1247,7 @@ class Tracker extends EventEmitter {
         turnDone: false,
         attention: null,
         attentionSince: null,
+        builds: 0,
       };
       this.ships.set(id, ship);
       this.queue({ type: 'ship-spawned', ship: publicShip(ship) });
@@ -1525,7 +1529,7 @@ function publicShip(s) {
     id: s.id, name: s.name, project: s.project, kind: s.kind,
     provider: normalizeProvider(s.provider || 'claude'),
     status: /** @type {ShipStatus} */ (s.status), detail: s.detail, lastEvent: s.lastEvent,
-    attention: s.attention, attentionSince: s.attentionSince,
+    attention: s.attention, attentionSince: s.attentionSince, builds: s.builds,
     taskId: typeof s.taskId === 'string' ? s.taskId : null,
     turnOutcome: typeof s.turnOutcome === 'string' ? s.turnOutcome : null,
   };

@@ -122,13 +122,17 @@ Project = { id, path, name, exists, firstSeen, lastActivity, totalBytes, totalBu
 // deleted paths use key `graveyard` with label `Graveyard`.
 
 Ship = { id, name, provider, project, kind, status, detail, lastEvent,
-         attention, attentionSince, taskId?, turnOutcome? }   // ?: LIVE only
+         attention, attentionSince, builds, taskId?, turnOutcome? }   // ?: LIVE only
 // provider: 'claude'|'codex'|'generic'; names use Claude-/Codex-/Signal-.
 // kind: 'main' | 'drone' (drone = subagent, render smaller);
 // status: 'Building'|'Exploring'|'Gathering Resources'|'Scanning'|'Delegating'|
 //         'Planning'|'Working'; detail: string|null (e.g. relative file path).
 // attention: 'question'|'permission'|'stalled'|'done'|null;
 // attentionSince: ms epoch|null.
+// builds: build events attributed to this ship since its source first read it
+//   (catch-up included). LIVE tails transcripts already on disk at startup from
+//   EOF, so a session running before launch restarts at 0. A ship-updated can
+//   precede the build it reports; the renderer also counts `build` events.
 
 FeedEntry = { kind, text, project, ts }
 // kind: 'discover'|'form'|'build'|'info'|'spawn'|'depart'|'attention'|'done'
