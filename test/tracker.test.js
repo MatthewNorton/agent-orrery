@@ -25,7 +25,7 @@ const PROJECT_KEYS = [
   'totalBuilds', 'totalBytes',
 ];
 const SHIP_KEYS = [
-  'attention', 'attentionSince', 'detail', 'id', 'kind', 'lastEvent', 'name', 'project',
+  'attention', 'attentionSince', 'builds', 'detail', 'id', 'kind', 'lastEvent', 'name', 'project',
   'provider', 'status', 'taskId', 'turnOutcome',
 ];
 
@@ -99,7 +99,7 @@ test('claude: startup discovers the project from slug dir + cwd and docks a ship
   assert.deepEqual(startup[1].ship, {
     id: SHIP_ID, name: 'Claude-1', project: SLUG, kind: 'main', provider: 'claude',
     status: 'Working', detail: null, lastEvent: T0, attention: null, attentionSince: null,
-    taskId: null, turnOutcome: null,
+    builds: 0, taskId: null, turnOutcome: null,
   });
   // Startup scans never announce discoveries in the feed.
   assert.deepEqual(startup[2].entry, { kind: 'spawn', text: 'Claude-1 entered demo', project: SLUG, ts: T0 });
@@ -166,8 +166,8 @@ test('claude: a transcript first seen after startup is read from offset 0 in cat
     'catchup counts builds but emits no build/activity events and launches no drones');
   const snapshot = session.tracker.snapshot();
   assert.equal(snapshot.projects[0].totalBuilds, 1);
-  assert.deepEqual(snapshot.ships.map((ship) => [ship.id, ship.status, ship.detail]),
-    [[SHIP_ID, 'Delegating', 'Survey']]);
+  assert.deepEqual(snapshot.ships.map((ship) => [ship.id, ship.status, ship.detail, ship.builds]),
+    [[SHIP_ID, 'Delegating', 'Survey', 1]], 'catchup builds count toward the ship too');
 
   const after = appendAndPoll(session, [
     claude.tool(dir, T0 + 4 * SEC, 'toolu_edit2', 'Edit', { file_path: path.join(dir, 'src', 'b.js') }),
@@ -239,6 +239,10 @@ test('claude: in-project edits emit build events and grow buckets; out-of-projec
     ['build', 'Claude-1 building notes.md in demo'],
   ]);
   assert.equal(tracker.snapshot().projects[0].totalBuilds, 3);
+  assert.equal(tracker.snapshot().ships[0].builds, 3, 'the out-of-project edit is not a build');
+  // ship-updated is queued before the build it announces, so it carries the
+  // previous count; the renderer counts build events itself.
+  assert.deepEqual(ofType(events, 'ship-updated').map((event) => event.ship.builds), [0, 1, 2, 3]);
   assert.deepEqual(tracker.getSystem(SLUG).planets, [
     { name: 'src', files: 0, builds: 2 },
     { name: '(root)', files: 0, builds: 1 },
@@ -334,7 +338,7 @@ test('claude: Task and Agent tool_use launch drones that dock again on tool_resu
   assert.deepEqual(ofType(events, 'ship-spawned')[0].ship, {
     id: 'drone:toolu_task1', name: 'Claude-2', project: SLUG, kind: 'drone', provider: 'claude',
     status: 'Working', detail: null, lastEvent: T0 + 1 * SEC, attention: null, attentionSince: null,
-    taskId: null, turnOutcome: null,
+    builds: 0, taskId: null, turnOutcome: null,
   });
   assert.equal(ofType(events, 'ship-spawned')[1].ship.id, 'drone:toolu_agent1');
   assert.deepEqual(ofType(events, 'ship-departed').map(pick(['shipId', 'ts'])),
@@ -548,7 +552,7 @@ test('codex: session_meta at startup creates a project keyed by canonical cwd an
   assert.deepEqual(startup[1].ship, {
     id: CODEX_SHIP_ID, name: 'Codex-1', project: projectId, kind: 'main', provider: 'codex',
     status: 'Working', detail: null, lastEvent: T0, attention: null, attentionSince: null,
-    taskId: null, turnOutcome: null,
+    builds: 0, taskId: null, turnOutcome: null,
   });
   assert.equal(startup[2].entry.text, 'Codex-1 entered demo');
   assert.equal(tracker.snapshot().projects[0].totalBytes, fs.statSync(file).size,
@@ -613,6 +617,7 @@ test('codex: function calls, patch builds (deduped by call id), turn lifecycle a
     { project: projectId, bucket: '(root)', file: 'notes.md', shipId: CODEX_SHIP_ID, isNew: true, ts: T0 + 6 * SEC },
   ]);
   assert.equal(tracker.snapshot().projects[0].totalBuilds, 2);
+  assert.equal(tracker.snapshot().ships[0].builds, 2, 'a re-reported call id and outside files do not count');
 
   const done = pollAt(session, T0 + 19 * SEC);
   assert.deepEqual(done.map((event) => [event.type, event.ship && event.ship.attention]),
@@ -699,6 +704,8 @@ test('codex: a forked child rollout found mid-run is a drone and skips its copie
     [{ id: `ship:codex:${childId}`, kind: 'drone', name: 'Codex-2' }]);
   assert.deepEqual(ofType(events, 'build'), [], 'a rollout found mid-run is read in catchup mode');
   assert.equal(tracker.snapshot().projects[0].totalBuilds, 1, 'only the child\'s own patch counts');
+  assert.deepEqual(tracker.snapshot().ships.map((ship) => [ship.id, ship.builds]),
+    [[`ship:codex:${parentId}`, 0], [`ship:codex:${childId}`, 1]]);
 });
 
 // Ported from kit/done/multi-provider/edge-validation.mjs.
@@ -806,7 +813,7 @@ test('signal: a watched file docks a generic ship from stat alone; its contents 
   assert.deepEqual(startup[1].ship, {
     id: shipId, name: 'Signal-1', project: projectId, kind: 'main', provider: 'generic',
     status: 'Working', detail: null, lastEvent: T0, attention: null, attentionSince: null,
-    taskId: null, turnOutcome: null,
+    builds: 0, taskId: null, turnOutcome: null,
   });
 
   world.clock.set(T0 + 5 * SEC);

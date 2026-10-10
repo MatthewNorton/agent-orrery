@@ -90,10 +90,12 @@ test('replay: a seek inside the history rebuilds the model silently', async (t) 
     {
       id: SHIP_ID, name: 'Claude-1', project: SLUG, kind: 'main', provider: 'claude',
       status: 'Building', detail: null, lastEvent: T0 + 30 * SEC, attention: null, attentionSince: null,
+      builds: 1,
     },
     {
       id: CODEX_SHIP_ID, name: 'Codex-1', project: SLUG, kind: 'main', provider: 'codex',
       status: 'Working', detail: null, lastEvent: T0 + 12 * SEC, attention: null, attentionSince: null,
+      builds: 0,
     },
   ]);
   assert.deepEqual(snapshot.feed, [
@@ -130,6 +132,7 @@ test('replay: advanceTo() emits one ordered batch from the cursor, renumbered fr
   assert.deepEqual(ofType(events, 'ship-spawned')[0].ship, {
     id: DRONE_ID, name: 'Claude-2', project: SLUG, kind: 'drone', provider: 'claude',
     status: 'Working', detail: null, lastEvent: T0 + 40 * SEC, attention: null, attentionSince: null,
+    builds: 0,
   });
   assert.deepEqual(ofType(events, 'build').map(pick(['project', 'bucket', 'file', 'shipId', 'isNew', 'ts'])), [
     { project: SLUG, bucket: 'docs', file: 'docs/notes.md', shipId: CODEX_SHIP_ID, isNew: true, ts: T0 + 45 * SEC },

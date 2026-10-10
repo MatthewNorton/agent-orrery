@@ -44,6 +44,8 @@ export interface Ship {
   lastEvent: number;
   attention: Attention | null;
   attentionSince: number | null;
+  /** Build events attributed to this ship since its source first observed it; picks its hull rank. */
+  builds: number;
   /** LIVE only. */
   taskId?: string | null;
   /** LIVE only. */

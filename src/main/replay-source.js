@@ -900,6 +900,7 @@ class ReplaySource extends EventEmitter {
         turnDone: false,
         attention: null,
         attentionSince: null,
+        builds: 0,
       };
       this._ships.set(id, ship);
       this._queue({ type: 'ship-spawned', ship: publicShip(ship) }, emit);
@@ -929,6 +930,7 @@ class ReplaySource extends EventEmitter {
       turnDone: false,
       attention: null,
       attentionSince: null,
+      builds: 0,
     };
     this._ships.set(id, drone);
     this._queue({ type: 'ship-spawned', ship: publicShip(drone) }, emit);
@@ -949,6 +951,7 @@ class ReplaySource extends EventEmitter {
       const bucket = bucketOf(relative, '/');
       const isNew = countBuild(project, bucket);
       project.totalBuilds++;
+      ship.builds++;
       this._queue({
         type: 'build', project: project.id, bucket, file: relative,
         shipId: ship.id, isNew, ts,
@@ -1317,6 +1320,7 @@ function publicShip(ship) {
     lastEvent: ship.lastEvent,
     attention: ship.attention,
     attentionSince: ship.attentionSince,
+    builds: ship.builds,
   };
 }
 

@@ -96,8 +96,9 @@ test('agree: claude project id, path, seed and ship identity', async (t) => {
   assert.deepEqual(project(replay.snapshot.projects[0]), project(live.snapshot.projects[0]));
   assert.equal(live.snapshot.projects[0].id, SLUG);
 
-  const ship = pick(['id', 'name', 'project', 'kind', 'provider', 'lastEvent', 'attention', 'attentionSince']);
+  const ship = pick(['id', 'name', 'project', 'kind', 'provider', 'lastEvent', 'attention', 'attentionSince', 'builds']);
   assert.deepEqual(replay.snapshot.ships.map(ship), live.snapshot.ships.map(ship));
+  assert.equal(live.snapshot.ships[0].builds, 2, 'the out-of-project edit is not a build');
   assert.deepEqual(live.snapshot.ships.map((item) => [item.id, item.name, item.provider]),
     [[SHIP_ID, 'Claude-1', 'claude']]);
 });
@@ -340,8 +341,10 @@ test('differs: a repeated tool_use id — live counts the edit twice, replay ded
   });
   assert.deepEqual(ofType(live.events, 'build').map((event) => event.isNew), [true, false]);
   assert.equal(live.snapshot.projects[0].totalBuilds, 2);
+  assert.equal(live.snapshot.ships[0].builds, 2);
   assert.deepEqual(ofType(replay.events, 'build').map((event) => event.isNew), [true]);
   assert.equal(replay.snapshot.projects[0].totalBuilds, 1);
+  assert.equal(replay.snapshot.ships[0].builds, 1);
 });
 
 test('differs: project-id collision suffix — live "<id>:<hash8>", replay "<id>-<hash>" (unpadded)', (t) => {
@@ -368,9 +371,10 @@ test('agree: codex project id, ship identity, classified activity and builds', a
   assert.deepEqual(replay.snapshot.projects.map((project) => project.id), [projectId]);
   assert.deepEqual(live.snapshot.projects.map((project) => project.id), [projectId]);
 
-  const ship = pick(['id', 'name', 'project', 'kind', 'provider', 'status', 'lastEvent']);
+  const ship = pick(['id', 'name', 'project', 'kind', 'provider', 'status', 'lastEvent', 'builds']);
   assert.deepEqual(replay.snapshot.ships.map(ship), live.snapshot.ships.map(ship));
   assert.equal(live.snapshot.ships[0].id, CODEX_SHIP_ID);
+  assert.equal(live.snapshot.ships[0].builds, 1);
 
   const activity = pick(['shipId', 'tool', 'status', 'detail', 'ts']);
   assert.deepEqual(ofType(replay.events, 'activity').map(activity), ofType(live.events, 'activity').map(activity));
