@@ -1,14 +1,15 @@
 // @ts-check
 'use strict';
 
-const { ipcMain, shell } = require('electron');
 const { isLocalProjectPath } = require('../provider-adapters');
 const { githubIdentity } = require('../project-vcs-status');
 const guards = require('./guards');
 
 /** @import { OpenExternalResult } from '../../types/contract' */
 
-function registerIpc(ctx, handlers) {
+/** @param {Pick<typeof import('electron'), 'ipcMain' | 'shell'>} [electron] */
+function registerIpc(ctx, handlers, electron = require('electron')) {
+  const { ipcMain, shell } = electron;
   const trustedMainFrame = (event) => guards.trustedMainFrame(ctx, event);
   const { visibleSnapshot, visibleSystem, visibleProject, handleReplayCommand } = handlers.replay;
   const { handleOpenTerminal } = handlers.terminal;
