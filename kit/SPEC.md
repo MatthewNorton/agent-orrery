@@ -221,6 +221,16 @@ Design tokens (put in `:root`):
 - Ship hulls use deterministic provider variants: Claude purple, Codex
   cyan/blue, and generic Signal amber/neutral. Missing provider values in
   legacy fixtures normalize to Claude; raw/unknown values normalize to Signal.
+- Main Claude/Codex ships fly the `aur-fleet-v2` rank ladder in
+  `assets/ships/manifest.json`: the hull is the highest rank whose `minBuilds`
+  the ship's `builds` has reached (interceptor 0 → carrier 200); display size
+  grows ~1.8× over the ladder. `AUR.ships` loads the hull's far file (`lods.far`,
+  instanced from a per-provider template) on the universe map and its near
+  `file` (clones, so focus mode can fade ships one by one) in system and planet
+  views; a near view steps down to far, then to the dart, at 100k hull
+  triangles per scene. `AUR.ships.refresh(scene, ship)` swaps the hull inside
+  the asset root the scene already holds; `app.js` calls it after `ship-updated`
+  and `build` events, and it waits while focus mode has the ship faded.
 
 ## 5. Universe view (`3.universe-map-view.png`)
 

@@ -27,7 +27,7 @@ Each asset folder contains:
 - visual-comparison, portable-material, and runtime audit JSON;
 - a deterministic Blender rebuild script.
 
-The top-level [`catalog.json`](catalog.json) is the integration index. These models are deliberately not added to the app's legacy `assets/ships/manifest.json`, whose normalized `main-s`/`main-m`/`main-l` roles do not preserve this fleet's physically meaningful scale ladder.
+The top-level [`catalog.json`](catalog.json) is the integration index. The app does not load these source GLBs. It loads the untextured far and near LODs built from them into `assets/ships/fleet-v2/`, listed in `assets/ships/manifest.json` as the `aur-fleet-v2` family: a rank ladder promoted by a session's build count from interceptor to carrier, with the drone reserved for subagents and the station unused. Regenerate the LODs with `node scripts/build-fleet-v2-runtime.mjs` (it runs `@gltf-transform/cli` through npx; no Blender needed).
 
 ## Rebuild
 
