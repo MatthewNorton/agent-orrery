@@ -7,10 +7,11 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const { classifyAttention } = require('../src/main/tracker');
 const {
-  adaptLine, createAdapterState, classifyTool, canonicalProjectPath,
+  adaptLine, createAdapterState, classifyTool, canonicalProjectPath, readGenericWatchConfig,
 } = require('../src/main/provider-adapters');
 const {
   SEC, MIN, T0, SLUG, CLAUDE_SESSION, CODEX_SESSION, TASK_ID,
@@ -30,8 +31,13 @@ const SHIP_KEYS = [
 
 // A Claude session whose first line was on disk at startup (so it is tailed
 // from EOF and its ship is docked), with startup events already drained.
-function startClaude(t, { mtime = T0 } = {}) {
+// `saved` is the projects map of a universe-state.json left by an earlier run.
+function startClaude(t, { mtime = T0, saved } = {}) {
   const world = createWorld(t);
+  if (saved) {
+    fs.mkdirSync(path.dirname(world.statePath), { recursive: true });
+    fs.writeFileSync(world.statePath, JSON.stringify({ projects: saved }));
+  }
   const file = world.claudeFile();
   appendJsonl(file, [claude.prompt(world.projectDir, mtime)], mtime);
   const live = world.live();
@@ -239,35 +245,48 @@ test('claude: in-project edits emit build events and grow buckets; out-of-projec
   ]);
 });
 
+const WINDOWS_ROOT = 'C:\\Orrery-Fixture-Missing\\Demo';
+const WINDOWS_SLUG = 'C--Orrery-Fixture-Missing-Demo';
+
 // Builds for a Windows-style project root (missing on disk, so any host works).
-function windowsRootBuilds(t) {
-  const root = 'C:\\Orrery-Fixture-Missing\\Demo';
-  const session = startClaude(t);
-  const file = session.world.claudeFile('C--Orrery-Fixture-Missing-Demo');
-  appendJsonl(file, [claude.prompt(root, T0)], T0);
+function windowsRootBuilds(t, saved) {
+  const session = startClaude(t, { saved });
+  const file = session.world.claudeFile(WINDOWS_SLUG);
+  appendJsonl(file, [claude.prompt(WINDOWS_ROOT, T0)], T0);
   session.tracker.scan(false);
   session.tracker.pollFiles(); // catch up, so the appended edits are live
   session.take();
-  return ofType(appendAndPoll({ ...session, file }, [
-    claude.tool(root, T0 + 1 * SEC, 'toolu_w1', 'Edit', { file_path: `${root}\\Docs\\Guide.md` }),
-    claude.tool(root, T0 + 2 * SEC, 'toolu_w2', 'Edit', { file_path: 'c:/orrery-fixture-missing/demo/Src/A.js' }),
+  const builds = ofType(appendAndPoll({ ...session, file }, [
+    claude.tool(WINDOWS_ROOT, T0 + 1 * SEC, 'toolu_w1', 'Edit', { file_path: `${WINDOWS_ROOT}\\Docs\\Guide.md` }),
+    claude.tool(WINDOWS_ROOT, T0 + 2 * SEC, 'toolu_w2', 'Edit', { file_path: 'c:/orrery-fixture-missing/demo/Src/A.js' }),
   ], T0 + 2 * SEC), 'build');
+  return { ...session, builds };
 }
 
-test('claude: build buckets under a Windows-style root are case-folded on any host (see the Windows planet todo)', (t) => {
-  assert.deepEqual(windowsRootBuilds(t).map((event) => event.bucket), ['docs', 'src']);
+test('claude: build buckets under a Windows-style root keep the folder\'s own casing on any host', (t) => {
+  assert.deepEqual(windowsRootBuilds(t).builds.map((event) => event.bucket), ['Docs', 'Src']);
 });
 
-test('claude: build file paths under a Windows-style root are lower-cased for display', {
-  todo: 'suspected bug: relativeInside returns the lower-cased relative path (same root cause as the Windows planet todo)',
-}, (t) => {
-  assert.deepEqual(windowsRootBuilds(t).map((event) => event.file),
-    [path.join('docs', 'guide.md'), path.join('src', 'a.js')]);
+test('claude: build file paths under a Windows-style root keep their own casing', (t) => {
+  assert.deepEqual(windowsRootBuilds(t).builds.map((event) => event.file),
+    [path.join('Docs', 'Guide.md'), path.join('Src', 'A.js')]);
 });
 
-test('claude: a mixed-case top-level folder never shows its builds on its planet (Windows host)', {
+test('claude: under a Windows-style root, builds merge into the lower-cased buckets earlier versions saved', (t) => {
+  const { world, tracker, builds } = windowsRootBuilds(t, {
+    [WINDOWS_SLUG]: { buckets: { docs: 2 }, totalBuilds: 2, firstSeen: T0 - MIN },
+  });
+  assert.deepEqual(builds.map(pick(['bucket', 'isNew'])),
+    [{ bucket: 'Docs', isNew: false }, { bucket: 'Src', isNew: true }]);
+  assert.deepEqual(['Docs', 'docs', 'DOCS'].map((name) => tracker.getPlanet(WINDOWS_SLUG, name).builds), [3, 3, 3]);
+  tracker.saveState();
+  const saved = JSON.parse(fs.readFileSync(world.statePath, 'utf8')).projects[WINDOWS_SLUG];
+  assert.deepEqual(pick(['buckets', 'totalBuilds'])(saved), { buckets: { docs: 3, Src: 1 }, totalBuilds: 4 },
+    'one bucket per folder: the saved key is kept, not split');
+});
+
+test('claude: a mixed-case top-level folder shows its builds on its planet (Windows host)', {
   skip: process.platform !== 'win32' && 'needs a Windows-rooted project on disk',
-  todo: 'suspected bug: relativeInside returns the lower-cased relative path, so bucket "docs" never matches planet "Docs"',
 }, (t) => {
   const session = startClaude(t);
   fs.mkdirSync(path.join(session.dir, 'Docs'));
@@ -276,7 +295,22 @@ test('claude: a mixed-case top-level folder never shows its builds on its planet
   ], T0 + 1 * SEC);
   assert.equal(session.tracker.snapshot().projects[0].totalBuilds, 1);
   assert.deepEqual(session.tracker.getSystem(SLUG).planets.find((planet) => planet.name === 'Docs'),
-    { name: 'Docs', files: 0, builds: 0 });
+    { name: 'Docs', files: 0, builds: 1 });
+});
+
+test('claude: a lower-cased saved bucket and new builds share the folder\'s on-disk planet (Windows host)', {
+  skip: process.platform !== 'win32' && 'needs a Windows-rooted project on disk',
+}, (t) => {
+  const session = startClaude(t, { saved: { [SLUG]: { buckets: { docs: 2 }, totalBuilds: 2, firstSeen: T0 - MIN } } });
+  fs.mkdirSync(path.join(session.dir, 'Docs'));
+  const events = appendAndPoll(session, [
+    claude.tool(session.dir, T0 + 1 * SEC, 'toolu_d', 'Write', { file_path: path.join(session.dir, 'Docs', 'guide.md') }),
+  ], T0 + 1 * SEC);
+  assert.deepEqual(ofType(events, 'build').map(pick(['bucket', 'file', 'isNew'])),
+    [{ bucket: 'Docs', file: path.join('Docs', 'guide.md'), isNew: false }]);
+  assert.deepEqual(session.tracker.getSystem(SLUG).planets.filter((planet) => planet.name.toLowerCase() === 'docs'),
+    [{ name: 'Docs', files: 0, builds: 3 }]);
+  assert.equal(session.tracker.getPlanet(SLUG, 'Docs').builds, 3);
 });
 
 test('claude: Task and Agent tool_use launch drones that dock again on tool_result', (t) => {
@@ -431,29 +465,73 @@ test('claude: question or permission attention keeps a ship docked for up to an 
   assert.deepEqual(sweepAt(session, last + 60 * MIN + 1).map((event) => event.type), ['ship-departed', 'feed']);
 });
 
-test('claude: a session resumed after 15 min idle is re-read from offset 0 and re-counts its old edits',
-  { todo: 'suspected bug (.docs/architecture.md §10 #29): old edits are counted into persisted totals again, and the resumed session\'s new edit emits no build event' },
-  (t) => {
-    const session = startClaude(t);
-    const { dir, tracker } = session;
-    appendAndPoll(session, [
-      claude.tool(dir, T0 + 1 * SEC, 'toolu_e1', 'Edit', { file_path: path.join(dir, 'src', 'a.js') }),
-    ], T0 + 1 * SEC);
-    assert.equal(tracker.snapshot().projects[0].totalBuilds, 1);
+// Edits src/a.js, lets the transcript go cold (> 15 min), then resumes it at T0 + 20 min with
+// an edit to src/b.js; also writes `alongside` with that time, then scans and polls once.
+function resumeAfterIdle(t, alongside = () => {}) {
+  const session = startClaude(t);
+  const { dir, tracker } = session;
+  appendAndPoll(session, [
+    claude.tool(dir, T0 + 1 * SEC, 'toolu_e1', 'Edit', { file_path: path.join(dir, 'src', 'a.js') }),
+  ], T0 + 1 * SEC);
+  assert.equal(tracker.snapshot().projects[0].totalBuilds, 1);
 
-    pollAt(session, T0 + 1 * SEC + 15 * MIN + 1);
-    const resumedAt = T0 + 20 * MIN;
-    session.world.clock.set(resumedAt);
-    appendJsonl(session.file, [
-      claude.tool(dir, resumedAt, 'toolu_e2', 'Edit', { file_path: path.join(dir, 'src', 'b.js') }),
-    ], resumedAt);
-    tracker.scan(false);
-    tracker.pollFiles();
-    const events = session.take();
+  pollAt(session, T0 + 1 * SEC + 15 * MIN + 1);
+  const resumedAt = T0 + 20 * MIN;
+  session.world.clock.set(resumedAt);
+  appendJsonl(session.file, [
+    claude.tool(dir, resumedAt, 'toolu_e2', 'Edit', { file_path: path.join(dir, 'src', 'b.js') }),
+  ], resumedAt);
+  alongside(session, resumedAt);
+  tracker.scan(false);
+  tracker.pollFiles();
+  return { ...session, events: session.take() };
+}
 
-    assert.equal(tracker.snapshot().projects[0].totalBuilds, 3, 'one old edit counted twice plus the new one');
-    assert.deepEqual(ofType(events, 'build'), [], 'the whole file is replayed in catchup mode');
+test('claude: a session resumed after 15 min idle continues from its previous offset (no re-count)', (t) => {
+  const { tracker, events } = resumeAfterIdle(t);
+  assert.deepEqual(ofType(events, 'build').map(pick(['shipId', 'file', 'isNew'])),
+    [{ shipId: SHIP_ID, file: path.join('src', 'b.js'), isNew: false }]);
+  assert.equal(tracker.snapshot().projects[0].totalBuilds, 2);
+});
+
+test('claude: a transcript that first appears while running is still replayed from zero and counts its edits', (t) => {
+  const newSession = '7c0d5f8e-1111-4222-8333-777788889999';
+  const { tracker, events } = resumeAfterIdle(t, ({ world, dir }, at) => {
+    appendJsonl(world.claudeFile(SLUG, newSession), [
+      claude.prompt(dir, at - 2 * SEC),
+      claude.tool(dir, at - 1 * SEC, 'toolu_n1', 'Edit', { file_path: path.join(dir, 'src', 'c.js') }),
+      claude.tool(dir, at, 'toolu_n2', 'Write', { file_path: path.join(dir, 'notes.md') }),
+    ], at);
   });
+  assert.deepEqual(ofType(events, 'build').map(pick(['shipId', 'file'])),
+    [{ shipId: SHIP_ID, file: path.join('src', 'b.js') }], 'the new transcript is caught up silently');
+  assert.deepEqual(ofType(events, 'ship-spawned').map((event) => event.ship.id), [`ship:${SLUG}:${newSession}`]);
+  assert.equal(tracker.snapshot().projects[0].totalBuilds, 4, 'a.js and b.js once each, plus both new-transcript edits');
+});
+
+test('claude: a transcript already idle over 15 min at startup resumes from its end (no re-count)', (t) => {
+  const world = createWorld(t);
+  const dir = world.projectDir;
+  const file = world.claudeFile();
+  appendJsonl(file, [
+    claude.prompt(dir, T0 - 60 * MIN),
+    claude.tool(dir, T0 - 59 * MIN, 'toolu_old', 'Edit', { file_path: path.join(dir, 'src', 'a.js') }),
+  ], T0 - 59 * MIN);
+  const { tracker, take } = world.live();
+  tracker.scan(true);
+  assert.deepEqual(take().map((event) => event.type), ['project-added']);
+
+  world.clock.set(T0 + 1 * MIN);
+  appendJsonl(file, [
+    claude.tool(dir, T0 + 1 * MIN, 'toolu_new', 'Edit', { file_path: path.join(dir, 'src', 'b.js') }),
+  ], T0 + 1 * MIN);
+  tracker.scan(false);
+  tracker.pollFiles();
+  const events = take();
+  assert.deepEqual(ofType(events, 'ship-spawned').map((event) => event.ship.id), [SHIP_ID]);
+  assert.deepEqual(ofType(events, 'build').map(pick(['file', 'isNew'])), [{ file: path.join('src', 'b.js'), isNew: true }]);
+  assert.equal(tracker.snapshot().projects[0].totalBuilds, 1);
+});
 
 // ---------- Codex ----------
 
@@ -674,7 +752,7 @@ test('classifyTool maps Codex tool names onto the shared status vocabulary', () 
 
 // ---------- Signal ----------
 
-function signalWorld(t, { mtime = T0 } = {}) {
+function signalWorld(t, { mtime = T0, extensions } = {}) {
   const world = createWorld(t);
   const signalDir = path.join(world.root, 'signals');
   const signalFile = path.join(signalDir, 'private.log');
@@ -683,11 +761,11 @@ function signalWorld(t, { mtime = T0 } = {}) {
   setMtime(signalFile, mtime);
   fs.mkdirSync(path.dirname(world.providerConfigPath), { recursive: true });
   fs.writeFileSync(world.providerConfigPath, JSON.stringify({
-    watch: [{ directory: signalDir, projectPath: world.projectDir, label: 'Fixture' }],
+    watch: [{ directory: signalDir, projectPath: world.projectDir, label: 'Fixture', extensions }],
   }));
   const sourceId = `watch-${hex8(canonicalProjectPath(signalDir))}`;
-  const shipId = `ship:generic:${sourceId}:${hex8(canonicalProjectPath(signalFile))}`;
-  return { world, signalDir, signalFile, shipId };
+  const shipIdOf = (file) => `ship:generic:${sourceId}:${hex8(canonicalProjectPath(file))}`;
+  return { world, signalDir, signalFile, shipId: shipIdOf(signalFile), shipIdOf };
 }
 
 // Records (rather than throws, which the tracker would swallow) any read of watched files.
@@ -754,20 +832,74 @@ test('signal: a watched file docks a generic ship from stat alone; its contents 
   assert.deepEqual(reads, []);
 });
 
-test('signal: ships for files idle 5-15 min are swept every sweep and respawned every scan',
-  { todo: 'suspected bug (.docs/architecture.md §10 #30): Signal ships flap and are renamed on every scan' },
-  (t) => {
-    const { world } = signalWorld(t, { mtime: T0 - 7 * MIN });
-    const session = { world, ...world.live() };
-    const spawned = [];
-    for (let round = 0; round < 2; round++) {
-      session.tracker.scan(false);
-      const events = session.take();
-      spawned.push(...ofType(events, 'ship-spawned').map((event) => event.ship.name));
-      assert.deepEqual(ofType(sweepAt(session, T0), 'ship-departed').length, 1, `round ${round}`);
-    }
-    assert.deepEqual(spawned, ['Signal-1', 'Signal-2']);
-  });
+// Docks a fresh .log and a fresh .txt file under `extensions`; returns which got a ship.
+function dockedSignalFiles(t, extensions) {
+  const { world, signalDir, signalFile, shipIdOf } = signalWorld(t, { extensions });
+  const notes = path.join(signalDir, 'notes.txt');
+  fs.writeFileSync(notes, 'PRIVATE_GENERIC_BYTES');
+  setMtime(notes, T0);
+  const { tracker } = world.live();
+  tracker.scan(true);
+  const docked = new Set(tracker.snapshot().ships.map((ship) => ship.id));
+  return [signalFile, notes].filter((file) => docked.has(shipIdOf(file))).map((file) => path.basename(file));
+}
+
+test('signal: a watch entry\'s configured extensions choose which files dock a ship', (t) => {
+  assert.deepEqual(dockedSignalFiles(t, ['.txt']), ['notes.txt']);
+});
+
+test('signal: a watch entry without a usable extensions list watches every default extension', (t) => {
+  assert.deepEqual(dockedSignalFiles(t, ['.exe']), ['private.log', 'notes.txt']);
+});
+
+test('signal config: extensions keep the supported ones listed; absent or unusable lists mean all four', (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'au-signal-config-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const file = path.join(root, 'providers.json');
+  const parse = (extensions) => {
+    fs.writeFileSync(file, JSON.stringify({ watch: [{ directory: root, extensions }] }));
+    const { watch, warnings } = readGenericWatchConfig(file);
+    return [watch[0].extensions, warnings];
+  };
+  const all = ['.json', '.jsonl', '.log', '.txt'];
+  const warning = 'provider config lists no supported watch extensions; using .json, .jsonl, .log and .txt';
+  assert.deepEqual(parse([' .TXT ', '.log', '.exe', 7, '.log']), [['.log', '.txt'], []]);
+  assert.deepEqual(parse(undefined), [all, []]);
+  for (const unusable of [[], ['.exe', 'log'], '.log', null]) {
+    assert.deepEqual(parse(unusable), [all, [warning]], JSON.stringify(unusable));
+  }
+});
+
+test('signal: a file idle 5-15 min docks no ship, so no sweep warps one out and no scan respawns it', (t) => {
+  const { world } = signalWorld(t, { mtime: T0 - 7 * MIN });
+  const session = { world, ...world.live() };
+  for (const [round, expected] of [[0, ['project-added']], [1, []]]) {
+    session.tracker.scan(false);
+    assert.deepEqual(session.take().map((event) => event.type), expected, `scan ${round}`);
+    assert.deepEqual(sweepAt(session, T0), [], `sweep ${round}`);
+  }
+});
+
+test('signal: an idle Signal ship warps out once and returns, renamed, only when its file changes', (t) => {
+  const { world, signalFile, shipId } = signalWorld(t);
+  const session = { world, ...world.live() };
+  session.tracker.scan(true);
+  session.take();
+
+  const gone = sweepAt(session, T0 + 5 * MIN + 1);
+  assert.deepEqual(gone.map((event) => [event.type, event.shipId || event.entry.text]),
+    [['ship-departed', shipId], ['feed', 'Signal-1 warped out']]);
+  session.tracker.scan(false);
+  assert.deepEqual(session.take(), [], 'an unchanged idle file stays undocked');
+
+  world.clock.set(T0 + 6 * MIN);
+  fs.appendFileSync(signalFile, 'MORE_PRIVATE_BYTES');
+  setMtime(signalFile, T0 + 6 * MIN);
+  session.tracker.scan(false);
+  const back = session.take();
+  assert.deepEqual(back.map((event) => event.type), ['ship-spawned', 'feed', 'ship-updated', 'activity']);
+  assert.deepEqual(pick(['id', 'name'])(back[0].ship), { id: shipId, name: 'Signal-2' });
+});
 
 // ---------- Derived views and persistence ----------
 

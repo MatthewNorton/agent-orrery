@@ -26,23 +26,14 @@ const { codexParentSessionId } = require('./transcripts/codex');
 const { fnv1a, hex8, mulberry32 } = require('./shared/hash');
 const { writeFileAtomic } = require('./shared/atomic-write');
 const { relativeInside } = require('./path-safety');
+const { signalSources, watchedFiles } = require('./signal-sources');
+const { bucketOf, countBuild, bucketBuilds } = require('./build-buckets');
 
 /**
  * @import { Attention, FeedEntry, PlanetData, Project, Ship, ShipStatus, SystemData }
  *   from '../types/contract'
  * @import { LiveProject, LiveShip } from '../types/live-model'
  * @import { ClaudeMessage, ClaudeSession, ClaudeToolStart } from './transcripts/claude'
- */
-
-/**
- * A Signal watch entry. `extensions` is never set: readGenericWatchConfig does not pass it
- * through, so every source watches the default extensions.
- * @typedef {object} SignalSource
- * @property {string} id
- * @property {string} directory
- * @property {string} projectPath
- * @property {string | null} label
- * @property {string[]} [extensions]
  */
 
 const DEFAULT_CLAUDE_PROJECTS_DIR = path.join(os.homedir(), '.claude', 'projects');
@@ -274,6 +265,7 @@ class Tracker extends EventEmitter {
     /** @type {Map<string, LiveProject>} */
     this.projects = new Map();   // slug -> project record
     this.files = new Map();      // abs jsonl path -> tail state
+    this.claudeTails = new Map(); // abs Claude jsonl path -> its tail, kept while cold
     /** @type {Map<string, LiveShip>} */
     this.ships = new Map();      // shipId -> ship record
     /** @type {FeedEntry[]} */
@@ -441,27 +433,39 @@ class Tracker extends EventEmitter {
         }
       }
 
-      // Tail any file fresh enough to matter.
+      // Tail any file fresh enough to matter; at startup, note where every file ends.
       for (const { fp, st } of stats) {
-        if (now - st.mtimeMs > HOT_WINDOW_MS) continue;
-        if (!this.files.has(fp)) {
-          this.files.set(fp, {
-            provider: 'claude',
-            project: project.id,
-            session: path.basename(fp, '.jsonl'),
-            // Startup: don't replay history, just tail from the end. A file
-            // appearing while we run is a new session: replay it from zero
-            // (in catchup mode) so its ship materializes with correct state.
-            offset: isStartup ? st.size : 0,
-            catchup: !isStartup,
-            remainder: '',
-          });
-          if (isStartup && now - st.mtimeMs < ACTIVE_WINDOW_MS) {
-            this.ensureShip(project.id, path.basename(fp, '.jsonl'), false, st.mtimeMs);
-          }
+        const hot = now - st.mtimeMs <= HOT_WINDOW_MS;
+        if (this.files.has(fp) || !(hot || isStartup)) continue;
+        const tail = this.claudeTail(fp, project.id, st.size, isStartup);
+        if (!hot) continue;
+        this.files.set(fp, tail);
+        if (isStartup && now - st.mtimeMs < ACTIVE_WINDOW_MS) {
+          this.ensureShip(project.id, tail.session, false, st.mtimeMs);
         }
       }
     }
+  }
+
+  /**
+   * A transcript keeps one tail for the whole run, so a session that goes cold and resumes
+   * reads on from where it stopped. Startup doesn't replay history: it tails from the end. A
+   * file appearing while we run (or replacing a longer one) is a new session: replay it from
+   * zero in catchup mode so its ship materializes with correct state.
+   * @param {string} fp
+   * @param {string} projectId
+   * @param {number} size
+   * @param {boolean} isStartup
+   */
+  claudeTail(fp, projectId, size, isStartup) {
+    const known = this.claudeTails.get(fp);
+    if (known && known.offset <= size) return known;
+    const tail = {
+      provider: 'claude', project: projectId, session: path.basename(fp, '.jsonl'),
+      offset: isStartup ? size : 0, catchup: !isStartup, remainder: '',
+    };
+    this.claudeTails.set(fp, tail);
+    return tail;
   }
 
   indexProjectPath(project) {
@@ -730,30 +734,13 @@ class Tracker extends EventEmitter {
       this.providerWarnings.add(warning);
       console.warn(`[providers] ${warning}`);
     }
-    const rawSources = (config.watch || []).map((item) => /** @type {SignalSource} */ ({
-        id: `watch-${hex8(canonicalProjectPath(item.directory))}`,
-        directory: item.directory,
-        projectPath: item.projectPath,
-        label: item.label,
-      }));
     const now = Date.now();
     const seenFiles = new Set();
-    for (const source of rawSources) {
-      if (!source || !/^[a-z0-9][a-z0-9-]{0,47}$/i.test(source.id || '') ||
-          !(path.win32.isAbsolute(source.directory || '') || path.posix.isAbsolute(source.directory || '')) ||
-          !(path.win32.isAbsolute(source.projectPath || '') || path.posix.isAbsolute(source.projectPath || ''))) continue;
+    for (const source of signalSources(config.watch || [])) {
       // Security follow-up: a UNC/device projectPath has no project key; skip it instead of fnv1a(null).
       const projectKey = canonicalProjectPath(source.projectPath);
       if (!projectKey) continue;
-      const extensions = new Set((Array.isArray(source.extensions) && source.extensions.length
-        ? source.extensions : ['.json', '.jsonl', '.log', '.txt'])
-        .map((ext) => String(ext).toLowerCase())
-        .filter((ext) => ['.json', '.jsonl', '.log', '.txt'].includes(ext)));
-      const candidates = listRegularFilesRecursive(source.directory)
-        .filter(({ fp }) => extensions.has(path.extname(fp).toLowerCase()))
-        .sort((a, b) => b.st.mtimeMs - a.st.mtimeMs || a.fp.localeCompare(b.fp))
-        .slice(0, 256);
-      for (const { fp, st } of candidates) {
+      for (const { fp, st } of watchedFiles(source)) {
         seenFiles.add(fp);
         const project = this.ensureProjectForPath(
           source.projectPath,
@@ -765,8 +752,12 @@ class Tracker extends EventEmitter {
         const previous = this.signalFiles.get(fp);
         // Security follow-up: a POSIX file name containing `\` has no canonical key; hash the raw path instead.
         const sessionId = `${source.id}:${hex8(canonicalProjectPath(fp) || fp)}`;
+        const changed = !previous || previous.size !== st.size || previous.mtimeMs !== st.mtimeMs;
+        this.signalFiles.set(fp, { size: st.size, mtimeMs: st.mtimeMs, sessionId });
+        // sweepShips departs a ship idle past the active window; docking one here would flap.
+        if (now - st.mtimeMs > ACTIVE_WINDOW_MS) continue;
         const ship = this.ensureProviderShip('signal', project.id, sessionId, 'main', st.mtimeMs, null);
-        if (!isStartup && (!previous || previous.size !== st.size || previous.mtimeMs !== st.mtimeMs)) {
+        if (!isStartup && changed) {
           ship.lastEvent = Math.max(ship.lastEvent, st.mtimeMs);
           ship.status = 'Working';
           ship.detail = null;
@@ -776,7 +767,6 @@ class Tracker extends EventEmitter {
             tool: 'signal', status: 'Working', detail: null, ts: st.mtimeMs,
           });
         }
-        this.signalFiles.set(fp, { size: st.size, mtimeMs: st.mtimeMs, sessionId });
       }
     }
     for (const [fp, previous] of this.signalFiles) {
@@ -817,6 +807,7 @@ class Tracker extends EventEmitter {
         st = fs.statSync(fp);
       } catch {
         this.files.delete(fp);
+        this.claudeTails.delete(fp);
         continue;
       }
       if (now - st.mtimeMs > HOT_WINDOW_MS) {
@@ -1050,9 +1041,8 @@ class Tracker extends EventEmitter {
 
   // Counts an edit to a file inside the project; catchup counts it without announcing it.
   addBuild(project, ship, rel, ts, catchup) {
-    const bucket = rel.includes(path.sep) ? rel.split(path.sep)[0] : '(root)';
-    const isNew = !(bucket in project.buckets);
-    project.buckets[bucket] = (project.buckets[bucket] || 0) + 1;
+    const bucket = bucketOf(rel, path.sep);
+    const isNew = countBuild(project, bucket);
     project.totalBuilds += 1;
     this.systemCache.delete(project.id);
     if (catchup) return;
@@ -1348,7 +1338,7 @@ class Tracker extends EventEmitter {
         planets = dirs.map((d) => ({
           name: d.name,
           files: shallowCount(path.join(project.path, d.name)),
-          builds: project.buckets[d.name] || 0,
+          builds: bucketBuilds(project, d.name),
         }));
         if (project.buckets['(root)']) {
           planets.push({ name: '(root)', files: beltDensity, builds: project.buckets['(root)'] });
@@ -1383,7 +1373,7 @@ class Tracker extends EventEmitter {
       name: planetName,
       project: publicProject(project),
       // Security follow-up: own keys only; 'constructor'/'__proto__' must not return a non-cloneable prototype value.
-      builds: Object.hasOwn(project.buckets, planetName) ? project.buckets[planetName] : 0,
+      builds: bucketBuilds(project, planetName),
     };
     if (!project.path || !project.exists || planetName.startsWith('Sector-')) {
       const rand = mulberry32(fnv1a(projectId + planetName));
@@ -1453,24 +1443,6 @@ function listFilesRecursive(root, extension) {
       const fp = path.join(dir, entry.name);
       if (entry.isDirectory()) queue.push(fp);
       else if (entry.isFile() && entry.name.toLowerCase().endsWith(extension)) out.push(fp);
-    }
-  }
-  return out;
-}
-
-function listRegularFilesRecursive(root) {
-  const out = [];
-  const queue = [root];
-  while (queue.length) {
-    const dir = queue.pop();
-    let entries;
-    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { continue; }
-    for (const entry of entries) {
-      const fp = path.join(dir, entry.name);
-      if (entry.isDirectory()) queue.push(fp);
-      else if (entry.isFile()) {
-        try { out.push({ fp, st: fs.statSync(fp) }); } catch { /* raced with deletion */ }
-      }
     }
   }
   return out;
