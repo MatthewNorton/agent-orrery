@@ -1,7 +1,6 @@
 // @ts-check
 'use strict';
 
-const { app, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
@@ -14,7 +13,9 @@ const { validProjectId } = guards;
  *   ProjectPathsScanResult } from '../../types/contract'
  */
 
-function createProjectPathsIpc(ctx) {
+/** @param {Pick<typeof import('electron'), 'app' | 'dialog'>} [electron] */
+function createProjectPathsIpc(ctx, electron = require('electron')) {
+  const { app, dialog } = electron;
   let projectPathDialogInFlight = false;
   let projectPathScanAbort = null;
   const projectPathCandidates = new Map();

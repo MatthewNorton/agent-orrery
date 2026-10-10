@@ -145,18 +145,34 @@ function windowsRootBoth(t) {
   return runBoth(t, { records, cwd: 'C:\\Orrery-Fixture-Missing\\Demo' });
 }
 
-test('agree: buckets are case-folded under a Windows-style root in both models', async (t) => {
+test('agree: buckets keep the folder\'s casing under a Windows-style root in both models', async (t) => {
   const { live, replay } = await windowsRootBoth(t);
-  assert.deepEqual(ofType(live.events, 'build').map((event) => event.bucket), ['docs']);
-  assert.deepEqual(ofType(replay.events, 'build').map((event) => event.bucket), ['docs']);
+  assert.deepEqual(ofType(live.events, 'build').map((event) => event.bucket), ['Docs']);
+  assert.deepEqual(ofType(replay.events, 'build').map((event) => event.bucket), ['Docs']);
 });
 
-test('agree: both models lower-case the build file under a Windows-style root', {
-  todo: 'suspected bug: relativeInside returns the lower-cased relative path (see the Windows planet todo in tracker.test.js)',
-}, async (t) => {
+test('agree: both models keep the build file\'s casing under a Windows-style root', async (t) => {
   const { live, replay } = await windowsRootBoth(t);
-  assert.deepEqual(ofType(live.events, 'build').map((event) => event.file), [path.join('docs', 'guide.md')]);
-  assert.deepEqual(ofType(replay.events, 'build').map((event) => event.file), ['docs/guide.md']);
+  assert.deepEqual(ofType(live.events, 'build').map((event) => event.file), [path.join('Docs', 'Guide.md')]);
+  assert.deepEqual(ofType(replay.events, 'build').map((event) => event.file), ['Docs/Guide.md']);
+});
+
+test('agree: one folder written in two casings under a Windows-style root keeps one bucket in both models', async (t) => {
+  const { live, replay } = await runBoth(t, {
+    cwd: 'C:\\Orrery-Fixture-Missing\\Demo',
+    records: (dir) => [
+      claude.prompt(dir, T0),
+      claude.tool(dir, T0 + 1 * SEC, 'toolu_a', 'Write', { file_path: `${dir}\\Docs\\a.md` }),
+      claude.tool(dir, T0 + 2 * SEC, 'toolu_b', 'Write', { file_path: `${dir}\\docs\\b.md` }),
+    ],
+  });
+  for (const side of [live, replay]) {
+    assert.deepEqual(ofType(side.events, 'build').map(pick(['bucket', 'isNew'])),
+      [{ bucket: 'Docs', isNew: true }, { bucket: 'docs', isNew: false }]);
+  }
+  assert.equal(live.tracker.getPlanet(SLUG, 'DOCS').builds, 2);
+  assert.deepEqual(replay.snapshot.projects[0].buckets, { Docs: 2 });
+  assert.equal(replay.source.getPlanet(SLUG, 'DOCS').builds, 2);
 });
 
 // ---------- Claude: where the models differ today ----------

@@ -72,8 +72,18 @@ function isInsidePath(root, candidate) {
 }
 
 /**
+ * Whether names under root compare case-insensitively: a Windows-style root (a drive letter
+ * or a backslash), on every host.
+ * @param {string | null | undefined} root
+ */
+function ignoresCase(root) {
+  return typeof root === 'string' && (/^[a-z]:[\\/]/i.test(root) || root.includes('\\'));
+}
+
+/**
  * file relative to root, joined with `separator`, or null unless it lies strictly beneath
  * root. The flavor, and Windows case folding, come from root's syntax, so every host agrees.
+ * Case folding only decides containment: the result keeps the file's own casing.
  * Without `requireAbsolute` a relative file resolves against the process cwd.
  * @param {string | null | undefined} root
  * @param {string | null | undefined} file
@@ -82,7 +92,7 @@ function isInsidePath(root, candidate) {
  */
 function relativeInside(root, file, { separator = path.sep, requireAbsolute = false } = {}) {
   if (!root || !file) return null;
-  const windows = /^[a-z]:[\\/]/i.test(root) || root.includes('\\');
+  const windows = ignoresCase(root);
   const flavor = windows ? path.win32 : path.posix;
   if (requireAbsolute && (!flavor.isAbsolute(root) || !flavor.isAbsolute(file))) return null;
   const normalizedRoot = flavor.normalize(root);
@@ -91,7 +101,9 @@ function relativeInside(root, file, { separator = path.sep, requireAbsolute = fa
   const comparableFile = windows ? normalizedFile.toLowerCase() : normalizedFile;
   const rel = flavor.relative(comparableRoot, comparableFile);
   if (!rel || rel === '..' || rel.startsWith(`..${flavor.sep}`) || flavor.isAbsolute(rel)) return null;
-  return rel.replace(/[\\/]+/g, separator);
+  // win32.relative also ignores case and answers in the file's casing; use it only if it agrees.
+  const cased = windows ? flavor.relative(normalizedRoot, normalizedFile) : rel;
+  return (cased.toLowerCase() === rel.toLowerCase() ? cased : rel).replace(/[\\/]+/g, separator);
 }
 
 module.exports = {
@@ -101,6 +113,7 @@ module.exports = {
   isCanonicalPathFor,
   isAbsolutePosixPath,
   isInsidePath,
+  ignoresCase,
   relativeInside,
   // Re-exported unchanged from provider-adapters.js, which owns them.
   isLocalProjectPath,
