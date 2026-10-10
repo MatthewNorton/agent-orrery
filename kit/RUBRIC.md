@@ -1,6 +1,6 @@
 # Grading rubric
 
-Two layers. Mechanical runs first and is scriptable (`node kit/grade.mjs`).
+Two layers. Mechanical runs first and is scriptable (`node kit/grade.mjs`, against the synthetic profile in `scripts/lib/synthetic-profile.mjs`; `--real` grades your own transcripts).
 Visual is graded by an agent (kit-runner) Reading `.shots/*.png` next to the
 mockups. Accept the build only when Mechanical = PASS and Visual has zero
 hard-fail items.
@@ -11,9 +11,9 @@ hard-fail items.
 |---|---|---|
 | M1 | `electron . --shots` exits 0 within 150s | nonzero exit / timeout / crash |
 | M2 | `.shots/shot-universe.png`, `shot-system.png`, `shot-planet.png` all exist, each ≥ 30 KB, created by this run | missing, stale, or ≤ 30 KB (a flat dark frame compresses below this; real starfield + UI does not) |
-| M3 | `.shots/state.json` parses; `projects.length ≥ 1` | tracker snapshot empty or unwritten |
+| M3 | `.shots/state.json` parses; `projects.length ≥ 1`; on the synthetic profile every project path is inside it and the app saved its state into it | tracker snapshot empty or unwritten, or the real profile was read |
 | M4 | Combined stdout/stderr has no `Uncaught`, `ReferenceError`, `TypeError`, `SyntaxError`, `is not defined`, `Failed to load resource` | any match (Electron GPU/`Autofill` noise is already filtered by the script) |
-| M5 (soft) | `state.json` ships length ≥ 1 | warn only — depends on a supported provider session being live during grading; the runner's Claude or Codex transcript normally produces a ship |
+| M5 (soft) | `state.json` ships length ≥ 1 | warn only — the synthetic profile always has live sessions, so a warning there means ship detection regressed; with `--real` it depends on a supported provider session being live |
 
 ## Visual — universe shot vs `3.universe-map-view.png`
 
