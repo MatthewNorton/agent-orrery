@@ -50,8 +50,7 @@ test('Vanta Seraph is the textured high-detail fleet benchmark', () => {
   assert.ok(width > 7.3, 'wide layered silhouette');
   assert.ok(length > 5.7, 'long spearhead silhouette');
 
-  assert.equal(manifest.providerFamilies.claude, 'aur-shared-fleet');
-  assert.equal(manifest.providerFamilies.codex, 'aur-shared-fleet');
+  // The shared fleet stays in the manifest after fleet-v2 became the active family.
   assert.equal(entry.family, 'aur-shared-fleet');
   assert.equal(entry.file, 'aur-vanta-seraph.glb');
   assert.equal(entry.license, 'CC0');

@@ -70,10 +70,21 @@ if (manifest) {
   const familyIds = new Set(hulls.map((h) => h.family));
   let droneCount = 0;
   for (const h of hulls) {
-    const f = path.join(ROOT, 'assets', 'ships', h.file || '');
-    if (!h.file || !fs.existsSync(f)) { bad('S3', `hull ${h.id}: file missing (${h.file})`); continue; }
-    const size = fs.statSync(f).size;
-    if (size > 2 * 1024 * 1024) bad('S3', `hull ${h.id}: ${Math.round(size / 1024)}KB exceeds 2MB cap`);
+    // 2026-10-10: fleet-v2 hulls add a far-LOD file under `lods`; every file a
+    // hull references gets the same existence and size checks.
+    const files = [h.file, ...Object.values(h.lods || {})];
+    let missing = false;
+    for (const file of files) {
+      const f = path.join(ROOT, 'assets', 'ships', typeof file === 'string' ? file : '');
+      if (typeof file !== 'string' || !file || !fs.existsSync(f)) {
+        bad('S3', `hull ${h.id}: file missing (${file})`);
+        missing = true;
+        continue;
+      }
+      const size = fs.statSync(f).size;
+      if (size > 2 * 1024 * 1024) bad('S3', `hull ${h.id}: ${file} ${Math.round(size / 1024)}KB exceeds 2MB cap`);
+    }
+    if (missing) continue;
     if (h.license !== 'CC0') bad('S3', `hull ${h.id}: license must be "CC0", found ${JSON.stringify(h.license)}`);
     if (!h.source) bad('S3', `hull ${h.id}: source missing`);
     if (h.role === 'drone') droneCount++;
