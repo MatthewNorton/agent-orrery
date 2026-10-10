@@ -497,10 +497,10 @@ There are four layers of checking, and only the first three run in CI.
 
 | Layer | Command | Runs Electron? | In CI? |
 |---|---|---|---|
-| Unit tests (23 files) | `npm test` | No | **Yes** (Ubuntu + Windows) |
+| Unit tests (43 files) | `npm test` | No | **Yes** (Ubuntu + Windows) |
 | Frozen-file pin check | `node kit/repin.mjs --check` | No | **Yes** |
 | Type check (JSDoc, files starting `// @ts-check`) | `npm run typecheck` | No | **Yes** |
-| Renderer regression gate | `node kit/grade.mjs` | Yes (`--shots`, on your real data) | No |
+| Renderer regression gate | `node kit/grade.mjs` | Yes (`--shots`, on a synthetic profile; `--real` for your own data) | No |
 | 12 archived kit gates | `node kit/done/<kit>/grade-*.mjs` | Most do | No |
 | Everything at once | `node kit/done/main-split/grade-main-split.mjs --full` | Yes | No |
 

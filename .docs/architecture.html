@@ -374,7 +374,7 @@ const NODES = {
   hmodes: { label: 'harness/modes/*.js', lines: 713, note: '5 files', layer: 'harness', path: 'src/main/harness/modes/',
     job: 'One runner per test mode — shots, control, history, provider, polish. Each writes result.json and exits; the kit gates launch them.',
     issues: ['Drives the renderer through DOM ids, mesh metadata keys and camera names — rename one and a gate fails',
-      'shots and polish run against your real transcripts and userData'] },
+      'npm run shots reads your real transcripts and userData; the gates pass it a synthetic or fixture profile'] },
 
   'br.replay': { label: 'replay', sub: 'invoke · + replay-state ↑', layer: 'bridge', anchor: 'mrc',
     job: 'Play, pause, speed, seek, live. The reply carries a new stream epoch and snapshot; replay state is pushed at most every 100 ms.' },
