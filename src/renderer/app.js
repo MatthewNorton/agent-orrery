@@ -185,6 +185,7 @@
     if (S.activeView && S.activeView.update) {
       try { S.activeView.update(batch); } catch (e) { AUR.log('view update err', e && e.message); }
     }
+    A.refreshShipHulls(workedShipIds(batch));
     if (S.agentFocus.shipId && !S.store.ships.has(S.agentFocus.shipId)) {
       A.exitAgentFocus(false);
     }
@@ -251,11 +252,42 @@
       case 'build': {
         const p = S.store.projects.get(ev.project);
         if (p) p.totalBuilds = (p.totalBuilds || 0) + 1;
+        // A ship-updated can precede the build it reports (and Codex patches
+        // send none), so the stored count follows build events too.
+        const ship = S.store.ships.get(ev.shipId);
+        if (ship) S.store.ships.set(ship.id, { ...ship, builds: (ship.builds || 0) + 1 });
         break;
       }
       default: break;
     }
   }
+
+  /**
+   * @param {AUEvent[]} batch
+   * @returns {Set<string>}
+   */
+  function workedShipIds(batch) {
+    const ids = new Set();
+    for (const ev of batch) {
+      if (ev.type === 'ship-updated') ids.add(ev.ship.id);
+      else if (ev.type === 'build') ids.add(ev.shipId);
+    }
+    return ids;
+  }
+
+  /**
+   * Promotes hulls whose build count crossed a rank. Every stored ship when no
+   * ids are given, e.g. after focus mode stops fading ships.
+   * @param {Iterable<string>} [ids]
+   */
+  A.refreshShipHulls = function refreshShipHulls(ids) {
+    const scene = S.activeScene;
+    if (!scene || !AUR.ships || typeof AUR.ships.refresh !== 'function') return;
+    for (const id of ids || S.store.ships.keys()) {
+      const ship = S.store.ships.get(id);
+      if (ship) AUR.ships.refresh(scene, ship);
+    }
+  };
 
   function maybeNotifyAttention(previousAttention, ship) {
     const entered = ship && (ship.attention === 'question' || ship.attention === 'permission');
