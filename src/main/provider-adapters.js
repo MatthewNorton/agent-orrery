@@ -70,6 +70,8 @@ const TOOL_CLASSES = Object.freeze({
 
 const UNKNOWN_TOOL = Object.freeze({ tool: 'Tool', status: 'Working', build: false });
 
+const SIGNAL_EXTENSIONS = Object.freeze(['.json', '.jsonl', '.log', '.txt']);
+
 /**
  * Normalize every externally supplied provider to the three public keys.
  * @param {unknown} value
@@ -195,6 +197,7 @@ function readGenericWatchConfig(file) {
 
   const seen = new Set();
   let invalid = 0;
+  let unsupportedExtensions = 0;
   for (const entry of parsed.watch.slice(0, 128)) {
     if (!plainObject(entry)) { invalid++; continue; }
     const directory = safePath(entry.directory);
@@ -212,12 +215,29 @@ function readGenericWatchConfig(file) {
     if (typeof entry.label === 'string') {
       label = entry.label.replace(/[^\x20-\x7e]/g, '').trim().slice(0, 24) || null;
     }
-    result.watch.push({ directory, projectPath, label });
+    const extensions = listedExtensions(entry.extensions);
+    if (entry.extensions !== undefined && !extensions) unsupportedExtensions++;
+    result.watch.push({ directory, projectPath, label, extensions: extensions || [...SIGNAL_EXTENSIONS] });
   }
   if (parsed.watch.length > 128 || invalid > 0) {
     result.warnings.push('provider config contains invalid or duplicate watch entries');
   }
+  if (unsupportedExtensions > 0) {
+    result.warnings.push('provider config lists no supported watch extensions; using .json, .jsonl, .log and .txt');
+  }
   return result;
+}
+
+/**
+ * The supported extensions a watch entry lists, or null when it lists none.
+ * @param {unknown} value
+ * @returns {string[] | null}
+ */
+function listedExtensions(value) {
+  if (!Array.isArray(value)) return null;
+  const listed = value.map((ext) => typeof ext === 'string' ? ext.trim().toLowerCase() : '');
+  const supported = SIGNAL_EXTENSIONS.filter((ext) => listed.includes(ext));
+  return supported.length ? supported : null;
 }
 
 /** Create the small mutable cursor needed to adapt one provider source. */
