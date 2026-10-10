@@ -516,8 +516,9 @@
     const entry = state && ship ? state.ships.get(String(ship.id)) : null;
     if (!entry || isSceneDisposed(scene, state)) return Promise.resolve(null);
     const hull = selectHull(manifestValue, ship);
-    if (!hull || hull.id === entry.hull.id) return Promise.resolve(null);
-    entry.wanted = hull.id;
+    if (!hull) return Promise.resolve(null);
+    entry.wanted = hull.id; // also cancels a pending swap when the rank falls back
+    if (hull.id === entry.hull.id) return Promise.resolve(null);
     return resolveAsset(scene, state, hull, entry.triangles).then((asset) => {
       if (!asset || entry.wanted !== hull.id || isNodeDisposed(entry.root) ||
           isSceneDisposed(scene, state) || isFaded(entry)) return null;

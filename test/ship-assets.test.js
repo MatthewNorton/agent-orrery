@@ -438,6 +438,10 @@ test('refresh waits while focus mode fades the ship and only applies the latest 
   assert.equal(await stale, null, 'superseded by a later rank');
   assert.equal(await latest, root);
   assert.equal(hullId(root), 'big');
+  const rewound = assets.ships.refresh(scene, ship('a', 3));
+  assert.equal(await assets.ships.refresh(scene, ship('a', 10)), null, 'back to the current rank');
+  assert.equal(await rewound, null, 'the pending swap is cancelled');
+  assert.equal(hullId(root), 'big');
 });
 
 test('the triangle budget steps near hulls down to far before falling back to the dart', async () => {
