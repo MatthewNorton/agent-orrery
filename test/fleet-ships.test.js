@@ -118,9 +118,13 @@ test('fleet-v2 display size grows gently with rank, from today\'s hull size', ()
   assert.ok(growth > 1.7 && growth < 1.9, `carrier is ${growth}x the interceptor`);
 });
 
-test('provider colors are fixed fleet identities in renderer source', () => {
+test('provider colors are fixed fleet identities in renderer source; a local model flies red', () => {
   const source = fs.readFileSync(path.join(ROOT, 'src', 'renderer', 'util.js'), 'utf8');
-  assert.match(source, /shipTint = \(_shipId, provider\) => AUR\.providerMeta\(provider\)\.color/);
+  assert.match(source, /key: 'claude', label: 'Claude', color: '#b026ff'/);
+  assert.match(source, /key: 'codex', label: 'Codex', color: '#2f7dff'/);
+  assert.match(source, /LOCAL_MODEL = Object\.freeze\(\{ key: 'local', label: 'Local model', color: '#ff3344' \}\)/);
+  assert.match(source, /AUR\.shipTint = \(shipId, provider\) =>/);
+  assert.match(source, /ship\.local === true/);
   assert.match(source, /kind === 'drone'/);
   assert.match(source, /providerKey\(ship\.provider\) === 'generic'/);
 });

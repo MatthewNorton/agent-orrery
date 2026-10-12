@@ -14,7 +14,7 @@
  * @typedef {{ file: string, lod: 'far' | 'near' | null }} HullFile
  * @typedef {HullFile & { record: HullRecord }} HullAsset
  * @typedef {{ root: BABYLON.Mesh, correction: BABYLON.TransformNode, hull: HullEntry,
- *   triangles: number, wanted: string, fallback: BABYLON.AbstractMesh | null }} ShipEntry
+ *   triangles: number, look: string, wanted: string, fallback: BABYLON.AbstractMesh | null }} ShipEntry
  * @typedef {{ containers: Map<string, HullRecord>, materials: Map<string, any>,
  *   templates: Map<string, BABYLON.TransformNode[]>, ships: Map<string, ShipEntry>,
  *   triangles: number, disposed: boolean }} SceneState
@@ -263,23 +263,38 @@
     );
   }
 
+  /** A ship's color identity: its provider, or 'local' when it runs a local model. */
+  function paletteKey(ship) {
+    return ship && ship.local === true ? 'local' : AUR.providerKey(ship && ship.provider);
+  }
+
+  /** What refresh() compares: the rank's hull and the colors it wears. */
+  function lookOf(hull, ship) {
+    return hull.id + '|' + paletteKey(ship);
+  }
+
+  // Livery: graphite hull and armor, the structure parts in the ship color, and
+  // accents emitting exactly the ship color (the scenes' provider evidence).
   function fleetMaterial(scene, state, file, selfLight, ship, baseMaterial) {
-    const provider = AUR.providerMeta(ship && ship.provider);
+    const palette = paletteKey(ship);
     const sourceName = String(baseMaterial && baseMaterial.name || 'material');
-    const key = file + ':' + provider.key + ':' + sourceName;
+    const key = file + ':' + palette + ':' + sourceName;
     let material = state.materials.get(key);
     if (material) return material;
-    const id = 'ship_fleet_' + file + '_' + provider.key + '_' + sourceName;
+    const id = 'ship_fleet_' + file + '_' + palette + '_' + sourceName;
     material = baseMaterial && typeof baseMaterial.clone === 'function'
       ? baseMaterial.clone(id)
       : new BABYLON.StandardMaterial(id, scene);
-    const tint = AUR.color3(provider.color);
+    const tint = AUR.color3(AUR.shipColor(ship));
     const name = sourceName.toLowerCase();
-    let surface = paletteTone(tint, 0.38, 0.09);
+    let surface = paletteTone(tint, 0.10, 0.06);
     let emissive = null;
 
-    if (/armor_secondary|hull_textured/.test(name)) surface = paletteTone(tint, 0.58, 0.10);
-    if (/structure|ivory/.test(name)) surface = paletteTone(tint, 0.25, 0.42);
+    if (/armor_secondary|hull_textured/.test(name)) surface = paletteTone(tint, 0.14, 0.07);
+    if (/structure|ivory/.test(name)) {
+      surface = paletteTone(tint, 0.85, 0.0);
+      emissive = tint.scale(0.12);
+    }
     if (/mechanical|gunmetal/.test(name)) surface = paletteTone(tint, 0.06, 0.045);
     if (/recess/.test(name)) surface = paletteTone(tint, 0.03, 0.02);
     if (/solar/.test(name)) surface = paletteTone(tint, 0.12, 0.03);
@@ -305,7 +320,7 @@
 
   /** One tinted, hidden copy of a hull per provider; universe ships draw as its instances. */
   function providerTemplate(scene, state, asset, ship) {
-    const key = asset.file + '|' + AUR.providerKey(ship && ship.provider);
+    const key = asset.file + '|' + paletteKey(ship);
     let roots = state.templates.get(key);
     if (roots) return roots;
     const entries = asset.record.container.instantiateModelsToScene(
@@ -400,7 +415,7 @@
       assetFamily: hull.family,
       assetRole: hull.role,
       assetLod: asset.lod,
-      providerTint: AUR.shipTint(ship && ship.id, ship && ship.provider),
+      providerTint: AUR.shipColor(ship),
     };
   }
 
@@ -416,7 +431,7 @@
     /** @type {ShipEntry} */
     const entry = {
       root, correction: built.correction, hull, triangles: asset.record.triangles,
-      wanted: hull.id, fallback: null,
+      look: lookOf(hull, ship), wanted: lookOf(hull, ship), fallback: null,
     };
     const shipId = String(ship.id);
     state.triangles += entry.triangles;
@@ -495,6 +510,7 @@
     entry.triangles = asset.record.triangles;
     entry.correction = built.correction;
     entry.hull = hull;
+    entry.look = lookOf(hull, ship);
     entry.root.material = built.evidence;
     entry.root.metadata = { ...(entry.root.metadata || {}), ...hullMetadata(hull, asset, ship) };
     if (entry.fallback && entry.fallback.metadata) {
@@ -504,10 +520,11 @@
   }
 
   /**
-   * Swaps a ship's hull in place when its rank has changed. The asset root the
-   * scene holds (directly, or under its fallback dart) stays the same node.
-   * Resolves to the root once swapped, else null (no model yet, same rank,
-   * superseded, or deferred while focus mode fades the ship).
+   * Swaps a ship's hull in place when its rank or colors have changed (a ship
+   * learns it runs a local model after it spawns). The asset root the scene
+   * holds (directly, or under its fallback dart) stays the same node. Resolves
+   * to the root once swapped, else null (no model yet, same look, superseded,
+   * or deferred while focus mode fades the ship).
    * @param {Ship} ship
    * @returns {Promise<BABYLON.Mesh | null>}
    */
@@ -517,10 +534,11 @@
     if (!entry || isSceneDisposed(scene, state)) return Promise.resolve(null);
     const hull = selectHull(manifestValue, ship);
     if (!hull) return Promise.resolve(null);
-    entry.wanted = hull.id; // also cancels a pending swap when the rank falls back
-    if (hull.id === entry.hull.id) return Promise.resolve(null);
+    const look = lookOf(hull, ship);
+    entry.wanted = look; // also cancels a pending swap when the rank falls back
+    if (look === entry.look) return Promise.resolve(null);
     return resolveAsset(scene, state, hull, entry.triangles).then((asset) => {
-      if (!asset || entry.wanted !== hull.id || isNodeDisposed(entry.root) ||
+      if (!asset || entry.wanted !== look || isNodeDisposed(entry.root) ||
           isSceneDisposed(scene, state) || isFaded(entry)) return null;
       return swapHull(scene, state, entry, hull, asset, ship) ? entry.root : null;
     }).catch(() => null);

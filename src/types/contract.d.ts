@@ -46,6 +46,8 @@ export interface Ship {
   attentionSince: number | null;
   /** Build events attributed to this ship since its source first observed it; picks its hull rank. */
   builds: number;
+  /** The session runs a local model (a Codex local model_provider, or a non-Claude model in Claude Code); tints the ship red. */
+  local: boolean;
   /** LIVE only. */
   taskId?: string | null;
   /** LIVE only. */

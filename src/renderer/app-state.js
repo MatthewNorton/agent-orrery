@@ -160,4 +160,6 @@
   };
 
   AUR.app = { state: S, const: C };
+  // Lets util.js's AUR.shipTint, which the scenes call with an id, see a ship's local flag.
+  AUR.shipLookup = (id) => S.store.ships.get(id) || null;
 })();

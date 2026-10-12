@@ -439,6 +439,7 @@ class ReplaySource extends EventEmitter {
         cwd: signal.cwd,
         kind: signal.kind,
         parentSessionId: codexParentSessionId(record.payload),
+        local: signal.local === true,
       };
       break;
     }
@@ -459,6 +460,7 @@ class ReplaySource extends EventEmitter {
       projectIdHint: null,
       kind: metadata.kind === 'drone' ? 'drone' : 'main',
       parentSessionId: metadata.parentSessionId,
+      local: metadata.local,
       startMs,
       endMs,
       size: inspected.size,
@@ -739,7 +741,9 @@ class ReplaySource extends EventEmitter {
       parentSessionId: record.entry.parentSessionId,
       projectIdHint: record.entry.projectIdHint,
       projectId: null,
+      local: record.entry.local === true,
     };
+    if (typeof signal.local === 'boolean') runtime.local = signal.local;
     if (signal.type === 'session') {
       runtime.sessionId = safeId(signal.sessionId) || runtime.sessionId;
       runtime.projectPath = safePath(signal.cwd) || runtime.projectPath;
@@ -754,6 +758,10 @@ class ReplaySource extends EventEmitter {
     this._runtimeBySource.set(record.sourceKey, runtime);
     const ship = this._ensureShip(runtime, record.ts, emit);
     if (!ship) return;
+    if (ship.local !== runtime.local) {
+      ship.local = runtime.local;
+      this._queue({ type: 'ship-updated', ship: publicShip(ship) }, emit);
+    }
     ship.lastEvent = Math.max(ship.lastEvent, record.ts);
     if (record.ts > project.lastActivity) {
       project.lastActivity = record.ts;
@@ -901,6 +909,7 @@ class ReplaySource extends EventEmitter {
         attention: null,
         attentionSince: null,
         builds: 0,
+        local: runtime.local,
       };
       this._ships.set(id, ship);
       this._queue({ type: 'ship-spawned', ship: publicShip(ship) }, emit);
@@ -931,6 +940,7 @@ class ReplaySource extends EventEmitter {
       attention: null,
       attentionSince: null,
       builds: 0,
+      local: parent.local === true,
     };
     this._ships.set(id, drone);
     this._queue({ type: 'ship-spawned', ship: publicShip(drone) }, emit);
@@ -1227,7 +1237,8 @@ function historicalClaudeSignals(entry, record, lineOffset, ts, sessionEmitted) 
       signals.push(signal('turn-end'));
     } else if (fact.type === 'message') {
       message = fact;
-      if ((fact.user && fact.prompt) || fact.assistant) signals.push(signal('turn-start'));
+      const local = fact.assistant && typeof fact.local === 'boolean' ? { local: fact.local } : {};
+      if ((fact.user && fact.prompt) || fact.assistant) signals.push(signal('turn-start', local));
       if (fact.blocks && fact.user && fact.text) signals.push(signal('turn-start'));
     } else if (fact.type === 'tool-start' && message.assistant) {
       const callId = safeId(fact.callId) || `line-${lineOffset.toString(16)}`;
@@ -1321,6 +1332,7 @@ function publicShip(ship) {
     attention: ship.attention,
     attentionSince: ship.attentionSince,
     builds: ship.builds,
+    local: ship.local === true,
   };
 }
 
