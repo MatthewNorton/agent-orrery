@@ -25,7 +25,7 @@ const PROJECT_KEYS = [
   'totalBuilds', 'totalBytes',
 ];
 const SHIP_KEYS = [
-  'attention', 'attentionSince', 'builds', 'detail', 'id', 'kind', 'lastEvent', 'name', 'project',
+  'attention', 'attentionSince', 'builds', 'detail', 'id', 'kind', 'lastEvent', 'local', 'name', 'project',
   'provider', 'status', 'taskId', 'turnOutcome',
 ];
 
@@ -99,7 +99,7 @@ test('claude: startup discovers the project from slug dir + cwd and docks a ship
   assert.deepEqual(startup[1].ship, {
     id: SHIP_ID, name: 'Claude-1', project: SLUG, kind: 'main', provider: 'claude',
     status: 'Working', detail: null, lastEvent: T0, attention: null, attentionSince: null,
-    builds: 0, taskId: null, turnOutcome: null,
+    builds: 0, local: false, taskId: null, turnOutcome: null,
   });
   // Startup scans never announce discoveries in the feed.
   assert.deepEqual(startup[2].entry, { kind: 'spawn', text: 'Claude-1 entered demo', project: SLUG, ts: T0 });
@@ -338,7 +338,7 @@ test('claude: Task and Agent tool_use launch drones that dock again on tool_resu
   assert.deepEqual(ofType(events, 'ship-spawned')[0].ship, {
     id: 'drone:toolu_task1', name: 'Claude-2', project: SLUG, kind: 'drone', provider: 'claude',
     status: 'Working', detail: null, lastEvent: T0 + 1 * SEC, attention: null, attentionSince: null,
-    builds: 0, taskId: null, turnOutcome: null,
+    builds: 0, local: false, taskId: null, turnOutcome: null,
   });
   assert.equal(ofType(events, 'ship-spawned')[1].ship.id, 'drone:toolu_agent1');
   assert.deepEqual(ofType(events, 'ship-departed').map(pick(['shipId', 'ts'])),
@@ -552,7 +552,7 @@ test('codex: session_meta at startup creates a project keyed by canonical cwd an
   assert.deepEqual(startup[1].ship, {
     id: CODEX_SHIP_ID, name: 'Codex-1', project: projectId, kind: 'main', provider: 'codex',
     status: 'Working', detail: null, lastEvent: T0, attention: null, attentionSince: null,
-    builds: 0, taskId: null, turnOutcome: null,
+    builds: 0, local: false, taskId: null, turnOutcome: null,
   });
   assert.equal(startup[2].entry.text, 'Codex-1 entered demo');
   assert.equal(tracker.snapshot().projects[0].totalBytes, fs.statSync(file).size,
@@ -813,7 +813,7 @@ test('signal: a watched file docks a generic ship from stat alone; its contents 
   assert.deepEqual(startup[1].ship, {
     id: shipId, name: 'Signal-1', project: projectId, kind: 'main', provider: 'generic',
     status: 'Working', detail: null, lastEvent: T0, attention: null, attentionSince: null,
-    builds: 0, taskId: null, turnOutcome: null,
+    builds: 0, local: false, taskId: null, turnOutcome: null,
   });
 
   world.clock.set(T0 + 5 * SEC);

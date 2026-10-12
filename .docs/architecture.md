@@ -27,7 +27,7 @@ draws it as a universe. It never controls the agents (two narrow exceptions in Â
 |---|---|
 | Solar system (sun) | A project folder (one per working directory) |
 | Galaxy | A group of projects that share a parent folder |
-| Starship | A live Claude / Codex session; its hull class rises with the edits it has made |
+| Starship | A live Claude (neon purple) / Codex (blue) session, red on a local model; its hull class rises with the edits it has made |
 | Drone | A Claude subagent (`Task`/`Agent` tool call) |
 | Planet | A top-level folder inside the project; it grows as the agent edits files in it |
 | Halo / "needs you" | A ship waiting on a question or permission |

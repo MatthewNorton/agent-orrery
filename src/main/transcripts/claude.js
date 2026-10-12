@@ -2,6 +2,7 @@
 'use strict';
 
 const { plainObject } = require('./fields');
+const { claudeModelIsLocal } = require('./model');
 
 const TOOL_STATUS = Object.freeze({
   Edit: 'Building', Write: 'Building', NotebookEdit: 'Building', MultiEdit: 'Building',
@@ -32,6 +33,8 @@ const SPAWN_TOOLS = new Set(['Agent', 'Task']);
  * @property {boolean} blocks The content is an array of blocks.
  * @property {boolean} text A block is text.
  * @property {boolean} toolResult A block is a tool result.
+ * @property {boolean | null} local An assistant message from a non-Claude (local) model; null
+ *   when the message names no model.
  *
  * @typedef {object} ClaudeToolStart
  * @property {'tool-start'} type
@@ -69,14 +72,16 @@ function claudeRecordToSignals(value) {
   if (!message || typeof message !== 'object') return signals;
   const content = message.content;
   const blocks = Array.isArray(content) ? content.filter(plainObject) : [];
+  const assistant = record.type === 'assistant' || message.role === 'assistant';
   signals.push({
     type: 'message',
-    assistant: record.type === 'assistant' || message.role === 'assistant',
+    assistant,
     user: record.type === 'user' || message.role === 'user',
     prompt: typeof content === 'string',
     blocks: Array.isArray(content),
     text: blocks.some((block) => block.type === 'text'),
     toolResult: blocks.some((block) => block.type === 'tool_result'),
+    local: assistant ? claudeModelIsLocal(message.model) : null,
   });
   for (const block of blocks) {
     if (block.type === 'tool_use') signals.push(toolStart(block));
