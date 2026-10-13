@@ -1,6 +1,7 @@
-// The live Tracker's own records (src/main/tracker.js); contract.d.ts has the public shapes.
+// The live Tracker's own records (src/main/tracker.js, src/main/live/); contract.d.ts has the
+// public shapes.
 
-import type { Attention } from './contract';
+import type { AUEvent, Attention, FeedEntry, SystemData } from './contract';
 
 export interface LiveProject {
   id: string;
@@ -39,4 +40,82 @@ export interface LiveShip {
   local: boolean;
   taskId?: string;
   turnOutcome?: string;
+}
+
+/** universe-state.json as an earlier run left it. */
+export interface PersistedState {
+  projects: Record<string, { buckets?: Record<string, number>; totalBuilds?: number; firstSeen?: number }>;
+  pathIds?: Record<string, string>;
+  pathOverrides?: Record<string, string>;
+}
+
+/**
+ * Where a transcript is being read. Claude tails keep a string remainder, provider tails a
+ * Buffer plus their adapter state.
+ */
+export interface LiveTail {
+  provider: string;
+  /** Project id. */
+  project: string;
+  session: string;
+  offset: number;
+  /** Reading a file found mid-run from zero: count builds, announce nothing. */
+  catchup: boolean;
+  remainder: any;
+  discardOversized?: boolean;
+  path?: string;
+  adapterState?: any;
+  kind?: 'main' | 'drone';
+  parentSessionId?: string | null;
+  local?: boolean;
+  seenSignals?: Set<string>;
+  missingScans?: number;
+}
+
+export interface LiveModelOptions {
+  claudeProjectsDir?: string;
+  codexSessionsDir?: string;
+  codexSessionDir?: string;
+  codexSessionDirs?: string[];
+  providerConfigPath?: string;
+}
+
+/** Everything the live modules share; src/main/live/model.js creates it. */
+export interface LiveModel {
+  statePath: string;
+  claudeProjectsDir: string;
+  codexSessionDirs: string[];
+  providerConfigPath: string;
+  /** Project id -> project record. */
+  projects: Map<string, LiveProject>;
+  /** Ship id -> ship record. */
+  ships: Map<string, LiveShip>;
+  /** Absolute transcript path -> tail, for every file polled. */
+  files: Map<string, LiveTail>;
+  /** Absolute Claude transcript path -> its tail, kept while the file is cold. */
+  claudeTails: Map<string, LiveTail>;
+  persisted: PersistedState;
+  /** Canonical project path -> project id, saved across runs. */
+  pathIds: Record<string, string>;
+  /** Project id -> a path the user recovered by hand, saved across runs. */
+  pathOverrides: Record<string, string>;
+  projectPathIndex: Map<string, string>;
+  codexTailsBySession: Map<string, LiveTail>;
+  codexMetaCache: Map<string, { size: number; mtimeMs: number; meta: any }>;
+  signalFiles: Map<string, { size: number; mtimeMs: number; sessionId: string }>;
+  providerWarnings: Set<string>;
+  /** Names Claude ships and drones: Claude-1, Claude-2, ... */
+  shipCounter: number;
+  /** Names provider ships per provider: Codex-1, Signal-1, ... */
+  providerCounters: Map<string, number>;
+  systemCache: Map<string, { at: number; data: SystemData }>;
+  /** Open tool call id -> id of the ship that issued it. */
+  pendingIndex: Map<any, string>;
+  /** Events queued since the last flush. */
+  pending: AUEvent[];
+  feed: FeedEntry[];
+  /** seq of the last queued event. */
+  eventSequence: number;
+  /** Hands a flushed batch to the Tracker's 'events' listeners. */
+  publish: (batch: AUEvent[]) => void;
 }
