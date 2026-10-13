@@ -6,6 +6,24 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
+const RENDERER = path.join(__dirname, '..', 'src', 'renderer');
+// The core loads first; the files after it extend AUR.shipAssets and publish AUR.ships.
+const SHIP_ASSET_FILES = [...fs.readFileSync(path.join(RENDERER, 'index.html'), 'utf8')
+  .matchAll(/<script src="(ship-assets[a-z-]*\.js)"><\/script>/g)].map((match) => match[1]);
+
+function loadShipAssetFiles(context) {
+  vm.createContext(context);
+  for (const file of SHIP_ASSET_FILES) {
+    vm.runInContext(fs.readFileSync(path.join(RENDERER, file), 'utf8'), context, { filename: file });
+  }
+}
+
+test('index.html loads every ship-assets file, the core first', () => {
+  const onDisk = fs.readdirSync(RENDERER).filter((file) => /^ship-assets.*\.js$/.test(file)).sort();
+  assert.equal(SHIP_ASSET_FILES[0], 'ship-assets.js');
+  assert.deepEqual([...SHIP_ASSET_FILES].sort(), onDisk);
+});
+
 test('shared hulls receive fixed provider palettes while signals and drones load no models', async () => {
   let containerLoads = 0;
   let materialClones = 0;
@@ -133,8 +151,7 @@ test('shared hulls receive fixed provider palettes while signals and drones load
       StandardMaterial: Material,
     },
   };
-  const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'ship-assets.js'), 'utf8');
-  vm.runInNewContext(source, context, { filename: 'ship-assets.js' });
+  loadShipAssetFiles(context);
 
   const scene = { uid: 'scene-1', isDisposed: () => false };
   const fallback = (id) => Object.assign(new Mesh('fallback-' + id), {
@@ -314,8 +331,7 @@ function loadShipAssets(manifest, trianglesByFile) {
       Color3: Color, Mesh, TransformNode, StandardMaterial: Material,
     },
   };
-  const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'ship-assets.js'), 'utf8');
-  vm.runInNewContext(source, context, { filename: 'ship-assets.js' });
+  loadShipAssetFiles(context);
   let sceneCount = 0;
   return {
     ships: AUR.ships,
