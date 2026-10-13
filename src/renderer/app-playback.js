@@ -3,7 +3,7 @@
 'use strict';
 
 /**
- * @import { ReplayCommand, ReplayResult, ReplayStatePush, Snapshot } from '../types/contract'
+ * @import { ReplayCommand, ReplayResult, ReplayStatePush } from '../types/contract'
  */
 
 (function () {
@@ -32,22 +32,6 @@
     S.retiredEpochs.add(String(value));
     while (S.retiredEpochs.size > 64) S.retiredEpochs.delete(S.retiredEpochs.values().next().value);
   }
-
-  /** @param {Snapshot} snap */
-  A.seedStore = function seedStore(snap) {
-    S.store.projects.clear();
-    S.store.ships.clear();
-    S.store.feed = [];
-    if (snap && Array.isArray(snap.projects)) {
-      for (const p of snap.projects) S.store.projects.set(p.id, p);
-    }
-    if (snap && Array.isArray(snap.ships)) {
-      for (const s of snap.ships) S.store.ships.set(s.id, s);
-    }
-    if (snap && Array.isArray(snap.feed)) {
-      S.store.feed = snap.feed.slice(-C.FEED_CAP);
-    }
-  };
 
   function finiteField(value, names, fallback) {
     for (const name of names) {
