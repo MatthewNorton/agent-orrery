@@ -33,6 +33,7 @@ const { proceduralSystem } = require('./universe/planets');
 const { liveProject, liveShip } = require('./universe/public-shape');
 const { createShipRecord } = require('./universe/ships');
 const { queue, pushFeed, flush, recentFeed } = require('./live/events');
+const { classifyAttention, evaluateAttention } = require('./live/attention');
 
 /**
  * @import { Attention, FeedEntry, PlanetData, Project, Ship, ShipStatus, SystemData }
@@ -53,48 +54,12 @@ const TICK_INTERVAL_MS = 5000;   // ship departure sweep
 const ACTIVE_WINDOW_MS = 5 * 60 * 1000;   // ship visible this long after last write
 const HOT_WINDOW_MS = 15 * 60 * 1000;     // only files this fresh get tailed
 const DRONE_TIMEOUT_MS = 15 * 60 * 1000;
-const QUESTION_PENDING_MS = 2_000;
-const FAST_PENDING_MS = 10_000;
-const SLOW_PENDING_MS = 180_000;
-const DONE_QUIET_MS = 10_000;
 const ATTENTION_LINGER_MS = 60 * 60 * 1000;
-const ASK_TOOLS = new Set(['AskUserQuestion', 'ExitPlanMode']);
-const LONG_TOOLS = new Set([
-  'Bash', 'PowerShell', 'BashOutput', 'TaskOutput', 'Agent', 'Task',
-  'Workflow', 'WebFetch', 'WebSearch', 'Monitor',
-]);
 
 const IGNORE_DIRS = new Set([
   'node_modules', '.git', '.next', '.venv', 'venv', 'dist', 'build', 'out',
   'release', 'coverage', 'target', '__pycache__', '.idea', '.vscode', 'bin', 'obj',
 ]);
-
-/**
- * @param {Pick<LiveShip, 'kind' | 'pending' | 'turnDone' | 'lastEvent'>} ship
- * @param {number} now
- * @returns {Attention | null}
- */
-function classifyAttention(ship, now) {
-  if (ship.kind === 'drone') return null;
-
-  for (const pending of ship.pending.values()) {
-    if (ASK_TOOLS.has(pending.tool) && now - pending.ts >= QUESTION_PENDING_MS) {
-      return 'question';
-    }
-  }
-  for (const pending of ship.pending.values()) {
-    if (!LONG_TOOLS.has(pending.tool) && now - pending.ts >= FAST_PENDING_MS) {
-      return 'permission';
-    }
-  }
-  for (const pending of ship.pending.values()) {
-    if (now - pending.ts >= SLOW_PENDING_MS) return 'stalled';
-  }
-  if (ship.pending.size === 0 && ship.turnDone === true && now - ship.lastEvent >= DONE_QUIET_MS) {
-    return 'done';
-  }
-  return null;
-}
 
 // Live reads a typed prompt, assistant blocks, or user blocks that answer no tool call as the
 // agent working again. History has its own rule (historicalClaudeSignals).
@@ -725,7 +690,7 @@ class Tracker extends EventEmitter {
       }
       if (tail.catchup && tail.offset >= st.size) tail.catchup = false;
     }
-    this.evaluateAttention(now);
+    evaluateAttention(this, now);
     flush(this);
   }
 
@@ -1114,33 +1079,9 @@ class Tracker extends EventEmitter {
     return ship;
   }
 
-  evaluateAttention(now) {
-    for (const ship of this.ships.values()) {
-      const next = classifyAttention(ship, now);
-      if (next === ship.attention) continue;
-
-      ship.attention = next;
-      ship.attentionSince = next ? now : null;
-      queue(this, { type: 'ship-updated', ship: liveShip(ship) });
-
-      if (!next) continue;
-      const project = this.projects.get(ship.project);
-      const projectName = project ? project.name : ship.project;
-      if (next === 'question') {
-        pushFeed(this, 'attention', `${ship.name} is asking you something in ${projectName}`, ship.project);
-      } else if (next === 'permission') {
-        pushFeed(this, 'attention', `${ship.name} needs permission in ${projectName}`, ship.project);
-      } else if (next === 'stalled') {
-        pushFeed(this, 'info', `${ship.name} may be stuck in ${projectName}`, ship.project);
-      } else if (next === 'done') {
-        pushFeed(this, 'done', `${ship.name} finished its task in ${projectName}`, ship.project);
-      }
-    }
-  }
-
   sweepShips() {
     const now = Date.now();
-    this.evaluateAttention(now);
+    evaluateAttention(this, now);
     for (const [id, ship] of this.ships) {
       const needsAttention = ship.attention === 'question' || ship.attention === 'permission';
       if (ship.kind !== 'drone' && needsAttention && now - ship.lastEvent <= ATTENTION_LINGER_MS) {
