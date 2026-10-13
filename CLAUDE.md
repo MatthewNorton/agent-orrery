@@ -9,6 +9,7 @@ Electron + Babylon.js desktop app that passively visualizes Claude Code / Codex 
 ## Commands
 
 - `npm start` — run the app
+- `npm run setup` — one-step install: dependencies if Electron is missing, the launcher shortcut for this OS, then opens the app. `Install Agent Orrery.cmd` / `.command` in the root run it
 - `npm test` — all tests (Node's built-in runner)
 - `node --test test/ship-assets.test.js` — single test file
 - `node kit/grade.mjs` — mechanical renderer regression gate; run after ANY renderer change, must stay green. Runs against the synthetic profile in `scripts/lib/synthetic-profile.mjs` (`--real` uses your own transcripts and app state) and replaces only its own files in `.shots/`

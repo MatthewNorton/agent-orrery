@@ -24,6 +24,15 @@ Built with Electron and Babylon.js. The renderer is fully offline — no network
 
 Requirements: Node.js 22.12 or newer and npm. Windows and macOS are first-class, including the terminal-launch integration (see `docs/WINDOWS-LAUNCH.md` and `docs/MACOS-LAUNCH.md`); Linux runs the viewer without terminal control.
 
+Get the code, then double-click the setup file in its folder:
+
+- **Windows:** `Install Agent Orrery.cmd`
+- **macOS:** `Install Agent Orrery.command`
+
+It installs the dependencies, adds an **Agent Orrery** shortcut (Desktop and Start menu on Windows, `~/Applications` on macOS), and opens the app. `npm run setup` does the same from a terminal. Run it again after moving the folder.
+
+To run it from a terminal without shortcuts, or on Linux:
+
 ```sh
 npm install
 npm start
