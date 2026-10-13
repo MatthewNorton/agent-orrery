@@ -114,7 +114,7 @@ function assertShortcutSet(id, inspected, expectedRoot, expectedElectron, expect
     if (!samePath(link.workingDirectory, expectedRoot)) {
       fail(id, `${link.path} working directory ${link.workingDirectory} != ${expectedRoot}`);
     }
-    if (link.description !== 'Launch Agent Universe Lite') {
+    if (link.description !== 'Launch Agent Orrery') {
       fail(id, `${link.path} description is ${JSON.stringify(link.description)}`);
     }
     if (Number(link.windowStyle) !== 1) fail(id, `${link.path} window style is ${link.windowStyle}`);
@@ -176,7 +176,7 @@ function validateIco(iconPath) {
 
   const preview = frames.at(-1);
   fs.writeFileSync(path.join(outDir, 'icon-preview.png'), bytes.subarray(preview.offset, preview.offset + preview.size));
-  fs.copyFileSync(iconPath, path.join(outDir, 'agent-universe-lite.ico'));
+  fs.copyFileSync(iconPath, path.join(outDir, 'agent-orrery.ico'));
   return { bytes: bytes.length, sha256: sha256(bytes), frames };
 }
 
@@ -299,8 +299,8 @@ if (failures.length === 0) {
     tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'aur-packaging-'));
     const desktop = path.join(tempRoot, 'Desktop With Spaces & Orbit');
     const programs = path.join(tempRoot, 'Start Menu (Programs)');
-    const startApp = path.join(programs, 'Agent Universe Lite');
-    const support = path.join(tempRoot, 'Local App Data', 'Agent Universe Lite');
+    const startApp = path.join(programs, 'Agent Orrery');
+    const support = path.join(tempRoot, 'Local App Data', 'Agent Orrery');
     fs.mkdirSync(desktop, { recursive: true });
     fs.mkdirSync(programs, { recursive: true });
     if (fs.existsSync(startApp) || fs.existsSync(support)) {
@@ -314,7 +314,7 @@ if (failures.length === 0) {
     try { fs.linkSync(actualElectron, fakeElectron); }
     catch { fs.copyFileSync(actualElectron, fakeElectron); }
     fs.writeFileSync(path.join(fakeRoot, 'package.json'), JSON.stringify({
-      name: 'agent-universe-lite', main: 'src/main/main.js',
+      name: 'agent-orrery', main: 'src/main/main.js',
     }, null, 2));
     const fakeMain = path.join(fakeRoot, 'src', 'main', 'main.js');
     fs.mkdirSync(path.dirname(fakeMain), { recursive: true });
@@ -360,9 +360,9 @@ try {
 }
 `);
 
-    const desktopLink = path.join(desktop, 'Agent Universe Lite.lnk');
-    const startLink = path.join(startApp, 'Agent Universe Lite.lnk');
-    const iconPath = path.join(support, 'agent-universe-lite.ico');
+    const desktopLink = path.join(desktop, 'Agent Orrery.lnk');
+    const startLink = path.join(startApp, 'Agent Orrery.lnk');
+    const iconPath = path.join(support, 'agent-orrery.ico');
 
     const first = runPowerShellFile(scriptPath,
       installerArgs(null, fakeRoot, desktop, programs, support), tempRoot);
@@ -374,11 +374,11 @@ try {
         listExtension(support, '.ico').length !== 1) {
       fail('W1', 'isolated install created duplicate or unexpected shortcut/icon artifacts');
     }
-    assertTree('W1', 'fresh Desktop', desktop, ['F:Agent Universe Lite.lnk']);
+    assertTree('W1', 'fresh Desktop', desktop, ['F:Agent Orrery.lnk']);
     assertTree('W1', 'fresh Programs', programs, [
-      'D:Agent Universe Lite', 'F:Agent Universe Lite/Agent Universe Lite.lnk',
+      'D:Agent Orrery', 'F:Agent Orrery/Agent Orrery.lnk',
     ]);
-    assertTree('W1', 'fresh support', support, ['F:agent-universe-lite.ico']);
+    assertTree('W1', 'fresh support', support, ['F:agent-orrery.ico']);
     const initial = inspectShortcuts(inspectorPath, desktopLink, startLink, iconPath);
     assertShortcutSet('W1', initial, fakeRoot, fakeElectron, iconPath);
     const ico = validateIco(iconPath);
@@ -414,14 +414,14 @@ try {
     const secondHash = sha256(fs.readFileSync(iconPath));
     if (secondHash !== ico.sha256) fail('W3', 'procedural ICO bytes changed across identical installs');
     assertTree('W2', 'idempotent Desktop', desktop, [
-      'F:Agent Universe Lite.lnk', 'F:unrelated-desktop.lnk', 'F:unrelated-desktop.txt',
+      'F:Agent Orrery.lnk', 'F:unrelated-desktop.lnk', 'F:unrelated-desktop.txt',
     ]);
     assertTree('W2', 'idempotent Programs', programs, [
-      'D:Agent Universe Lite', 'F:Agent Universe Lite/Agent Universe Lite.lnk',
-      'F:Agent Universe Lite/unrelated-start.lnk', 'F:Agent Universe Lite/unrelated-start.txt',
+      'D:Agent Orrery', 'F:Agent Orrery/Agent Orrery.lnk',
+      'F:Agent Orrery/unrelated-start.lnk', 'F:Agent Orrery/unrelated-start.txt',
     ]);
     assertTree('W2', 'idempotent support', support, [
-      'F:agent-universe-lite.ico', 'F:unrelated-support.ico', 'F:unrelated-support.txt',
+      'F:agent-orrery.ico', 'F:unrelated-support.ico', 'F:unrelated-support.txt',
     ]);
 
     const reboundRun = runPowerShellFile(scriptPath,
@@ -447,8 +447,8 @@ try {
       'F:unrelated-desktop.lnk', 'F:unrelated-desktop.txt',
     ]);
     assertTree('W2', 'uninstalled Programs', programs, [
-      'D:Agent Universe Lite', 'F:Agent Universe Lite/unrelated-start.lnk',
-      'F:Agent Universe Lite/unrelated-start.txt',
+      'D:Agent Orrery', 'F:Agent Orrery/unrelated-start.lnk',
+      'F:Agent Orrery/unrelated-start.txt',
     ]);
     assertTree('W2', 'uninstalled support', support, [
       'F:unrelated-support.ico', 'F:unrelated-support.txt',
@@ -471,7 +471,7 @@ try {
 
     const missingRoot = path.join(tempRoot, 'Missing Electron Repo');
     fs.mkdirSync(missingRoot);
-    fs.writeFileSync(path.join(missingRoot, 'package.json'), JSON.stringify({ name: 'agent-universe-lite' }));
+    fs.writeFileSync(path.join(missingRoot, 'package.json'), JSON.stringify({ name: 'agent-orrery' }));
     const failDesktop = path.join(tempRoot, 'Failure Desktop');
     const failPrograms = path.join(tempRoot, 'Failure Programs');
     const failSupport = path.join(tempRoot, 'Failure Support');
@@ -493,7 +493,7 @@ try {
     const wrongPackage = runPowerShellFile(scriptPath,
       installerArgs('Install', wrongRoot, wrongDesktop, wrongPrograms, wrongSupport), tempRoot);
     if (wrongPackage.status === 0) fail('W2', 'wrong package identity unexpectedly succeeded');
-    if (!/Agent Universe Lite|agent-universe-lite/i.test(`${wrongPackage.stdout}\n${wrongPackage.stderr}`)) {
+    if (!/Agent Orrery|agent-orrery/i.test(`${wrongPackage.stdout}\n${wrongPackage.stderr}`)) {
       fail('W2', 'wrong package identity failure is not actionable');
     }
     if ([wrongDesktop, wrongPrograms, wrongSupport].some((dir) => fs.existsSync(dir))) {

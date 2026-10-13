@@ -253,12 +253,12 @@ function buildTaskPrompt(input, taskText = null) {
   const taskContext = typeof text === 'string' && text.length > 0
     ? `\n\nThe tagged task text is:\n${text}` : '';
   return [
-    'Complete one Agent Universe task in this repository.',
+    'Complete one Agent Orrery task in this repository.',
     `The exact task marker is\nagent-universe:${canonicalId}`,
     'Read and follow the repository instructions and GOALS.md before making changes.',
     'Work only on the TODO item tagged with that exact marker.',
     'Implement the task and validate the result with the relevant tests or checks.',
-    'Leave the task checkbox unchanged; Agent Universe will mark it complete when you finish.',
+    'Leave the task checkbox unchanged; Agent Orrery will mark it complete when you finish.',
   ].join('\n') + taskContext;
 }
 

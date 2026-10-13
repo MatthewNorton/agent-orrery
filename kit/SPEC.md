@@ -1,4 +1,4 @@
-# Agent Universe Lite — live app and renderer spec
+# Agent Orrery — live app and renderer spec
 
 The Electron main process passively watches Claude Code and Codex transcript
 JSONL files plus explicitly configured metadata-only Signal directories, then

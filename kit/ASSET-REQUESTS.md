@@ -14,11 +14,11 @@ Format per entry:
 ```
 
 ## agent-universe-windows-icon
-- Purpose: Branded icon for the Agent Universe Lite Desktop and Start-menu
+- Purpose: Branded icon for the Agent Orrery Desktop and Start-menu
   shortcuts.
 - Suggested spec: Transparent multi-resolution Windows `.ico` with 16, 24,
   32, 48, 64, 128, and 256 px 32-bit RGBA frames, matching the dark
   navy/purple/cyan/gold universe UI.
 - Plugs in at: `scripts/windows-shortcuts.ps1` in
-  `New-AgentUniverseIcon`; until supplied, that function generates the
+  `New-AgentOrreryIcon`; until supplied, that function generates the
   deterministic orbit-glyph fallback outside the repository.

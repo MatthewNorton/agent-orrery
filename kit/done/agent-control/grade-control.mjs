@@ -89,8 +89,9 @@ if (!fs.existsSync(launcherPath)) {
 // 2026-09-28 re-pinned: src/renderer/index.html — kit 13 task B: app-ideas split
 // 2026-09-28 re-pinned: src/renderer/index.html — kit 13 task B: app-project-tasks split
 // 2026-10-12 re-pinned: src/renderer/util.js — provider colors: Claude neon purple, Codex blue, local models red; AUR.shipTint resolves a ship's local flag (owner request 2026-10-12)
+// 2026-10-12 re-pinned: src/renderer/index.html — rename: window title Agent Universe -> Agent Orrery (owner request 2026-10-12)
 const frozen = new Map([
-  ['src/renderer/index.html', '5f871aab64e18bfbd9e827a201d149495d3f82c69daa6deae8ee1ffd6e234ca8'],
+  ['src/renderer/index.html', '187016679c165493a0c085531c4412689dfe5a50a0093b2664b9dfec170abc98'],
   ['src/renderer/util.js', 'e1b1928ebc9b6d3c56db9f3e2317c1caa76ff8827c31df85555ff59054981916'],
   ['src/renderer/scene-universe.js', '61ff27fa53ea8ca6d3d944c29ece4f9f82aa46fea53321df0e01d1e82b1a5b3a'],
   ['src/renderer/scene-system.js', '1819bfc26082fd06f4035a98197821808d35c8826d29fb962764d65ed4a8968b'],

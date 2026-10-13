@@ -1,6 +1,6 @@
 # UX improvement backlog
 
-Captured from the July 2026 UX review. The goal is to evolve Agent Universe
+Captured from the July 2026 UX review. The goal is to evolve Agent Orrery
 from a beautiful passive visualization into a command deck that remains
 glanceable, useful, and small enough to maintain.
 
@@ -47,7 +47,7 @@ exploration feels deliberate and accidental navigation is less likely.
 
 Implement the planned universe-to-system warp and system-to-planet swoop.
 Keep orientation predictable with a breadcrumb such as
-`Universe / agent-universe-lite / kit` and provide a Reset Camera action.
+`Universe / agent-orrery / kit` and provide a Reset Camera action.
 Cinematic camera choreography should remain the boundary; free flight stays
 out of scope.
 
