@@ -35,6 +35,8 @@ export interface LiveShip {
   attentionSince: number | null;
   /** Build events attributed to this ship, counted during catch-up too. */
   builds: number;
+  /** Learned from the transcript (Codex session_meta.model_provider, Claude message.model). */
+  local: boolean;
   taskId?: string;
   turnOutcome?: string;
 }

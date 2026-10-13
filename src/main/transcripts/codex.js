@@ -2,6 +2,7 @@
 'use strict';
 
 const { plainObject, safeId, safePath, firstTrimmed } = require('./fields');
+const { codexProviderIsLocal } = require('./model');
 
 const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/ig;
 const MAX_BUILD_FILES = 256;
@@ -53,7 +54,8 @@ function codexRecordToSignals(record) {
     const fallbackDrone = threadSource === null
       && Boolean(safePath(payload.agent_path) || safeId(payload.parent_thread_id) || nestedSubagent);
     const kind = threadSource === 'subagent' || fallbackDrone ? 'drone' : 'main';
-    return [withTs({ type: 'session', sessionId, cwd, kind })];
+    const local = codexProviderIsLocal(payload.model_provider);
+    return [withTs({ type: 'session', sessionId, cwd, kind, ...(local === null ? {} : { local }) })];
   }
 
   if (recordType === 'response_item') {

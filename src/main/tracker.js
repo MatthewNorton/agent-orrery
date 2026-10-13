@@ -686,11 +686,12 @@ class Tracker extends EventEmitter {
           adapterState,
           kind: meta.kind,
           parentSessionId: meta.parentSessionId || null,
+          local: meta.local,
         };
         this.files.set(fp, tail);
         this.codexTailsBySession.set(sessionId, tail);
         if (isStartup && now - st.mtimeMs < ACTIVE_WINDOW_MS) {
-          this.ensureProviderShip('codex', project.id, sessionId, meta.kind, st.mtimeMs, meta.parentSessionId);
+          this.setLocal(this.ensureProviderShip('codex', project.id, sessionId, meta.kind, st.mtimeMs, meta.parentSessionId), meta.local);
         }
       } else {
         tail.project = project.id;
@@ -940,12 +941,13 @@ class Tracker extends EventEmitter {
           );
           if (project) tail.project = project.id;
         }
+        if (typeof signal.local === 'boolean') tail.local = signal.local;
         if (tail.project) {
-          this.ensureProviderShip(
+          this.setLocal(this.ensureProviderShip(
             provider, tail.project, sessionId,
             signal.kind || tail.kind || 'main', ts,
             signal.parentSessionId || tail.parentSessionId
-          );
+          ), tail.local);
         }
         continue;
       }
@@ -956,6 +958,7 @@ class Tracker extends EventEmitter {
         signal.parentSessionId || tail.parentSessionId
       );
       if (!ship) continue;
+      this.setLocal(ship, tail.local);
       ship.lastEvent = Math.max(ship.lastEvent, ts);
 
       if (signal.type === 'task-claim') {
@@ -1083,6 +1086,7 @@ class Tracker extends EventEmitter {
       } else if (signal.type === 'message') {
         message = signal;
         if (resumesTurn(signal)) ship.turnDone = false;
+        this.setLocal(ship, signal.local);
       } else if (signal.type === 'tool-start') {
         if (message.assistant && signal.callId) {
           // A tool_use id belongs to the ship that issued it last.
@@ -1190,6 +1194,7 @@ class Tracker extends EventEmitter {
       attention: null,
       attentionSince: null,
       builds: 0,
+      local: parent.local === true,
     };
     this.ships.set(id, drone);
     this.queue({ type: 'ship-spawned', ship: publicShip(drone) });
@@ -1215,12 +1220,24 @@ class Tracker extends EventEmitter {
         attention: null,
         attentionSince: null,
         builds: 0,
+        local: false,
       };
       this.ships.set(id, ship);
       this.queue({ type: 'ship-spawned', ship: publicShip(ship) });
       this.pushFeed('spawn', `${ship.name} entered ${project ? project.name : projectId}`, projectId);
     }
     return ship;
+  }
+
+  /**
+   * Records whether a ship runs a local model, learned from its transcript, and announces a change.
+   * @param {LiveShip | null} ship
+   * @param {unknown} local
+   */
+  setLocal(ship, local) {
+    if (!ship || typeof local !== 'boolean' || ship.local === local) return;
+    ship.local = local;
+    this.queue({ type: 'ship-updated', ship: publicShip(ship) });
   }
 
   ensureProviderShip(providerValue, projectId, sessionId, kind, ts, parentSessionId) {
@@ -1248,6 +1265,7 @@ class Tracker extends EventEmitter {
         attention: null,
         attentionSince: null,
         builds: 0,
+        local: false,
       };
       this.ships.set(id, ship);
       this.queue({ type: 'ship-spawned', ship: publicShip(ship) });
@@ -1474,6 +1492,7 @@ function readCodexOwnMetadata(file, sessionId) {
         cwd: session.cwd,
         parentSessionId: codexParentSessionId(payload),
         kind: session.kind,
+        local: session.local,
         timestamp: session.ts || 0,
       };
       if (recordSessionId === sessionId) return result;
@@ -1529,7 +1548,7 @@ function publicShip(s) {
     id: s.id, name: s.name, project: s.project, kind: s.kind,
     provider: normalizeProvider(s.provider || 'claude'),
     status: /** @type {ShipStatus} */ (s.status), detail: s.detail, lastEvent: s.lastEvent,
-    attention: s.attention, attentionSince: s.attentionSince, builds: s.builds,
+    attention: s.attention, attentionSince: s.attentionSince, builds: s.builds, local: s.local === true,
     taskId: typeof s.taskId === 'string' ? s.taskId : null,
     turnOutcome: typeof s.turnOutcome === 'string' ? s.turnOutcome : null,
   };
