@@ -1,7 +1,6 @@
 // Item 07 gate: safe live-only Windows Terminal action plus real rendered proof.
 // Run from anywhere; exit 0 = PASS, 1 = FAIL.
 import assert from 'node:assert/strict';
-import crypto from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -26,12 +25,6 @@ function read(rel) {
   const file = path.join(root, rel);
   if (!fs.existsSync(file)) { fail('C0', `missing ${rel}`); return ''; }
   return fs.readFileSync(file, 'utf8');
-}
-function sha256(file) {
-  // Hash with line endings normalized to LF so the pins hold on every platform and
-  // every core.autocrlf setting (a fresh Windows checkout is CRLF, macOS/Linux are LF).
-  const text = fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n');
-  return crypto.createHash('sha256').update(text).digest('hex');
 }
 function withTimeout(promise, ms, fallback) {
   let timer;
@@ -72,45 +65,7 @@ if (!fs.existsSync(launcherPath)) {
   process.exit(1);
 }
 
-// Baseline re-pinned 2026-09-04 to main after PR #24 (macOS support + security
-// hardening). Later kits legitimately moved these files; the hashes track the
-// state each subsequent kit must not regress from.
-// src/main/tracker.js, replay-source.js and provider-adapters.js are no longer pinned: they
-// were unfrozen to give live and replay one transcript parser (CLAUDE.md, Frozen files).
-// All hashes re-pinned 2026-09-27 as LF-normalized digests (docs/PUBLIC-RELEASE-TASKS.md
-// item 5.6); file contents are unchanged from the previous pins.
-// package.json and package-lock.json re-pinned 2026-09-27 after Dependabot #27 (Babylon 9.28) and #30 (Electron 44).
-// 2026-09-28 re-pinned: src/renderer/index.html — kit 13 task 0: app-state/app-agent-focus split
-// 2026-09-28 re-pinned: src/renderer/index.html — kit 13 task B: app-playback split
-// 2026-09-28 re-pinned: src/renderer/index.html — kit 13 task B: app-chrome split
-// 2026-09-28 re-pinned: src/renderer/index.html — kit 13 task B: app-project-search split
-// 2026-09-28 re-pinned: src/renderer/index.html — kit 13 task B: app-project-settings split
-// 2026-09-28 re-pinned: src/renderer/index.html — kit 13 task B: app-project-control split
-// 2026-09-28 re-pinned: src/renderer/index.html — kit 13 task B: app-ideas split
-// 2026-09-28 re-pinned: src/renderer/index.html — kit 13 task B: app-project-tasks split
-// 2026-10-12 re-pinned: src/renderer/util.js — provider colors: Claude neon purple, Codex blue, local models red; AUR.shipTint resolves a ship's local flag (owner request 2026-10-12)
-// 2026-10-12 re-pinned: src/renderer/index.html — rename: window title Agent Universe -> Agent Orrery (owner request 2026-10-12)
-// 2026-10-13 re-pinned: src/renderer/scene-universe.js, src/renderer/scene-system.js, src/renderer/scene-planet.js — ship heading: ships face along their orbit either way round (owner request 2026-10-13)
-// 2026-10-13 re-pinned: src/renderer/index.html — rename: header brand AGENT UNIVERSE -> AGENT ORRERY (owner request 2026-10-12)
-const frozen = new Map([
-  ['src/renderer/index.html', '786fc802bbf5e221500097c83c509e3888c486131c626ced7fcca8f285500bbc'],
-  ['src/renderer/util.js', 'e1b1928ebc9b6d3c56db9f3e2317c1caa76ff8827c31df85555ff59054981916'],
-  ['src/renderer/scene-universe.js', 'b06fa399c4b9956e5f80e95243bbe87d2231bbc1596508048600cd2f907b8512'],
-  ['src/renderer/scene-system.js', 'bdc6fa72462f90fda83de476477a809116047701843099243a3db7b10fea14f1'],
-  ['src/renderer/scene-planet.js', 'd532fe6937c054c4e1c5563d3bdefa11c1e7486fd4176c792a4d69283cf5747f'],
-  ['src/renderer/galaxy-layout.js', '3b6456404bea666a2b7d6e0db5b5c57190b3a67b7c383786beb4d8fb7e76ea39'],
-  ['src/renderer/polish-math.js', '2d8c154844aa89aeb3d666a8be1e1583cae45f42ce2d8f6ca75c5c17e02385ef'],
-]);
-for (const [rel, expected] of frozen) {
-  const file = path.join(root, rel);
-  if (!fs.existsSync(file)) fail('C0', `frozen file missing: ${rel}`);
-  else if (sha256(file) !== expected) fail('C0', `frozen file changed: ${rel}`);
-}
-// 2026-09-28: package.json and package-lock.json are no longer fingerprinted. Dependabot
-// changes them routinely, and the rule this gate protects is "no new dependencies", so
-// the dependency NAMES are pinned instead: version bumps pass, an added package fails.
-// package-lock.json needs no pin of its own: `npm ci` refuses a lockfile that disagrees
-// with package.json.
+// No new dependencies without asking: version bumps pass, an added package fails.
 const FROZEN_DEPENDENCY_NAMES = ['babylonjs', 'babylonjs-gui', 'babylonjs-loaders', 'electron', 'typescript'];
 {
   const pkg = JSON.parse(read('package.json') || '{}');

@@ -212,7 +212,7 @@ in a closure, and anything shared is a field of `ctx`.
 | `window-security.js` | 55 | functions | Navigation / pop-up / permission lockdown, trusted-frame check | — |
 | `shared/bounded-process.js` | 96 | function | One child-process runner with a timeout and output cap (git and gh) | `shared/values` |
 | `shared/atomic-write.js` | 28 | function | Temp file + rename write (`GOALS.md`, IDEAS and run stores, `universe-state.json`) | — |
-| `shared/hash.js` | 47 | functions | `fnv1a`, `hex8`, `mulberry32` (the renderer keeps hash-pinned copies) | — |
+| `shared/hash.js` | 47 | functions | `fnv1a`, `hex8`, `mulberry32` (the renderer keeps its own copies) | — |
 | `shared/values.js` | 25 | functions | `boundedInteger`, `ownString`, `bufferValue` | — |
 | `shared/ids.js` | 23 | functions | `validProjectId`, `validGoalId`, control-character check | — |
 
@@ -302,7 +302,7 @@ sequenceDiagram
 **Project identity.** Claude: the project id is the `~/.claude/projects/<slug>` folder name
 (unless the canonical cwd is already known). Codex / Signal: canonical path key → known id, or
 `project:<fnv1a(key)>`. The renderer seeds all randomness from `fnv1a(project.id)` — the main
-process has it in `shared/hash.js`; `util.js` and `galaxy-layout.js` keep hash-pinned copies.
+process has it in `shared/hash.js`; `util.js` and `galaxy-layout.js` keep their own copies.
 
 **Event vocabulary** (`au:events` batch; every event has `seq`):
 
@@ -504,7 +504,6 @@ There are four layers of checking, and only the first three run in CI.
 | Layer | Command | Runs Electron? | In CI? |
 |---|---|---|---|
 | Unit tests (43 files) | `npm test` | No | **Yes** (Ubuntu + Windows) |
-| Frozen-file pin check | `node kit/repin.mjs --check` | No | **Yes** |
 | Type check (JSDoc, files starting `// @ts-check`) | `npm run typecheck` | No | **Yes** |
 | Renderer regression gate | `node kit/grade.mjs` | Yes (`--shots`, on a synthetic profile; `--real` for your own data) | No |
 | 12 archived kit gates | `node kit/done/<kit>/grade-*.mjs` | Most do | No |
@@ -518,8 +517,8 @@ There are four layers of checking, and only the first three run in CI.
 | `packaging/grade-packaging.mjs` | Windows shortcuts; **fails if the working tree has changes outside its own files, untracked ones included** | PowerShell, Windows only |
 | `galaxy-grouping/grade-galaxies.mjs` | galaxy derivation and layout metrics | `--polish-test` |
 | `multi-provider/grade-providers.mjs` | adapters, privacy sentinel, provider rendering | `--provider-test` |
-| `history-playback/grade-history.mjs` | **hash pins**, replay fixtures, scrubber | `--history-test` |
-| `agent-control/grade-control.mjs` | **hash pins**, terminal spec, LIVE-only gating | `--control-test` |
+| `history-playback/grade-history.mjs` | replay fixtures, scrubber, no new dependencies | `--history-test` |
+| `agent-control/grade-control.mjs` | terminal spec, LIVE-only gating, no new dependencies | `--control-test` |
 | `project-tasks/grade-tasks.mjs` | `GOALS.md` parse / write, then `grade.mjs` | fixtures + `--shots` |
 | `project-search/grade-search.mjs` | ranking, then `grade.mjs` | fixtures + `--shots` |
 | `ship-assets-pack/grade-ships.mjs` | manifest schema, loader pin, then `grade.mjs` | static + `--shots` |
@@ -529,13 +528,12 @@ There are four layers of checking, and only the first three run in CI.
 Six of the older gates grep "the main process" by concatenating every `.js` file under `src/main`,
 so they keep passing wherever code moves inside that folder.
 
-**How "frozen" is actually enforced.** The control and history gates store SHA-256 hashes of
-7 renderer files: `index.html`, `util.js`, the three `scene-*.js`, `galaxy-layout.js`,
-`polish-math.js`. Editing any of them means running `node kit/repin.mjs --note "<why>"`, or CI
-turns red. `preload.js` — which `CLAUDE.md` lists as frozen — is **not** hashed. `tracker.js`,
-`replay-source.js` and `provider-adapters.js` are no longer frozen or pinned; `grade-main-split.mjs`
-caps `tracker.js` and `replay-source.js` at the size they had when they were unfrozen, and
-`provider-adapters.js` at the usual 450 lines.
+**How "frozen" is enforced.** By review, not by the gates: the **Frozen files** bullet in
+`CLAUDE.md` lists what changes only on the owner's request. Until October 2026 two gates also
+stored SHA-256 fingerprints of 7 renderer files; they were retired because every edit needed a
+re-pin step and the fingerprints caught nothing the PR diff doesn't show. The control and
+history gates still fail if a dependency is added. `grade-main-split.mjs` caps `tracker.js` and
+`replay-source.js` at the size they had when they were unfrozen, and other modules at 450 lines.
 
 ---
 
@@ -558,8 +556,8 @@ not reproduced.
    (`resumesTurn`, `claudeTool`) and history (`historicalClaudeSignals`, `classifyTool`) still
    read its facts differently; the `differs:` tests in `tracker-replay-parity.test.js` name each
    difference (§5.5).
-6. `fnv1a` / `mulberry32`: one main-process copy (`shared/hash.js`) plus hash-pinned copies in
-   `util.js` and `galaxy-layout.js`.
+6. `fnv1a` / `mulberry32`: one main-process copy (`shared/hash.js`) plus copies in the classic
+   renderer scripts `util.js` and `galaxy-layout.js`.
 7. "Is path inside folder": 4 variants that really do answer differently (`isInsidePath`,
    `isPathInside` — which accepts UNC roots and long paths — `isInside`, which treats an equal
    path as outside, and `relativeInside`, whose callers choose the separator).
@@ -575,8 +573,7 @@ not reproduced.
     names (`ucam` / `scam` / `pcam`).
 13. Four `docs/*.md` files and a section of `kit/ASSET-REQUESTS.md` are gate fixtures —
     editing their wording can fail a gate.
-14. The frozen list (`CLAUDE.md`) and what the hashes enforce (§9) disagree: `index.html` and
-    `util.js` are pinned though editable, `preload.js` is frozen but not pinned.
+14. *(resolved)* The file fingerprints are retired; the frozen list in `CLAUDE.md` is the only one.
 15. Line caps in `grade-structure.mjs` equal the current sizes (971 / 618): adding one line to
     either scene fails the gate.
 16. *(resolved)* `kit/grade.mjs` replaces only its own files in `.shots/`.
@@ -629,7 +626,7 @@ not reproduced.
 |---|---|
 | Kit | A contract + grading script handed to an agent to build one feature. Finished ones keep only their gate, in `kit/done/`. |
 | Gate | A `grade-*.mjs` script that exits 0 / 1. |
-| Frozen / pinned | A file whose SHA-256 is stored in a gate; edits need `kit/repin.mjs`. |
+| Frozen | A file that changes only on the owner's request (`CLAUDE.md`, Frozen files). |
 | `ctx` | The one shared object in the main process (`app-context.js`); holds the window, sources and services. |
 | LIVE / REPLAY | Whether the window shows the Tracker or the history ReplaySource. |
 | Epoch | Counter that increments on every LIVE ↔ REPLAY switch; stale batches are dropped. |

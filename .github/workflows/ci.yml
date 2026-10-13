@@ -30,9 +30,5 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci --ignore-scripts  # unit tests never launch Electron; skip its download
-      # Frozen-file pins in the two hash-pinning kit gates must match the tree, so a PR
-      # that edits a frozen file turns red here with the file named, instead of failing
-      # a local gate run later.
-      - run: node kit/repin.mjs --check
       - run: npm run typecheck
       - run: npm test
