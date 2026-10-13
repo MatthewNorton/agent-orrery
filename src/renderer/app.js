@@ -1,5 +1,5 @@
 // @ts-check
-// app.js — boot, view stack, event routing, overlay DOM chrome, debug hooks.
+// app.js — boot, event routing, view switching, debug hooks.
 'use strict';
 
 /**
@@ -125,7 +125,7 @@
     if (S.activeView && typeof S.activeView.update === 'function') {
       try { S.activeView.update([event]); } catch (error) { AUR.log('VCS view update failed'); }
     }
-    scheduleChrome(CHROME_PROJECT | CHROME_SEARCH | CHROME_DIRECTORY);
+    A.scheduleChrome(C.CHROME.PROJECT | C.CHROME.SEARCH | C.CHROME.DIRECTORY);
   }
 
   /**
@@ -174,8 +174,8 @@
       }
       const previous = ev.type === 'project-updated' && ev.project
         ? S.store.projects.get(ev.project.id) : null;
-      applyEvent(ev);
-      chromeMask |= chromeMaskFor(ev);
+      A.applyEvent(ev);
+      chromeMask |= A.chromeMaskFor(ev);
       if (previous && ev.type === 'project-updated' && previous.exists === false &&
           ev.project.exists === true &&
           S.current.view !== 'universe' && S.current.projectId === ev.project.id) {
@@ -185,129 +185,15 @@
     if (S.activeView && S.activeView.update) {
       try { S.activeView.update(batch); } catch (e) { AUR.log('view update err', e && e.message); }
     }
-    A.refreshShipHulls(workedShipIds(batch));
+    A.refreshShipHulls(A.workedShipIds(batch));
     if (S.agentFocus.shipId && !S.store.ships.has(S.agentFocus.shipId)) {
       A.exitAgentFocus(false);
     }
     // Project creation is rare and its live-region announcement should not
     // wait behind a busy scene/chrome animation frame.
-    if (chromeMask & CHROME_HISTORY) A.renderHistory();
-    scheduleChrome(chromeMask);
+    if (chromeMask & C.CHROME.HISTORY) A.renderHistory();
+    A.scheduleChrome(chromeMask);
     if (recoveredRoute) queueMicrotask(() => A.rebuildRoute(recoveredRoute));
-  }
-
-  const CHROME_AGENTS = 1 << 0;
-  const CHROME_FEED = 1 << 1;
-  const CHROME_SUMMARY = 1 << 2;
-  const CHROME_PROJECT = 1 << 3;
-  const CHROME_PLANET = 1 << 4;
-  const CHROME_RECENT = 1 << 5;
-  const CHROME_SEARCH = 1 << 6;
-  const CHROME_SETTINGS = 1 << 7;
-  const CHROME_DIRECTORY = 1 << 8;
-  const CHROME_IDEAS = 1 << 9;
-  const CHROME_FOCUS = 1 << 10;
-  const CHROME_HISTORY = 1 << 11;
-
-  /** @param {AUEvent} ev */
-  function chromeMaskFor(ev) {
-    if (ev.type === 'ship-spawned' || ev.type === 'ship-updated' || ev.type === 'ship-departed') {
-      return CHROME_AGENTS | CHROME_SUMMARY | CHROME_PROJECT | CHROME_PLANET |
-        CHROME_RECENT | CHROME_SEARCH | CHROME_DIRECTORY | CHROME_FOCUS;
-    }
-    if (ev.type === 'project-added' || ev.type === 'project-updated') {
-      const projectChrome = CHROME_AGENTS | CHROME_FEED | CHROME_SUMMARY | CHROME_PROJECT |
-        CHROME_RECENT | CHROME_SEARCH | CHROME_SETTINGS | CHROME_DIRECTORY | CHROME_IDEAS;
-      return ev.type === 'project-added' ? projectChrome | CHROME_HISTORY : projectChrome;
-    }
-    if (ev.type === 'feed') return CHROME_FEED;
-    if (ev.type === 'build') return CHROME_SUMMARY | CHROME_PROJECT | CHROME_PLANET;
-    return 0;
-  }
-
-  /** @param {AUEvent} ev */
-  function applyEvent(ev) {
-    switch (ev.type) {
-      case 'project-added':
-      case 'project-updated':
-        S.store.projects.set(ev.project.id, ev.project);
-        break;
-      case 'ship-spawned':
-        S.store.ships.set(ev.ship.id, ev.ship);
-        break;
-      case 'ship-updated': {
-        const previous = S.store.ships.get(ev.ship.id);
-        maybeNotifyAttention(previous ? previous.attention : null, ev.ship);
-        S.store.ships.set(ev.ship.id, ev.ship);
-        break;
-      }
-      case 'ship-departed':
-        S.store.ships.delete(ev.shipId);
-        S.notificationByShip.delete(ev.shipId);
-        break;
-      case 'feed':
-        S.store.feed.push(ev.entry);
-        if (S.store.feed.length > C.FEED_CAP) S.store.feed = S.store.feed.slice(-C.FEED_CAP);
-        break;
-      case 'build': {
-        const p = S.store.projects.get(ev.project);
-        if (p) p.totalBuilds = (p.totalBuilds || 0) + 1;
-        // A ship-updated can precede the build it reports (and Codex patches
-        // send none), so the stored count follows build events too.
-        const ship = S.store.ships.get(ev.shipId);
-        if (ship) S.store.ships.set(ship.id, { ...ship, builds: (ship.builds || 0) + 1 });
-        break;
-      }
-      default: break;
-    }
-  }
-
-  /**
-   * @param {AUEvent[]} batch
-   * @returns {Set<string>}
-   */
-  function workedShipIds(batch) {
-    const ids = new Set();
-    for (const ev of batch) {
-      if (ev.type === 'ship-updated') ids.add(ev.ship.id);
-      else if (ev.type === 'build') ids.add(ev.shipId);
-    }
-    return ids;
-  }
-
-  /**
-   * Promotes hulls whose build count crossed a rank. Every stored ship when no
-   * ids are given, e.g. after focus mode stops fading ships.
-   * @param {Iterable<string>} [ids]
-   */
-  A.refreshShipHulls = function refreshShipHulls(ids) {
-    const scene = S.activeScene;
-    if (!scene || !AUR.ships || typeof AUR.ships.refresh !== 'function') return;
-    for (const id of ids || S.store.ships.keys()) {
-      const ship = S.store.ships.get(id);
-      if (ship) AUR.ships.refresh(scene, ship);
-    }
-  };
-
-  function maybeNotifyAttention(previousAttention, ship) {
-    const entered = ship && (ship.attention === 'question' || ship.attention === 'permission');
-    if (S.playback.mode !== 'live' || previousAttention != null || !entered ||
-        typeof window.Notification !== 'function') return;
-
-    const now = Date.now();
-    const lastForShip = S.notificationByShip.get(ship.id) ?? -Infinity;
-    if (now - lastForShip < C.NOTIFICATION_SHIP_THROTTLE_MS ||
-        now - S.lastNotificationAt < C.NOTIFICATION_GLOBAL_THROTTLE_MS) return;
-
-    const meta = AUR.attentionMeta(ship.attention);
-    if (!meta) return;
-    try {
-      new window.Notification(ship.name + ' needs you', {
-        body: meta.label + ' · ' + A.projectName(ship.project),
-      });
-      S.notificationByShip.set(ship.id, now);
-      S.lastNotificationAt = now;
-    } catch (e) { /* notifications are best-effort */ }
   }
 
   // ---------- view switching ----------
@@ -475,49 +361,6 @@
       scene.onAfterRenderObservable.addOnce(() => AU.debugReady());
     });
   }
-
-  // ---------- overlay chrome ----------
-  let chromePending = false;
-  let pendingChromeMask = 0;
-  function scheduleChrome(mask) {
-    pendingChromeMask |= mask;
-    if (chromePending || pendingChromeMask === 0) return;
-    chromePending = true;
-    requestAnimationFrame(() => {
-      chromePending = false;
-      const next = pendingChromeMask;
-      pendingChromeMask = 0;
-      if (next & CHROME_AGENTS) A.renderAgents();
-      if (next & CHROME_FEED) A.renderFeed();
-      if (next & CHROME_SUMMARY) A.renderSummary();
-      if (next & CHROME_PROJECT) A.renderProjectCard();
-      if (next & CHROME_PLANET) A.renderPlanetCard();
-      if (next & CHROME_RECENT) A.renderRecent();
-      if (next & CHROME_SEARCH) A.refreshProjectSearchFromStore();
-      if (next & CHROME_SETTINGS) A.renderProjectSettings();
-      if (next & CHROME_DIRECTORY) A.refreshProjectDirectoryFromStore();
-      if (next & CHROME_IDEAS) A.renderIdeas();
-      if (next & CHROME_FOCUS) A.renderAgentFocus();
-      if (next & CHROME_HISTORY) A.renderHistory();
-    });
-  }
-
-  A.renderChrome = function renderChrome() {
-    A.renderAgents();
-    A.renderFeed();
-    A.renderSummary();
-    A.renderProjectCard();
-    A.renderPlanetCard();
-    A.renderTabbar();
-    A.renderBackButton();
-    A.renderRecent();
-    A.renderProjectSearchVisibility();
-    A.renderProjectDirectory();
-    A.renderProjectSettings();
-    A.renderIdeas();
-    A.renderHistory();
-    A.renderAgentFocus();
-  };
 
   // ---------- go ----------
   boot().catch((e) => {
