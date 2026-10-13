@@ -4,9 +4,10 @@
 // How one transcript line becomes history signals. Codex lines go through the shared
 // adapter; Claude records get history's own reading below.
 
-const { adaptLine, classifyTool } = require('../provider-adapters');
+const { classifyTool, createAdapterState, normalizeProvider } = require('../provider-adapters');
 const { claudeRecordToSignals } = require('../transcripts/claude');
-const { safeId, safePath } = require('../transcripts/fields');
+const { adaptCodexRecord } = require('../transcripts/codex');
+const { plainObject, safeId, safePath } = require('../transcripts/fields');
 const { parseJsonLine } = require('./jsonl');
 
 /**
@@ -38,10 +39,7 @@ function parseHistoricalLine(entry, line, lineOffset, adapterState, claudeSessio
     return { signals: [], adapterState, claudeSessionEmitted, recordTs: ts };
   }
   if (entry.provider === 'codex') {
-    const adapted = adaptLine('codex', line.toString('utf8'), adapterState, {
-      lineOffset,
-      now: ts,
-    });
+    const adapted = adaptParsedCodexRecord(record, adapterState, ts);
     const signals = (adapted && Array.isArray(adapted.signals) ? adapted.signals : [])
       .filter((signal) => signal && Number.isFinite(signal.ts))
       .map((signal) => ({ ...signal, ts }));
@@ -58,6 +56,19 @@ function parseHistoricalLine(entry, line, lineOffset, adapterState, claudeSessio
     claudeSessionEmitted: true,
     recordTs: ts,
   };
+}
+
+/**
+ * What adaptLine('codex', line, state, { now }) does for a line that parses to `record`: the
+ * same state check and copy and the same reducer, without parsing the line again.
+ * @param {Record<string, any>} record
+ * @param {Record<string, any> | null} state
+ * @param {number} now
+ */
+function adaptParsedCodexRecord(record, state, now) {
+  const base = plainObject(state) && normalizeProvider(state.provider) === 'codex'
+    ? state : createAdapterState('codex');
+  return adaptCodexRecord(record, { ...base, provider: 'codex' }, now);
 }
 
 /**
