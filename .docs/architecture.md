@@ -207,7 +207,7 @@ in a closure, and anything shared is a field of `ctx`.
 | `live/codex-source.js` | 219 | functions | Finds Codex rollouts, one tail per session (also across `archived_sessions/`) | `provider-adapters`, `transcripts/codex`, `shared/hash`, `live/projects`, `live/ships` |
 | `live/signal-source.js` | 71 | functions | Signal ships from file stats only | `signal-sources`, `provider-adapters`, `live/projects`, `live/ships` |
 | `live/provider-records.js` | 200 | functions | Codex / Signal bytes → `adaptLine` signals → ships, pending calls, builds | `provider-adapters`, `live/projects`, `live/ships`, `live/builds` |
-| `replay-source.js` | 340 | `class ReplaySource extends EventEmitter` | Façade over `history/`: indexes all history once at startup; rebuilds the universe at any timestamp | `history/*` |
+| `replay-source.js` | 359 | `class ReplaySource extends EventEmitter` | Façade over `history/`: indexes all history once at startup; rebuilds the universe at any timestamp, from the nearest seek checkpoint | `history/*` |
 | `history/options.js` | 107 | functions | Source roots and limits | — |
 | `history/index-builder.js` | 295 | functions | Finds every transcript and records its time range from bounded head / tail reads | `provider-adapters`, `transcripts/*`, `shared/hash`, `history/jsonl`, `history/order` |
 | `history/record-reader.js` | 267 | functions | Per-source cursors over the indexed byte ranges; 256 KB chunks, a read index into the cursor buffer, a shared pool of open handles | `provider-adapters`, `history/jsonl`, `history/historical-line` |
@@ -217,6 +217,8 @@ in a closure, and anything shared is a field of `ctx`.
 | `history/merge.js` | 78 | functions | k-way merge of the cursors | `history/order`, `history/record-reader` |
 | `history/apply-record.js` | 156 | functions | Reduces one merged record into the historical model | `provider-adapters`, `transcripts/fields`, `shared/hash`, `universe/public-shape` |
 | `history/model.js` | 314 | factory | The historical universe, its event batches, `getSystem` / `getPlanet` | `history/apply-record`, `universe/*`, `transcripts/fields`, `build-buckets`, `path-safety`, `shared/hash` |
+| `history/checkpoint-plan.js` | 79 | function | Up to 32 checkpoint times that split the indexed bytes evenly | — |
+| `history/checkpoints.js` | 277 | factory | In-memory seek checkpoints: capture, restore, a 64 MB budget, and a guard that redoes a seek cold when a checkpoint is stale | `history/checkpoint-plan`, `history/model` |
 | `universe/galaxy.js` | 157 | functions | `deriveGalaxy` (live), `historyGalaxy` (history) | `provider-adapters`, `shared/hash` |
 | `universe/planets.js` | 27 | function | `proceduralSystem` | `shared/hash` |
 | `universe/ships.js` | 33 | function | `createShipRecord` | — |
@@ -358,12 +360,19 @@ Two event sources run side by side; `app-context.js` forwards only the active on
 
 - `ctx.activeSource` is either the Tracker or the ReplaySource. `replay-control.js` switches it
   and increments `ctx.streamEpoch`; the renderer drops batches from retired epochs.
-- Seek: forward seeks advance in place; backward seeks reset and replay from the start
-  (k-way merge over all files in `history/merge.js`). Play ticks every 100 ms at 1×–1000×.
+- Seek: forward seeks advance in place; other seeks restore the latest seek checkpoint at or
+  before the target and replay from there (k-way merge over all files in `history/merge.js`).
+  Play ticks every 100 ms at 1×–1000×.
   Reading uses 256 KB chunks, a read index into the cursor buffer instead of a copy per line,
   and one JSON parse per Codex line; on ~3.8 GB of real transcripts (480 sources) a seek to the
-  end went from 18.7 s to 4.9 s and a seek to the middle from 6.1 s to 2.6 s. Backward scrubs
-  still replay from the start; seek checkpoints are not built yet.
+  end went from 18.7 s to 4.9 s and a seek to the middle from 6.1 s to 2.6 s.
+- **Seek checkpoints** (`history/checkpoints.js`): at index time up to 32 times are planned that
+  split the indexed bytes evenly; a seek that passes one saves a copy of the model and every
+  source cursor there (8 MB for all 32 on that data; 64 MB budget). After the first seek to the
+  end, a seek to the middle takes ~40 ms instead of ~1.6 s; seeks before the first checkpoint
+  stay cold. Continuing from a checkpoint equals a cold seek only while every record applied is
+  later than it; a record that is not marks the checkpoint stale for that target and the seek
+  is redone cold. Checkpoints are dropped on re-index and on stop.
 - The **Tracker never stops** during playback. Only the `au:events` send is gated, so IDEAS
   runs, git refreshes and `GOALS.md` ticks keep happening while you scrub.
 - Live and history share `universe/` (galaxy, procedural planets, ship records, public shapes),
@@ -530,7 +539,7 @@ contract), `AUR`, `AUR_POLISH` and `AUR_GALAXY` (all `any` for now).
 | browser | `localStorage` | renderer | Rail collapsed, cockpit environment / vantage |
 | repo | `.shots/` | test modes | Screenshots, `state.json`, gate run folders |
 
-Nothing is stored for history playback; it re-reads the transcripts.
+Nothing is stored on disk for history playback; it re-reads the transcripts. Seek checkpoints live in memory only.
 
 Until October 2026 the app was Agent Universe Lite, and userData was `%APPDATA%\agent-universe-lite`.
 The first normal run under the new name copies the four userData files from there (`user-data.js`),
@@ -609,7 +618,7 @@ Facts only, grouped by why they hurt. Items marked *(by reading)* were found in 
 not reproduced.
 
 ### Too much in one place
-1. *(resolved)* `tracker.js` (180) and `replay-source.js` (340) are façades over `live/` and
+1. *(resolved)* `tracker.js` (180) and `replay-source.js` (359) are façades over `live/` and
    `history/`; the public shapes, galaxies, planets and ship records are shared in `universe/`.
 2. *(resolved)* `scene-universe.js` is split into five parts (§6.2). `updateLabelLayout`
    (`scene-universe-labels.js`) is still one 158-line function.
