@@ -28,6 +28,10 @@ const { writeFileAtomic } = require('./shared/atomic-write');
 const { relativeInside } = require('./path-safety');
 const { signalSources, watchedFiles } = require('./signal-sources');
 const { bucketOf, countBuild, bucketBuilds } = require('./build-buckets');
+const { deriveGalaxy } = require('./universe/galaxy');
+const { proceduralSystem } = require('./universe/planets');
+const { liveProject, liveShip } = require('./universe/public-shape');
+const { createShipRecord } = require('./universe/ships');
 
 /**
  * @import { Attention, FeedEntry, PlanetData, Project, Ship, ShipStatus, SystemData }
@@ -63,16 +67,6 @@ const LONG_TOOLS = new Set([
 const IGNORE_DIRS = new Set([
   'node_modules', '.git', '.next', '.venv', 'venv', 'dist', 'build', 'out',
   'release', 'coverage', 'target', '__pycache__', '.idea', '.vscode', 'bin', 'obj',
-]);
-
-const GENERIC_WORKSPACE_DIRS = new Set([
-  'code', 'src', 'source', 'repos', 'repositories', 'projects', 'dev',
-  'development', 'git', 'github',
-]);
-const HOME_FOLDERS = new Map([
-  ['documents', 'Documents'],
-  ['desktop', 'Desktop'],
-  ['downloads', 'Downloads'],
 ]);
 
 /**
@@ -125,126 +119,6 @@ function isProjectDirectory(projectPath) {
   } catch {
     return false;
   }
-}
-
-// Pure, host-independent project grouping. Both path implementations are
-// selected from the input syntax, never from process.platform or ambient
-// filesystem state, so Windows and POSIX fixtures behave identically on any
-// machine.
-function deriveGalaxy(projectPath, projectId, exists) {
-  const hasPath = typeof projectPath === 'string' && projectPath.trim() !== '';
-  if (hasPath && exists === false) {
-    return { key: 'graveyard', label: 'Graveyard' };
-  }
-
-  if (!hasPath) return deriveGalaxyFromSlug(projectId);
-
-  const input = projectPath.trim();
-  const windows = /^[a-z]:[\\/]/i.test(input) || /^\\\\/.test(input) || input.includes('\\');
-  const flavor = windows ? path.win32 : path.posix;
-  const normalized = flavor.normalize(input);
-  const root = flavor.parse(normalized).root;
-  const relative = normalized.slice(root.length);
-  const segments = relative.split(flavor.sep).filter(Boolean);
-  const structural = deriveStructuralGalaxy(segments);
-  if (structural) return structural;
-
-  const parent = flavor.dirname(normalized);
-  if (windows) {
-    const canonical = path.win32.normalize(parent).replace(/\\/g, '/').toLowerCase();
-    const parsed = path.win32.parse(parent);
-    if (parent === parsed.root) {
-      const drive = parsed.root.match(/^([a-z]):/i);
-      return {
-        key: `path:win:${canonical}`,
-        label: drive ? `${drive[1].toUpperCase()}: Drive` : humanizeSegment(path.win32.basename(parsed.root)),
-      };
-    }
-    return {
-      key: `path:win:${canonical}`,
-      label: humanizeSegment(path.win32.basename(parent)),
-    };
-  }
-
-  const canonical = path.posix.normalize(parent);
-  if (canonical === '/') return { key: 'path:posix:/', label: 'Root' };
-  return {
-    key: `path:posix:${canonical}`,
-    label: humanizeSegment(path.posix.basename(parent)),
-  };
-}
-
-function deriveStructuralGalaxy(segments) {
-  const lower = segments.map((segment) => segment.toLowerCase());
-
-  for (let i = lower.length - 1; i >= 0; i--) {
-    if (lower[i] !== 'workspace' && lower[i] !== 'workspaces') continue;
-    let selected = i + 1;
-    while (selected < lower.length && GENERIC_WORKSPACE_DIRS.has(lower[selected])) selected++;
-    if (selected < segments.length) return namedGalaxy('workspace', segments[selected]);
-  }
-
-  // Prefer the most specific recognizable home occurrence. This also keeps
-  // isolated test profiles (whose synthetic /home/user lives below a temp
-  // root) portable without consulting os.homedir().
-  for (let i = lower.length - 1; i >= 0; i--) {
-    const marker = lower[i];
-    const isHome = marker === 'home' || marker === 'users';
-    if (!isHome || i + 1 >= segments.length) continue;
-    const childIndex = i + 2;
-    if (childIndex >= segments.length) return { key: 'home', label: 'Home' };
-    const child = lower[childIndex];
-    if (HOME_FOLDERS.has(child)) {
-      return { key: `home:${child}`, label: HOME_FOLDERS.get(child) };
-    }
-    if (segments[childIndex].startsWith('.')) return { key: 'home', label: 'Home' };
-  }
-
-  // Outside an explicit workspace, a conventional repository container is
-  // itself generic; its first non-generic child is the meaningful bucket.
-  for (let i = 0; i < lower.length - 1; i++) {
-    if (!GENERIC_WORKSPACE_DIRS.has(lower[i])) continue;
-    let selected = i + 1;
-    while (selected < lower.length && GENERIC_WORKSPACE_DIRS.has(lower[selected])) selected++;
-    if (selected < segments.length) return namedGalaxy('container', segments[selected]);
-  }
-  return null;
-}
-
-function deriveGalaxyFromSlug(projectId) {
-  const id = typeof projectId === 'string' ? projectId : String(projectId || 'unknown');
-  const segments = id.split('-').filter(Boolean);
-  const structural = deriveStructuralGalaxy(segments);
-  if (structural) return structural;
-  return {
-    key: `slug:${hex8(id)}`,
-    label: humanizeSegment(id).slice(0, 32) || 'Unknown',
-  };
-}
-
-function namedGalaxy(namespace, segment) {
-  const normalized = normalizeSegment(segment);
-  if (!normalized) return null;
-  return { key: `${namespace}:${normalized}`, label: humanizeSegment(segment) };
-}
-
-function normalizeSegment(segment) {
-  return String(segment || '')
-    .trim()
-    .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
-    .replace(/[^a-z0-9]+/gi, '-')
-    .replace(/^-+|-+$/g, '')
-    .toLowerCase();
-}
-
-function humanizeSegment(segment) {
-  const words = String(segment || '')
-    .trim()
-    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
-    .replace(/[_-]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  return words.replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 class Tracker extends EventEmitter {
@@ -352,7 +226,7 @@ class Tracker extends EventEmitter {
       if (exists === project.exists) continue;
       project.exists = exists;
       this.systemCache.delete(project.id);
-      this.queue({ type: 'project-updated', project: publicProject(project) });
+      this.queue({ type: 'project-updated', project: liveProject(project) });
     }
   }
 
@@ -413,7 +287,7 @@ class Tracker extends EventEmitter {
           };
           this.projects.set(projectId, project);
           this.indexProjectPath(project);
-          this.queue({ type: 'project-added', project: publicProject(project) });
+          this.queue({ type: 'project-added', project: liveProject(project) });
           if (!isStartup) this.pushFeed('discover', `New system discovered: ${project.name}`, project.id);
         }
         if (pathKey) {
@@ -429,7 +303,7 @@ class Tracker extends EventEmitter {
         if (exists !== project.exists) {
           project.exists = exists;
           this.systemCache.delete(project.id);
-          this.queue({ type: 'project-updated', project: publicProject(project) });
+          this.queue({ type: 'project-updated', project: liveProject(project) });
         }
       }
 
@@ -553,7 +427,7 @@ class Tracker extends EventEmitter {
       else delete this.pathIds[key];
       throw trackerPathError('FAILED', 'project path could not be saved');
     }
-    const visible = publicProject(project);
+    const visible = liveProject(project);
     this.queue({ type: 'project-updated', project: visible });
     this.pushFeed('discover', `Project path recovered: ${project.name}`, projectId);
     this.flush();
@@ -597,7 +471,7 @@ class Tracker extends EventEmitter {
         firstSeen: saved.firstSeen || Date.now(),
       };
       this.projects.set(id, project);
-      this.queue({ type: 'project-added', project: publicProject(project) });
+      this.queue({ type: 'project-added', project: liveProject(project) });
     } else {
       let changed = false;
       // Security follow-up: only adopt a path that survived preferredProjectPath (never null).
@@ -608,7 +482,7 @@ class Tracker extends EventEmitter {
         changed = true;
       }
       if (activity > project.lastActivity) project.lastActivity = activity;
-      if (changed) this.queue({ type: 'project-updated', project: publicProject(project) });
+      if (changed) this.queue({ type: 'project-updated', project: liveProject(project) });
     }
     this.projectPathIndex.set(key, id);
     this.pathIds[key] = id;
@@ -762,7 +636,7 @@ class Tracker extends EventEmitter {
           ship.lastEvent = Math.max(ship.lastEvent, st.mtimeMs);
           ship.status = 'Working';
           ship.detail = null;
-          this.queue({ type: 'ship-updated', ship: publicShip(ship) });
+          this.queue({ type: 'ship-updated', ship: liveShip(ship) });
           this.queue({
             type: 'activity', project: project.id, shipId: ship.id,
             tool: 'signal', status: 'Working', detail: null, ts: st.mtimeMs,
@@ -964,25 +838,25 @@ class Tracker extends EventEmitter {
       if (signal.type === 'task-claim') {
         if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(signal.taskId || '')) {
           ship.taskId = signal.taskId.toLowerCase();
-          this.queue({ type: 'ship-updated', ship: publicShip(ship) });
+          this.queue({ type: 'ship-updated', ship: liveShip(ship) });
         }
       } else if (signal.type === 'turn-start') {
         ship.turnDone = false;
         ship.turnOutcome = 'running';
         ship.status = 'Working';
         ship.detail = null;
-        this.queue({ type: 'ship-updated', ship: publicShip(ship) });
+        this.queue({ type: 'ship-updated', ship: liveShip(ship) });
       } else if (signal.type === 'turn-done' || signal.type === 'turn-complete' || signal.type === 'turn-end') {
         ship.turnDone = true;
         ship.turnOutcome = 'completed';
         ship.detail = null;
-        this.queue({ type: 'ship-updated', ship: publicShip(ship) });
+        this.queue({ type: 'ship-updated', ship: liveShip(ship) });
       } else if (signal.type === 'turn-aborted') {
         ship.turnDone = false;
         ship.turnOutcome = 'aborted';
         ship.status = 'Working';
         ship.detail = null;
-        this.queue({ type: 'ship-updated', ship: publicShip(ship) });
+        this.queue({ type: 'ship-updated', ship: liveShip(ship) });
       } else if (signal.type === 'tool-use' || signal.type === 'tool-start') {
         const pendingId = `${provider}:${sessionId}:${signal.id || signal.callId || signal.key || ts}`;
         const classified = classifyTool(signal.tool);
@@ -991,7 +865,7 @@ class Tracker extends EventEmitter {
         ship.detail = null;
         ship.turnDone = false;
         this.addPending(ship, pendingId, tool, ts);
-        this.queue({ type: 'ship-updated', ship: publicShip(ship) });
+        this.queue({ type: 'ship-updated', ship: liveShip(ship) });
         if (!tail.catchup) {
           this.queue({
             type: 'activity', project: ship.project, shipId: ship.id,
@@ -1006,7 +880,7 @@ class Tracker extends EventEmitter {
       } else if (signal.type === 'activity' || signal.type === 'heartbeat' || signal.type === 'status') {
         if (signal.status) ship.status = signal.status;
         ship.detail = null;
-        this.queue({ type: 'ship-updated', ship: publicShip(ship) });
+        this.queue({ type: 'ship-updated', ship: liveShip(ship) });
         if (!tail.catchup && signal.type !== 'heartbeat') {
           this.queue({
             type: 'activity', project: ship.project, shipId: ship.id,
@@ -1024,7 +898,7 @@ class Tracker extends EventEmitter {
     if (owner) {
       owner.pending.delete(pendingId);
       owner.lastEvent = Math.max(owner.lastEvent, ts);
-      this.queue({ type: 'ship-updated', ship: publicShip(owner) });
+      this.queue({ type: 'ship-updated', ship: liveShip(owner) });
     }
     this.pendingIndex.delete(pendingId);
   }
@@ -1118,7 +992,7 @@ class Tracker extends EventEmitter {
       project.exists = isProjectDirectory(session.cwd);
       this.indexProjectPath(project);
       this.systemCache.delete(project.id);
-      this.queue({ type: 'project-updated', project: publicProject(project) });
+      this.queue({ type: 'project-updated', project: liveProject(project) });
     }
     if (ts > project.lastActivity) project.lastActivity = ts;
     const ship = this.ensureShip(tail.project, tail.session, session.kind === 'drone', ts);
@@ -1139,7 +1013,7 @@ class Tracker extends EventEmitter {
     ship.status = status;
     const rel = signal.filePath === null ? null : relativeInside(project.path, signal.filePath);
     ship.detail = signal.filePath === null ? signal.detail : rel || path.basename(signal.filePath);
-    this.queue({ type: 'ship-updated', ship: publicShip(ship) });
+    this.queue({ type: 'ship-updated', ship: liveShip(ship) });
 
     if (build && rel) {
       this.addBuild(project, ship, rel, ts, catchup);
@@ -1178,26 +1052,12 @@ class Tracker extends EventEmitter {
     if (!toolUseId) return;
     const id = `drone:${toolUseId}`;
     if (this.ships.has(id)) return;
-    /** @type {LiveShip} */
-    const drone = {
-      id,
-      name: `Claude-${++this.shipCounter}`,
-      provider: 'claude',
-      project: project.id,
-      kind: 'drone',
-      parentName: parent.name,
-      status: 'Working',
-      detail: null,
-      lastEvent: ts,
-      pending: new Map(),
-      turnDone: false,
-      attention: null,
-      attentionSince: null,
-      builds: 0,
-      local: parent.local === true,
-    };
+    const drone = createShipRecord({
+      id, name: `Claude-${++this.shipCounter}`, provider: 'claude', project: project.id, kind: 'drone',
+      parentName: parent.name, lastEvent: ts, local: parent.local === true,
+    });
     this.ships.set(id, drone);
-    this.queue({ type: 'ship-spawned', ship: publicShip(drone) });
+    this.queue({ type: 'ship-spawned', ship: liveShip(drone) });
     this.pushFeed('spawn', `${parent.name} launched ${drone.name} in ${project.name}`, project.id);
   }
 
@@ -1206,24 +1066,12 @@ class Tracker extends EventEmitter {
     let ship = this.ships.get(id);
     if (!ship) {
       const project = this.projects.get(projectId);
-      ship = {
-        id,
-        name: `Claude-${++this.shipCounter}`,
-        provider: 'claude',
-        project: projectId,
-        kind: sidechain ? 'drone' : 'main',
-        status: 'Working',
-        detail: null,
-        lastEvent: ts,
-        pending: new Map(),
-        turnDone: false,
-        attention: null,
-        attentionSince: null,
-        builds: 0,
-        local: false,
-      };
+      ship = createShipRecord({
+        id, name: `Claude-${++this.shipCounter}`, provider: 'claude', project: projectId,
+        kind: sidechain ? 'drone' : 'main', lastEvent: ts,
+      });
       this.ships.set(id, ship);
-      this.queue({ type: 'ship-spawned', ship: publicShip(ship) });
+      this.queue({ type: 'ship-spawned', ship: liveShip(ship) });
       this.pushFeed('spawn', `${ship.name} entered ${project ? project.name : projectId}`, projectId);
     }
     return ship;
@@ -1237,7 +1085,7 @@ class Tracker extends EventEmitter {
   setLocal(ship, local) {
     if (!ship || typeof local !== 'boolean' || ship.local === local) return;
     ship.local = local;
-    this.queue({ type: 'ship-updated', ship: publicShip(ship) });
+    this.queue({ type: 'ship-updated', ship: liveShip(ship) });
   }
 
   ensureProviderShip(providerValue, projectId, sessionId, kind, ts, parentSessionId) {
@@ -1250,25 +1098,12 @@ class Tracker extends EventEmitter {
       const next = (this.providerCounters.get(provider) || 0) + 1;
       this.providerCounters.set(provider, next);
       const parent = parentSessionId ? this.ships.get(`ship:${provider}:${parentSessionId}`) : null;
-      ship = {
-        id,
-        name: `${labels[provider] || 'Signal'}-${next}`,
-        provider,
-        project: projectId,
-        kind: kind === 'drone' ? 'drone' : 'main',
-        parentName: parent ? parent.name : null,
-        status: 'Working',
-        detail: null,
-        lastEvent: ts,
-        pending: new Map(),
-        turnDone: false,
-        attention: null,
-        attentionSince: null,
-        builds: 0,
-        local: false,
-      };
+      ship = createShipRecord({
+        id, name: `${labels[provider] || 'Signal'}-${next}`, provider, project: projectId,
+        kind: kind === 'drone' ? 'drone' : 'main', parentName: parent ? parent.name : null, lastEvent: ts,
+      });
       this.ships.set(id, ship);
-      this.queue({ type: 'ship-spawned', ship: publicShip(ship) });
+      this.queue({ type: 'ship-spawned', ship: liveShip(ship) });
       const project = this.projects.get(projectId);
       this.pushFeed('spawn', `${ship.name} entered ${project ? project.name : projectId}`, projectId);
     } else {
@@ -1285,7 +1120,7 @@ class Tracker extends EventEmitter {
 
       ship.attention = next;
       ship.attentionSince = next ? now : null;
-      this.queue({ type: 'ship-updated', ship: publicShip(ship) });
+      this.queue({ type: 'ship-updated', ship: liveShip(ship) });
 
       if (!next) continue;
       const project = this.projects.get(ship.project);
@@ -1328,8 +1163,8 @@ class Tracker extends EventEmitter {
   /** @returns {{ projects: Project[], ships: Ship[], feed: FeedEntry[], eventSequence: number }} */
   snapshot() {
     return {
-      projects: [...this.projects.values()].map(publicProject),
-      ships: [...this.ships.values()].map(publicShip),
+      projects: [...this.projects.values()].map(liveProject),
+      ships: [...this.ships.values()].map(liveShip),
       feed: this.feed.slice(-FEED_LIMIT),
       eventSequence: this.eventSequence,
     };
@@ -1369,15 +1204,8 @@ class Tracker extends EventEmitter {
         planets = planets.slice(0, 8);
       } catch { /* fall through to procedural */ }
     }
-    if (planets.length === 0) {
-      const rand = mulberry32(fnv1a(projectId));
-      const n = 3 + Math.floor(rand() * 4);
-      for (let i = 0; i < n; i++) {
-        planets.push({ name: `Sector-${i + 1}`, files: 5 + Math.floor(rand() * 120), builds: 0, procedural: true });
-      }
-      beltDensity = Math.floor(rand() * 40);
-    }
-    const data = { project: publicProject(project), planets, beltDensity };
+    if (planets.length === 0) ({ planets, beltDensity } = proceduralSystem(projectId));
+    const data = { project: liveProject(project), planets, beltDensity };
     this.systemCache.set(projectId, { at: Date.now(), data });
     return data;
   }
@@ -1393,7 +1221,7 @@ class Tracker extends EventEmitter {
     if (!project) return null;
     const base = {
       name: planetName,
-      project: publicProject(project),
+      project: liveProject(project),
       // Security follow-up: own keys only; 'constructor'/'__proto__' must not return a non-cloneable prototype value.
       builds: bucketBuilds(project, planetName),
     };
@@ -1524,34 +1352,6 @@ function shallowCount(dir) {
     }
   } catch { /* ignore */ }
   return count;
-}
-
-/**
- * @param {LiveProject} p
- * @returns {Project}
- */
-function publicProject(p) {
-  return {
-    id: p.id, path: p.path, name: p.name, exists: p.exists,
-    firstSeen: p.firstSeen, lastActivity: p.lastActivity, totalBytes: p.totalBytes,
-    totalBuilds: p.totalBuilds, seed: fnv1a(p.id),
-    galaxy: deriveGalaxy(p.path, p.id, p.exists),
-  };
-}
-
-/**
- * @param {LiveShip} s
- * @returns {Ship}
- */
-function publicShip(s) {
-  return {
-    id: s.id, name: s.name, project: s.project, kind: s.kind,
-    provider: normalizeProvider(s.provider || 'claude'),
-    status: /** @type {ShipStatus} */ (s.status), detail: s.detail, lastEvent: s.lastEvent,
-    attention: s.attention, attentionSince: s.attentionSince, builds: s.builds, local: s.local === true,
-    taskId: typeof s.taskId === 'string' ? s.taskId : null,
-    turnOutcome: typeof s.turnOutcome === 'string' ? s.turnOutcome : null,
-  };
 }
 
 module.exports = { Tracker, classifyAttention, deriveGalaxy };
