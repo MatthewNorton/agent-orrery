@@ -165,7 +165,7 @@
         tmp.set(Math.cos(r.a) * r.r, r.yoff + Math.sin(r.a) * r.r * r.tilt, Math.sin(r.a) * r.r);
         r.mesh.position.copyFrom(tmp);
         r.mesh.lookAt(new BABYLON.Vector3(
-          Math.cos(r.a + 0.025) * r.r, r.yoff, Math.sin(r.a + 0.025) * r.r));
+          Math.cos(r.a + Math.sign(r.speed) * 0.025) * r.r, r.yoff, Math.sin(r.a + Math.sign(r.speed) * 0.025) * r.r));
       }
     });
 

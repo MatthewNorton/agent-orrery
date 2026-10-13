@@ -853,7 +853,7 @@
           Math.sin(r.a) * r.r
         );
         r.mesh.position.copyFrom(tmp);
-        r.mesh.rotation.y = -r.a + Math.PI / 2;
+        r.mesh.rotation.y = -r.a + (r.speed < 0 ? Math.PI : 0);
         // warp-in grow
         const age = (now - r.born) / 900;
         if (age < 1) r.mesh.scaling.setAll(0.3 + 0.7 * age);

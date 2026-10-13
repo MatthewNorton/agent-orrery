@@ -184,7 +184,7 @@ Design tokens (put in `:root`):
 --accent: #6c8cff;        --radius: 10px;
 ```
 
-- **Top bar** (full width, ~56px): purple glowing dot logo, `AGENT UNIVERSE`
+- **Top bar** (full width, ~56px): purple glowing dot logo, `AGENT ORRERY`
   (letter-spaced, semibold), pill badge `MULTI-PROVIDER` (purple-tinted
   border). Window controls are native — do not draw min/max/close.
   Universe view only: a `RECENT` strip after the badge — up to 5 pills, the
