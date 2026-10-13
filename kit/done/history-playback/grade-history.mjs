@@ -74,10 +74,11 @@ if (!fs.existsSync(replayPath)) {
 // All hashes re-pinned 2026-09-27 as LF-normalized digests (docs/PUBLIC-RELEASE-TASKS.md
 // item 5.6); file contents are unchanged from the previous pins.
 // package.json and package-lock.json re-pinned 2026-09-27 after Dependabot #27 (Babylon 9.28) and #30 (Electron 44).
+// 2026-10-13 re-pinned: src/renderer/scene-universe.js, src/renderer/scene-system.js, src/renderer/scene-planet.js — ship heading: ships face along their orbit either way round (owner request 2026-10-13)
 const frozen = new Map([
-  ['src/renderer/scene-universe.js', '61ff27fa53ea8ca6d3d944c29ece4f9f82aa46fea53321df0e01d1e82b1a5b3a'],
-  ['src/renderer/scene-system.js', '1819bfc26082fd06f4035a98197821808d35c8826d29fb962764d65ed4a8968b'],
-  ['src/renderer/scene-planet.js', '7c6bd48e4c90183b01b382e5fb4d7ed7e7ede3f14b88f0d8813fb0ea716575b3'],
+  ['src/renderer/scene-universe.js', 'b06fa399c4b9956e5f80e95243bbe87d2231bbc1596508048600cd2f907b8512'],
+  ['src/renderer/scene-system.js', 'bdc6fa72462f90fda83de476477a809116047701843099243a3db7b10fea14f1'],
+  ['src/renderer/scene-planet.js', 'd532fe6937c054c4e1c5563d3bdefa11c1e7486fd4176c792a4d69283cf5747f'],
   ['src/renderer/galaxy-layout.js', '3b6456404bea666a2b7d6e0db5b5c57190b3a67b7c383786beb4d8fb7e76ea39'],
   ['src/renderer/polish-math.js', '2d8c154844aa89aeb3d666a8be1e1583cae45f42ce2d8f6ca75c5c17e02385ef'],
 ]);
