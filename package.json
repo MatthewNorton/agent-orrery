@@ -5,6 +5,7 @@
   "main": "src/main/main.js",
   "scripts": {
     "start": "electron .",
+    "setup": "node scripts/setup.mjs",
     "shots": "electron . --shots",
     "ships:generate": "node scripts/generate-original-ship.mjs && node scripts/generate-vanta-seraph.mjs && node scripts/generate-fleet-ships.mjs",
     "ships:generate:aster": "node scripts/generate-original-ship.mjs",
