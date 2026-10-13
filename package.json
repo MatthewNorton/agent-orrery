@@ -19,7 +19,7 @@
   "author": "matt",
   "license": "MIT",
   "devDependencies": {
-    "electron": "^44.5.1",
+    "electron": "^44.7.0",
     "typescript": "7.0.2"
   },
   "dependencies": {
