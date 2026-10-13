@@ -25,6 +25,9 @@ const { relativeInside } = require('./path-safety');
 const { bucketOf, bucketKey, countBuild, bucketBuilds } = require('./build-buckets');
 const { safeId, safePath } = require('./transcripts/fields');
 const { codexParentSessionId } = require('./transcripts/codex');
+const { proceduralSystem } = require('./universe/planets');
+const { historyProject, historyShip } = require('./universe/public-shape');
+const { createShipRecord } = require('./universe/ships');
 
 /**
  * @import { FeedEntry, PlanetData, PlaybackStatus, Project, ReplaySpeed, Ship, SystemData }
@@ -250,8 +253,8 @@ class ReplaySource extends EventEmitter {
   /** @returns {{ projects: Project[], ships: Ship[], feed: FeedEntry[], eventSequence: number }} */
   snapshot() {
     return {
-      projects: [...this._projects.values()].map(publicProject),
-      ships: [...this._ships.values()].map(publicShip),
+      projects: [...this._projects.values()].map(historyProject),
+      ships: [...this._ships.values()].map(historyShip),
       feed: this._feed.slice(-FEED_LIMIT).map((entry) => ({ ...entry })),
       eventSequence: this._eventSequence,
     };
@@ -268,8 +271,8 @@ class ReplaySource extends EventEmitter {
       .map(([name, builds]) => ({ name, files: 0, builds }))
       .sort((a, b) => b.builds - a.builds || a.name.localeCompare(b.name))
       .slice(0, 8);
-    if (planets.length === 0) planets = proceduralPlanets(projectId);
-    return { project: publicProject(project), planets, beltDensity: 0 };
+    if (planets.length === 0) planets = proceduralSystem(projectId).planets;
+    return { project: historyProject(project), planets, beltDensity: 0 };
   }
 
   /**
@@ -285,7 +288,7 @@ class ReplaySource extends EventEmitter {
     const rand = mulberry32(fnv1a(`${projectId}:${planetName}`));
     return {
       name: planetName,
-      project: publicProject(project),
+      project: historyProject(project),
       builds,
       files: procedural ? Math.floor(rand() * 160) : 0,
       sizeKb: procedural ? Math.floor(rand() * 3200) : 0,
@@ -760,12 +763,12 @@ class ReplaySource extends EventEmitter {
     if (!ship) return;
     if (ship.local !== runtime.local) {
       ship.local = runtime.local;
-      this._queue({ type: 'ship-updated', ship: publicShip(ship) }, emit);
+      this._queue({ type: 'ship-updated', ship: historyShip(ship) }, emit);
     }
     ship.lastEvent = Math.max(ship.lastEvent, record.ts);
     if (record.ts > project.lastActivity) {
       project.lastActivity = record.ts;
-      this._queue({ type: 'project-updated', project: publicProject(project) }, emit);
+      this._queue({ type: 'project-updated', project: historyProject(project) }, emit);
     }
 
     if (signal.type === 'session') return;
@@ -774,13 +777,13 @@ class ReplaySource extends EventEmitter {
       ship.status = 'Working';
       ship.detail = null;
       this._setAttention(ship, null, record.ts, emit);
-      this._queue({ type: 'ship-updated', ship: publicShip(ship) }, emit);
+      this._queue({ type: 'ship-updated', ship: historyShip(ship) }, emit);
       return;
     }
     if (signal.type === 'turn-end' || signal.type === 'turn-done' || signal.type === 'turn-complete') {
       ship.turnDone = true;
       ship.detail = null;
-      this._queue({ type: 'ship-updated', ship: publicShip(ship) }, emit);
+      this._queue({ type: 'ship-updated', ship: historyShip(ship) }, emit);
       return;
     }
     if (signal.type === 'turn-aborted') {
@@ -788,7 +791,7 @@ class ReplaySource extends EventEmitter {
       ship.status = 'Working';
       ship.detail = null;
       this._setAttention(ship, null, record.ts, emit);
-      this._queue({ type: 'ship-updated', ship: publicShip(ship) }, emit);
+      this._queue({ type: 'ship-updated', ship: historyShip(ship) }, emit);
       return;
     }
     if (signal.type === 'tool-start' || signal.type === 'tool-use') {
@@ -801,7 +804,7 @@ class ReplaySource extends EventEmitter {
       ship.turnDone = false;
       ship.detail = null;
       this._setAttention(ship, null, record.ts, emit);
-      this._queue({ type: 'ship-updated', ship: publicShip(ship) }, emit);
+      this._queue({ type: 'ship-updated', ship: historyShip(ship) }, emit);
       this._queue({
         type: 'activity', project: project.id, shipId: ship.id,
         tool: classification.tool, status: ship.status, detail: null, ts: record.ts,
@@ -817,7 +820,7 @@ class ReplaySource extends EventEmitter {
       if (!callId) return;
       const pendingId = `${runtime.provider}:${runtime.sessionId}:${callId}`;
       ship.pending.delete(pendingId);
-      this._queue({ type: 'ship-updated', ship: publicShip(ship) }, emit);
+      this._queue({ type: 'ship-updated', ship: historyShip(ship) }, emit);
       if (runtime.provider === 'claude') {
         const droneId = `drone:claude:${runtime.sessionId}:${callId}`;
         const drone = this._ships.get(droneId);
@@ -843,7 +846,7 @@ class ReplaySource extends EventEmitter {
     if (signal.type === 'activity' || signal.type === 'status' || signal.type === 'heartbeat') {
       ship.status = typeof signal.status === 'string' ? signal.status : 'Working';
       ship.detail = null;
-      this._queue({ type: 'ship-updated', ship: publicShip(ship) }, emit);
+      this._queue({ type: 'ship-updated', ship: historyShip(ship) }, emit);
       if (signal.type !== 'heartbeat') this._queue({
         type: 'activity', project: project.id, shipId: ship.id,
         tool: 'Activity', status: ship.status, detail: null, ts: record.ts,
@@ -877,7 +880,7 @@ class ReplaySource extends EventEmitter {
       };
       this._projects.set(id, project);
       this._projectIdByPath.set(key, id);
-      this._queue({ type: 'project-added', project: publicProject(project) }, emit);
+      this._queue({ type: 'project-added', project: historyProject(project) }, emit);
     }
     return project;
   }
@@ -894,25 +897,14 @@ class ReplaySource extends EventEmitter {
       const parentId = runtime.parentSessionId
         ? `ship:${runtime.provider}:${runtime.parentSessionId}` : null;
       const parent = parentId ? this._ships.get(parentId) : null;
-      ship = {
-        id,
-        name: `${runtime.provider === 'codex' ? 'Codex' : 'Claude'}-${number}`,
-        provider: runtime.provider,
-        project: runtime.projectId,
-        kind: runtime.kind === 'drone' ? 'drone' : 'main',
-        parentName: parent ? parent.name : null,
-        status: 'Working',
-        detail: null,
-        lastEvent: ts,
-        pending: new Map(),
-        turnDone: false,
-        attention: null,
-        attentionSince: null,
-        builds: 0,
-        local: runtime.local,
-      };
+      ship = createShipRecord({
+        id, name: `${runtime.provider === 'codex' ? 'Codex' : 'Claude'}-${number}`,
+        provider: runtime.provider, project: runtime.projectId,
+        kind: runtime.kind === 'drone' ? 'drone' : 'main', parentName: parent ? parent.name : null,
+        lastEvent: ts, local: runtime.local,
+      });
       this._ships.set(id, ship);
-      this._queue({ type: 'ship-spawned', ship: publicShip(ship) }, emit);
+      this._queue({ type: 'ship-spawned', ship: historyShip(ship) }, emit);
       const project = this._projects.get(runtime.projectId);
       this._pushFeed('spawn', `${ship.name} entered ${project ? project.name : runtime.projectId}`,
         runtime.projectId, ts, emit);
@@ -925,25 +917,12 @@ class ReplaySource extends EventEmitter {
     if (this._ships.has(id)) return;
     const number = (this._providerCounters.get('claude') || 0) + 1;
     this._providerCounters.set('claude', number);
-    const drone = {
-      id,
-      name: `Claude-${number}`,
-      provider: 'claude',
-      project: project.id,
-      kind: 'drone',
-      parentName: parent.name,
-      status: 'Working',
-      detail: null,
-      lastEvent: ts,
-      pending: new Map(),
-      turnDone: false,
-      attention: null,
-      attentionSince: null,
-      builds: 0,
-      local: parent.local === true,
-    };
+    const drone = createShipRecord({
+      id, name: `Claude-${number}`, provider: 'claude', project: project.id, kind: 'drone',
+      parentName: parent.name, lastEvent: ts, local: parent.local === true,
+    });
     this._ships.set(id, drone);
-    this._queue({ type: 'ship-spawned', ship: publicShip(drone) }, emit);
+    this._queue({ type: 'ship-spawned', ship: historyShip(drone) }, emit);
     this._pushFeed('spawn', `${parent.name} launched ${drone.name} in ${project.name}`,
       project.id, ts, emit);
   }
@@ -995,7 +974,7 @@ class ReplaySource extends EventEmitter {
     if (ship.attention === attention) return;
     ship.attention = attention;
     ship.attentionSince = attention ? ts : null;
-    this._queue({ type: 'ship-updated', ship: publicShip(ship) }, emit);
+    this._queue({ type: 'ship-updated', ship: historyShip(ship) }, emit);
     if (attention === 'done') {
       const project = this._projects.get(ship.project);
       this._pushFeed('done', `${ship.name} finished its task in ${project ? project.name : ship.project}`,
@@ -1301,67 +1280,6 @@ function providerRank(provider) {
   return provider === 'claude' ? 0 : 1;
 }
 
-/** @returns {Project} */
-function publicProject(project) {
-  return {
-    id: project.id,
-    path: project.path,
-    name: project.name,
-    exists: project.exists,
-    firstSeen: project.firstSeen,
-    lastActivity: project.lastActivity,
-    totalBytes: project.totalBytes,
-    totalBuilds: project.totalBuilds,
-    buckets: { ...project.buckets },
-    seed: fnv1a(project.id),
-    galaxy: replayGalaxy(project.path, project.exists),
-  };
-}
-
-/** @returns {Ship} */
-function publicShip(ship) {
-  return {
-    id: ship.id,
-    name: ship.name,
-    project: ship.project,
-    kind: ship.kind,
-    provider: ship.provider,
-    status: ship.status,
-    detail: null,
-    lastEvent: ship.lastEvent,
-    attention: ship.attention,
-    attentionSince: ship.attentionSince,
-    builds: ship.builds,
-    local: ship.local === true,
-  };
-}
-
-function replayGalaxy(projectPath, exists) {
-  if (exists === false) return { key: 'graveyard', label: 'Graveyard' };
-  const canonical = canonicalProjectPath(projectPath) || 'history';
-  const windows = canonical.startsWith('win:');
-  const flavor = windows ? path.win32 : path.posix;
-  const raw = canonical.slice(canonical.indexOf(':') + 1).replace(/\//g, flavor.sep);
-  const parent = flavor.dirname(raw);
-  const label = humanize(flavor.basename(parent)) || 'History';
-  return { key: `history:${hex8(parent)}`, label };
-}
-
-function proceduralPlanets(projectId) {
-  const rand = mulberry32(fnv1a(projectId));
-  const count = 3 + Math.floor(rand() * 4);
-  const planets = [];
-  for (let index = 0; index < count; index++) {
-    planets.push({
-      name: `Sector-${index + 1}`,
-      files: 5 + Math.floor(rand() * 120),
-      builds: 0,
-      procedural: true,
-    });
-  }
-  return planets;
-}
-
 function safeExists(value) {
   // Security: never probe a UNC/device path derived from transcript content.
   if (!isLocalProjectPath(value)) return false;
@@ -1389,11 +1307,6 @@ function positiveInteger(value, fallback) {
 function finiteNow(now) {
   const value = Number(now());
   return Number.isFinite(value) ? value : Date.now();
-}
-
-function humanize(value) {
-  return String(value || '').replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim()
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 module.exports = { ReplaySource };

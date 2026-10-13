@@ -63,7 +63,12 @@ if (!fs.existsSync(adapterPath)) {
   process.exit(1);
 }
 
-const trackerSource = read('src/main/tracker.js');
+// 2026-10-13: tracker.js is a facade over src/main/live and src/main/universe; read them together.
+const trackerSource = ['src/main/tracker.js', ...['live', 'universe'].flatMap((dir) => {
+  const full = path.join(root, 'src', 'main', dir);
+  return fs.existsSync(full)
+    ? fs.readdirSync(full).filter((f) => f.endsWith('.js')).sort().map((f) => `src/main/${dir}/${f}`) : [];
+})].map(read).join('\n');
 // Kit 14 (2026-10-01): main.js is split across src/main; grep the whole layer.
 const mainSource = (function readMainLayer(dir) {
   return fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))
