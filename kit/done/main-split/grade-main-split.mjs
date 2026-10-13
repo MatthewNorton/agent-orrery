@@ -42,8 +42,8 @@ function walk(dir) {
   }
   return out.sort();
 }
-// Formerly frozen files may shrink but never grow past their size when they were unfrozen.
-const LEGACY_CAPS = { 'src/main/tracker.js': 1573, 'src/main/replay-source.js': 1420 };
+// Owner's rule (2026-10-13): every module stays at 400 lines or fewer.
+const MODULE_CAP = 400;
 const mainSrc = read('src/main/main.js');
 
 // ---- stage A: flags + fixtures ----
@@ -116,11 +116,10 @@ else {
   for (const file of walk(MAIN)) {
     const r = rel(file);
     const n = lines(r);
-    if (r in LEGACY_CAPS) { if (n > LEGACY_CAPS[r]) fail('T6', `${r} is ${n} lines (cap ${LEGACY_CAPS[r]})`); continue; }
     if (r === 'src/main/main.js') continue; // capped at stage E
-    if (n > 450) fail('T6', `${r} is ${n} lines (cap 450)`);
+    if (n > MODULE_CAP) fail('T6', `${r} is ${n} lines (cap ${MODULE_CAP})`);
   }
-  if (failures === before) ok('T6', 'every src/main module within its cap; formerly frozen files no larger than when unfrozen');
+  if (failures === before) ok('T6', `every src/main module is ${MODULE_CAP} lines or fewer`);
 }
 
 // ---- T7: no module-level let (always, main.js from stage E) ----
