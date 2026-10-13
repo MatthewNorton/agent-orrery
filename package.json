@@ -1,5 +1,5 @@
 {
-  "name": "agent-universe-lite",
+  "name": "agent-orrery",
   "version": "0.1.0",
   "description": "Lightweight persistent universe visualization of Claude Code agents. Projects are solar systems, agents are starships.",
   "main": "src/main/main.js",

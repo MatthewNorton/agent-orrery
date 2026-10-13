@@ -12,7 +12,7 @@ You can expect an acknowledgement within 7 days.
 
 ## Scope
 
-Agent Universe Lite is a local desktop app. It tails Claude Code and Codex
+Agent Orrery is a local desktop app. It tails Claude Code and Codex
 transcript files on the user's own machine and never contacts the network from
 the renderer. The security boundary that matters most is **transcript content**:
 anything an observed agent writes into a transcript (working directories, file

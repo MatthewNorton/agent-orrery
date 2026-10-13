@@ -1,4 +1,4 @@
-# Architecture — Agent Universe Lite (repo `agent-orrery`)
+# Architecture — Agent Orrery
 
 How the codebase is structured **today**, written for someone who finds it confusing.
 
@@ -12,7 +12,7 @@ How the codebase is structured **today**, written for someone who finds it confu
 
 ## 1. The one-minute version
 
-Agent Universe Lite is an Electron desktop app that **watches** Claude Code and Codex work and
+Agent Orrery is an Electron desktop app that **watches** Claude Code and Codex work and
 draws it as a universe. It never controls the agents (two narrow exceptions in §3).
 
 - The **main process** (Node, `src/main/`) polls the transcript files that Claude Code and Codex
@@ -80,7 +80,7 @@ or the record of how the app was built.
 
 | Folder | Files | Size | What it is | Part of the running app? |
 |---|---|---|---|---|
-| `src/main/` + `src/preload.js` | 46 | 10,099 lines JS (1,345 of it test harness) | Main process | **Yes** (harness runs only with test flags) |
+| `src/main/` + `src/preload.js` | 48 | 10,213 lines JS (1,345 of it test harness) | Main process | **Yes** (harness runs only with test flags) |
 | `src/renderer/` | 29 | 7,280 lines JS + 3,042 HTML/CSS | Renderer (UI + 3D) | **Yes** |
 | `assets/` | 347 | ~280 MB | Planet / skybox / asteroid textures, ship GLBs | Partly — see §8 |
 | `test/` | 45 | 9,019 lines | Unit tests (`npm test`, Node's runner, no Electron) | No |
@@ -190,11 +190,12 @@ in a closure, and anything shared is a field of `ctx`.
 
 | File | Lines | Shape | Job | Requires |
 |---|---|---|---|---|
-| `tracker.js` | 1,538 | `class Tracker extends EventEmitter` | Polls Claude / Codex / Signal sources, owns the live model, emits event batches, saves `universe-state.json` | `provider-adapters`, `transcripts/*`, `shared/*`, `path-safety` |
-| `replay-source.js` | 1,387 | `class ReplaySource extends EventEmitter` | Indexes all history once at startup; rebuilds the universe at any timestamp | `provider-adapters`, `transcripts/*`, `shared/hash`, `path-safety` |
+| `tracker.js` | 1,557 | `class Tracker extends EventEmitter` | Polls Claude / Codex / Signal sources, owns the live model, emits event batches, saves `universe-state.json` | `provider-adapters`, `transcripts/*`, `shared/*`, `path-safety` |
+| `replay-source.js` | 1,399 | `class ReplaySource extends EventEmitter` | Indexes all history once at startup; rebuilds the universe at any timestamp | `provider-adapters`, `transcripts/*`, `shared/hash`, `path-safety` |
 | `provider-adapters.js` | 368 | pure functions | Provider names, project path keys, the cross-provider tool vocabulary (`classifyTool`), Signal config, `adaptLine` | `transcripts/codex`, `transcripts/fields` |
-| `transcripts/codex.js` | 235 | pure functions | One Codex record → structural signals; rollout ownership; parent thread id | `transcripts/fields` |
-| `transcripts/claude.js` | 111 | pure functions | One Claude Code record → structural facts for both models; Claude's own tool vocabulary (`claudeTool`) | `transcripts/fields` |
+| `transcripts/codex.js` | 237 | pure functions | One Codex record → structural signals; rollout ownership; parent thread id | `transcripts/fields` |
+| `transcripts/claude.js` | 116 | pure functions | One Claude Code record → structural facts for both models; Claude's own tool vocabulary (`claudeTool`) | `transcripts/fields` |
+| `transcripts/model.js` | 31 | pure functions | Is a session on a local model: Codex `model_provider`, Claude `message.model` | — |
 | `transcripts/fields.js` | 52 | functions | `safeId`, `safePath`, `plainObject`, `firstTrimmed` for transcript fields | — |
 | `task-runs.js` | 397 | `class TaskRunTracker` | Matches a launched Codex run to its ship; ticks the `GOALS.md` box when done | `goals` |
 | `root-task-coordinator.js` | 386 | `class RootTaskCoordinator` | Assign / retry flow: write goal → start run → launch Codex | `goals` |
@@ -221,7 +222,8 @@ in a closure, and anything shared is a field of `ctx`.
 |---|---|---|
 | `main.js` | 48 | Bootstrap (§5.1) |
 | `flags.js` | 45 | Parses `argv` into a frozen flags object |
-| `app-context.js` | 244 | Creates `ctx`; `start()` builds and wires every service; `cleanup()` tears down on quit |
+| `app-context.js` | 250 | Creates `ctx`; `start()` builds and wires every service; `cleanup()` tears down on quit |
+| `user-data.js` | 39 | First run under the Agent Orrery name: copies the state files from the old `agent-universe-lite` folder |
 | `replay-control.js` | 227 | LIVE ↔ REPLAY switching, `au:replay` commands, `streamEpoch`, replay-state and git-status pushes, visible snapshot |
 | `window.js` | 62 | Creates and hardens the `BrowserWindow`, loads `index.html` |
 | `ipc/register.js` | 77 | The one table of `ipcMain.handle` registrations; small handlers inline |
@@ -459,7 +461,7 @@ contract), `AUR`, `AUR_POLISH` and `AUR_GALAXY` (all `any` for now).
 
 | Location | File | Written by | Holds |
 |---|---|---|---|
-| userData (`%APPDATA%\agent-universe-lite`) | `universe-state.json` | `tracker.js` every 60 s | Build counts per folder, path → id map, path overrides |
+| userData (`%APPDATA%\agent-orrery`) | `universe-state.json` | `tracker.js` every 60 s | Build counts per folder, path → id map, path overrides |
 | userData | `root-tasks.json` | `root-tasks.js` | IDEAS queue (cap 1,000 records) |
 | userData | `task-runs.json` | `task-runs.js` | Codex run ↔ ship bindings |
 | userData | `providers.json` | you (read-only to the app) | Signal folders to watch |
@@ -468,6 +470,10 @@ contract), `AUR`, `AUR_POLISH` and `AUR_GALAXY` (all `any` for now).
 | repo | `.shots/` | test modes | Screenshots, `state.json`, gate run folders |
 
 Nothing is stored for history playback; it re-reads the transcripts.
+
+Until October 2026 the app was Agent Universe Lite, and userData was `%APPDATA%\agent-universe-lite`.
+The first normal run under the new name copies the four userData files from there (`user-data.js`),
+never writes to the old folder, and skips the copy in every test mode.
 
 ---
 
@@ -596,8 +602,8 @@ not reproduced.
 24. *(resolved)* Every archived gate prints its `kit/done/` usage path.
 25. No single backlog: `ROADMAP`, `UX-IMPROVEMENTS`, `DESIGN-DIRECTION`, `TIMELINE-SLIDER`,
     `PUBLIC-RELEASE-TASKS` Phase 5 and `kit/todo/` overlap.
-26. Names drift: repo `agent-orrery`, package / userData `agent-universe-lite`, product
-    "Agent Universe Lite", most docs "Agent Universe".
+26. *(resolved)* One name: Agent Orrery for the repo, package, userData folder, window and docs.
+    The `agent-universe:<uuid>` task marker keeps its spelling: it is already written into `GOALS.md` files.
 
 ### Test gaps
 27. *(mostly resolved)* The wiring has unit tests (`app-context`, `replay-control`, `ipc-*`), and

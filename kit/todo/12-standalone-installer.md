@@ -1,6 +1,6 @@
 # Stub — standalone installer (parked: wanted later, not yet)
 
-Goal: a real packaged build — a self-contained `Agent Universe Lite.exe`
+Goal: a real packaged build — a self-contained `Agent Orrery.exe`
 (NSIS installer and/or portable exe; macOS `.app`/dmg later) that launches
 without a checkout or `node_modules`, like the sibling `agent-universe` app's
 `npm run pack:dir` / `npm run dist`.

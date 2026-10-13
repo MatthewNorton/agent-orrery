@@ -34,9 +34,9 @@ CommonJS so its normalization and filtering behavior can be unit tested.
 
 ```js
 {
-  id: 'agent-universe-lite',
-  name: 'agent-universe-lite',
-  path: 'C:\\workspace\\agent-universe-lite',
+  id: 'agent-orrery',
+  name: 'agent-orrery',
+  path: 'C:\\workspace\\agent-orrery',
   git: {
     branch: 'feat/github-project-status',
     detached: false,
@@ -44,8 +44,8 @@ CommonJS so its normalization and filtering behavior can be unit tested.
     changedFiles: 4,
   },
   github: {
-    url: 'https://github.com/MatthewNorton/agent-universe-lite.git',
-    nameWithOwner: 'MatthewNorton/agent-universe-lite',
+    url: 'https://github.com/MatthewNorton/agent-orrery.git',
+    nameWithOwner: 'MatthewNorton/agent-orrery',
     openPullRequests: 2,
     state: 'ready', // ready | stale | loading | unknown | error
   },

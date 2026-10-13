@@ -1,6 +1,6 @@
 # Launch on macOS
 
-Agent Universe Lite runs on macOS from a checkout with no platform-specific
+Agent Orrery runs on macOS from a checkout with no platform-specific
 setup. Transcript discovery, the universe state, and all three views work the
 same as on Windows; only the two LIVE-only controls need host support, and both
 have macOS implementations.
@@ -23,7 +23,7 @@ After `npm install`, from the repository root:
 bash scripts/macos-shortcuts.sh install
 ```
 
-This creates `~/Applications/Agent Universe Lite.app`, a thin launcher bundle
+This creates `~/Applications/Agent Orrery.app`, a thin launcher bundle
 that runs the Electron binary already inside `node_modules` with this
 repository as its argument. It records the absolute repository path at install
 time, so re-run Install after moving the checkout or reinstalling Electron.

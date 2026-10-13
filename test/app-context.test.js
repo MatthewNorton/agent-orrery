@@ -106,6 +106,12 @@ test('a new context holds no services until start()', () => {
   assert.deepEqual(ctx.harness, { rendererTestErrors: [], openedProjects: [], controlFixture: null, historyFixture: null });
 });
 
+test('a test-mode run never looks for the Agent Universe Lite data folder', (t) => {
+  const warn = t.mock.method(console, 'warn', () => {});
+  started(t, { historyTest: true });
+  assert.equal(warn.mock.calls.some(({ arguments: [message] }) => String(message).startsWith('[startup]')), false);
+});
+
 test('start() and cleanup() name the wiring main.js must attach first', () => {
   const fixtures = fakeFixtures(null);
   const ctx = createAppContext({ flags: { historyTest: true, testMode: true }, fixtures }, NO_USER_DATA);
