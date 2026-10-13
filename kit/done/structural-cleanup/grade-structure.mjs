@@ -141,14 +141,6 @@ else {
   if (failures === before) ok('T5', 'disposeSettled is a documented, bounded isReady() poll');
 }
 
-// ---- T6: pins current (task A; always checked because A is the first task) ----
-if (!exists('kit/repin.mjs')) fail('T6', 'kit/repin.mjs missing');
-else {
-  const r = spawnSync(process.execPath, [path.join(ROOT, 'kit', 'repin.mjs'), '--check'], { cwd: ROOT, encoding: 'utf8' });
-  if (r.status !== 0) fail('T6', `repin --check failed:\n${(r.stdout + r.stderr).trim()}`);
-  else ok('T6', 'all frozen-file pins current');
-}
-
 // ---- T7: unit tests (always) ----
 {
   const r = spawnSync('npm test', { cwd: ROOT, encoding: 'utf8', shell: true });

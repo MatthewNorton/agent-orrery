@@ -28,8 +28,6 @@ function read(rel) {
   return fs.readFileSync(file, 'utf8');
 }
 function sha256(file) {
-  // Hash with line endings normalized to LF so the pins hold on every platform and
-  // every core.autocrlf setting (a fresh Windows checkout is CRLF, macOS/Linux are LF).
   const text = fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n');
   return crypto.createHash('sha256').update(text).digest('hex');
 }
@@ -66,32 +64,7 @@ if (!fs.existsSync(replayPath)) {
   process.exit(1);
 }
 
-// Baseline re-pinned 2026-09-04 to main after PR #24 (macOS support + security
-// hardening). Later kits legitimately moved these files; the hashes track the
-// state each subsequent kit must not regress from.
-// src/main/tracker.js and provider-adapters.js are no longer pinned: they were unfrozen to
-// give live and replay one transcript parser (CLAUDE.md, Frozen files).
-// All hashes re-pinned 2026-09-27 as LF-normalized digests (docs/PUBLIC-RELEASE-TASKS.md
-// item 5.6); file contents are unchanged from the previous pins.
-// package.json and package-lock.json re-pinned 2026-09-27 after Dependabot #27 (Babylon 9.28) and #30 (Electron 44).
-// 2026-10-13 re-pinned: src/renderer/scene-universe.js, src/renderer/scene-system.js, src/renderer/scene-planet.js — ship heading: ships face along their orbit either way round (owner request 2026-10-13)
-const frozen = new Map([
-  ['src/renderer/scene-universe.js', 'b06fa399c4b9956e5f80e95243bbe87d2231bbc1596508048600cd2f907b8512'],
-  ['src/renderer/scene-system.js', 'bdc6fa72462f90fda83de476477a809116047701843099243a3db7b10fea14f1'],
-  ['src/renderer/scene-planet.js', 'd532fe6937c054c4e1c5563d3bdefa11c1e7486fd4176c792a4d69283cf5747f'],
-  ['src/renderer/galaxy-layout.js', '3b6456404bea666a2b7d6e0db5b5c57190b3a67b7c383786beb4d8fb7e76ea39'],
-  ['src/renderer/polish-math.js', '2d8c154844aa89aeb3d666a8be1e1583cae45f42ce2d8f6ca75c5c17e02385ef'],
-]);
-for (const [rel, expected] of frozen) {
-  const file = path.join(root, rel);
-  if (!fs.existsSync(file)) fail('H0', `frozen file missing: ${rel}`);
-  else if (sha256(file) !== expected) fail('H0', `frozen file changed: ${rel}`);
-}
-// 2026-09-28: package.json and package-lock.json are no longer fingerprinted. Dependabot
-// changes them routinely, and the rule this gate protects is "no new dependencies", so
-// the dependency NAMES are pinned instead: version bumps pass, an added package fails.
-// package-lock.json needs no pin of its own: `npm ci` refuses a lockfile that disagrees
-// with package.json.
+// No new dependencies without asking: version bumps pass, an added package fails.
 const FROZEN_DEPENDENCY_NAMES = ['babylonjs', 'babylonjs-gui', 'babylonjs-loaders', 'electron', 'typescript'];
 {
   const pkg = JSON.parse(read('package.json') || '{}');

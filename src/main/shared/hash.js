@@ -1,7 +1,7 @@
 // @ts-check
 'use strict';
 
-// The renderer keeps hash-pinned copies in src/renderer/util.js and galaxy-layout.js, so
+// The renderer keeps its own copies in src/renderer/util.js and galaxy-layout.js, so
 // seeds agree across processes; test/shared-hash.test.js holds util.js to this one.
 
 /**
