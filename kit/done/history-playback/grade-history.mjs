@@ -88,7 +88,16 @@ const appSource = fs.readdirSync(path.join(root, 'src', 'renderer'))
   .map((f) => read(`src/renderer/${f}`)).join('\n');
 const htmlSource = read('src/renderer/index.html');
 const styleSource = read('src/renderer/style.css');
-const utilSource = read('src/renderer/util.js');
+// 2026-10-13: renderer files may be split. A view's source is its scene-<view>*.js files plus the
+// shared scene helpers and ship-assets*.js; util source is util.js plus util-*.js.
+const rendererJs = fs.readdirSync(path.join(root, 'src', 'renderer')).filter((f) => f.endsWith('.js')).sort();
+const VIEWS = ['universe', 'system', 'planet'];
+const viewSource = (view) => rendererJs.filter((f) => f.startsWith(`scene-${view}`) || f.startsWith('ship-assets') ||
+  (f.startsWith('scene-') && !VIEWS.some((other) => f.startsWith(`scene-${other}`))))
+  .map((f) => read(`src/renderer/${f}`)).join('\n');
+const utilLayer = () => rendererJs.filter((f) => /^util(-[a-z0-9-]+)?\.js$/.test(f))
+  .map((f) => read(`src/renderer/${f}`)).join('\n');
+const utilSource = utilLayer();
 const docsSource = read('docs/HISTORY-PLAYBACK.md');
 
 if (!/history-test/.test(mainSource) || !/au:replay/.test(mainSource) ||

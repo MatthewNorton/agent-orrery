@@ -30,6 +30,21 @@
       aft: 'AFT',
       port: 'PORT',
     }),
+    // Overlay chrome sections as dirty-mask bits (app-chrome-queue.js).
+    CHROME: Object.freeze({
+      AGENTS: 1 << 0,
+      FEED: 1 << 1,
+      SUMMARY: 1 << 2,
+      PROJECT: 1 << 3,
+      PLANET: 1 << 4,
+      RECENT: 1 << 5,
+      SEARCH: 1 << 6,
+      SETTINGS: 1 << 7,
+      DIRECTORY: 1 << 8,
+      IDEAS: 1 << 9,
+      FOCUS: 1 << 10,
+      HISTORY: 1 << 11,
+    }),
   };
 
   const S = {
