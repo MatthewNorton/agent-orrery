@@ -64,7 +64,10 @@ test('runtime planet generation is deterministic and spans distinct world classe
 });
 
 test('solar systems build three deformed asteroid forms with nonuniform instances', () => {
-  const source = fs.readFileSync(path.join(root, 'src/renderer/scene-system.js'), 'utf8');
+  // The system view's source is its scene-system*.js files.
+  const source = fs.readdirSync(path.join(root, 'src/renderer'))
+    .filter((file) => /^scene-system.*\.js$/.test(file)).sort()
+    .map((file) => fs.readFileSync(path.join(root, 'src/renderer', file), 'utf8')).join('\n');
   const manifest = JSON.parse(fs.readFileSync(path.join(root, 'assets/manifest.json'), 'utf8'));
   const asteroids = manifest.assets.filter((entry) => entry.type === 'asteroid');
 
