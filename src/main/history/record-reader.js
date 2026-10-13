@@ -21,8 +21,9 @@ const MAX_OPEN_STREAM_HANDLES = 64;
 /**
  * @typedef {object} SourceCursor
  * @property {number} readOffset file offset of the next read
- * @property {Buffer} buffer bytes read but not yet split into lines
- * @property {number} bufferOffset file offset of buffer[0]
+ * @property {Buffer} buffer bytes read; lines before bufferStart are already consumed
+ * @property {number} bufferStart index of the first unread byte in buffer
+ * @property {number} bufferOffset file offset of buffer[bufferStart]
  * @property {boolean} discardingOversized skipping the rest of an oversized line
  * @property {Record<string, any> | null} adapterState Codex adapter cursor
  * @property {boolean} claudeSessionEmitted
@@ -51,6 +52,7 @@ const MAX_OPEN_STREAM_HANDLES = 64;
  * @property {() => void} assertCurrent throws ERR_REPLAY_CANCELLED once superseded
  * @property {TimestampGuard} safeTimestamp
  * @property {(entry: IndexEntry, cursor: SourceCursor, handles: HandlePool) => Promise<FileHandle>} openStreamHandle
+ * @property {number} [chunkBytes] read size; tests shrink it to cross chunk boundaries
  */
 
 /**
@@ -64,6 +66,7 @@ function sourceCursor(cursors, entry) {
   cursor = {
     readOffset: 0,
     buffer: Buffer.alloc(0),
+    bufferStart: 0,
     bufferOffset: 0,
     discardingOversized: false,
     adapterState: entry.provider === 'codex'
@@ -108,25 +111,26 @@ async function readNextRecord(ctx, entry, cursor, target, handles) {
       cursor.blockedUntil = null;
 
       if (cursor.discardingOversized) {
-        const newline = cursor.buffer.indexOf(0x0a);
+        const newline = cursor.buffer.indexOf(0x0a, cursor.bufferStart);
         if (newline >= 0) {
-          cursor.buffer = Buffer.from(cursor.buffer.subarray(newline + 1));
-          cursor.bufferOffset += newline + 1;
+          cursor.bufferOffset += newline + 1 - cursor.bufferStart;
+          cursor.bufferStart = newline + 1;
           cursor.discardingOversized = false;
-        } else if (cursor.buffer.length) {
-          cursor.bufferOffset += cursor.buffer.length;
-          cursor.buffer = Buffer.alloc(0);
+        } else if (cursor.buffer.length > cursor.bufferStart) {
+          cursor.bufferOffset += cursor.buffer.length - cursor.bufferStart;
+          dropBuffer(cursor);
         }
       }
 
-      const newline = cursor.discardingOversized ? -1 : cursor.buffer.indexOf(0x0a);
+      const start = cursor.bufferStart;
+      const newline = cursor.discardingOversized ? -1 : cursor.buffer.indexOf(0x0a, start);
       if (newline >= 0) {
         let end = newline;
-        if (end > 0 && cursor.buffer[end - 1] === 0x0d) end--;
-        const line = cursor.buffer.subarray(0, end);
+        if (end > start && cursor.buffer[end - 1] === 0x0d) end--;
+        const line = cursor.buffer.subarray(start, end);
         const lineOffset = cursor.bufferOffset;
-        cursor.buffer = Buffer.from(cursor.buffer.subarray(newline + 1));
-        cursor.bufferOffset += newline + 1;
+        cursor.bufferStart = newline + 1;
+        cursor.bufferOffset += newline + 1 - start;
         if (line.length === 0) continue;
         if (line.length > MAX_LINE_BYTES) {
           cursor.partial = true;
@@ -162,35 +166,37 @@ async function readNextRecord(ctx, entry, cursor, target, handles) {
         continue;
       }
 
-      if (cursor.buffer.length > MAX_LINE_BYTES) {
-        cursor.bufferOffset += cursor.buffer.length;
-        cursor.buffer = Buffer.alloc(0);
+      if (cursor.buffer.length - cursor.bufferStart > MAX_LINE_BYTES) {
+        cursor.bufferOffset += cursor.buffer.length - cursor.bufferStart;
+        dropBuffer(cursor);
         cursor.discardingOversized = true;
         cursor.partial = true;
       }
       if (cursor.readOffset >= entry.size) {
         // The captured immutable range ended without another complete line.
-        cursor.buffer = Buffer.alloc(0);
+        dropBuffer(cursor);
         cursor.done = true;
         return null;
       }
       const handle = await ctx.openStreamHandle(entry, cursor, handles);
       ctx.assertCurrent();
-      const length = Math.min(STREAM_READ_CHUNK_BYTES, entry.size - cursor.readOffset);
-      const chunk = Buffer.alloc(length);
+      const length = Math.min(ctx.chunkBytes || STREAM_READ_CHUNK_BYTES, entry.size - cursor.readOffset);
       const readAt = cursor.readOffset;
-      const { bytesRead } = await handle.read(chunk, 0, length, readAt);
+      // Compact only here: the unread tail moves to the front of the next buffer.
+      const unread = cursor.buffer.subarray(cursor.bufferStart);
+      const next = Buffer.allocUnsafe(unread.length + length);
+      unread.copy(next, 0);
+      const { bytesRead } = await handle.read(next, unread.length, length, readAt);
       ctx.assertCurrent();
       if (bytesRead <= 0) {
         cursor.partial = true;
         cursor.done = true;
         return null;
       }
-      if (cursor.buffer.length === 0) cursor.bufferOffset = readAt;
-      const received = chunk.subarray(0, bytesRead);
-      cursor.buffer = cursor.buffer.length
-        ? Buffer.concat([cursor.buffer, received]) : Buffer.from(received);
-      cursor.readOffset += bytesRead;
+      cursor.buffer = next.subarray(0, unread.length + bytesRead);
+      cursor.bufferStart = 0;
+      cursor.bufferOffset = readAt - unread.length;
+      cursor.readOffset = readAt + bytesRead;
       sliceBytes += bytesRead;
       if (sliceBytes >= 8 * 1024 * 1024) {
         sliceBytes = 0;
@@ -210,9 +216,15 @@ async function readNextRecord(ctx, entry, cursor, target, handles) {
  * @param {SourceCursor | undefined} cursor
  */
 function releaseCursorBuffer(cursor) {
-  if (!cursor || !cursor.buffer.length) return;
-  cursor.readOffset = cursor.bufferOffset;
+  if (!cursor) return;
+  if (cursor.buffer.length > cursor.bufferStart) cursor.readOffset = cursor.bufferOffset;
+  dropBuffer(cursor);
+}
+
+/** @param {SourceCursor} cursor */
+function dropBuffer(cursor) {
   cursor.buffer = Buffer.alloc(0);
+  cursor.bufferStart = 0;
 }
 
 /**

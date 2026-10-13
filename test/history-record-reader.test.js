@@ -27,7 +27,8 @@ const result = (cwd, ts, id) => ({
   message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, content: 'private' }] },
 });
 
-function writeFixture(t) {
+// `small` keeps every line short enough to read a few bytes at a time.
+function writeFixture(t, { small = false } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'au-history-reader-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const dir = path.join(root, 'workspace', 'demo');
@@ -36,12 +37,12 @@ function writeFixture(t) {
     json(prompt(dir, T0)),
     json(tool(dir, T0 + 1000, 'toolu_a', 'Edit', { file_path: path.join(dir, 'src', 'a.js') })),
     json(tool(dir, T0 + 2000, null, 'Read', {})),
-    json(prompt(dir, T0 + 3000, 'x'.repeat(40_000))),
+    json(prompt(dir, T0 + 3000, 'x'.repeat(small ? 700 : 40_000))),
     '',
     '{not json',
     `${json(result(dir, T0 + 4000, 'toolu_a'))}\r`,
-    json(prompt(dir, T0 + 3500, 'héllo wörld ✓ '.repeat(3000))),
-    json(prompt(dir, T0 + 5000, 'y'.repeat(MAX_LINE_BYTES + 10))),
+    json(prompt(dir, T0 + 3500, 'héllo wörld ✓ '.repeat(small ? 40 : 3000))),
+    small ? '\r' : json(prompt(dir, T0 + 5000, 'y'.repeat(MAX_LINE_BYTES + 10))),
     json(tool(dir, T0 + 6000, 'toolu_b', 'Write', { file_path: path.join(dir, 'docs', 'b.md') })),
   ];
   const content = `${lines.join('\n')}\n${json(prompt(dir, T0 + 7000))}`;
@@ -130,6 +131,32 @@ test('record reader: releasing the buffer between records resumes at the same li
   }
 });
 
+test('record reader: any chunk size frames the same lines (CRLF and UTF-8 split across reads)', async (t) => {
+  const { entry, content } = writeFixture(t, { small: true });
+  const expected = expectedRecords(entry, content);
+  assert.equal(expected.length, 13);
+  for (const chunkBytes of [1, 2, 3, 5, 7, 11, 13, 17, 64, 1000, 4096]) {
+    const context = { ...ctx, chunkBytes };
+    const { records, cursor } = await readAll(entry, { context });
+    assert.deepEqual(records.map(shape), expected, `chunk ${chunkBytes}`);
+    assert.equal(cursor.partial, false, `chunk ${chunkBytes}`);
+    for (const releaseEvery of [1, 3]) {
+      assert.deepEqual((await readAll(entry, { context, releaseEvery })).records.map(shape), expected,
+        `chunk ${chunkBytes}, release every ${releaseEvery}`);
+    }
+  }
+});
+
+test('record reader: an oversized line is skipped the same way at any chunk size', async (t) => {
+  const { entry, content } = writeFixture(t);
+  const expected = expectedRecords(entry, content);
+  for (const chunkBytes of [4096, 65_536, 1024 * 1024, 4 * 1024 * 1024]) {
+    const { records, cursor } = await readAll(entry, { context: { ...ctx, chunkBytes } });
+    assert.deepEqual(records.map(shape), expected, `chunk ${chunkBytes}`);
+    assert.equal(cursor.partial, true, `chunk ${chunkBytes}`);
+  }
+});
+
 test('record reader: a record past the target waits in the cursor for the next advance', async (t) => {
   const { entry } = writeFixture(t);
   const cursor = sourceCursor(new Map(), entry);
@@ -170,7 +197,7 @@ test('handle pool: past 64 open sources the least recently used is closed and re
     const filePath = path.join(root, `${index}.jsonl`);
     fs.writeFileSync(filePath, 'x\n');
     const entry = { sourceKey: `source-${index}`, filePath };
-    const cursor = { buffer: Buffer.from('unread'), bufferOffset: 10, readOffset: 16 };
+    const cursor = { buffer: Buffer.from('read|unread'), bufferStart: 5, bufferOffset: 10, readOffset: 16 };
     cursors.push(cursor);
     await openStreamHandle(entry, cursor, handles);
     if (index === 1) await openStreamHandle({ sourceKey: 'source-0', filePath }, cursors[0], handles);
@@ -179,7 +206,7 @@ test('handle pool: past 64 open sources the least recently used is closed and re
   assert.equal(handles.has('source-0'), true, 'reuse refreshes a source');
   assert.equal(handles.has('source-1'), false, 'the least recently used source was evicted');
   assert.deepEqual({ readOffset: cursors[1].readOffset, buffered: cursors[1].buffer.length }, { readOffset: 10, buffered: 0 });
-  assert.equal(cursors[0].buffer.length, 6);
+  assert.equal(cursors[0].buffer.length, 11);
   await closeStreamHandles(handles);
   assert.equal(handles.size, 0);
   assert.ok(cursors.every((cursor) => cursor.buffer.length === 0 && cursor.readOffset === 10));
