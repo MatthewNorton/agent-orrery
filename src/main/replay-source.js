@@ -5,9 +5,12 @@
 // Tracker: it never starts live watchers, writes persistent state, opens a
 // process, or exposes transcript contents. Only structural transcript facts
 // cross this module's public boundary. The work lives in history/: the index,
-// per-source record readers, the merge, and the model they rebuild.
+// per-source record readers, the merge, the model they rebuild, and seek checkpoints.
 
 const { EventEmitter } = require('events');
+const {
+  createCheckpointStore, planCheckpointTimes, seekThrough, staleCheckpoint,
+} = require('./history/checkpoints');
 const { collectIndexEntries, orderIndex } = require('./history/index-builder');
 const { parseTimestamp, safeTimestamp } = require('./history/jsonl');
 const { mergeThrough } = require('./history/merge');
@@ -60,6 +63,7 @@ class ReplaySource extends EventEmitter {
       onBatch: (batch) => this.emit('events', batch),
       preferredProjectId: (key) => this._preferredProjectIds.get(key),
     });
+    this._checkpoints = createCheckpointStore();
   }
 
   /** Build a bounded file/time index. Raw lines and source paths stay private. */
@@ -104,7 +108,19 @@ class ReplaySource extends EventEmitter {
     this._model.reset();
     this._cursorMs = this._minMs;
     if (!beforeRange) {
-      await this._advanceThrough(token, target, false);
+      this._lastDrainPeakRecords = 0;
+      await seekThrough({
+        store: this._checkpoints,
+        model: this._model,
+        cursors: () => this._sourceCursors,
+        setCursors: (cursors) => { this._sourceCursors = cursors; },
+        advance: (time, after) => this._advanceThrough(token, time, false, after),
+        reset: () => {
+          this._model.reset();
+          this._sourceCursors = new Map();
+        },
+        assertCurrent: () => this._assertCurrent(token),
+      }, target);
     } else {
       this._cursorMs = target;
     }
@@ -126,6 +142,7 @@ class ReplaySource extends EventEmitter {
     const target = this._clampTimestamp(timestampMs);
     if (target === null) return this.snapshot();
     if (this._cursorMs !== null && target < this._cursorMs) return this.seek(target);
+    this._lastDrainPeakRecords = 0;
     await this._advanceThrough(token, target, emit !== false);
     if (this._maxMs !== null && target >= this._maxMs && this._phase === 'playing') {
       this._cancelTimer();
@@ -213,6 +230,7 @@ class ReplaySource extends EventEmitter {
     this._maxMs = null;
     this._cursorMs = null;
     this._model.reset();
+    this._checkpoints.reset([]);
     this._emitState();
   }
 
@@ -239,6 +257,7 @@ class ReplaySource extends EventEmitter {
     this._hasIndex = true;
     this._phase = preservePlaying ? 'playing' : 'paused';
     this._model.reset();
+    this._checkpoints.reset(planCheckpointTimes(index.entries, index.minMs, index.maxMs));
     if (preservePlaying) {
       this._playCursorStart = this._minMs || 0;
       this._playWallStart = finiteNow(this.now);
@@ -246,9 +265,9 @@ class ReplaySource extends EventEmitter {
     this._emitState();
   }
 
-  async _advanceThrough(token, target, emit) {
+  /** `after` guards a checkpoint continuation: every record applied must be later. */
+  async _advanceThrough(token, target, emit, after = -Infinity) {
     if (!Number.isFinite(target)) return;
-    this._lastDrainPeakRecords = 0;
     const partial = await mergeThrough({
       entries: this._indexEntries,
       partial: this._partial,
@@ -258,6 +277,7 @@ class ReplaySource extends EventEmitter {
       cursorFor: (entry) => sourceCursor(this._sourceCursors, entry),
       cursorOf: (sourceKey) => this._sourceCursors.get(sourceKey),
       apply: (record) => {
+        if (record.ts <= after) throw staleCheckpoint(record.ts);
         this._model.advanceLifecycle(record.ts, emit);
         this._model.applyRecord(record, emit);
       },
