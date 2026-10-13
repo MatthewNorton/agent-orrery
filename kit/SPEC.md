@@ -122,7 +122,7 @@ Project = { id, path, name, exists, firstSeen, lastActivity, totalBytes, totalBu
 // deleted paths use key `graveyard` with label `Graveyard`.
 
 Ship = { id, name, provider, project, kind, status, detail, lastEvent,
-         attention, attentionSince, builds, taskId?, turnOutcome? }   // ?: LIVE only
+         attention, attentionSince, builds, local, taskId?, turnOutcome? }   // ?: LIVE only
 // provider: 'claude'|'codex'|'generic'; names use Claude-/Codex-/Signal-.
 // kind: 'main' | 'drone' (drone = subagent, render smaller);
 // status: 'Building'|'Exploring'|'Gathering Resources'|'Scanning'|'Delegating'|
@@ -133,6 +133,10 @@ Ship = { id, name, provider, project, kind, status, detail, lastEvent,
 //   (catch-up included). LIVE tails transcripts already on disk at startup from
 //   EOF, so a session running before launch restarts at 0. A ship-updated can
 //   precede the build it reports; the renderer also counts `build` events.
+// local: the session runs a local model. Codex: session_meta.model_provider is a
+//   local server (oss, ollama, lmstudio, llama.cpp, vllm, localai). Claude: the
+//   latest assistant message.model is not a Claude model. Drones inherit it from
+//   their parent; a change arrives as ship-updated. The provider stays claude/codex.
 
 FeedEntry = { kind, text, project, ts }
 // kind: 'discover'|'form'|'build'|'info'|'spawn'|'depart'|'attention'|'done'
@@ -218,9 +222,14 @@ Design tokens (put in `:root`):
 - Status dot colors: Building `#4da3ff`, Exploring `#a78bfa`,
   Gathering Resources `#ffb454`, Scanning `#34d399`, Delegating `#f472b6`,
   Planning `#facc15`, Working `#94a3b8`.
-- Ship hulls use deterministic provider variants: Claude purple, Codex
-  cyan/blue, and generic Signal amber/neutral. Missing provider values in
-  legacy fixtures normalize to Claude; raw/unknown values normalize to Signal.
+- Provider colors (`AUR.PROVIDERS`): Claude neon purple `#b026ff`, Codex blue
+  `#2f7dff`, generic Signal `#94a3b8`; a `local` ship of either provider is red
+  `#ff3344` (`AUR.LOCAL_MODEL`). `AUR.shipColor(ship)` and `AUR.shipTint(id,
+  provider)` both resolve local, so hulls, agent rows and focus mode agree.
+  Missing provider values in legacy fixtures normalize to Claude; raw/unknown
+  values normalize to Signal.
+- Fleet hulls wear a livery: graphite hull and armor, the structure (ivory)
+  parts in the ship color, accents emitting exactly the ship color.
 - Main Claude/Codex ships fly the `aur-fleet-v2` rank ladder in
   `assets/ships/manifest.json`: the hull is the highest rank whose `minBuilds`
   the ship's `builds` has reached (interceptor 0 → carrier 200); display size

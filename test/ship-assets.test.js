@@ -96,7 +96,7 @@ test('shared hulls receive fixed provider palettes while signals and drones load
   };
   const providerKey = (value) => value === 'codex' ? 'codex' :
     value === 'signal' ? 'generic' : 'claude';
-  const colors = { claude: '#a78bfa', codex: '#22d3ee', generic: '#94a3b8' };
+  const colors = { claude: '#b026ff', codex: '#2f7dff', generic: '#94a3b8' };
   const AUR = {
     log() {},
     fnv1a() { return 0; },
@@ -106,6 +106,7 @@ test('shared hulls receive fixed provider palettes while signals and drones load
       return { key, label: key, color: colors[key] };
     },
     shipTint(_id, provider) { return colors[providerKey(provider)]; },
+    shipColor(ship) { return ship && ship.local === true ? '#ff3344' : colors[providerKey(ship && ship.provider)]; },
     color3(hex) { return new Color(hex); },
     markShipMesh(mesh, ship) {
       mesh.metadata = {
@@ -151,10 +152,10 @@ test('shared hulls receive fixed provider palettes while signals and drones load
   assert.equal(containerLoads, 1);
   assert.equal(materialClones, 2);
   assert.notEqual(claude.material, codex.material);
-  assert.equal(claude.material.emissiveColor.toHexString(), '#a78bfa');
-  assert.equal(codex.material.emissiveColor.toHexString(), '#22d3ee');
-  assert.equal(claude.metadata.providerTint, '#a78bfa');
-  assert.equal(codex.metadata.providerTint, '#22d3ee');
+  assert.equal(claude.material.emissiveColor.toHexString(), '#b026ff');
+  assert.equal(codex.material.emissiveColor.toHexString(), '#2f7dff');
+  assert.equal(claude.metadata.providerTint, '#b026ff');
+  assert.equal(codex.metadata.providerTint, '#2f7dff');
   assert.equal(claudeFallback.metadata.isShip, false);
   assert.equal(codexFallback.metadata.isShip, false);
   assert.ok(instantiatedMeshes.every((mesh) => mesh.isPickable === false));
@@ -283,7 +284,7 @@ function loadShipAssets(manifest, trianglesByFile) {
     dispose() {},
   });
   const providerKey = (value) => value === 'codex' ? 'codex' : value === 'signal' ? 'generic' : 'claude';
-  const colors = { claude: '#a78bfa', codex: '#22d3ee', generic: '#94a3b8' };
+  const colors = { claude: '#b026ff', codex: '#2f7dff', generic: '#94a3b8' };
   const AUR = {
     log() {},
     fnv1a() { return 0; },
@@ -293,6 +294,7 @@ function loadShipAssets(manifest, trianglesByFile) {
       return { key, label: key, color: colors[key] };
     },
     shipTint(_id, provider) { return colors[providerKey(provider)]; },
+    shipColor(ship) { return ship && ship.local === true ? '#ff3344' : colors[providerKey(ship && ship.provider)]; },
     color3(hex) { return new Color(hex); },
     markShipMesh(mesh, ship) {
       mesh.metadata = { ...(mesh.metadata || {}), isShip: true, shipId: ship.id };
@@ -371,8 +373,8 @@ test('the universe instances far hulls from one template per provider; other vie
   const sources = (root) => root.getChildMeshes(false).filter((mesh) => mesh.sourceMesh).map((mesh) => mesh.sourceMesh);
   assert.deepEqual(sources(first), sources(second), 'one template per provider');
   assert.notDeepEqual(sources(first), sources(codex));
-  assert.equal(first.material.emissiveColor.toHexString(), '#a78bfa');
-  assert.equal(codex.material.emissiveColor.toHexString(), '#22d3ee');
+  assert.equal(first.material.emissiveColor.toHexString(), '#b026ff');
+  assert.equal(codex.material.emissiveColor.toHexString(), '#2f7dff');
   const hull = first.getChildMeshes(false).find((mesh) => mesh.material && mesh.material.name.includes('hull_primary'));
   assert.ok(hull.material.emissiveColor.r > 0, 'far hulls carry a faint self-light on the unlit map');
 
@@ -418,11 +420,23 @@ test('refresh swaps the hull inside the same root and keeps the fallback valid',
   assert.equal(firstCorrection.disposed, true);
   assert.equal(root.children.length, 1);
   assert.equal(root.children[0].scaling.x, 0.3, 'class display size lives on the correction node');
-  assert.equal(root.material.emissiveColor.toHexString(), '#a78bfa');
+  assert.equal(root.material.emissiveColor.toHexString(), '#b026ff');
 
   assert.equal(await assets.ships.refresh(scene, ship('unknown', 50)), null);
   root.dispose();
   assert.equal(await assets.ships.refresh(scene, ship('a', 50)), null, 'a disposed ship is forgotten');
+});
+
+test('refresh re-tints a ship that turns out to run a local model, keeping its hull', async () => {
+  const assets = loadShipAssets(LADDER_MANIFEST, {});
+  const scene = assets.scene('system');
+  const root = await assets.ships.upgrade(scene, ship('a', 0), assets.fallback('a'), 1);
+  assert.equal(root.material.emissiveColor.toHexString(), '#b026ff');
+  assert.equal(await assets.ships.refresh(scene, ship('a', 0, { local: true })), root);
+  assert.equal(hullId(root), 'small', 'same rank, new colors');
+  assert.equal(root.material.emissiveColor.toHexString(), '#ff3344');
+  assert.equal(root.metadata.providerTint, '#ff3344');
+  assert.equal(await assets.ships.refresh(scene, ship('a', 0, { local: true })), null, 'same look: nothing to do');
 });
 
 test('refresh waits while focus mode fades the ship and only applies the latest request', async () => {

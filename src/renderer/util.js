@@ -45,16 +45,18 @@
   };
   const PROVIDERS = Object.freeze({
     claude: Object.freeze({
-      key: 'claude', label: 'Claude', color: '#a78bfa',
+      key: 'claude', label: 'Claude', color: '#b026ff',
     }),
     codex: Object.freeze({
-      key: 'codex', label: 'Codex', color: '#22d3ee',
+      key: 'codex', label: 'Codex', color: '#2f7dff',
     }),
     generic: Object.freeze({
       key: 'generic', label: 'Signal', color: '#94a3b8',
     }),
   });
   AUR.PROVIDERS = PROVIDERS;
+  // A session on a local model keeps its provider identity but flies red.
+  AUR.LOCAL_MODEL = Object.freeze({ key: 'local', label: 'Local model', color: '#ff3344' });
   AUR.FEED_KIND = {
     build: '#4da3ff', form: '#ffb454', spawn: '#34d399',
     depart: '#8b93a8', info: '#8b93a8', discover: '#a78bfa',
@@ -86,8 +88,13 @@
     return 'generic';
   };
   AUR.providerMeta = (value) => PROVIDERS[AUR.providerKey(value)];
-  // Provider color is fleet identity. It never varies by agent or hull.
-  AUR.shipTint = (_shipId, provider) => AUR.providerMeta(provider).color;
+  // Provider color is fleet identity, red for a local model. It never varies by agent or hull.
+  AUR.shipColor = (ship) => (ship && ship.local === true
+    ? AUR.LOCAL_MODEL.color : AUR.providerMeta(ship && ship.provider).color);
+  AUR.shipTint = (shipId, provider) => {
+    const ship = typeof AUR.shipLookup === 'function' ? AUR.shipLookup(shipId) : null;
+    return AUR.shipColor(ship && ship.local === true ? ship : { provider });
+  };
   AUR.isSignalEntity = (ship) => Boolean(
     ship && (ship.kind === 'drone' || AUR.providerKey(ship.provider) === 'generic')
   );
