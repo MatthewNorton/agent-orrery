@@ -91,8 +91,9 @@ if (!fs.existsSync(launcherPath)) {
 // 2026-10-12 re-pinned: src/renderer/util.js — provider colors: Claude neon purple, Codex blue, local models red; AUR.shipTint resolves a ship's local flag (owner request 2026-10-12)
 // 2026-10-12 re-pinned: src/renderer/index.html — rename: window title Agent Universe -> Agent Orrery (owner request 2026-10-12)
 // 2026-10-13 re-pinned: src/renderer/scene-universe.js, src/renderer/scene-system.js, src/renderer/scene-planet.js — ship heading: ships face along their orbit either way round (owner request 2026-10-13)
+// 2026-10-13 re-pinned: src/renderer/index.html — rename: header brand AGENT UNIVERSE -> AGENT ORRERY (owner request 2026-10-12)
 const frozen = new Map([
-  ['src/renderer/index.html', '187016679c165493a0c085531c4412689dfe5a50a0093b2664b9dfec170abc98'],
+  ['src/renderer/index.html', '786fc802bbf5e221500097c83c509e3888c486131c626ced7fcca8f285500bbc'],
   ['src/renderer/util.js', 'e1b1928ebc9b6d3c56db9f3e2317c1caa76ff8827c31df85555ff59054981916'],
   ['src/renderer/scene-universe.js', 'b06fa399c4b9956e5f80e95243bbe87d2231bbc1596508048600cd2f907b8512'],
   ['src/renderer/scene-system.js', 'bdc6fa72462f90fda83de476477a809116047701843099243a3db7b10fea14f1'],
