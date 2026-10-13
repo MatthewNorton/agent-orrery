@@ -311,4 +311,4 @@ function safeExists(value) {
 
 /** @typedef {ReturnType<typeof createHistoryModel>} HistoryModel */
 
-module.exports = { createHistoryModel, FEED_LIMIT };
+module.exports = { createHistoryModel, safeExists, FEED_LIMIT };

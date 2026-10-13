@@ -49,10 +49,10 @@ existing control was removed.
    precision.
 5. **Avoid repeated allocations and DOM writes (implemented).** Cache date
    formatters and keep preview updates limited to the clock and progress style.
-6. **Consider durable checkpoints later.** If profiles grow by another order
-   of magnitude, bounded in-memory or on-disk reducer checkpoints could speed
-   backward seeks. This is intentionally deferred to avoid a data migration or
-   a new persistence/privacy surface.
+6. **Bounded in-memory checkpoints (implemented).** `history/checkpoints.js`
+   keeps up to 32 reducer checkpoints, spaced by indexed bytes, so a seek
+   replays only from the nearest one. They live in memory only (64 MB budget),
+   so there is no data migration or new persistence/privacy surface.
 
 ## Representative implementation
 
