@@ -212,7 +212,6 @@ th { font-size: 11.5px; color: var(--muted); font-weight: 600; text-transform: u
     <span><i class="sw" style="background:var(--app-f);border-color:var(--app-s)"></i>renderer app layer</span>
     <span><i class="sw" style="background:var(--view-f);border-color:var(--view-s)"></i>views + libraries</span>
     <span><i class="sw" style="background:var(--asset-f);border-color:var(--asset-s)"></i>assets</span>
-    <span><svg width="12" height="12" viewBox="0 0 12 12"><path d="M6 1 L11 6 L6 11 L1 6 Z" fill="var(--pin)"/></svg>hash-pinned (edits need <code>kit/repin.mjs</code>)</span>
     <span><svg width="40" height="8" viewBox="0 0 40 8"><rect x="0" y="2" width="26" height="3" fill="var(--warn)"/></svg>size bar (red: over 600 lines)</span>
     <span><svg width="34" height="8" viewBox="0 0 34 8"><line x1="0" y1="4" x2="34" y2="4" stroke="var(--edge)" stroke-width="1.5" stroke-dasharray="5 3"/></svg>reads / writes / spawns</span>
     <span><svg width="34" height="8" viewBox="0 0 34 8"><line x1="0" y1="4" x2="34" y2="4" stroke="var(--edge)" stroke-width="1.5"/></svg>calls / data flow</span>
@@ -256,8 +255,7 @@ th { font-size: 11.5px; color: var(--muted); font-weight: 600; text-transform: u
     at exactly their current size, so they cannot grow by a single line without failing <code>grade-structure.mjs</code>.</p>
   <div class="sizes">
     <div class="chart"><h3>Main process (<code>src/main</code> + preload)</h3><div id="sz-main"></div></div>
-    <div class="chart"><h3>Renderer (<code>src/renderer</code>)</h3><div id="sz-ren"></div>
-      <p class="note"><span class="pinmark">◆</span> hash-pinned by the control / history gates.</p></div>
+    <div class="chart"><h3>Renderer (<code>src/renderer</code>)</h3><div id="sz-ren"></div></div>
   </div>
 </div>
 
@@ -422,30 +420,30 @@ const NODES = {
   appstate: { label: 'app-state.js', lines: 163, note: 'AUR.app.state', layer: 'app', path: 'src/renderer/app-state.js',
     job: 'Creates AUR.app.state (one shared mutable object: store, view, epochs, replay flags, per-panel state) and AUR.app.const.',
     issues: ['Every module reads and writes the same object; ownership is by convention only'] },
-  shell: { label: 'index.html + style.css', lines: 2466, note: '356 + 2,110', layer: 'app', pinned: true, path: 'src/renderer/',
+  shell: { label: 'index.html + style.css', lines: 2466, note: '356 + 2,110', layer: 'app', path: 'src/renderer/',
     job: 'Every panel exists in the HTML from the start; modules show and hide them. style.css holds every style.',
-    issues: ['style.css is 2,110 lines in one file', 'index.html is hash-pinned although the docs call renderer files editable',
+    issues: ['style.css is 2,110 lines in one file',
       'The test harness drives the app through its element ids'] },
 
-  vuni: { label: 'scene-universe.js', lines: 971, note: 'galaxy map', layer: 'view', pinned: true, path: 'src/renderer/scene-universe.js',
+  vuni: { label: 'scene-universe.js', lines: 971, note: 'galaxy map', layer: 'view', path: 'src/renderer/scene-universe.js',
     job: 'Galaxy map: one glyph per project, galaxy discs, ships orbiting suns, label de-cluttering, search dimming, git markers.',
     issues: ['One 959-line function', 'At its line cap: one more line fails grade-structure', 'A live project add resets your camera zoom',
       'Ship-building code is duplicated in all three scenes'] },
-  vsys: { label: 'scene-system.js', lines: 618, note: 'solar system', layer: 'view', pinned: true, path: 'src/renderer/scene-system.js',
+  vsys: { label: 'scene-system.js', lines: 618, note: 'solar system', layer: 'view', path: 'src/renderer/scene-system.js',
     job: 'Planets, asteroid belt (thin instances), ships that fly to the planet they edit, first-person focus camera.',
     issues: ['At its line cap', 'By reading: refetchPlanets can build meshes into an already-disposed scene', 'Calls window.AU directly'] },
-  vplan: { label: 'scene-planet.js', lines: 196, note: 'planet close-up', layer: 'view', pinned: true, path: 'src/renderer/scene-planet.js',
+  vplan: { label: 'scene-planet.js', lines: 196, note: 'planet close-up', layer: 'view', path: 'src/renderer/scene-planet.js',
     job: 'Planet close-up with atmosphere, moons and the project’s ships.' },
-  util: { label: 'util.js', lines: 408, note: 'creates window.AUR', layer: 'view', pinned: true, path: 'src/renderer/util.js',
+  util: { label: 'util.js', lines: 408, note: 'creates window.AUR', layer: 'view', path: 'src/renderer/util.js',
     job: 'Creates window.AUR: hashes, colours, provider metadata, motion tuning, asset paths, DOM and Babylon helpers.',
-    issues: ['Holds a copy of fnv1a / mulberry32 from tracker.js (4 copies in total)', 'Hash-pinned although the docs call it editable'] },
+    issues: ['Holds a copy of fnv1a / mulberry32 from tracker.js (4 copies in total)'] },
   procw: { label: 'procedural-worlds.js', lines: 329, layer: 'view', path: 'src/renderer/procedural-worlds.js',
     job: 'Planet and asteroid surfaces: authored textures plus generated normal maps.' },
   ships: { label: 'ship-assets.js', lines: 545, layer: 'view', path: 'src/renderer/ship-assets.js',
     job: 'Fetches assets/ships/manifest.json at load and picks each ship’s hull by rank (its builds against the fleet-v2 ladder). Loads the far file on the universe map (instances of one tinted template) and the near file in system and planet views (clones, so focus mode can fade them), within 100k triangles per scene. refresh() swaps a promoted hull in place; a procedural dart is the fallback.' },
-  galaxy: { label: 'galaxy-layout.js', lines: 178, note: 'UMD · pure', layer: 'view', pinned: true, path: 'src/renderer/galaxy-layout.js',
+  galaxy: { label: 'galaxy-layout.js', lines: 178, note: 'UMD · pure', layer: 'view', path: 'src/renderer/galaxy-layout.js',
     job: 'Galaxy grouping and placement; publishes window.AUR_GALAXY (outside the AUR namespace).' },
-  polish: { label: 'polish-math.js', lines: 56, note: 'UMD · pure', layer: 'view', pinned: true, path: 'src/renderer/polish-math.js',
+  polish: { label: 'polish-math.js', lines: 56, note: 'UMD · pure', layer: 'view', path: 'src/renderer/polish-math.js',
     job: 'Label overlap and sun pulse; publishes window.AUR_POLISH.' },
   searchc: { label: 'search-core.js', lines: 34, note: 'UMD · pure', layer: 'view', path: 'src/renderer/search-core.js',
     job: 'Ranks projects by name prefix, name substring, then path.', issues: ['Also leaks a bare global searchProjects'] },
@@ -1108,13 +1106,13 @@ const SIZES_MAIN = [
   ['shared/atomic-write.js', 28], ['shared/values.js', 25], ['shared/ids.js', 23], ['user-data.js', 39],
 ];
 const SIZES_REN = [
-  ['style.css', 2110, 0, 'shell'], ['scene-universe.js', 971, 1, 'view'], ['scene-system.js', 618, 1, 'view'], ['app-playback.js', 531, 0, 'app'],
-  ['app-project-search.js', 483, 0, 'app'], ['app.js', 526, 0, 'app'], ['util.js', 408, 1, 'view'], ['app-ideas.js', 408, 0, 'app'],
-  ['app-chrome.js', 369, 0, 'app'], ['index.html', 356, 1, 'shell'], ['app-agent-focus.js', 327, 0, 'app'],
+  ['style.css', 2110, 0, 'shell'], ['scene-universe.js', 971, 0, 'view'], ['scene-system.js', 618, 0, 'view'], ['app-playback.js', 531, 0, 'app'],
+  ['app-project-search.js', 483, 0, 'app'], ['app.js', 526, 0, 'app'], ['util.js', 408, 0, 'view'], ['app-ideas.js', 408, 0, 'app'],
+  ['app-chrome.js', 369, 0, 'app'], ['index.html', 356, 0, 'shell'], ['app-agent-focus.js', 327, 0, 'app'],
   ['app-project-settings.js', 340, 0, 'app'], ['procedural-worlds.js', 329, 0, 'view'], ['ship-assets.js', 545, 0, 'view'],
   ['app-project-tasks.js', 286, 0, 'app'], ['components/project-vcs-status.js', 268, 0, 'view'], ['app-project-control.js', 244, 0, 'app'],
-  ['scene-planet.js', 196, 1, 'view'], ['galaxy-layout.js', 178, 1, 'view'], ['app-state.js', 163, 0, 'app'],
-  ['polish-math.js', 56, 1, 'view'], ['search-core.js', 34, 0, 'view'],
+  ['scene-planet.js', 196, 0, 'view'], ['galaxy-layout.js', 178, 0, 'view'], ['app-state.js', 163, 0, 'app'],
+  ['polish-math.js', 56, 0, 'view'], ['search-core.js', 34, 0, 'view'],
 ];
 function chart(el, rows, layerDefault, withCap) {
   for (const [name, n, pin, layer] of rows) {

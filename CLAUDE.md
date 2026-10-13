@@ -15,17 +15,17 @@ Electron + Babylon.js desktop app that passively visualizes Claude Code / Codex 
 - `node kit/grade.mjs` — mechanical renderer regression gate; run after ANY renderer change, must stay green. Runs against the synthetic profile in `scripts/lib/synthetic-profile.mjs` (`--real` uses your own transcripts and app state) and replaces only its own files in `.shots/`
 - `npm run shots` — headless screenshot mode; writes `.shots/*.png` for visual comparison against the three mockup PNGs in the repo root (gold samples: `3.universe-map-view.png` → universe, `2.solar-system-view.png` → system, `1.planet-view.png` → planet)
 - `npm run ships:generate` — regenerate procedural ship GLB assets
-- `npm run typecheck` — type-checks the JSDoc in `src/` (`tsconfig.json`: main + preload; `src/renderer/tsconfig.json`: renderer; shared shapes in `src/types/`). Only files whose first line is `// @ts-check` are checked: every `src/` JS file except the hash-pinned ones, and every new file. Runs in CI; there is no lint tooling.
+- `npm run typecheck` — type-checks the JSDoc in `src/` (`tsconfig.json`: main + preload; `src/renderer/tsconfig.json`: renderer; shared shapes in `src/types/`). Only files whose first line is `// @ts-check` are checked: every `src/` JS file except six older renderer files (the three `scene-*.js`, `util.js`, `galaxy-layout.js`, `polish-math.js`), and every new file. Runs in CI; there is no lint tooling.
 
 ## Hard constraints (from kit/SPEC.md — read it before renderer work)
 
-- **Frozen files** — read but never modify unless an active kit contract explicitly unfreezes them: `src/preload.js`, `package.json` (no new runtime dependencies, no script changes; `typescript` is a dev-only checker), `assets/*`, the mockup PNGs. `main.js` is a bootstrap; concerns live in `app-context.js`, `window.js`, `replay-control.js`, `ipc/`, `harness/`.
-  - Security exception: `src/main/main.js`, `src/main/tracker.js`, `src/main/replay-source.js`, and `src/main/provider-adapters.js` were edited under the security hardening PR #24 and its follow-ups (`docs/PUBLIC-RELEASE-TASKS.md` Phase 1). Security fixes are the one standing exception to the freeze; they must be minimal and carry a `// Security` comment at the edit site.
+- **Frozen files** — change only when the owner asks: `assets/*`, the mockup PNGs, `src/preload.js` (the renderer's only bridge; see `kit/SPEC.md` §3), and `package.json` (no new dependencies or scripts without asking; `typescript` is a dev-only checker). `main.js` is a bootstrap; concerns live in `app-context.js`, `window.js`, `replay-control.js`, `ipc/`, `harness/`.
+- Security fixes stay minimal and carry a `// Security` comment at the edit site.
 - Renderer is plain JS with classic `<script>` tags — **no ES modules** (file:// CORS), no `.ts` files (types are JSDoc checked by `npm run typecheck`), no bundler, no npm installs. Renderer code attaches to the single `window.AUR` namespace; script load order in `src/renderer/index.html` provides globals.
 - Babylon loads from local UMD bundles in `node_modules` (`BABYLON`, `BABYLON.GUI` globals). Renderer is fully offline — zero network requests, system font stack only.
 - `contextIsolation` is on; the renderer's only channel to the main process is the `window.AU` bridge defined in `src/preload.js` and documented in `kit/SPEC.md` §3.
 - One `BABYLON.Engine` for the app lifetime; each view builds its own `BABYLON.Scene` and disposes it on view switch.
-- Renderer files stay under ~600 lines (scene-universe.js and scene-system.js are frozen at their current size).
+- Files stay at about 400 lines or fewer; going over needs a written reason. Some renderer files are still over and due to be split: until then `grade-structure.mjs` caps renderer files at 600 lines, and `scene-universe.js` / `scene-system.js` at their current size.
 - Never generate or download art ad hoc — use a procedural fallback in code and log the want in `kit/ASSET-REQUESTS.md`.
 
 ## Architecture

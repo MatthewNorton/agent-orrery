@@ -135,14 +135,6 @@ else {
   if (failures === before) ok('T7', `no module-level let in src/main${reached('E') ? '' : ' (main.js checked from stage E)'}`);
 }
 
-// ---- T8: pins current ----
-if (!exists('kit/repin.mjs')) fail('T8', 'kit/repin.mjs missing');
-else {
-  const r = spawnSync(process.execPath, [path.join(ROOT, 'kit', 'repin.mjs'), '--check'], { cwd: ROOT, encoding: 'utf8' });
-  if (r.status !== 0) fail('T8', `repin --check failed:\n${(r.stdout + r.stderr).trim()}`);
-  else ok('T8', 'all frozen-file pins current');
-}
-
 // ---- T9: unit tests ----
 {
   const r = spawnSync('npm test', { cwd: ROOT, encoding: 'utf8', shell: true });

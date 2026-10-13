@@ -7,7 +7,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const { fnv1a, hex8, mulberry32 } = require('../src/main/shared/hash');
 
-// util.js is hash-pinned, so it keeps its own copy; the renderer seeds from it.
+// util.js is a classic renderer script that cannot require shared/hash.js, so it keeps its own copy; the renderer seeds from it.
 function loadRendererUtil() {
   const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'util.js'), 'utf8');
   const sandbox = { window: {} };
