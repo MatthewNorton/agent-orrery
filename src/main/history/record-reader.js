@@ -15,7 +15,7 @@ const { parseHistoricalLine } = require('./historical-line');
  * @import { TimestampGuard } from './jsonl'
  */
 
-const STREAM_READ_CHUNK_BYTES = 16 * 1024;
+const STREAM_READ_CHUNK_BYTES = 256 * 1024;
 const MAX_OPEN_STREAM_HANDLES = 64;
 
 /**
