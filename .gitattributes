@@ -3,8 +3,11 @@
 # checkout style never affects them.
 * text=auto
 
-# Shell scripts must be LF on disk or bash rejects them.
+# Shell scripts must be LF on disk or bash rejects them; batch files must be CRLF or
+# cmd.exe can misread their labels.
 *.sh text eol=lf
+*.command text eol=lf
+*.cmd text eol=crlf
 
 # Binary art and models: never touch line endings or show text diffs.
 *.png   binary

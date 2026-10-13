@@ -12,12 +12,18 @@ npm install
 npm start
 ```
 
-Node 20 or newer is expected. Electron and Babylon.js install from npm; the app
+Node.js 22.12 or newer is expected. Electron and Babylon.js install from npm; the app
 itself makes no network requests.
 
 ## Install a Launchpad / Spotlight / Dock shortcut
 
-After `npm install`, from the repository root:
+Double-click `Install Agent Orrery.command` in the repository root, or run
+`npm run setup`. It installs the dependencies when Electron is missing, runs
+the install command below, and opens the app. If the folder came from a
+downloaded ZIP rather than `git clone`, macOS may block the file the first
+time; right-click it and choose **Open**.
+
+To do it by hand, after `npm install`, from the repository root:
 
 ```sh
 bash scripts/macos-shortcuts.sh install
