@@ -33,6 +33,8 @@ export interface LiveShip {
   turnDone: boolean;
   attention: Attention | null;
   attentionSince: number | null;
+  /** Build events attributed to this ship, counted during catch-up too. */
+  builds: number;
   taskId?: string;
   turnOutcome?: string;
 }

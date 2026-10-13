@@ -1,12 +1,96 @@
 {
   "schemaVersion": 1,
-  "providerFamilies": {
-    "claude": "aur-shared-fleet",
-    "codex": "aur-shared-fleet"
-  },
+  "providerFamilies": { "claude": "aur-fleet-v2", "codex": "aur-fleet-v2" },
   "nonModelProviders": ["signal"],
   "nonModelKinds": ["drone"],
   "hulls": [
+    {
+      "id": "aur-wisp-drone",
+      "file": "fleet-v2/aur-wisp-drone-near.glb",
+      "lods": { "far": "fleet-v2/aur-wisp-drone-far.glb" },
+      "family": "aur-fleet-v2",
+      "role": "escort",
+      "correction": { "rotateY": 3.14159265, "scale": 1.0935, "offset": [0, 0, 0] },
+      "source": "Agent Universe original fleet-scale-v2 design (fleet-scale-v2/aur-wisp-drone), runtime LODs from scripts/build-fleet-v2-runtime.mjs",
+      "license": "CC0"
+    },
+    {
+      "id": "aur-lance-interceptor",
+      "file": "fleet-v2/aur-lance-interceptor-near.glb",
+      "lods": { "far": "fleet-v2/aur-lance-interceptor-far.glb" },
+      "family": "aur-fleet-v2",
+      "role": "main",
+      "minBuilds": 0,
+      "correction": { "rotateY": 3.14159265, "scale": 0.19668, "offset": [0, 0, 0] },
+      "source": "Agent Universe original fleet-scale-v2 design (fleet-scale-v2/aur-lance-interceptor), runtime LODs from scripts/build-fleet-v2-runtime.mjs",
+      "license": "CC0"
+    },
+    {
+      "id": "aur-wayfarer-shuttle",
+      "file": "fleet-v2/aur-wayfarer-shuttle-near.glb",
+      "lods": { "far": "fleet-v2/aur-wayfarer-shuttle-far.glb" },
+      "family": "aur-fleet-v2",
+      "role": "main",
+      "minBuilds": 3,
+      "correction": { "rotateY": 3.14159265, "scale": 0.092649, "offset": [0, 0, 0] },
+      "source": "Agent Universe original fleet-scale-v2 design (fleet-scale-v2/aur-wayfarer-shuttle), runtime LODs from scripts/build-fleet-v2-runtime.mjs",
+      "license": "CC0"
+    },
+    {
+      "id": "aur-bastion-corvette",
+      "file": "fleet-v2/aur-bastion-corvette-near.glb",
+      "lods": { "far": "fleet-v2/aur-bastion-corvette-far.glb" },
+      "family": "aur-fleet-v2",
+      "role": "main",
+      "minBuilds": 10,
+      "correction": { "rotateY": 3.14159265, "scale": 0.041823, "offset": [0, 0, 0] },
+      "source": "Agent Universe original fleet-scale-v2 design (fleet-scale-v2/aur-bastion-corvette), runtime LODs from scripts/build-fleet-v2-runtime.mjs",
+      "license": "CC0"
+    },
+    {
+      "id": "aur-vigil-frigate",
+      "file": "fleet-v2/aur-vigil-frigate-near.glb",
+      "lods": { "far": "fleet-v2/aur-vigil-frigate-far.glb" },
+      "family": "aur-fleet-v2",
+      "role": "main",
+      "minBuilds": 25,
+      "correction": { "rotateY": 3.14159265, "scale": 0.018724, "offset": [0, 0, 0] },
+      "source": "Agent Universe original fleet-scale-v2 design (fleet-scale-v2/aur-vigil-frigate), runtime LODs from scripts/build-fleet-v2-runtime.mjs",
+      "license": "CC0"
+    },
+    {
+      "id": "aur-helix-destroyer",
+      "file": "fleet-v2/aur-helix-destroyer-near.glb",
+      "lods": { "far": "fleet-v2/aur-helix-destroyer-far.glb" },
+      "family": "aur-fleet-v2",
+      "role": "main",
+      "minBuilds": 50,
+      "correction": { "rotateY": 3.14159265, "scale": 0.010815, "offset": [0, 0, 0] },
+      "source": "Agent Universe original fleet-scale-v2 design (fleet-scale-v2/aur-helix-destroyer), runtime LODs from scripts/build-fleet-v2-runtime.mjs",
+      "license": "CC0"
+    },
+    {
+      "id": "aur-atlas-cruiser",
+      "file": "fleet-v2/aur-atlas-cruiser-near.glb",
+      "lods": { "far": "fleet-v2/aur-atlas-cruiser-far.glb" },
+      "family": "aur-fleet-v2",
+      "role": "main",
+      "minBuilds": 100,
+      "correction": { "rotateY": 3.14159265, "scale": 0.005697, "offset": [0, 0, 0] },
+      "source": "Agent Universe original fleet-scale-v2 design (fleet-scale-v2/aur-atlas-cruiser), runtime LODs from scripts/build-fleet-v2-runtime.mjs",
+      "license": "CC0"
+    },
+    {
+      "id": "aur-ark-carrier",
+      "file": "fleet-v2/aur-ark-carrier-near.glb",
+      "lods": { "far": "fleet-v2/aur-ark-carrier-far.glb" },
+      "family": "aur-fleet-v2",
+      "role": "main",
+      "minBuilds": 200,
+      "correction": { "rotateY": 3.14159265, "scale": 0.0032849, "offset": [0, 0, 0] },
+      "source": "Agent Universe original fleet-scale-v2 design (fleet-scale-v2/aur-ark-carrier), runtime LODs from scripts/build-fleet-v2-runtime.mjs",
+      "license": "CC0"
+    },
     {
       "id": "aur-halcyon-dart",
       "file": "aur-halcyon-dart.glb",

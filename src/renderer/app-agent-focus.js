@@ -179,6 +179,7 @@
     S.agentFocus.pendingShipId = null;
     if (S.activeView && typeof S.activeView.clearShipFocus === 'function') {
       S.activeView.clearShipFocus();
+      A.refreshShipHulls(); // promotions wait while focus mode fades the ships
     }
     S.agentFocus.shipId = null;
     document.body.classList.remove('agent-focus-active');
