@@ -3,9 +3,11 @@
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { setup } from './lib/setup.mjs';
 
-const root = path.resolve(import.meta.dirname, '..');
+// Not import.meta.dirname: it needs Node 20.11, and an older Node must still reach the version message.
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 function run(command, args) {
   // npm is a .cmd shim on Windows, which only starts through a shell. The arguments are fixed strings.
