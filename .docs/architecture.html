@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Orrery Architecture Map</title>
-<meta name="description" content="How Agent Universe Lite is structured today: processes, modules, IPC channels, data flows and hotspots.">
+<meta name="description" content="How Agent Orrery is structured today: processes, modules, IPC channels, data flows and hotspots.">
 <style>
 :root {
   --bg: #f6f6f3; --surface: #ffffff; --fg: #1b1d22; --muted: #5b616d; --rule: #dcdde2;
@@ -183,7 +183,7 @@ th { font-size: 11.5px; color: var(--muted); font-weight: 600; text-transform: u
 <div class="wrap">
   <header class="topline">
     <div>
-      <h1>Agent Universe Lite — architecture map</h1>
+      <h1>Agent Orrery — architecture map</h1>
       <p>How the code is structured on <code>main</code> after the 7 Oct 2026 cleanup (PRs #14–#22) and the 10 Oct fleet-v2 ships. The written companion is
         <code>architecture.md</code> in this folder. Hover a box to see what it talks to; click to pin it; use the buttons to
         follow one flow end to end.</p>
@@ -289,7 +289,7 @@ const NODES = {
   'ext.codexcli': { label: 'codex', sub: 'codex exec · IDEAS only', layer: 'ext',
     job: 'Started detached with --sandbox workspace-write for an IDEAS item. The only place the app starts an agent.' },
 
-  tracker: { label: 'tracker.js', lines: 1538, note: 'class Tracker', layer: 'main', path: 'src/main/tracker.js',
+  tracker: { label: 'tracker.js', lines: 1557, note: 'class Tracker', layer: 'main', path: 'src/main/tracker.js',
     job: 'Polls every source (scan 3 s, poll 1 s, sweep 5 s), owns the live model of projects, ships and planets, classifies attention, emits event batches and saves universe-state.json.',
     issues: ['Still one 1,538-line class: scanning, live model, attention, persistence and planet walks',
       'A session already running at launch is read from the end of its transcript, so its ship restarts at 0 builds (the smallest hull)',
@@ -298,7 +298,7 @@ const NODES = {
     job: 'Provider names, canonical path keys, rejection of UNC / device paths, the cross-provider tool vocabulary (classifyTool), Signal config, and adaptLine.' },
   transcripts: { label: 'transcripts/*.js', lines: 398, note: 'claude · codex · fields', layer: 'main', path: 'src/main/transcripts/',
     job: 'The one parser per provider: a transcript record becomes structural signals (session, turn end, message shape, tool start / end). Live and replay both read through it and each applies the signals with its own named rules.' },
-  replay: { label: 'replay-source.js', lines: 1387, note: 'class ReplaySource', layer: 'main', path: 'src/main/replay-source.js',
+  replay: { label: 'replay-source.js', lines: 1399, note: 'class ReplaySource', layer: 'main', path: 'src/main/replay-source.js',
     job: 'Indexes all history once at launch, then rebuilds the universe at any timestamp with a k-way merge over files (64 open handles max).',
     issues: ['20 deliberate differences from live (galaxy keys, drone ids, no attention…), each named in the parity tests', 'Index built once: the scrubber end time is frozen until restart'] },
   coord: { label: 'root-task-coordinator.js', lines: 386, note: 'class', layer: 'main', path: 'src/main/root-task-coordinator.js',
@@ -345,7 +345,7 @@ const NODES = {
     job: 'Reads flags, creates ctx, attaches replay control and the IPC handler factories, registers every au:* handler, then on ready creates the window and calls ctx.start().' },
   mflags: { label: 'flags.js', lines: 45, note: 'argv → frozen flags', layer: 'main', path: 'src/main/flags.js',
     job: 'Parses --shots, --polish-test, --provider-test, --history-test, --control-test and their output paths into a frozen object.' },
-  mctx: { label: 'app-context.js', lines: 244, note: 'ctx · start · cleanup', layer: 'main', path: 'src/main/app-context.js',
+  mctx: { label: 'app-context.js', lines: 250, note: 'ctx · start · cleanup', layer: 'main', path: 'src/main/app-context.js',
     job: 'Creates ctx, the one shared object (window, tracker, replay source, active source, stream epoch, services, harness state). start() builds every service and forwards tracker / replay events to the window; cleanup() tears it down on quit.',
     issues: ['Service locator: start() calls into ctx.ipc.* and ctx.replay.*, which main.js must attach before start() runs',
       'Test-fixture branches (provider / history / control) are mixed into service construction',
@@ -1094,18 +1094,18 @@ for (const st of STRIPES) {
 
 // ---------- size charts ----------
 const SIZES_MAIN = [
-  ['tracker.js', 1538], ['replay-source.js', 1387], ['provider-adapters.js', 368], ['transcripts/codex.js', 235],
-  ['transcripts/claude.js', 111], ['transcripts/fields.js', 52], ['shared/hash.js', 47], ['task-runs.js', 397],
+  ['tracker.js', 1557], ['replay-source.js', 1399], ['provider-adapters.js', 368], ['transcripts/codex.js', 237],
+  ['transcripts/claude.js', 116], ['transcripts/fields.js', 52], ['transcripts/model.js', 31], ['shared/hash.js', 47], ['task-runs.js', 397],
   ['root-task-coordinator.js', 386], ['goals.js', 352], ['root-tasks.js', 344], ['agent-launcher.js', 391],
   ['github-metadata-provider.js', 301], ['project-vcs-status.js', 284], ['project-vcs-status-service.js', 307],
-  ['harness/driver.js', 263, 0, 'harness'], ['ipc/project-paths.js', 244], ['app-context.js', 244], ['replay-control.js', 227],
+  ['harness/driver.js', 263, 0, 'harness'], ['ipc/project-paths.js', 244], ['app-context.js', 250], ['replay-control.js', 227],
   ['harness/modes/history.js', 205, 0, 'harness'], ['harness/metrics.js', 190, 0, 'harness'], ['terminal-launcher.js', 206],
   ['harness/fixtures.js', 179, 0, 'harness'], ['project-paths.js', 162], ['shared/bounded-process.js', 96], ['harness/modes/control.js', 153, 0, 'harness'],
   ['harness/modes/polish.js', 140, 0, 'harness'], ['ipc/tasks.js', 87], ['harness/modes/shots.js', 117, 0, 'harness'],
   ['project-vcs-status-controller.js', 127], ['ipc/root-tasks.js', 112], ['harness/modes/provider.js', 98, 0, 'harness'],
   ['path-safety.js', 121], ['ipc/terminal.js', 81], ['ipc/register.js', 77], ['window-security.js', 55], ['window.js', 62],
   ['main.js', 48], ['flags.js', 45], ['preload.js', 41], ['ipc/guards.js', 12],
-  ['shared/atomic-write.js', 28], ['shared/values.js', 25], ['shared/ids.js', 23],
+  ['shared/atomic-write.js', 28], ['shared/values.js', 25], ['shared/ids.js', 23], ['user-data.js', 39],
 ];
 const SIZES_REN = [
   ['style.css', 2110, 0, 'shell'], ['scene-universe.js', 971, 1, 'view'], ['scene-system.js', 618, 1, 'view'], ['app-playback.js', 531, 0, 'app'],

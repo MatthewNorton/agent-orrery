@@ -1,4 +1,4 @@
-# Agent Universe Lite
+# Agent Orrery
 
 A desktop app that turns your Claude Code and Codex sessions into a living universe you can fly around.
 

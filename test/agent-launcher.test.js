@@ -44,13 +44,13 @@ function fakeFs(entries) {
   };
 }
 
-test('task prompt identifies the exact tagged goal and leaves completion to Agent Universe', () => {
+test('task prompt identifies the exact tagged goal and leaves completion to Agent Orrery', () => {
   const prompt = buildTaskPrompt({ taskId: TASK_ID, text: 'Add the root task list' });
   assert.match(prompt, new RegExp(`agent-universe:${TASK_ID}`));
   assert.match(prompt, /repository instructions and GOALS\.md/i);
   assert.match(prompt, /only on the TODO item tagged/i);
   assert.match(prompt, /validate/i);
-  assert.match(prompt, /Agent Universe will mark it complete/i);
+  assert.match(prompt, /Agent Orrery will mark it complete/i);
   assert.match(prompt, /Add the root task list/);
   const claim = codexRecordToSignals({
     type: 'response_item',

@@ -1,4 +1,4 @@
-# Agent Universe Lite — kit folder
+# Agent Orrery — kit folder
 
 Status board for all kit work on this app. One glance answers: what shipped,
 what's live tooling, what runs next, what's parked.
