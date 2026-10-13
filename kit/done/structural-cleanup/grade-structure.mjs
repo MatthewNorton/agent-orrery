@@ -47,9 +47,9 @@ const modulesOnDisk = rendererFiles.filter((f) => /^app-[a-z0-9-]+\.js$/.test(f)
 if (!reached('0')) skip('T1', '0');
 else {
   const before = failures;
-  const CAPS = { 'scene-universe.js': 971, 'scene-system.js': 618 }; // frozen at current size
   for (const f of rendererFiles) {
-    const cap = f === 'app.js' && !reached('B') ? Infinity : (CAPS[f] ?? 600);
+    // Owner's rule (2026-10-13): every renderer file stays at 400 lines or fewer.
+    const cap = f === 'app.js' && !reached('B') ? Infinity : 400;
     const n = lines('src/renderer/' + f);
     if (n > cap) fail('T1', `${f} is ${n} lines (cap ${cap})`);
   }

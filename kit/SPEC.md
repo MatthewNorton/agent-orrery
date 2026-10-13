@@ -35,9 +35,9 @@ Frozen files: the **Frozen files** bullet in `CLAUDE.md` is the one authoritativ
    the web. Use the `system-ui, 'Segoe UI', sans-serif` stack.
 5. `contextIsolation` is on. The ONLY way to reach the main process is
    `window.AU` (documented below). No `require`, no `process`.
-6. New renderer files live under `src/renderer/`. Keep each file under 600 lines.
-   `scene-universe.js` (971) and `scene-system.js` (618) are capped at their
-   current size by `grade-structure.mjs`; growth means extracting a helper.
+6. New renderer files live flat in `src/renderer/` (the gates scan only the top level).
+   Keep each file at about 300 lines, 400 at most; `grade-structure.mjs` fails any
+   renderer file over 400. Growth means extracting a part or a helper.
 7. One `BABYLON.Engine` for the whole app lifetime. Views may each build their
    own `BABYLON.Scene`; dispose the old scene on view switch.
 
@@ -48,10 +48,10 @@ loaders), then:
 
 | Layer | Files |
 |---|---|
-| Shared libraries | `util.js` (creates `window.AUR`; `fnv1a`/`mulberry32` copied from `src/main/shared/hash.js` so seeds agree), `procedural-worlds.js`, `ship-assets.js`, `polish-math.js` and `galaxy-layout.js` (pure UMD), `search-core.js`, `components/project-vcs-status.js` |
-| Views | `scene-universe.js`, `scene-system.js`, `scene-planet.js` |
+| Shared libraries | `util.js` (creates `window.AUR`; `fnv1a`/`mulberry32` copied from `src/main/shared/hash.js` so seeds agree), `util-scene.js` (Babylon helpers), `procedural-worlds.js`, `ship-assets.js` + `ship-assets-hulls.js` + `ship-assets-api.js` (`AUR.ships`), `polish-math.js` and `galaxy-layout.js` (pure UMD), `search-core.js`, `components/project-vcs-status.js` |
+| Views | `scene-common.js` (`AUR.sceneParts`), then each view's parts before the view: `scene-universe-{galaxies,glyphs,labels,ships,stats}.js` → `scene-universe.js`, `scene-system-{belt,focus,ships}.js` → `scene-system.js`, then `scene-planet.js` |
 | App state | `app-state.js` — the only file that assigns `AUR.app` (`state`, `const`) |
-| App modules | `app-agent-focus.js`, `app-chrome.js`, `app-ideas.js`, `app-playback.js`, `app-project-control.js`, `app-project-search.js`, `app-project-settings.js`, `app-project-tasks.js` |
+| App modules | `app-agent-focus.js`, `app-chrome.js`, `app-chrome-queue.js`, `app-history-metrics.js`, `app-ideas.js`, `app-ideas-list.js`, `app-playback.js`, `app-project-control.js`, `app-project-directory.js`, `app-project-search.js`, `app-project-settings.js`, `app-project-tasks.js`, `app-replay.js`, `app-store.js` |
 | Boot | `app.js` — boot, event routing, view switching, debug hooks |
 
 View contract: each `scene-*.js` registers
