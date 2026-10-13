@@ -34,6 +34,10 @@ const { queue, pushFeed, flush, recentFeed } = require('./live/events');
 const { classifyAttention, evaluateAttention } = require('./live/attention');
 const { loadState, saveState } = require('./live/state-file');
 const { getSystem, getPlanet } = require('./live/system-view');
+const {
+  isProjectDirectory, updateProjectExists, refreshProjectExistence, indexProjectPath,
+  preferredProjectPath, remapProjectPath, ensureProjectForPath,
+} = require('./live/projects');
 
 /**
  * @import { Attention, FeedEntry, PlanetData, Project, Ship, ShipStatus, SystemData }
@@ -62,23 +66,6 @@ const ATTENTION_LINGER_MS = 60 * 60 * 1000;
 function resumesTurn(message) {
   return (message.user && message.prompt) ||
     (message.blocks && (message.assistant || (message.user && !message.toolResult)));
-}
-
-function trackerPathError(code, message) {
-  const error = /** @type {NodeJS.ErrnoException} */ (new Error(message));
-  error.code = code;
-  return error;
-}
-
-function isProjectDirectory(projectPath) {
-  // Security: transcript-derived paths reach the filesystem here on every scan.
-  // Never stat a UNC or device path (forced SMB authentication), see isLocalProjectPath.
-  if (!isLocalProjectPath(projectPath) || !path.isAbsolute(projectPath)) return false;
-  try {
-    return fs.statSync(projectPath).isDirectory();
-  } catch {
-    return false;
-  }
 }
 
 class Tracker extends EventEmitter {
@@ -153,18 +140,8 @@ class Tracker extends EventEmitter {
     this.scanClaude(isStartup);
     this.scanCodex(isStartup);
     this.scanSignals(isStartup);
-    this.refreshProjectExistence();
+    refreshProjectExistence(this);
     flush(this);
-  }
-
-  refreshProjectExistence() {
-    for (const project of this.projects.values()) {
-      const exists = isProjectDirectory(project.path);
-      if (exists === project.exists) continue;
-      project.exists = exists;
-      this.systemCache.delete(project.id);
-      queue(this, { type: 'project-updated', project: liveProject(project) });
-    }
   }
 
   scanClaude(isStartup) {
@@ -206,7 +183,7 @@ class Tracker extends EventEmitter {
         const mappedId = pathKey && (this.projectPathIndex.get(pathKey) || this.pathIds[pathKey]);
         if (mappedId) project = this.projects.get(mappedId);
         const projectId = project ? project.id : (mappedId || slug);
-        const projPath = this.preferredProjectPath(projectId, discoveredPath);
+        const projPath = preferredProjectPath(this, projectId, discoveredPath);
         const saved = this.persisted.projects[projectId] || {};
         if (!project) {
           project = {
@@ -223,7 +200,7 @@ class Tracker extends EventEmitter {
             firstSeen: saved.firstSeen || now,
           };
           this.projects.set(projectId, project);
-          this.indexProjectPath(project);
+          indexProjectPath(this, project);
           queue(this, { type: 'project-added', project: liveProject(project) });
           if (!isStartup) pushFeed(this, 'discover', `New system discovered: ${project.name}`, project.id);
         }
@@ -235,14 +212,7 @@ class Tracker extends EventEmitter {
       project.claudeBytes = totalBytes;
       project.totalBytes = totalBytes + (project.codexBytes || 0);
       if (newest > project.lastActivity) project.lastActivity = newest;
-      if (project.path) {
-        const exists = isProjectDirectory(project.path);
-        if (exists !== project.exists) {
-          project.exists = exists;
-          this.systemCache.delete(project.id);
-          queue(this, { type: 'project-updated', project: liveProject(project) });
-        }
-      }
+      if (project.path) updateProjectExists(this, project);
 
       // Tail any file fresh enough to matter; at startup, note where every file ends.
       for (const { fp, st } of stats) {
@@ -279,151 +249,16 @@ class Tracker extends EventEmitter {
     return tail;
   }
 
-  indexProjectPath(project) {
-    const key = canonicalProjectPath(project && project.path);
-    if (!key) return;
-    this.projectPathIndex.set(key, project.id);
-    this.pathIds[key] = project.id;
-  }
-
-  preferredProjectPath(projectId, discoveredPath) {
-    const override = this.pathOverrides[projectId];
-    if (typeof override === 'string' && path.isAbsolute(override) && isLocalProjectPath(override)) {
-      return path.normalize(override);
-    }
-    return isLocalProjectPath(discoveredPath) ? discoveredPath : null;
-  }
-
   remapProjectPath(projectId, nextPath) {
-    const project = this.projects.get(projectId);
-    if (!project) throw trackerPathError('NOT_FOUND', 'project was not found');
-    if (project.exists === true) {
-      throw trackerPathError('NOT_MISSING', 'only missing project paths can be recovered');
-    }
-    if (typeof nextPath !== 'string' || !path.isAbsolute(nextPath)) {
-      throw trackerPathError('INVALID', 'project path must be absolute');
-    }
-
-    let real;
-    try {
-      real = path.normalize(fs.realpathSync.native(nextPath));
-      if (!fs.statSync(real).isDirectory()) {
-        throw trackerPathError('INVALID', 'project path must be a directory');
-      }
-    } catch (error) {
-      if (error && error.code === 'INVALID') throw error;
-      throw trackerPathError('NOT_FOUND', 'project directory is unavailable');
-    }
-
-    const key = canonicalProjectPath(real);
-    if (!key) throw trackerPathError('INVALID', 'project path is invalid');
-    const owner = this.projectPathIndex.get(key) || this.pathIds[key];
-    if (owner && owner !== projectId) {
-      throw trackerPathError('IN_USE', 'project path is already assigned');
-    }
-    for (const other of this.projects.values()) {
-      if (!other || other.id === projectId || !isProjectDirectory(other.path)) continue;
-      try {
-        if (canonicalProjectPath(fs.realpathSync.native(other.path)) === key) {
-          throw trackerPathError('IN_USE', 'project path is already assigned');
-        }
-      } catch (error) {
-        if (error && error.code === 'IN_USE') throw error;
-      }
-    }
-
-    const previous = {
-      path: project.path,
-      name: project.name,
-      exists: project.exists,
-      hadOverride: Object.prototype.hasOwnProperty.call(this.pathOverrides, projectId),
-      override: this.pathOverrides[projectId],
-      hadIndex: this.projectPathIndex.has(key),
-      indexOwner: this.projectPathIndex.get(key),
-      hadPathId: Object.prototype.hasOwnProperty.call(this.pathIds, key),
-      pathIdOwner: this.pathIds[key],
-    };
-    project.path = real;
-    project.name = path.basename(real) || project.name;
-    project.exists = true;
-    this.pathOverrides[projectId] = real;
-    this.projectPathIndex.set(key, projectId);
-    this.pathIds[key] = projectId;
-    this.systemCache.delete(projectId);
-    try {
-      this.saveState(true);
-    } catch {
-      project.path = previous.path;
-      project.name = previous.name;
-      project.exists = previous.exists;
-      if (previous.hadOverride) this.pathOverrides[projectId] = previous.override;
-      else delete this.pathOverrides[projectId];
-      if (previous.hadIndex) this.projectPathIndex.set(key, previous.indexOwner);
-      else this.projectPathIndex.delete(key);
-      if (previous.hadPathId) this.pathIds[key] = previous.pathIdOwner;
-      else delete this.pathIds[key];
-      throw trackerPathError('FAILED', 'project path could not be saved');
-    }
-    const visible = liveProject(project);
-    queue(this, { type: 'project-updated', project: visible });
-    pushFeed(this, 'discover', `Project path recovered: ${project.name}`, projectId);
-    flush(this);
-    return visible;
+    return remapProjectPath(this, projectId, nextPath);
   }
 
   ensureProjectForPath(projectPath, fallbackId, activity, totalBytes = 0) {
-    // Security follow-up: canonicalProjectPath trims; trim here too so every later check sees the same path.
-    if (typeof projectPath === 'string') projectPath = projectPath.trim();
-    const key = canonicalProjectPath(projectPath);
-    if (!key) return null;
-    let id = this.projectPathIndex.get(key) || this.pathIds[key];
-    if (!id) {
-      const legacyClaudeId = String(projectPath).replace(/[^A-Za-z0-9]/g, '-');
-      if (this.projects.has(legacyClaudeId) && !this.projects.get(legacyClaudeId).path) {
-        id = legacyClaudeId;
-      }
-    }
-    if (!id) {
-      id = fallbackId || `project:${hex8(key)}`;
-      if (this.projects.has(id) && canonicalProjectPath(this.projects.get(id).path) !== key) {
-        id = `${id}:${hex8(key)}`;
-      }
-    }
-    let project = this.projects.get(id);
-    const preferredPath = this.preferredProjectPath(id, projectPath);
-    if (!project) {
-      const saved = this.persisted.projects[id] || {};
-      project = {
-        id,
-        path: preferredPath,
-        // Security follow-up: never hand a null path to path.basename (throws in the poll tick).
-        name: preferredPath ? path.basename(preferredPath) || id : id,
-        exists: isProjectDirectory(preferredPath),
-        lastActivity: activity || 0,
-        totalBytes,
-        claudeBytes: 0,
-        codexBytes: totalBytes,
-        buckets: saved.buckets || {},
-        totalBuilds: saved.totalBuilds || 0,
-        firstSeen: saved.firstSeen || Date.now(),
-      };
-      this.projects.set(id, project);
-      queue(this, { type: 'project-added', project: liveProject(project) });
-    } else {
-      let changed = false;
-      // Security follow-up: only adopt a path that survived preferredProjectPath (never null).
-      if (!project.path && preferredPath) {
-        project.path = preferredPath;
-        project.name = path.basename(preferredPath) || project.name;
-        project.exists = isProjectDirectory(preferredPath);
-        changed = true;
-      }
-      if (activity > project.lastActivity) project.lastActivity = activity;
-      if (changed) queue(this, { type: 'project-updated', project: liveProject(project) });
-    }
-    this.projectPathIndex.set(key, id);
-    this.pathIds[key] = id;
-    return project;
+    return ensureProjectForPath(this, projectPath, fallbackId, activity, totalBytes);
+  }
+
+  preferredProjectPath(projectId, discoveredPath) {
+    return preferredProjectPath(this, projectId, discoveredPath);
   }
 
   scanCodex(isStartup) {
@@ -452,7 +287,7 @@ class Tracker extends EventEmitter {
       seenSessions.add(sessionId);
 
       const fallbackId = `project:${hex8(projectKey)}`;
-      const project = this.ensureProjectForPath(meta.cwd, fallbackId, st.mtimeMs, 0);
+      const project = ensureProjectForPath(this, meta.cwd, fallbackId, st.mtimeMs, 0);
       if (!project) continue;
       totals.set(project.id, (totals.get(project.id) || 0) + st.size);
       if (st.mtimeMs > project.lastActivity) project.lastActivity = st.mtimeMs;
@@ -554,7 +389,7 @@ class Tracker extends EventEmitter {
       if (!projectKey) continue;
       for (const { fp, st } of watchedFiles(source)) {
         seenFiles.add(fp);
-        const project = this.ensureProjectForPath(
+        const project = ensureProjectForPath(this, 
           source.projectPath,
           `project:${hex8(projectKey)}`,
           st.mtimeMs,
@@ -744,7 +579,7 @@ class Tracker extends EventEmitter {
         // Security follow-up: UNC/relative cwds have no project key; skip the association, never fnv1a(null).
         const projectKey = signal.cwd ? canonicalProjectPath(signal.cwd) : null;
         if (projectKey) {
-          const project = this.ensureProjectForPath(
+          const project = ensureProjectForPath(this, 
             signal.cwd,
             `project:${hex8(projectKey)}`,
             ts,
@@ -927,7 +762,7 @@ class Tracker extends EventEmitter {
       project.path = session.cwd;
       project.name = path.basename(session.cwd);
       project.exists = isProjectDirectory(session.cwd);
-      this.indexProjectPath(project);
+      indexProjectPath(this, project);
       this.systemCache.delete(project.id);
       queue(this, { type: 'project-updated', project: liveProject(project) });
     }
