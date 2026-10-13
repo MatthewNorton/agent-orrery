@@ -4,7 +4,7 @@ The command rail includes a global **IDEAS** queue. It is independent of the
 current universe, system, or planet view, so a user can capture a to-do before
 choosing where it belongs.
 
-New ideas are stored in Agent Universe's per-user application data. An idea is
+New ideas are stored in Agent Orrery's per-user application data. An idea is
 not written into a repository and does not start an agent until the user picks
 an existing project and chooses **Assign & start**. Project assignment is
 permanent for that idea.
@@ -13,7 +13,7 @@ An unassigned idea can be removed from the global queue after confirmation.
 Once assignment begins, the global record is protected so removing it cannot
 orphan a project goal or an active task run.
 
-Assignment is available only in **LIVE** mode. Agent Universe resolves the
+Assignment is available only in **LIVE** mode. Agent Orrery resolves the
 selected project through the live tracker, writes one tagged unchecked item to
 that project's root `GOALS.md`, records the launch request, and starts Codex in
 the project directory. The tag is an internal UUID and is hidden from the task
@@ -28,7 +28,7 @@ project) and the native architecture package from an npm-installed
 assigned and the idea exposes **Retry start**; retrying does not duplicate the
 `GOALS.md` item.
 
-Agent Universe correlates the spawned Codex transcript with the exact hidden
+Agent Orrery correlates the spawned Codex transcript with the exact hidden
 task tag. When that agent reports successful completion, the matching checkbox
 is marked complete and both the global idea and the project task show **Ready
 for review**. Aborted, missing, or failed starts remain visible with a bounded

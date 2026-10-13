@@ -1,6 +1,6 @@
 # Passive multi-provider tracking
 
-Agent Universe's passive discovery layer observes Claude Code and Codex session
+Agent Orrery's passive discovery layer observes Claude Code and Codex session
 files without owning the agents that create them. It never launches or spawns
 provider processes, sends commands to a discovered session, or writes to its
 transcript. The separate, user-initiated global task workflow may start a new
@@ -30,7 +30,7 @@ An unrecognized local tool can appear as a metadata-only Signal ship. Create
 
 `directory` must be absolute. `projectPath` defaults to that directory, and
 `label` is optional. Configuration changes take effect after an app restart.
-Agent Universe recursively stats regular `.json`, `.jsonl`, `.log`, and `.txt`
+Agent Orrery recursively stats regular `.json`, `.jsonl`, `.log`, and `.txt`
 files but never reads their contents. An optional `extensions` array, such as
 `[".log"]`, narrows that list; one that names none of the four is ignored with a
 warning. A fresh or changed file produces a

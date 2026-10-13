@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install or remove a per-user macOS app bundle that launches Agent Universe Lite
+# Install or remove a per-user macOS app bundle that launches Agent Orrery
 # from Launchpad, Spotlight, or the Dock without a terminal window.
 #
 #   bash scripts/macos-shortcuts.sh install
@@ -12,7 +12,7 @@ set -euo pipefail
 
 ACTION="${1:-install}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-APP_NAME="Agent Universe Lite"
+APP_NAME="Agent Orrery"
 APP_DIR="${HOME}/Applications/${APP_NAME}.app"
 ELECTRON="${REPO_ROOT}/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron"
 
@@ -26,7 +26,7 @@ install_bundle() {
     echo "Electron is missing at ${ELECTRON}. Run 'npm install' in ${REPO_ROOT} first." >&2
     exit 1
   fi
-  if [[ -e "${APP_DIR}" && ! -f "${APP_DIR}/Contents/.agent-universe-lite" ]]; then
+  if [[ -e "${APP_DIR}" && ! -f "${APP_DIR}/Contents/.agent-orrery" ]]; then
     echo "Refusing to replace ${APP_DIR}: it was not created by this script." >&2
     exit 1
   fi
@@ -39,7 +39,7 @@ install_bundle() {
 <dict>
   <key>CFBundleName</key><string>${APP_NAME}</string>
   <key>CFBundleDisplayName</key><string>${APP_NAME}</string>
-  <key>CFBundleIdentifier</key><string>ai.digitalbyte.agent-universe-lite.launcher</string>
+  <key>CFBundleIdentifier</key><string>ai.digitalbyte.agent-orrery.launcher</string>
   <key>CFBundleVersion</key><string>0.1.0</string>
   <key>CFBundleShortVersionString</key><string>0.1.0</string>
   <key>CFBundlePackageType</key><string>APPL</string>
@@ -62,7 +62,7 @@ PLIST
     printf 'exec %s %s\n' "${quoted_electron}" "${quoted_repo}"
   } > "${APP_DIR}/Contents/MacOS/launch"
   chmod 755 "${APP_DIR}/Contents/MacOS/launch"
-  : > "${APP_DIR}/Contents/.agent-universe-lite"
+  : > "${APP_DIR}/Contents/.agent-orrery"
   touch "${APP_DIR}"
   echo "Installed ${APP_DIR}"
   echo "Open it from ~/Applications, Launchpad, or Spotlight. Re-run after moving the repository."
@@ -73,7 +73,7 @@ uninstall_bundle() {
     echo "Nothing to remove at ${APP_DIR}"
     exit 0
   fi
-  if [[ ! -f "${APP_DIR}/Contents/.agent-universe-lite" ]]; then
+  if [[ ! -f "${APP_DIR}/Contents/.agent-orrery" ]]; then
     echo "Refusing to remove ${APP_DIR}: it was not created by this script." >&2
     exit 1
   fi

@@ -34,9 +34,9 @@ test('profileEnv points every home and app-data variable into the profile and dr
 test('userDataDir follows Electron per platform', async () => {
   const { userDataDir } = await load();
   const root = path.join(path.sep, 'p');
-  assert.equal(userDataDir(root, 'win32'), path.join(root, 'AppData', 'Roaming', 'agent-universe-lite'));
-  assert.equal(userDataDir(root, 'darwin'), path.join(root, 'Library', 'Application Support', 'agent-universe-lite'));
-  assert.equal(userDataDir(root, 'linux'), path.join(root, '.config', 'agent-universe-lite'));
+  assert.equal(userDataDir(root, 'win32'), path.join(root, 'AppData', 'Roaming', 'agent-orrery'));
+  assert.equal(userDataDir(root, 'darwin'), path.join(root, 'Library', 'Application Support', 'agent-orrery'));
+  assert.equal(userDataDir(root, 'linux'), path.join(root, '.config', 'agent-orrery'));
 });
 
 test('isInside accepts only paths below the root', async () => {

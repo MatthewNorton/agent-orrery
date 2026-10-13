@@ -15,6 +15,7 @@ const { createLocalGitStatusCollector } = require('./project-vcs-status');
 const { createGitHubMetadataProvider } = require('./github-metadata-provider');
 const { createProjectVcsStatusService } = require('./project-vcs-status-service');
 const { createProjectVcsStatusController } = require('./project-vcs-status-controller');
+const { adoptLegacyUserData } = require('./user-data');
 
 /** @import { AUEvent, BatchMeta, TasksChangedPush } from '../types/contract' */
 
@@ -75,6 +76,11 @@ function createAppContext({ flags, fixtures }, electron = require('electron')) {
     if (providerFixture) providerFixtureRoot = providerFixture.root;
     if (ctx.harness.historyFixture) historyFixtureRoot = ctx.harness.historyFixture.root;
     const fixture = ctx.harness.historyFixture || providerFixture;
+    if (!ctx.flags.testMode) {
+      try { adoptLegacyUserData(app); } catch (error) {
+        console.warn(`[startup] could not copy Agent Universe Lite data: ${error && error.message ? error.message : error}`);
+      }
+    }
     const trackerOptions = ctx.harness.historyFixture ? ctx.harness.historyFixture.trackerOptions : providerFixture?.options;
     ctx.tracker = fixture
       ? new Tracker(fixture.statePath, trackerOptions)

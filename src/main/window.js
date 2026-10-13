@@ -19,7 +19,7 @@ function createWindow(ctx, electron = require('electron')) {
     minHeight: 720,
     backgroundColor: '#04050a',
     autoHideMenuBar: true,
-    title: 'Agent Universe',
+    title: 'Agent Orrery',
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload.js'),
       contextIsolation: true,

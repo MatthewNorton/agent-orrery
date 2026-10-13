@@ -13,7 +13,7 @@ param(
     [Environment+SpecialFolder]::Programs
   ),
 
-  [string]$SupportDirectory = (Join-Path -Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)) -ChildPath 'Agent Universe Lite')
+  [string]$SupportDirectory = (Join-Path -Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)) -ChildPath 'Agent Orrery')
 )
 
 Set-StrictMode -Version Latest
@@ -73,7 +73,7 @@ function Assert-OwnedFileDestination {
   }
 }
 
-function New-AgentUniverseIcon {
+function New-AgentOrreryIcon {
   param([Parameter(Mandatory = $true)][string]$IconPath)
 
   Add-Type -AssemblyName System.Drawing
@@ -189,7 +189,7 @@ function New-AgentUniverseIcon {
   }
 
   $temporaryIcon = Join-Path -Path (Split-Path -Parent $IconPath) -ChildPath (
-    '.agent-universe-lite-' + [Guid]::NewGuid().ToString('N') + '.ico'
+    '.agent-orrery-' + [Guid]::NewGuid().ToString('N') + '.ico'
   )
   try {
     $stream = [IO.File]::Open(
@@ -242,7 +242,7 @@ function New-AgentUniverseIcon {
   }
 }
 
-function Set-AgentUniverseShortcut {
+function Set-AgentOrreryShortcut {
   param(
     [Parameter(Mandatory = $true)]$Shell,
     [Parameter(Mandatory = $true)][string]$ShortcutPath,
@@ -252,7 +252,7 @@ function Set-AgentUniverseShortcut {
   )
 
   $temporaryShortcut = Join-Path -Path (Split-Path -Parent $ShortcutPath) -ChildPath (
-    '.agent-universe-lite-' + [Guid]::NewGuid().ToString('N') + '.lnk'
+    '.agent-orrery-' + [Guid]::NewGuid().ToString('N') + '.lnk'
   )
   $shortcut = $null
   try {
@@ -260,7 +260,7 @@ function Set-AgentUniverseShortcut {
     $shortcut.TargetPath = $ElectronPath
     $shortcut.Arguments = '.'
     $shortcut.WorkingDirectory = $WorkingDirectory
-    $shortcut.Description = 'Launch Agent Universe Lite'
+    $shortcut.Description = 'Launch Agent Orrery'
     $shortcut.IconLocation = "$IconPath,0"
     $shortcut.WindowStyle = 1
     $shortcut.Save()
@@ -280,7 +280,7 @@ function Set-AgentUniverseShortcut {
   }
 }
 
-function Publish-AgentUniverseArtifacts {
+function Publish-AgentOrreryArtifacts {
   param([Parameter(Mandatory = $true)][object[]]$Artifacts)
 
   $backups = [System.Collections.Generic.List[object]]::new()
@@ -293,7 +293,7 @@ function Publish-AgentUniverseArtifacts {
       Assert-OwnedFileDestination $artifact.Final 'Owned artifact'
       if (Test-Path -LiteralPath $artifact.Final -PathType Leaf) {
         $backup = Join-Path -Path (Split-Path -Parent $artifact.Final) -ChildPath (
-          '.agent-universe-lite-backup-' + [Guid]::NewGuid().ToString('N')
+          '.agent-orrery-backup-' + [Guid]::NewGuid().ToString('N')
         )
         Move-Item -LiteralPath $artifact.Final -Destination $backup
         [void]$backups.Add([pscustomobject]@{ Backup = $backup; Final = $artifact.Final })
@@ -360,17 +360,17 @@ function Remove-EmptyOwnedDirectory {
 }
 
 if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
-  throw 'Agent Universe Lite shortcuts are supported only on Windows.'
+  throw 'Agent Orrery shortcuts are supported only on Windows.'
 }
 
 $repo = ConvertTo-CanonicalPath $RepositoryRoot 'RepositoryRoot'
 $desktop = ConvertTo-CanonicalPath $DesktopDirectory 'DesktopDirectory'
 $programs = ConvertTo-CanonicalPath $ProgramsDirectory 'ProgramsDirectory'
 $support = ConvertTo-CanonicalPath $SupportDirectory 'SupportDirectory'
-$startMenuAppDirectory = Join-Path $programs 'Agent Universe Lite'
-$desktopShortcut = Join-Path $desktop 'Agent Universe Lite.lnk'
-$startMenuShortcut = Join-Path $startMenuAppDirectory 'Agent Universe Lite.lnk'
-$icon = Join-Path $support 'agent-universe-lite.ico'
+$startMenuAppDirectory = Join-Path $programs 'Agent Orrery'
+$desktopShortcut = Join-Path $desktop 'Agent Orrery.lnk'
+$startMenuShortcut = Join-Path $startMenuAppDirectory 'Agent Orrery.lnk'
+$icon = Join-Path $support 'agent-orrery.ico'
 
 if ($Action -eq 'Uninstall') {
   foreach ($ownedFile in @($desktopShortcut, $startMenuShortcut, $icon)) {
@@ -395,11 +395,11 @@ if (-not (Test-Path -LiteralPath $repo -PathType Container)) {
   throw "RepositoryRoot does not exist: $repo"
 }
 if (-not (Test-Path -LiteralPath $packagePath -PathType Leaf)) {
-  throw "Agent Universe Lite package.json was not found under: $repo"
+  throw "Agent Orrery package.json was not found under: $repo"
 }
 $package = Get-Content -LiteralPath $packagePath -Raw | ConvertFrom-Json
-if ($package.name -ne 'agent-universe-lite') {
-  throw "RepositoryRoot is not Agent Universe Lite: $repo"
+if ($package.name -ne 'agent-orrery') {
+  throw "RepositoryRoot is not Agent Orrery: $repo"
 }
 if (-not (Test-Path -LiteralPath $electron -PathType Leaf)) {
   throw "Electron is not installed at $electron. Run npm install in $repo, then retry."
@@ -426,15 +426,15 @@ try {
     [void][IO.Directory]::CreateDirectory($startMenuAppDirectory)
     [void][IO.Directory]::CreateDirectory($support)
     $transaction = [Guid]::NewGuid().ToString('N')
-    $stagedIcon = Join-Path $support ".agent-universe-lite-$transaction.ico"
-    $stagedDesktop = Join-Path $desktop ".agent-universe-lite-$transaction.lnk"
-    $stagedStartMenu = Join-Path $startMenuAppDirectory ".agent-universe-lite-$transaction.lnk"
+    $stagedIcon = Join-Path $support ".agent-orrery-$transaction.ico"
+    $stagedDesktop = Join-Path $desktop ".agent-orrery-$transaction.lnk"
+    $stagedStartMenu = Join-Path $startMenuAppDirectory ".agent-orrery-$transaction.lnk"
     $stagedFiles = @($stagedIcon, $stagedDesktop, $stagedStartMenu)
     try {
-      New-AgentUniverseIcon $stagedIcon
-      Set-AgentUniverseShortcut $shell $stagedDesktop $electron $repo $icon
-      Set-AgentUniverseShortcut $shell $stagedStartMenu $electron $repo $icon
-      Publish-AgentUniverseArtifacts @(
+      New-AgentOrreryIcon $stagedIcon
+      Set-AgentOrreryShortcut $shell $stagedDesktop $electron $repo $icon
+      Set-AgentOrreryShortcut $shell $stagedStartMenu $electron $repo $icon
+      Publish-AgentOrreryArtifacts @(
         [pscustomobject]@{ Staged = $stagedIcon; Final = $icon },
         [pscustomobject]@{ Staged = $stagedDesktop; Final = $desktopShortcut },
         [pscustomobject]@{ Staged = $stagedStartMenu; Final = $startMenuShortcut }

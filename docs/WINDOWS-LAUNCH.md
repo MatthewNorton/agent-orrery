@@ -2,7 +2,7 @@
 
 For macOS, see [MACOS-LAUNCH.md](MACOS-LAUNCH.md).
 
-Agent Universe Lite can install per-user shortcuts that launch Electron
+Agent Orrery can install per-user shortcuts that launch Electron
 directly as a Windows GUI application. After the one-time setup, neither the
 Desktop nor Start-menu shortcut opens a terminal window.
 
@@ -22,12 +22,12 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\windows-shortc
 
 The command creates or refreshes exactly two shortcuts:
 
-- `Agent Universe Lite.lnk` on the current user's Desktop
-- `Agent Universe Lite\Agent Universe Lite.lnk` in the current user's Start
+- `Agent Orrery.lnk` on the current user's Desktop
+- `Agent Orrery\Agent Orrery.lnk` in the current user's Start
   menu Programs folder
 
 It also creates a deterministic procedural multi-resolution icon under
-`%LOCALAPPDATA%\Agent Universe Lite`. Re-running Install is safe and rebinds
+`%LOCALAPPDATA%\Agent Orrery`. Re-running Install is safe and rebinds
 the same shortcuts without creating duplicates.
 
 The links target Electron's GUI executable directly, pass `.` as its argument,
