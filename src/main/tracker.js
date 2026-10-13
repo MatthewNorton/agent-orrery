@@ -24,7 +24,6 @@ const {
 const { claudeRecordToSignals, claudeTool } = require('./transcripts/claude');
 const { codexParentSessionId } = require('./transcripts/codex');
 const { fnv1a, hex8, mulberry32 } = require('./shared/hash');
-const { writeFileAtomic } = require('./shared/atomic-write');
 const { relativeInside } = require('./path-safety');
 const { signalSources, watchedFiles } = require('./signal-sources');
 const { bucketOf, countBuild, bucketBuilds } = require('./build-buckets');
@@ -34,6 +33,7 @@ const { liveProject, liveShip } = require('./universe/public-shape');
 const { createShipRecord } = require('./universe/ships');
 const { queue, pushFeed, flush, recentFeed } = require('./live/events');
 const { classifyAttention, evaluateAttention } = require('./live/attention');
+const { loadState, saveState } = require('./live/state-file');
 
 /**
  * @import { Attention, FeedEntry, PlanetData, Project, Ship, ShipStatus, SystemData }
@@ -110,7 +110,7 @@ class Tracker extends EventEmitter {
     /** @type {FeedEntry[]} */
     this.feed = [];              // ring buffer of recent feed entries
     this.shipCounter = 0;
-    this.persisted = this.loadState();
+    this.persisted = loadState(statePath);
     this.pathIds = Object.assign(Object.create(null), this.persisted.pathIds || {});
     this.pathOverrides = Object.create(null);
     for (const [projectId, projectPath] of Object.entries(this.persisted.pathOverrides || {})) {
@@ -148,32 +148,8 @@ class Tracker extends EventEmitter {
     this.saveState();
   }
 
-  loadState() {
-    try {
-      return JSON.parse(fs.readFileSync(this.statePath, 'utf8'));
-    } catch {
-      return { projects: {} };
-    }
-  }
-
   saveState(throwOnError = false) {
-    const out = {
-      projects: {},
-      pathIds: { ...this.pathIds },
-      pathOverrides: { ...this.pathOverrides },
-    };
-    for (const [slug, p] of this.projects) {
-      out.projects[slug] = { buckets: p.buckets, totalBuilds: p.totalBuilds, firstSeen: p.firstSeen };
-    }
-    try {
-      fs.mkdirSync(path.dirname(this.statePath), { recursive: true });
-      writeFileAtomic(this.statePath, JSON.stringify(out));
-      return true;
-    } catch (e) {
-      if (throwOnError) throw e;
-      console.error('state save failed', e.message);
-      return false;
-    }
+    return saveState(this, throwOnError);
   }
 
   // ---------- discovery ----------
