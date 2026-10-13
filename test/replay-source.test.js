@@ -6,6 +6,8 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { ReplaySource } = require('../src/main/replay-source');
+const { inspectClaudeFile } = require('../src/main/history/index-builder');
+const { safeTimestamp } = require('../src/main/history/jsonl');
 
 function createFixture(t, name = 'timeline-project') {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-universe-replay-'));
@@ -191,12 +193,12 @@ test('cancelled seek closes handles against the cursors that opened them', async
 });
 
 test('history index skips a Claude transcript whose cwd has no local project key', async (t) => {
-  const { sessionDir, claudeRoot } = createFixture(t, 'unc-project');
-  const source = createSource(t, claudeRoot, Date.UTC(2026, 7, 4, 13, 0, 0));
+  const { sessionDir } = createFixture(t, 'unc-project');
+  const now = Date.UTC(2026, 7, 4, 13, 0, 0);
   const timestamp = new Date(Date.UTC(2026, 7, 4, 12, 0, 0)).toISOString();
   for (const cwd of ['\\\\wsl.localhost\\Ubuntu\\home\\u\\proj', 'relative/proj']) {
     const file = path.join(sessionDir, `${cwd.length}.jsonl`);
     fs.writeFileSync(file, `${JSON.stringify({ type: 'user', timestamp, cwd })}\n`);
-    assert.equal(await source._inspectClaudeFile(file, 'unc-project'), null, cwd);
+    assert.equal(await inspectClaudeFile(file, 'unc-project', (value) => safeTimestamp(value, now)), null, cwd);
   }
 });

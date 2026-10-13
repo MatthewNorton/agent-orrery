@@ -358,8 +358,8 @@ test('differs: project-id collision suffix — live "<id>:<hash8>", replay "<id>
   assert.equal(tracker.ensureProjectForPath(second, 'project:shared', T0, 0).id, `project:shared:${hash}`);
 
   const { source } = world.replay();
-  assert.equal(source._ensureProject(first, T0, false, 'shared').id, 'shared');
-  assert.equal(source._ensureProject(second, T0, false, 'shared').id,
+  assert.equal(source._model.ensureProject(first, T0, false, 'shared').id, 'shared');
+  assert.equal(source._model.ensureProject(second, T0, false, 'shared').id,
     `shared-${parseInt(hash, 16).toString(16)}`);
 });
 
