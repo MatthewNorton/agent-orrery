@@ -8,11 +8,21 @@ Desktop nor Start-menu shortcut opens a terminal window.
 
 ## Quick setup
 
-Double-click `Install Agent Orrery.cmd` in the repository root, or run
-`npm run setup`. It installs the dependencies when Electron is missing, runs
-the Install command below, and opens the app. Node.js 22.12 or newer must
-already be installed; the window says so if it is not. Run it again after
-moving the checkout. The rest of this page describes the shortcut script it runs.
+From the repository root, run:
+
+```powershell
+npm run setup
+```
+
+It installs the dependencies when Electron is missing, runs the Install
+command below, and opens the app. Run it again after moving the checkout.
+
+In a `git clone`, double-clicking `Install Agent Orrery.cmd` in the repository
+root does the same, and says so if Node.js 22.12 or newer is missing. A folder
+extracted from a downloaded ZIP carries Windows' download mark, so the file
+may raise a security prompt or be blocked by Smart App Control or company
+policy; use `npm run setup` there instead. The rest of this page describes
+the shortcut script it runs.
 
 ## Prerequisite
 

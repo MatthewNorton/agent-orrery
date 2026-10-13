@@ -61,6 +61,6 @@ you (or a Claude kit-runner session):
 
 Nothing is feedable today. Kits 01–08, 10, 11, 13 and 14 are done (see
 `kit/README.md`); `kit/todo/09-ship-assets-gen.md` is a stub and
-`kit/todo/12-standalone-installer.md` is parked. To make the next feedable
+`kit/todo/12-standalone-installer.md` is declined. To make the next feedable
 kit, run `/distill` on a stub to produce its contract and grader, then use
 this handoff.

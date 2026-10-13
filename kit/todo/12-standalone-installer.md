@@ -1,4 +1,4 @@
-# Stub — standalone installer (parked: wanted later, not yet)
+# Stub — standalone installer (declined 2026-10-13)
 
 Goal: a real packaged build — a self-contained `Agent Orrery.exe`
 (NSIS installer and/or portable exe; macOS `.app`/dmg later) that launches
@@ -42,4 +42,6 @@ Seed notes:
   must be rebuilt after each pull; the shortcuts always run the checkout.
   Unsigned builds trigger SmartScreen / Gatekeeper prompts.
 
-Status: parked. Not distilled.
+Status: declined 2026-10-13. The users are developers, so `git clone` +
+`npm run setup` (or the root double-click files in a clone) is the install
+path. Kept for its notes; don't propose a packaged build unless matt asks.
