@@ -8,10 +8,14 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const read = (file) => fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', file), 'utf8');
-function headingCode(file, pattern) {
-  const match = read(file).match(pattern);
-  assert.ok(match, `${file}: heading code not found`);
+const RENDERER = path.join(__dirname, '..', 'src', 'renderer');
+// A view's source is its scene-<view>*.js files.
+const viewSource = (view) => fs.readdirSync(RENDERER)
+  .filter((file) => file.startsWith(`scene-${view}`) && file.endsWith('.js')).sort()
+  .map((file) => fs.readFileSync(path.join(RENDERER, file), 'utf8')).join('\n');
+function headingCode(view, pattern) {
+  const match = viewSource(view).match(pattern);
+  assert.ok(match, `${view} view: heading code not found`);
   return match[0];
 }
 
@@ -26,7 +30,7 @@ const along = ({ a, speed }, [x, z]) => {
 
 test('system view: a patrolling ship faces along its orbit either way round', () => {
   const look = new Function('r', 'shipLookTarget',
-    headingCode('scene-system.js', /shipLookTarget\.set\([^;]+\);/));
+    headingCode('system', /shipLookTarget\.set\([^;]+\);/));
   for (const orbit of ORBITS) {
     const target = { set(x, y, z) { Object.assign(this, { x, z }); } };
     look({ ...orbit, r: R }, target);
@@ -37,7 +41,7 @@ test('system view: a patrolling ship faces along its orbit either way round', ()
 
 test('planet view: an orbiting ship faces along its orbit either way round', () => {
   const look = new Function('r', 'BABYLON',
-    headingCode('scene-planet.js', /r\.mesh\.lookAt\(new BABYLON\.Vector3\([\s\S]*?\)\);/));
+    headingCode('planet', /r\.mesh\.lookAt\(new BABYLON\.Vector3\([\s\S]*?\)\);/));
   const BABYLON = { Vector3: function Vector3(x, y, z) { Object.assign(this, { x, y, z }); } };
   for (const orbit of ORBITS) {
     let target = null;
@@ -48,7 +52,7 @@ test('planet view: an orbiting ship faces along its orbit either way round', () 
 });
 
 test('universe view: a ship faces along its orbit either way round, not out from the star', () => {
-  const turn = new Function('r', headingCode('scene-universe.js', /r\.mesh\.rotation\.y = [^;]+;/));
+  const turn = new Function('r', headingCode('universe', /r\.mesh\.rotation\.y = [^;]+;/));
   for (const orbit of ORBITS) {
     const r = { ...orbit, mesh: { rotation: {} } };
     turn(r);

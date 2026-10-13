@@ -1,11 +1,11 @@
 // scene-system.js — one project's solar system: central sun, orbit rings,
-// textured planets, asteroid belt, ships with labels + build fly-to.
+// textured planets and the first-person focus camera. The asteroid belt, the
+// ships and the focus fade are scene-system-belt/-ships/-focus.js.
 'use strict';
 
 (function () {
   const AUR = window.AUR;
   const POLISH = window.AUR_POLISH;
-  const AU = window.AU;
   const SHIP_FOCUS_VANTAGE_YAW = Object.freeze({
     forward: 0,
     starboard: Math.PI / 2,
@@ -78,13 +78,25 @@
     corona.isPickable = false;
     let lastPulseFactor = 1;
 
+    // State shared with the scene-system-*.js parts.
+    const planets = new Map(); // name -> record
+    const ships = new Map();
+    const view = {
+      scene, gui, sys, projectId, orbitR, outer, planets, ships,
+      reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+      shipFocus: null, buildPlanet, clearShipFocus, shipFocusState,
+    };
+    const parts = AUR.sceneParts.system;
+    Object.assign(view, parts.ships(view), parts.focus(view));
+    const { reducedMotion } = view;
+
     scene.metadata = {
       view: 'system',
       providerStats() {
         return AUR.sceneProviderStats(scene);
       },
       focusStats() {
-        return shipFocusStats();
+        return view.shipFocusStats();
       },
       polishStats() {
         return {
@@ -97,7 +109,6 @@
     };
 
     // ---- planets ----
-    const planets = new Map(); // name -> record
     const topNames = planetList.slice()
       .sort((a, b) => (b.files + b.builds * 5) - (a.files + a.builds * 5))
       .slice(0, 3).map((p) => p.name);
@@ -141,54 +152,15 @@
     }
     planetList.forEach(buildPlanet);
 
-    // ---- asteroid belt ----
-    let belt = null;
-    (function buildBelt() {
-      const n = planetList.length;
-      const beltR = n >= 2 ? (orbitR(Math.floor(n / 2) - 1) + orbitR(Math.floor(n / 2))) / 2 : outer + 4;
-      const count = AUR.clamp(Math.max((sys.beltDensity || 0) * 4, 70), 0, 300);
-      if (count <= 0) return;
-      const rand = AUR.mulberry32(AUR.fnv1a(projectId + ':belt'));
-      belt = new BABYLON.TransformNode('asteroid-belt', scene);
-      const variants = [1, 2, 3];
-      const q = BABYLON.Quaternion.Identity();
-      for (let variant = 0; variant < variants.length; variant += 1) {
-        const rock = AUR.createAsteroidMesh(
-          scene, 'asteroid-form-' + variant,
-          AUR.fnv1a(projectId + ':asteroid-form:' + variant), 0.19);
-        const rmat = new BABYLON.StandardMaterial('asteroid-mat-' + variant, scene);
-        AUR.applyAsteroidSurface(scene, rmat, variants[variant]);
-        rmat.emissiveColor = new BABYLON.Color3(0.018, 0.016, 0.014);
-        rock.material = rmat;
-        rock.parent = belt;
-        rock.isPickable = false;
-        const variantCount = Math.floor((count + (variants.length - 1 - variant)) / variants.length);
-        const buf = new Float32Array(variantCount * 16);
-        for (let i = 0; i < variantCount; i += 1) {
-          const a = rand() * Math.PI * 2;
-          const rr = beltR + (rand() - 0.5) * 3.4;
-          const y = (rand() - 0.5) * 1.2;
-          const s = 0.45 + rand() * 1.18;
-          const stretch = 0.68 + rand() * 0.76;
-          BABYLON.Quaternion.FromEulerAnglesToRef(rand() * 3, rand() * 3, rand() * 3, q);
-          const m = BABYLON.Matrix.Compose(
-            new BABYLON.Vector3(s * stretch, s * (0.78 + rand() * 0.42), s / Math.sqrt(stretch)), q,
-            new BABYLON.Vector3(Math.cos(a) * rr, y, Math.sin(a) * rr));
-          m.copyToArray(buf, i * 16);
-        }
-        rock.thinInstanceSetBuffer('matrix', buf, 16);
-      }
-    })();
+    const belt = parts.belt(view);
 
-    // ---- ships ----
-    const ships = new Map();
+    // ---- focus camera ----
     const focusCamera = new BABYLON.UniversalCamera(
       'ship-focus-camera', BABYLON.Vector3.Zero(), scene);
     focusCamera.inputs.clear();
     focusCamera.fov = 0.84;
     focusCamera.minZ = 0.03;
     focusCamera.maxZ = 6000;
-    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const focusForward = new BABYLON.Vector3();
     const focusUp = new BABYLON.Vector3();
     const focusRight = new BABYLON.Vector3();
@@ -197,59 +169,9 @@
     const focusLookDesired = new BABYLON.Vector3();
     const focusLookCurrent = new BABYLON.Vector3();
     const focusOffset = new BABYLON.Vector3();
-    let shipFocus = null;
-
-    function recordVisualNodes(rec) {
-      const nodes = [];
-      if (rec.mesh && typeof rec.mesh.visibility === 'number') nodes.push(rec.mesh);
-      if (rec.mesh && typeof rec.mesh.getChildMeshes === 'function') {
-        for (const child of rec.mesh.getChildMeshes(false)) nodes.push(child);
-      }
-      if (rec.trail && !nodes.includes(rec.trail)) nodes.push(rec.trail);
-      return nodes;
-    }
-
-    function focusedVisualRecord(rec) {
-      let saved = shipFocus && shipFocus.saved.get(rec.id);
-      if (saved) return saved;
-      saved = {
-        nodes: new Map(),
-        labelAlpha: rec.label ? rec.label.alpha : null,
-        suffixAlpha: rec.suffix ? rec.suffix.alpha : null,
-      };
-      if (shipFocus) shipFocus.saved.set(rec.id, saved);
-      return saved;
-    }
-
-    function applyShipFocusVisual(rec, visibility) {
-      if (!shipFocus) return;
-      const saved = focusedVisualRecord(rec);
-      for (const node of recordVisualNodes(rec)) {
-        if (!saved.nodes.has(node)) saved.nodes.set(node, node.visibility);
-        node.visibility = visibility;
-      }
-      if (rec.label) rec.label.alpha = 0;
-      if (rec.suffix) rec.suffix.alpha = 0;
-    }
-
-    function restoreShipFocusVisuals() {
-      if (!shipFocus) return;
-      for (const saved of shipFocus.saved.values()) {
-        for (const [node, visibility] of saved.nodes) {
-          const disposed = typeof node.isDisposed === 'function'
-            ? node.isDisposed() : node.isDisposed === true;
-          if (!disposed) node.visibility = visibility;
-        }
-      }
-      for (const [id, saved] of shipFocus.saved) {
-        const rec = ships.get(id);
-        if (!rec) continue;
-        if (rec.label && saved.labelAlpha != null) rec.label.alpha = saved.labelAlpha;
-        if (rec.suffix && saved.suffixAlpha != null) rec.suffix.alpha = saved.suffixAlpha;
-      }
-    }
 
     function updateShipFocusCamera(immediate, dt) {
+      const { shipFocus } = view;
       const rec = shipFocus && ships.get(shipFocus.shipId);
       if (!rec || !rec.mesh) return;
       const shipPosition = rec.mesh.getAbsolutePosition();
@@ -293,9 +215,9 @@
       const rec = ships.get(id);
       if (!rec) return false;
       clearShipFocus();
-      shipFocus = { shipId: id, vantage: 'forward', saved: new Map() };
+      view.shipFocus = { shipId: id, vantage: 'forward', saved: new Map() };
       for (const item of ships.values()) {
-        applyShipFocusVisual(item, item.id === id ? 0 : 0.16);
+        view.applyShipFocusVisual(item, item.id === id ? 0 : 0.16);
       }
       camera.detachControl(canvas);
       scene.activeCamera = focusCamera;
@@ -305,6 +227,7 @@
     }
 
     function setShipFocusVantage(value) {
+      const { shipFocus } = view;
       if (!shipFocus) return false;
       shipFocus.vantage = typeof value === 'string' &&
         Object.hasOwn(SHIP_FOCUS_VANTAGE_YAW, value) ? value : 'forward';
@@ -312,14 +235,15 @@
     }
 
     function clearShipFocus() {
-      if (!shipFocus) return;
-      restoreShipFocusVisuals();
-      shipFocus = null;
+      if (!view.shipFocus) return;
+      view.restoreShipFocusVisuals();
+      view.shipFocus = null;
       scene.activeCamera = camera;
       camera.attachControl(canvas, true);
     }
 
     function shipFocusState() {
+      const { shipFocus } = view;
       const rec = shipFocus && ships.get(shipFocus.shipId);
       if (!rec) return null;
       const target = rec.fly && rec.fly.planet && rec.fly.planet.mesh &&
@@ -339,132 +263,8 @@
       };
     }
 
-    function shipFocusStats() {
-      const state = shipFocusState();
-      const focused = shipFocus && ships.get(shipFocus.shipId);
-      const speed = focused ? Math.abs(focused.speed) : null;
-      return {
-        active: Boolean(shipFocus),
-        shipId: shipFocus ? shipFocus.shipId : null,
-        vantage: shipFocus ? shipFocus.vantage : null,
-        activeCamera: scene.activeCamera ? scene.activeCamera.name : null,
-        dimmedShipCount: shipFocus ? Math.max(0, ships.size - 1) : 0,
-        target: state ? state.target : null,
-        motion: {
-          focusedPatrolSpeed: speed,
-          estimatedOrbitSeconds: speed ? (Math.PI * 2) / speed : null,
-          focusFollowRate: reducedMotion
-            ? AUR.MOTION.reducedFocusFollowRate
-            : AUR.MOTION.focusFollowRate,
-          cameraPosition: scene.activeCamera ? {
-            x: scene.activeCamera.position.x,
-            y: scene.activeCamera.position.y,
-            z: scene.activeCamera.position.z,
-          } : null,
-        },
-      };
-    }
-    function attentionSuffix(attention) {
-      if (attention === 'question' || attention === 'permission') return '· needs you';
-      if (attention === 'done') return '· done';
-      return '';
-    }
-
-    function applyShipAttention(rec, ship) {
-      const text = attentionSuffix(ship.attention);
-      rec.suffix.text = text;
-      rec.suffix.isVisible = text !== '';
-      if (!text) return;
-      rec.suffix.color = AUR.attentionColor(ship.attention);
-      // Both controls are linked to the ship. Offset the suffix beyond the
-      // centered name label while keeping their vertical baselines aligned.
-      rec.suffix.linkOffsetX = Math.round(((String(ship.name).length * 7) + (text.length * 6)) / 2 + 4);
-    }
-
-    function buildShip(s) {
-      const tint = AUR.shipTint(s.id, s.provider);
-      const signal = AUR.isSignalEntity(s);
-      const scale = signal ? 0.72 : 1.1;
-      let mesh = signal
-        ? AUR.signalMarker(scene, 'ssig_' + s.id, tint)
-        : AUR.ships.instantiate(scene, s);
-      const usedFallback = !signal && !mesh;
-      if (usedFallback) mesh = AUR.dartMesh(scene, 'sshp_' + s.id, tint, scale);
-      else mesh.scaling.setAll(scale);
-      const provider = AUR.markShipMesh(mesh, s);
-      const rand = AUR.mulberry32(AUR.fnv1a(s.id));
-      const r = outer + 3 + rand() * 4;
-      const a0 = rand() * Math.PI * 2;
-      mesh.position.set(Math.cos(a0) * r, (rand() - 0.5) * 2, Math.sin(a0) * r);
-      const trail = new BABYLON.TrailMesh('t_' + s.id, mesh, scene, 0.08, 18, true);
-      const tmat = new BABYLON.StandardMaterial('tm_' + s.id, scene);
-      tmat.emissiveColor = AUR.color3(tint);
-      tmat.diffuseColor = new BABYLON.Color3(0, 0, 0);
-      tmat.specularColor = new BABYLON.Color3(0, 0, 0);
-      tmat.alpha = 0.24;
-      trail.material = tmat;
-      const label = AUR.label(gui, s.name, { fontSize: 13, color: '#eaf0ff' });
-      label.linkWithMesh(mesh);
-      label.linkOffsetY = -22;
-      const suffix = AUR.label(gui, attentionSuffix(s.attention), {
-        fontSize: 13, color: AUR.attentionColor(s.attention),
-      });
-      suffix.linkWithMesh(mesh);
-      suffix.linkOffsetY = -22;
-      const rec = {
-        id: s.id, mesh, trail, label, suffix, tint, providerKey: provider.key,
-        r, a: a0, speed: (AUR.MOTION.systemShipOrbitMin +
-          rand() * AUR.MOTION.systemShipOrbitRange) * (rand() > 0.5 ? 1 : -1),
-        bob: rand() * 6.28, mode: 'patrol', fly: null, born: performance.now(),
-      };
-      applyShipAttention(rec, s);
-      ships.set(s.id, rec);
-      if (shipFocus) applyShipFocusVisual(rec, 0.16);
-      if (usedFallback) {
-        AUR.ships.upgrade(scene, s, mesh, scale).then(() => {
-          if (shipFocus && ships.has(s.id)) {
-            applyShipFocusVisual(rec, shipFocus.shipId === rec.id ? 0 : 0.16);
-          }
-        });
-      }
-      return rec;
-    }
-    function removeShip(id) {
-      const r = ships.get(id);
-      if (!r) return;
-      if (shipFocus && shipFocus.shipId === id) clearShipFocus();
-      else if (shipFocus) shipFocus.saved.delete(id);
-      if (r.fly && r.fly.beam) disposeMeshAndMaterial(r.fly.beam);
-      if (r.trail) disposeMeshAndMaterial(r.trail);
-      if (r.label) r.label.dispose();
-      if (r.suffix) r.suffix.dispose();
-      if (r.mesh) disposeMeshAndMaterial(r.mesh);
-      ships.delete(id);
-    }
-
-    function disposeMeshAndMaterial(mesh) {
-      if (!mesh) return;
-      const material = mesh.material;
-      const sharedAssetMaterial = Boolean(mesh.metadata && mesh.metadata.assetHullId);
-      mesh.dispose();
-      if (material && !sharedAssetMaterial) material.dispose();
-    }
-    for (const s of store.ships.values()) if (s.project === projectId) buildShip(s);
-
-    function beamTo(shipRec, planetRec) {
-      const beam = BABYLON.MeshBuilder.CreateTube('beam', {
-        path: [shipRec.mesh.position.clone(), planetRec.mesh.position.clone()],
-        radius: 0.06, tessellation: 6, updatable: false,
-      }, scene);
-      const bm = new BABYLON.StandardMaterial('beamm', scene);
-      bm.emissiveColor = AUR.color3(shipRec.tint);
-      bm.diffuseColor = new BABYLON.Color3(0, 0, 0);
-      bm.specularColor = new BABYLON.Color3(0, 0, 0);
-      bm.alpha = 0.7;
-      beam.material = bm;
-      beam.isPickable = false;
-      return beam;
-    }
+    // ---- ships ----
+    for (const s of store.ships.values()) if (s.project === projectId) view.buildShip(s);
 
     // ---- interaction ----
     let hovered = null;
@@ -485,7 +285,6 @@
     });
 
     // ---- animation ----
-    const shipLookTarget = new BABYLON.Vector3();
     scene.onBeforeRenderObservable.add(() => {
       const dt = engine.getDeltaTime() / 1000;
       const now = performance.now();
@@ -512,94 +311,14 @@
       }
       if (belt) belt.rotation.y += dt * 0.03;
 
-      for (const r of ships.values()) {
-        if (r.mode === 'patrol') {
-          r.a += r.speed * dt;
-          r.mesh.position.set(
-            Math.cos(r.a) * r.r,
-            Math.sin(r.bob + t * AUR.MOTION.systemShipBobRate) * AUR.MOTION.systemShipBobAmount,
-            Math.sin(r.a) * r.r
-          );
-          shipLookTarget.set(Math.cos(r.a + Math.sign(r.speed) * 0.025) * r.r, 0, Math.sin(r.a + Math.sign(r.speed) * 0.025) * r.r);
-          r.mesh.lookAt(shipLookTarget);
-        } else if (r.mode === 'flyto') {
-          const f = r.fly;
-          f.t = Math.min(1, f.t + dt / AUR.MOTION.flyToSeconds);
-          const target = f.planet.mesh.position;
-          BABYLON.Vector3.LerpToRef(f.from, target, ease(f.t), r.mesh.position);
-          r.mesh.lookAt(target);
-          if (f.t >= 1) {
-            f.beam = beamTo(r, f.planet);
-            f.planet.pulseUntil = now + 600;
-            r.mode = 'hold'; f.hold = now + 2400;
-          }
-        } else if (r.mode === 'hold') {
-          const f = r.fly;
-          r.mesh.lookAt(f.planet.mesh.position);
-          if (now >= f.hold) {
-            if (f.beam) disposeMeshAndMaterial(f.beam);
-            const px = r.mesh.position.x, pz = r.mesh.position.z;
-            r.r = Math.max(outer + 2, Math.hypot(px, pz));
-            r.a = Math.atan2(pz, px);
-            r.mode = 'patrol'; r.fly = null;
-          }
-        }
-        const age = (now - r.born) / 900;
-        if (age < 1) r.mesh.scaling.setAll(0.3 + 0.7 * age);
-      }
-      if (shipFocus) updateShipFocusCamera(false, dt);
+      view.animateShips(dt, now, t);
+      if (view.shipFocus) updateShipFocusCamera(false, dt);
     });
-
-    function ease(x) { return x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2; }
-
-    // ---- live updates ----
-    function update(batch) {
-      for (const ev of batch) {
-        if (ev.type === 'ship-spawned' && ev.ship.project === projectId) {
-          if (!ships.has(ev.ship.id)) buildShip(ev.ship);
-        } else if (ev.type === 'ship-updated' && ev.ship.project === projectId) {
-          const sh = ships.get(ev.ship.id);
-          if (sh) applyShipAttention(sh, ev.ship);
-        } else if (ev.type === 'ship-departed') {
-          if (ships.has(ev.shipId)) removeShip(ev.shipId);
-        } else if (ev.type === 'build' && ev.project === projectId) {
-          const pr = planets.get(ev.bucket);
-          const sh = ships.get(ev.shipId);
-          if (ev.isNew && !pr) { refetchPlanets(); }
-          if (pr) {
-            pr.pulseUntil = performance.now() + 600;
-            if (sh && sh.mode === 'patrol') {
-              sh.mode = 'flyto';
-              sh.fly = { planet: pr, t: 0, from: sh.mesh.position.clone(), beam: null };
-            }
-          }
-        } else if (ev.type === 'activity' && ev.project === projectId) {
-          const sh = ships.get(ev.shipId);
-          if (sh) sh.born = performance.now() - 120; // brief thruster re-flash
-        }
-      }
-    }
-
-    let refetching = false;
-    function refetchPlanets() {
-      if (refetching) return;
-      refetching = true;
-      AU.getSystem(projectId).then((ns) => {
-        refetching = false;
-        if (!ns) return;
-        ns.planets.forEach((pd, i) => {
-          if (!planets.has(pd.name)) {
-            const rec = buildPlanet(pd, i);
-            rec.appear = 0.01;
-          }
-        });
-      }).catch(() => { refetching = false; });
-    }
 
     return {
       scene,
       systemData: sys,
-      update,
+      update: view.update,
       focusShip,
       setShipFocusVantage,
       clearShipFocus,

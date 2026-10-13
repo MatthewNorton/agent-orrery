@@ -212,7 +212,7 @@ th { font-size: 11.5px; color: var(--muted); font-weight: 600; text-transform: u
     <span><i class="sw" style="background:var(--app-f);border-color:var(--app-s)"></i>renderer app layer</span>
     <span><i class="sw" style="background:var(--view-f);border-color:var(--view-s)"></i>views + libraries</span>
     <span><i class="sw" style="background:var(--asset-f);border-color:var(--asset-s)"></i>assets</span>
-    <span><svg width="40" height="8" viewBox="0 0 40 8"><rect x="0" y="2" width="26" height="3" fill="var(--warn)"/></svg>size bar (red: over 600 lines)</span>
+    <span><svg width="40" height="8" viewBox="0 0 40 8"><rect x="0" y="2" width="26" height="3" fill="var(--warn)"/></svg>size bar (red: over 400 lines)</span>
     <span><svg width="34" height="8" viewBox="0 0 34 8"><line x1="0" y1="4" x2="34" y2="4" stroke="var(--edge)" stroke-width="1.5" stroke-dasharray="5 3"/></svg>reads / writes / spawns</span>
     <span><svg width="34" height="8" viewBox="0 0 34 8"><line x1="0" y1="4" x2="34" y2="4" stroke="var(--edge)" stroke-width="1.5"/></svg>calls / data flow</span>
   </div>
@@ -251,8 +251,8 @@ th { font-size: 11.5px; color: var(--muted); font-weight: 600; text-transform: u
   </div>
 
   <h2>File sizes</h2>
-  <p class="lede">Every source file on one scale (hatched: test harness). The dashed mark is the 600-line renderer rule; the two scene files are capped
-    at exactly their current size, so they cannot grow by a single line without failing <code>grade-structure.mjs</code>.</p>
+  <p class="lede">Every source file on one scale (hatched: test harness). The dashed mark is the 400-line rule every source file is held to
+    (<code>grade-main-split.mjs</code> T6, <code>grade-structure.mjs</code> T1); the target is about 300.</p>
   <div class="sizes">
     <div class="chart"><h3>Main process (<code>src/main</code> + preload)</h3><div id="sz-main"></div></div>
     <div class="chart"><h3>Renderer (<code>src/renderer</code>)</h3><div id="sz-ren"></div></div>
@@ -287,18 +287,17 @@ const NODES = {
   'ext.codexcli': { label: 'codex', sub: 'codex exec · IDEAS only', layer: 'ext',
     job: 'Started detached with --sandbox workspace-write for an IDEAS item. The only place the app starts an agent.' },
 
-  tracker: { label: 'tracker.js', lines: 1557, note: 'class Tracker', layer: 'main', path: 'src/main/tracker.js',
-    job: 'Polls every source (scan 3 s, poll 1 s, sweep 5 s), owns the live model of projects, ships and planets, classifies attention, emits event batches and saves universe-state.json.',
-    issues: ['Still one 1,538-line class: scanning, live model, attention, persistence and planet walks',
-      'A session already running at launch is read from the end of its transcript, so its ship restarts at 0 builds (the smallest hull)',
+  tracker: { label: 'tracker.js + live/', lines: 180, note: 'façade · 13 live modules', layer: 'main', path: 'src/main/tracker.js',
+    job: 'class Tracker is a façade over src/main/live/: it creates one LiveModel (live/model.js) that every live module takes as its first argument, and runs the timers (scan 3 s, poll 1 s, sweep 5 s, save 60 s). The live modules discover sources (claude-source, codex-source, signal-source), apply records (claude-records, provider-records), keep projects, ships and builds, classify attention, build the system and planet views, queue events and save universe-state.json. Galaxies, planets, ship records and public shapes come from the shared src/main/universe/.',
+    issues: ['A session already running at launch is read from the end of its transcript, so its ship restarts at 0 builds (the smallest hull)',
       'Every 3 s it stats every transcript and lists all Codex history'] },
   adapters: { label: 'provider-adapters.js', lines: 368, note: 'pure functions', layer: 'main', path: 'src/main/provider-adapters.js',
     job: 'Provider names, canonical path keys, rejection of UNC / device paths, the cross-provider tool vocabulary (classifyTool), Signal config, and adaptLine.' },
   transcripts: { label: 'transcripts/*.js', lines: 398, note: 'claude · codex · fields', layer: 'main', path: 'src/main/transcripts/',
     job: 'The one parser per provider: a transcript record becomes structural signals (session, turn end, message shape, tool start / end). Live and replay both read through it and each applies the signals with its own named rules.' },
-  replay: { label: 'replay-source.js', lines: 1399, note: 'class ReplaySource', layer: 'main', path: 'src/main/replay-source.js',
-    job: 'Indexes all history once at launch, then rebuilds the universe at any timestamp with a k-way merge over files (64 open handles max).',
-    issues: ['20 deliberate differences from live (galaxy keys, drone ids, no attention…), each named in the parity tests', 'Index built once: the scrubber end time is frozen until restart'] },
+  replay: { label: 'replay-source.js + history/', lines: 340, note: 'façade · 9 history modules', layer: 'main', path: 'src/main/replay-source.js',
+    job: 'class ReplaySource is a façade over src/main/history/: index-builder indexes all history once at launch; record-reader, order and merge stream records in time order (256 KB chunks, k-way merge, 64 open handles max); historical-line and apply-record reduce them into history/model.js. Shares src/main/universe/ with live.',
+    issues: ['20 deliberate differences from live (galaxy keys, drone ids, no attention…), each named in the parity tests', 'Index built once: the scrubber end time is frozen until restart', 'Backward scrubs still replay from the first record (no seek checkpoints yet)'] },
   coord: { label: 'root-task-coordinator.js', lines: 386, note: 'class', layer: 'main', path: 'src/main/root-task-coordinator.js',
     job: 'Assign / retry for an IDEAS item: append the goal to GOALS.md, start a run record, launch Codex.',
     issues: ['run() is 116 lines', 'completion-failed has no retry path'] },
@@ -394,53 +393,52 @@ const NODES = {
     job: 'Lets the --shots harness switch views and wait for a rendered frame.',
     issues: ['debug-ready is the one channel without a trusted-frame check'] },
 
-  aplay: { label: 'app-playback.js', lines: 531, layer: 'app', path: 'src/renderer/app-playback.js',
-    job: 'Stream epochs, store seeding, replay commands and the history bar. After a seek it rebuilds the whole scene.',
-    issues: ['Largest app module'] },
+  aplay: { label: 'app-playback.js', lines: 244, note: '+ app-replay 193 · metrics 97', layer: 'app', path: 'src/renderer/app-playback.js',
+    job: 'The history bar. app-replay.js holds stream epochs, playback state and issueReplay; app-history-metrics.js publishes AUR.historyTestMetrics for the history harness. After a seek the whole scene is rebuilt.' },
   actl: { label: 'app-project-control.js', lines: 244, layer: 'app', path: 'src/renderer/app-project-control.js',
     job: 'Project card, the Open Terminal button state machine, planet card.' },
   atasks: { label: 'app-project-tasks.js', lines: 286, layer: 'app', path: 'src/renderer/app-project-tasks.js',
     job: 'TASKS panel for GOALS.md; polls every 10 s.',
     issues: ['Does not check playback mode before editing; relies on main.js to refuse'] },
-  aideas: { label: 'app-ideas.js', lines: 408, layer: 'app', path: 'src/renderer/app-ideas.js',
-    job: 'IDEAS panel; polls every 5 s.', issues: ['renderIdeas is 145 lines', 'The generic confirmRemoval lives here and the tasks panel borrows it'] },
+  aideas: { label: 'app-ideas.js', lines: 144, note: '+ app-ideas-list 274', layer: 'app', path: 'src/renderer/app-ideas.js',
+    job: 'IDEAS panel; polls every 5 s. app-ideas-list.js renders the list.', issues: [ 'The generic confirmRemoval lives here and the tasks panel borrows it'] },
   asettings: { label: 'app-project-settings.js', lines: 340, layer: 'app', path: 'src/renderer/app-project-settings.js',
     job: 'The moved-project recovery dialog.' },
-  asearch: { label: 'app-project-search.js', lines: 483, layer: 'app', path: 'src/renderer/app-project-search.js',
-    job: 'Top-bar search with the GitHub filter, and the ALL PROJECTS dialog.',
+  asearch: { label: 'app-project-search.js', lines: 237, note: '+ app-project-directory 257', layer: 'app', path: 'src/renderer/app-project-search.js',
+    job: 'Top-bar search with the GitHub filter; app-project-directory.js is the ALL PROJECTS dialog.',
     issues: ['Search and the directory dialog are near-copies (debounce, keyboard navigation, ranking)'] },
   achrome: { label: 'app-chrome.js', lines: 369, layer: 'app', path: 'src/renderer/app-chrome.js',
     job: 'Command rail, RECENT strip, agent list, feed, summary card, tab bar, back-button text.',
     issues: ['Re-queries the DOM and rebuilds whole lists on every render'] },
   afocus: { label: 'app-agent-focus.js', lines: 327, layer: 'app', path: 'src/renderer/app-agent-focus.js',
     job: 'First-person cockpit overlay, hologram mini-map, environments and vantages.' },
-  appjs: { label: 'app.js', lines: 526, note: 'boot · routing', layer: 'app', path: 'src/renderer/app.js',
-    job: 'Boot, event routing (epoch + seq checks), view switching, the once-per-frame chrome scheduler, desktop notifications, debug hooks.',
+  appjs: { label: 'app.js', lines: 369, note: '+ app-store 113 · chrome-queue 71', layer: 'app', path: 'src/renderer/app.js',
+    job: 'Boot, event routing (epoch + seq checks), view switching, debug hooks. app-store.js holds seedStore, applyEvent, maybeNotifyAttention (desktop notifications) and refreshShipHulls; app-chrome-queue.js holds chromeMaskFor / scheduleChrome / renderChrome, the once-per-frame panel redraw (bits in AUR.app.const.CHROME).',
     issues: ['The hub: calls into every other module', 'Its fnv1a self-check only ever tests the first project'] },
-  appstate: { label: 'app-state.js', lines: 163, note: 'AUR.app.state', layer: 'app', path: 'src/renderer/app-state.js',
+  appstate: { label: 'app-state.js', lines: 180, note: 'AUR.app.state', layer: 'app', path: 'src/renderer/app-state.js',
     job: 'Creates AUR.app.state (one shared mutable object: store, view, epochs, replay flags, per-panel state) and AUR.app.const.',
     issues: ['Every module reads and writes the same object; ownership is by convention only'] },
-  shell: { label: 'index.html + style.css', lines: 2466, note: '356 + 2,110', layer: 'app', path: 'src/renderer/',
+  shell: { label: 'index.html + style.css', lines: 2484, note: '374 + 2,110', layer: 'app', path: 'src/renderer/',
     job: 'Every panel exists in the HTML from the start; modules show and hide them. style.css holds every style.',
     issues: ['style.css is 2,110 lines in one file',
       'The test harness drives the app through its element ids'] },
 
-  vuni: { label: 'scene-universe.js', lines: 971, note: 'galaxy map', layer: 'view', path: 'src/renderer/scene-universe.js',
-    job: 'Galaxy map: one glyph per project, galaxy discs, ships orbiting suns, label de-cluttering, search dimming, git markers.',
-    issues: ['One 959-line function', 'At its line cap: one more line fails grade-structure', 'A live project add resets your camera zoom',
+  vuni: { label: 'scene-universe*.js', lines: 274, note: 'galaxy map · + 5 parts', layer: 'view', path: 'src/renderer/scene-universe.js',
+    job: 'Galaxy map: one glyph per project, galaxy discs, ships orbiting suns, label de-cluttering, search dimming, git markers. scene-universe.js builds one view object and merges its parts from AUR.sceneParts.universe (scene-universe-galaxies, -glyphs, -labels, -ships, -stats; created by scene-common.js).',
+    issues: ['updateLabelLayout (scene-universe-labels.js) is one 158-line function', 'A live project add resets your camera zoom',
       'Ship-building code is duplicated in all three scenes'] },
-  vsys: { label: 'scene-system.js', lines: 618, note: 'solar system', layer: 'view', path: 'src/renderer/scene-system.js',
-    job: 'Planets, asteroid belt (thin instances), ships that fly to the planet they edit, first-person focus camera.',
-    issues: ['At its line cap', 'By reading: refetchPlanets can build meshes into an already-disposed scene', 'Calls window.AU directly'] },
+  vsys: { label: 'scene-system*.js', lines: 337, note: 'solar system · + 3 parts', layer: 'view', path: 'src/renderer/scene-system.js',
+    job: 'Planets, asteroid belt (thin instances), ships that fly to the planet they edit, first-person focus camera. Parts on AUR.sceneParts.system: scene-system-belt, -ships, -focus.',
+    issues: ['By reading: refetchPlanets (scene-system-ships.js) can build meshes into an already-disposed scene', 'Calls window.AU directly'] },
   vplan: { label: 'scene-planet.js', lines: 196, note: 'planet close-up', layer: 'view', path: 'src/renderer/scene-planet.js',
     job: 'Planet close-up with atmosphere, moons and the project’s ships.' },
-  util: { label: 'util.js', lines: 408, note: 'creates window.AUR', layer: 'view', path: 'src/renderer/util.js',
-    job: 'Creates window.AUR: hashes, colours, provider metadata, motion tuning, asset paths, DOM and Babylon helpers.',
+  util: { label: 'util.js', lines: 213, note: 'creates window.AUR · + util-scene 209', layer: 'view', path: 'src/renderer/util.js',
+    job: 'Creates window.AUR: hashes, colours, provider metadata, motion tuning, asset paths, DOM helpers. util-scene.js holds the Babylon helpers: skybox, starfield, rings, markers, GUI labels.',
     issues: ['Holds a copy of fnv1a / mulberry32 from tracker.js (4 copies in total)'] },
   procw: { label: 'procedural-worlds.js', lines: 329, layer: 'view', path: 'src/renderer/procedural-worlds.js',
     job: 'Planet and asteroid surfaces: authored textures plus generated normal maps.' },
-  ships: { label: 'ship-assets.js', lines: 545, layer: 'view', path: 'src/renderer/ship-assets.js',
-    job: 'Fetches assets/ships/manifest.json at load and picks each ship’s hull by rank (its builds against the fleet-v2 ladder). Loads the far file on the universe map (instances of one tinted template) and the near file in system and planet views (clones, so focus mode can fade them), within 100k triangles per scene. refresh() swaps a promoted hull in place; a procedural dart is the fallback.' },
+  ships: { label: 'ship-assets*.js', lines: 254, note: '+ hulls 252 · api 123', layer: 'view', path: 'src/renderer/ship-assets.js',
+    job: 'Split into ship-assets.js (manifest, hull choice, loading), ship-assets-hulls.js (building hulls) and ship-assets-api.js (AUR.ships). Fetches assets/ships/manifest.json at load and picks each ship’s hull by rank (its builds against the fleet-v2 ladder). Loads the far file on the universe map (instances of one tinted template) and the near file in system and planet views (clones, so focus mode can fade them), within 100k triangles per scene. refresh() swaps a promoted hull in place; a procedural dart is the fallback.' },
   galaxy: { label: 'galaxy-layout.js', lines: 178, note: 'UMD · pure', layer: 'view', path: 'src/renderer/galaxy-layout.js',
     job: 'Galaxy grouping and placement; publishes window.AUR_GALAXY (outside the AUR namespace).' },
   polish: { label: 'polish-math.js', lines: 56, note: 'UMD · pure', layer: 'view', path: 'src/renderer/polish-math.js',
@@ -463,8 +461,8 @@ const NODES = {
 };
 
 // The boxes outlined by "Show hotspots"; every box still lists all of its issues when selected.
-const HOT = new Set(['mctx', 'hmodes', 'tracker', 'replay', 'taskruns', 'pathsafety', 'appstate', 'shell',
-  'vuni', 'vsys', 'util', 'asunused']);
+const HOT = new Set(['mctx', 'hmodes', 'replay', 'taskruns', 'pathsafety', 'appstate', 'shell',
+  'vuni', 'util', 'asunused']);
 
 const STRIPES = [
   { id: 'm.flags', label: 'flags + 25 file-scope lets', from: 28, to: 82, kind: 'app', after: 'flags.js + app-context.js' },
@@ -683,9 +681,9 @@ const TRACES = {
     ['tracker', 'mctx', 'The Tracker applies the signals to its model and emits an event batch. ctx.start() in app-context.js subscribed to it.'],
     ['mctx', 'br.events', 'app-context.js sends au:events with {streamEpoch, mode}, but only while the Tracker is the active source.'],
     ['br.events', 'appjs', 'The preload hands the batch to app.js, which drops batches from old epochs and events it has already seen (seq).'],
-    ['appjs', 'appstate', 'applyEvent updates the shared store (projects, ships, feed). An attention change can raise a desktop notification here.'],
+    ['appjs', 'appstate', 'applyEvent (app-store.js) updates the shared store (projects, ships, feed). An attention change can raise a desktop notification here.'],
     ['appjs', 'vuni', 'The active view gets update(batch) once per batch.'],
-    ['appjs', 'achrome', 'Panels whose bit is set in the chrome mask redraw on the next animation frame.'],
+    ['appjs', 'achrome', 'scheduleChrome (app-chrome-queue.js) sets chrome bits; those panels redraw on the next animation frame.'],
   ] },
   replay: { title: 'Scrubbing history (REPLAY)', steps: [
     ['br.replay', 'aplay', 'Dragging the scrubber calls AU.replay({action: "seek", ts}).'],
@@ -821,7 +819,7 @@ function drawNode(id) {
   fit(mk('text', { class: 'n-sub', x: b.x + 9, y: b.y + 31 }, g, sub), b.w - 18);
   if (n.lines) {
     const frac = Math.min(n.lines / MAXL, 1);
-    mk('rect', { class: `bar${n.lines > 600 ? ' over' : ''}`, x: b.x + 1.5, y: b.y + b.h - 4.5, width: Math.max(2, (b.w - 3) * frac), height: 3, rx: 1.5 }, g);
+    mk('rect', { class: `bar${n.lines > 400 ? ' over' : ''}`, x: b.x + 1.5, y: b.y + b.h - 4.5, width: Math.max(2, (b.w - 3) * frac), height: 3, rx: 1.5 }, g);
   }
   if (n.pinned) {
     const cx = b.x + b.w - 12, cy = b.y + 13;
@@ -966,7 +964,7 @@ function showDetails(id) {
   h += `<div class="meta">${meta.join(' · ')}</div>`;
   const tags = [];
   if (n.pinned) tags.push('<span class="tag">hash-pinned</span>');
-  if (n.lines > 600 && n.layer !== 'main') tags.push('<span class="tag warn">over the 600-line rule</span>');
+  if (n.lines > 400) tags.push('<span class="tag warn">over the 400-line rule</span>');
   if (n.unused) tags.push('<span class="tag warn">unused at runtime</span>');
   if (tags.length) h += `<div>${tags.join('')}</div>`;
   if (n.job) h += `<p>${esc(n.job)}</p>`;
@@ -1092,7 +1090,14 @@ for (const st of STRIPES) {
 
 // ---------- size charts ----------
 const SIZES_MAIN = [
-  ['tracker.js', 1557], ['replay-source.js', 1399], ['provider-adapters.js', 368], ['transcripts/codex.js', 237],
+  ['tracker.js', 180], ['replay-source.js', 340],
+  ['live/projects.js', 235], ['live/codex-source.js', 219], ['live/provider-records.js', 200], ['live/claude-records.js', 193],
+  ['live/ships.js', 180], ['live/claude-source.js', 150], ['live/system-view.js', 139], ['live/model.js', 86], ['live/attention.js', 81],
+  ['live/signal-source.js', 71], ['live/builds.js', 60], ['live/events.js', 53], ['live/state-file.js', 50],
+  ['history/model.js', 314], ['history/index-builder.js', 295], ['history/record-reader.js', 267], ['history/apply-record.js', 156],
+  ['history/historical-line.js', 120], ['history/options.js', 107], ['history/merge.js', 78], ['history/order.js', 74], ['history/jsonl.js', 73],
+  ['universe/galaxy.js', 157], ['universe/public-shape.js', 79], ['universe/ships.js', 33], ['universe/planets.js', 27],
+  ['build-buckets.js', 55], ['signal-sources.js', 76], ['provider-adapters.js', 368], ['transcripts/codex.js', 237],
   ['transcripts/claude.js', 116], ['transcripts/fields.js', 52], ['transcripts/model.js', 31], ['shared/hash.js', 47], ['task-runs.js', 397],
   ['root-task-coordinator.js', 386], ['goals.js', 352], ['root-tasks.js', 344], ['agent-launcher.js', 391],
   ['github-metadata-provider.js', 301], ['project-vcs-status.js', 284], ['project-vcs-status-service.js', 307],
@@ -1106,12 +1111,17 @@ const SIZES_MAIN = [
   ['shared/atomic-write.js', 28], ['shared/values.js', 25], ['shared/ids.js', 23], ['user-data.js', 39],
 ];
 const SIZES_REN = [
-  ['style.css', 2110, 0, 'shell'], ['scene-universe.js', 971, 0, 'view'], ['scene-system.js', 618, 0, 'view'], ['app-playback.js', 531, 0, 'app'],
-  ['app-project-search.js', 483, 0, 'app'], ['app.js', 526, 0, 'app'], ['util.js', 408, 0, 'view'], ['app-ideas.js', 408, 0, 'app'],
-  ['app-chrome.js', 369, 0, 'app'], ['index.html', 356, 0, 'shell'], ['app-agent-focus.js', 327, 0, 'app'],
-  ['app-project-settings.js', 340, 0, 'app'], ['procedural-worlds.js', 329, 0, 'view'], ['ship-assets.js', 545, 0, 'view'],
+  ['style.css', 2110, 0, 'shell'], ['scene-universe.js', 274, 0, 'view'], ['scene-universe-labels.js', 238, 0, 'view'], ['scene-universe-stats.js', 218, 0, 'view'],
+  ['scene-universe-galaxies.js', 145, 0, 'view'], ['scene-universe-glyphs.js', 138, 0, 'view'], ['scene-universe-ships.js', 64, 0, 'view'],
+  ['scene-system.js', 337, 0, 'view'], ['scene-system-ships.js', 193, 0, 'view'], ['scene-system-focus.js', 94, 0, 'view'], ['scene-system-belt.js', 46, 0, 'view'],
+  ['scene-common.js', 18, 0, 'view'], ['app-playback.js', 244, 0, 'app'], ['app-replay.js', 193, 0, 'app'], ['app-history-metrics.js', 97, 0, 'app'],
+  ['app-project-search.js', 237, 0, 'app'], ['app-project-directory.js', 257, 0, 'app'], ['app.js', 369, 0, 'app'], ['app-store.js', 113, 0, 'app'],
+  ['app-chrome-queue.js', 71, 0, 'app'], ['util.js', 213, 0, 'view'], ['util-scene.js', 209, 0, 'view'], ['app-ideas.js', 144, 0, 'app'], ['app-ideas-list.js', 274, 0, 'app'],
+  ['app-chrome.js', 369, 0, 'app'], ['index.html', 374, 0, 'shell'], ['app-agent-focus.js', 327, 0, 'app'],
+  ['app-project-settings.js', 340, 0, 'app'], ['procedural-worlds.js', 329, 0, 'view'], ['ship-assets.js', 254, 0, 'view'],
+  ['ship-assets-hulls.js', 252, 0, 'view'], ['ship-assets-api.js', 123, 0, 'view'],
   ['app-project-tasks.js', 286, 0, 'app'], ['components/project-vcs-status.js', 268, 0, 'view'], ['app-project-control.js', 244, 0, 'app'],
-  ['scene-planet.js', 196, 0, 'view'], ['galaxy-layout.js', 178, 0, 'view'], ['app-state.js', 163, 0, 'app'],
+  ['scene-planet.js', 196, 0, 'view'], ['galaxy-layout.js', 178, 0, 'view'], ['app-state.js', 180, 0, 'app'],
   ['polish-math.js', 56, 0, 'view'], ['search-core.js', 34, 0, 'view'],
 ];
 function chart(el, rows, layerDefault, withCap) {
@@ -1119,10 +1129,10 @@ function chart(el, rows, layerDefault, withCap) {
     const row = document.createElement('div');
     row.className = 'row';
     const js = /\.js/.test(name);
-    const over = withCap && js && n > 600;
+    const over = js && n > 400;
     row.innerHTML = `<div class="name" title="${esc(name)}">${esc(name)}${pin ? '<span class="pinmark" title="hash-pinned">◆</span>' : ''}</div>` +
       `<div class="track"><div class="fill ${over ? 'over' : (layer || layerDefault)}" style="width:${100 * n / MAXL}%"></div>` +
-      `${withCap ? `<div class="cap" style="left:${100 * 600 / MAXL}%" title="600-line renderer rule"></div>` : ''}</div>` +
+      `<div class="cap" style="left:${100 * 400 / MAXL}%" title="400-line rule"></div></div>` +
       `<div class="n">${n.toLocaleString('en-US')}</div>`;
     el.appendChild(row);
   }
