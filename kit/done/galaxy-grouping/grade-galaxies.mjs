@@ -56,7 +56,16 @@ const mainSource = (function readMainLayer(dir) {
     .join('\n');
 })(path.join(root, 'src', 'main'));
 const indexSource = read('src/renderer/index.html');
-const universeSource = read('src/renderer/scene-universe.js');
+// 2026-10-13: renderer files may be split. A view's source is its scene-<view>*.js files plus the
+// shared scene helpers and ship-assets*.js; util source is util.js plus util-*.js.
+const rendererJs = fs.readdirSync(path.join(root, 'src', 'renderer')).filter((f) => f.endsWith('.js')).sort();
+const VIEWS = ['universe', 'system', 'planet'];
+const viewSource = (view) => rendererJs.filter((f) => f.startsWith(`scene-${view}`) || f.startsWith('ship-assets') ||
+  (f.startsWith('scene-') && !VIEWS.some((other) => f.startsWith(`scene-${other}`))))
+  .map((f) => read(`src/renderer/${f}`)).join('\n');
+const utilLayer = () => rendererJs.filter((f) => /^util(-[a-z0-9-]+)?\.js$/.test(f))
+  .map((f) => read(`src/renderer/${f}`)).join('\n');
+const universeSource = viewSource('universe');
 const layoutPath = path.join(root, 'src', 'renderer', 'galaxy-layout.js');
 
 if (!/function\s+deriveGalaxy\s*\(/.test(trackerSource) ||
