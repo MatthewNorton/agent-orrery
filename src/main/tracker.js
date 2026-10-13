@@ -38,6 +38,11 @@ const {
   isProjectDirectory, updateProjectExists, refreshProjectExistence, indexProjectPath,
   preferredProjectPath, remapProjectPath, ensureProjectForPath,
 } = require('./live/projects');
+const { ACTIVE_WINDOW_MS, HOT_WINDOW_MS } = require('./live/model');
+const {
+  ensureShip, spawnDrone, setLocal, ensureProviderShip, addPending, clearPending, departIdleShips,
+} = require('./live/ships');
+const { addBuild, applyProviderBuildFiles } = require('./live/builds');
 
 /**
  * @import { Attention, FeedEntry, PlanetData, Project, Ship, ShipStatus, SystemData }
@@ -55,10 +60,6 @@ const DEFAULT_CODEX_SESSION_DIRS = [
 const SCAN_INTERVAL_MS = 3000;   // discover new projects / session files
 const POLL_INTERVAL_MS = 1000;   // tail active session files
 const TICK_INTERVAL_MS = 5000;   // ship departure sweep
-const ACTIVE_WINDOW_MS = 5 * 60 * 1000;   // ship visible this long after last write
-const HOT_WINDOW_MS = 15 * 60 * 1000;     // only files this fresh get tailed
-const DRONE_TIMEOUT_MS = 15 * 60 * 1000;
-const ATTENTION_LINGER_MS = 60 * 60 * 1000;
 
 // Live reads a typed prompt, assistant blocks, or user blocks that answer no tool call as the
 // agent working again. History has its own rule (historicalClaudeSignals).
@@ -222,7 +223,7 @@ class Tracker extends EventEmitter {
         if (!hot) continue;
         this.files.set(fp, tail);
         if (isStartup && now - st.mtimeMs < ACTIVE_WINDOW_MS) {
-          this.ensureShip(project.id, tail.session, false, st.mtimeMs);
+          ensureShip(this, project.id, tail.session, false, st.mtimeMs);
         }
       }
     }
@@ -337,7 +338,7 @@ class Tracker extends EventEmitter {
         this.files.set(fp, tail);
         this.codexTailsBySession.set(sessionId, tail);
         if (isStartup && now - st.mtimeMs < ACTIVE_WINDOW_MS) {
-          this.setLocal(this.ensureProviderShip('codex', project.id, sessionId, meta.kind, st.mtimeMs, meta.parentSessionId), meta.local);
+          setLocal(this, ensureProviderShip(this, 'codex', project.id, sessionId, meta.kind, st.mtimeMs, meta.parentSessionId), meta.local);
         }
       } else {
         tail.project = project.id;
@@ -403,7 +404,7 @@ class Tracker extends EventEmitter {
         this.signalFiles.set(fp, { size: st.size, mtimeMs: st.mtimeMs, sessionId });
         // sweepShips departs a ship idle past the active window; docking one here would flap.
         if (now - st.mtimeMs > ACTIVE_WINDOW_MS) continue;
-        const ship = this.ensureProviderShip('signal', project.id, sessionId, 'main', st.mtimeMs, null);
+        const ship = ensureProviderShip(this, 'signal', project.id, sessionId, 'main', st.mtimeMs, null);
         if (!isStartup && changed) {
           ship.lastEvent = Math.max(ship.lastEvent, st.mtimeMs);
           ship.status = 'Working';
@@ -523,7 +524,7 @@ class Tracker extends EventEmitter {
     } catch {
       return;
     }
-    const touchedShip = this.ensureProviderShip(
+    const touchedShip = ensureProviderShip(this, 
       tail.provider, tail.project, tail.session,
       tail.kind || 'main', st.mtimeMs, tail.parentSessionId
     );
@@ -589,7 +590,7 @@ class Tracker extends EventEmitter {
         }
         if (typeof signal.local === 'boolean') tail.local = signal.local;
         if (tail.project) {
-          this.setLocal(this.ensureProviderShip(
+          setLocal(this, ensureProviderShip(this, 
             provider, tail.project, sessionId,
             signal.kind || tail.kind || 'main', ts,
             signal.parentSessionId || tail.parentSessionId
@@ -598,13 +599,13 @@ class Tracker extends EventEmitter {
         continue;
       }
 
-      const ship = this.ensureProviderShip(
+      const ship = ensureProviderShip(this, 
         provider, tail.project, sessionId,
         signal.kind || tail.kind || 'main', ts,
         signal.parentSessionId || tail.parentSessionId
       );
       if (!ship) continue;
-      this.setLocal(ship, tail.local);
+      setLocal(this, ship, tail.local);
       ship.lastEvent = Math.max(ship.lastEvent, ts);
 
       if (signal.type === 'task-claim') {
@@ -636,7 +637,7 @@ class Tracker extends EventEmitter {
         ship.status = signal.status || classified.status;
         ship.detail = null;
         ship.turnDone = false;
-        this.addPending(ship, pendingId, tool, ts);
+        addPending(this, ship, pendingId, tool, ts);
         queue(this, { type: 'ship-updated', ship: liveShip(ship) });
         if (!tail.catchup) {
           queue(this, {
@@ -646,9 +647,9 @@ class Tracker extends EventEmitter {
         }
       } else if (signal.type === 'tool-result' || signal.type === 'tool-end') {
         const pendingId = `${provider}:${sessionId}:${signal.id || signal.callId || ''}`;
-        this.clearPending(pendingId, ts);
+        clearPending(this, pendingId, ts);
       } else if (signal.type === 'build-files' || signal.type === 'build') {
-        if (signal.success !== false) this.applyProviderBuildFiles(ship, signal.files, ts, tail.catchup);
+        if (signal.success !== false) applyProviderBuildFiles(this, ship, signal.files, ts, tail.catchup);
       } else if (signal.type === 'activity' || signal.type === 'heartbeat' || signal.type === 'status') {
         if (signal.status) ship.status = signal.status;
         ship.detail = null;
@@ -660,57 +661,6 @@ class Tracker extends EventEmitter {
           });
         }
       }
-    }
-  }
-
-  clearPending(pendingId, ts) {
-    const ownerId = this.pendingIndex.get(pendingId);
-    if (!ownerId) return;
-    const owner = this.ships.get(ownerId);
-    if (owner) {
-      owner.pending.delete(pendingId);
-      owner.lastEvent = Math.max(owner.lastEvent, ts);
-      queue(this, { type: 'ship-updated', ship: liveShip(owner) });
-    }
-    this.pendingIndex.delete(pendingId);
-  }
-
-  applyProviderBuildFiles(ship, files, ts, catchup) {
-    const project = this.projects.get(ship.project);
-    if (!project || !Array.isArray(files)) return;
-    const seen = new Set();
-    for (const item of files.slice(0, 64)) {
-      const filePath = typeof item === 'string' ? item : (item && (item.movePath || item.path));
-      const rel = relativeInside(project.path, filePath);
-      if (!rel || seen.has(rel)) continue;
-      seen.add(rel);
-      this.addBuild(project, ship, rel, ts, catchup);
-    }
-  }
-
-  // Counts an edit to a file inside the project; catchup counts it without announcing it.
-  addBuild(project, ship, rel, ts, catchup) {
-    const bucket = bucketOf(rel, path.sep);
-    const isNew = countBuild(project, bucket);
-    project.totalBuilds += 1;
-    ship.builds += 1;
-    this.systemCache.delete(project.id);
-    if (catchup) return;
-    queue(this, {
-      type: 'build', project: project.id, bucket, file: rel,
-      shipId: ship.id, isNew, ts,
-    });
-    if (isNew) pushFeed(this, 'form', `Planet formation started: ${bucket} in ${project.name}`, project.id);
-    pushFeed(this, 'build', `${ship.name} building ${rel} in ${project.name}`, project.id);
-  }
-
-  addPending(ship, pendingId, tool, ts) {
-    ship.pending.set(pendingId, { tool, ts });
-    this.pendingIndex.set(pendingId, ship.id);
-    while (ship.pending.size > 12) {
-      const oldestId = ship.pending.keys().next().value;
-      ship.pending.delete(oldestId);
-      if (this.pendingIndex.get(oldestId) === ship.id) this.pendingIndex.delete(oldestId);
     }
   }
 
@@ -732,7 +682,7 @@ class Tracker extends EventEmitter {
       } else if (signal.type === 'message') {
         message = signal;
         if (resumesTurn(signal)) ship.turnDone = false;
-        this.setLocal(ship, signal.local);
+        setLocal(this, ship, signal.local);
       } else if (signal.type === 'tool-start') {
         if (message.assistant && signal.callId) {
           // A tool_use id belongs to the ship that issued it last.
@@ -741,7 +691,7 @@ class Tracker extends EventEmitter {
             const previousOwner = this.ships.get(previousOwnerId);
             if (previousOwner) previousOwner.pending.delete(signal.callId);
           }
-          this.addPending(ship, signal.callId, signal.tool, ts);
+          addPending(this, ship, signal.callId, signal.tool, ts);
         }
         this.onToolUse(project, ship, signal, ts, tail.catchup);
       } else if (signal.type === 'tool-end' && signal.callId) {
@@ -767,7 +717,7 @@ class Tracker extends EventEmitter {
       queue(this, { type: 'project-updated', project: liveProject(project) });
     }
     if (ts > project.lastActivity) project.lastActivity = ts;
-    const ship = this.ensureShip(tail.project, tail.session, session.kind === 'drone', ts);
+    const ship = ensureShip(this, tail.project, tail.session, session.kind === 'drone', ts);
     ship.lastEvent = Math.max(ship.lastEvent, ts);
     return ship;
   }
@@ -788,14 +738,14 @@ class Tracker extends EventEmitter {
     queue(this, { type: 'ship-updated', ship: liveShip(ship) });
 
     if (build && rel) {
-      this.addBuild(project, ship, rel, ts, catchup);
+      addBuild(this, project, ship, rel, ts, catchup);
     } else if (!catchup) {
       queue(this, {
         type: 'activity',
         project: project.id, shipId: ship.id, tool, status: ship.status, detail: ship.detail, ts,
       });
       if (spawn) {
-        this.spawnDrone(project, ship, signal.callId, ts);
+        spawnDrone(this, project, ship, signal.callId, ts);
       } else if (Math.random() < 0.12) {
         // Sample non-build activity into the feed so it stays readable.
         pushFeed(this, 'info', `${ship.name} ${ship.status.toLowerCase()} in ${project.name}`, project.id);
@@ -820,89 +770,10 @@ class Tracker extends EventEmitter {
     }
   }
 
-  spawnDrone(project, parent, toolUseId, ts) {
-    if (!toolUseId) return;
-    const id = `drone:${toolUseId}`;
-    if (this.ships.has(id)) return;
-    const drone = createShipRecord({
-      id, name: `Claude-${++this.shipCounter}`, provider: 'claude', project: project.id, kind: 'drone',
-      parentName: parent.name, lastEvent: ts, local: parent.local === true,
-    });
-    this.ships.set(id, drone);
-    queue(this, { type: 'ship-spawned', ship: liveShip(drone) });
-    pushFeed(this, 'spawn', `${parent.name} launched ${drone.name} in ${project.name}`, project.id);
-  }
-
-  ensureShip(projectId, session, sidechain, ts) {
-    const id = `ship:${projectId}:${session}`;
-    let ship = this.ships.get(id);
-    if (!ship) {
-      const project = this.projects.get(projectId);
-      ship = createShipRecord({
-        id, name: `Claude-${++this.shipCounter}`, provider: 'claude', project: projectId,
-        kind: sidechain ? 'drone' : 'main', lastEvent: ts,
-      });
-      this.ships.set(id, ship);
-      queue(this, { type: 'ship-spawned', ship: liveShip(ship) });
-      pushFeed(this, 'spawn', `${ship.name} entered ${project ? project.name : projectId}`, projectId);
-    }
-    return ship;
-  }
-
-  /**
-   * Records whether a ship runs a local model, learned from its transcript, and announces a change.
-   * @param {LiveShip | null} ship
-   * @param {unknown} local
-   */
-  setLocal(ship, local) {
-    if (!ship || typeof local !== 'boolean' || ship.local === local) return;
-    ship.local = local;
-    queue(this, { type: 'ship-updated', ship: liveShip(ship) });
-  }
-
-  ensureProviderShip(providerValue, projectId, sessionId, kind, ts, parentSessionId) {
-    const provider = normalizeProvider(providerValue);
-    if (!projectId || !sessionId || !this.projects.has(projectId)) return null;
-    const id = `ship:${provider}:${sessionId}`;
-    let ship = this.ships.get(id);
-    if (!ship) {
-      const labels = { claude: 'Claude', codex: 'Codex', signal: 'Signal' };
-      const next = (this.providerCounters.get(provider) || 0) + 1;
-      this.providerCounters.set(provider, next);
-      const parent = parentSessionId ? this.ships.get(`ship:${provider}:${parentSessionId}`) : null;
-      ship = createShipRecord({
-        id, name: `${labels[provider] || 'Signal'}-${next}`, provider, project: projectId,
-        kind: kind === 'drone' ? 'drone' : 'main', parentName: parent ? parent.name : null, lastEvent: ts,
-      });
-      this.ships.set(id, ship);
-      queue(this, { type: 'ship-spawned', ship: liveShip(ship) });
-      const project = this.projects.get(projectId);
-      pushFeed(this, 'spawn', `${ship.name} entered ${project ? project.name : projectId}`, projectId);
-    } else {
-      ship.project = projectId;
-      if (kind === 'drone') ship.kind = 'drone';
-    }
-    return ship;
-  }
-
   sweepShips() {
     const now = Date.now();
     evaluateAttention(this, now);
-    for (const [id, ship] of this.ships) {
-      const needsAttention = ship.attention === 'question' || ship.attention === 'permission';
-      if (ship.kind !== 'drone' && needsAttention && now - ship.lastEvent <= ATTENTION_LINGER_MS) {
-        continue;
-      }
-      const timeout = ship.kind === 'drone' ? DRONE_TIMEOUT_MS : ACTIVE_WINDOW_MS;
-      if (now - ship.lastEvent > timeout) {
-        for (const toolUseId of ship.pending.keys()) {
-          if (this.pendingIndex.get(toolUseId) === id) this.pendingIndex.delete(toolUseId);
-        }
-        this.ships.delete(id);
-        queue(this, { type: 'ship-departed', shipId: id, ts: now });
-        pushFeed(this, 'depart', `${ship.name} warped out`, ship.project);
-      }
-    }
+    departIdleShips(this, now);
     flush(this);
   }
 
