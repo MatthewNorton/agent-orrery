@@ -32,6 +32,7 @@ const { deriveGalaxy } = require('./universe/galaxy');
 const { proceduralSystem } = require('./universe/planets');
 const { liveProject, liveShip } = require('./universe/public-shape');
 const { createShipRecord } = require('./universe/ships');
+const { queue, pushFeed, flush, recentFeed } = require('./live/events');
 
 /**
  * @import { Attention, FeedEntry, PlanetData, Project, Ship, ShipStatus, SystemData }
@@ -52,7 +53,6 @@ const TICK_INTERVAL_MS = 5000;   // ship departure sweep
 const ACTIVE_WINDOW_MS = 5 * 60 * 1000;   // ship visible this long after last write
 const HOT_WINDOW_MS = 15 * 60 * 1000;     // only files this fresh get tailed
 const DRONE_TIMEOUT_MS = 15 * 60 * 1000;
-const FEED_LIMIT = 60;
 const QUESTION_PENDING_MS = 2_000;
 const FAST_PENDING_MS = 10_000;
 const SLOW_PENDING_MS = 180_000;
@@ -164,6 +164,7 @@ class Tracker extends EventEmitter {
     this.pending = [];           // event batch flushed once per poll
     this.pendingIndex = new Map(); // toolUseId -> shipId
     this.eventSequence = 0;      // additive event cursor for snapshot reconciliation
+    this.publish = (batch) => this.emit('events', batch);
     this.timers = [];
   }
 
@@ -217,7 +218,7 @@ class Tracker extends EventEmitter {
     this.scanCodex(isStartup);
     this.scanSignals(isStartup);
     this.refreshProjectExistence();
-    this.flush();
+    flush(this);
   }
 
   refreshProjectExistence() {
@@ -226,7 +227,7 @@ class Tracker extends EventEmitter {
       if (exists === project.exists) continue;
       project.exists = exists;
       this.systemCache.delete(project.id);
-      this.queue({ type: 'project-updated', project: liveProject(project) });
+      queue(this, { type: 'project-updated', project: liveProject(project) });
     }
   }
 
@@ -287,8 +288,8 @@ class Tracker extends EventEmitter {
           };
           this.projects.set(projectId, project);
           this.indexProjectPath(project);
-          this.queue({ type: 'project-added', project: liveProject(project) });
-          if (!isStartup) this.pushFeed('discover', `New system discovered: ${project.name}`, project.id);
+          queue(this, { type: 'project-added', project: liveProject(project) });
+          if (!isStartup) pushFeed(this, 'discover', `New system discovered: ${project.name}`, project.id);
         }
         if (pathKey) {
           this.projectPathIndex.set(pathKey, project.id);
@@ -303,7 +304,7 @@ class Tracker extends EventEmitter {
         if (exists !== project.exists) {
           project.exists = exists;
           this.systemCache.delete(project.id);
-          this.queue({ type: 'project-updated', project: liveProject(project) });
+          queue(this, { type: 'project-updated', project: liveProject(project) });
         }
       }
 
@@ -428,9 +429,9 @@ class Tracker extends EventEmitter {
       throw trackerPathError('FAILED', 'project path could not be saved');
     }
     const visible = liveProject(project);
-    this.queue({ type: 'project-updated', project: visible });
-    this.pushFeed('discover', `Project path recovered: ${project.name}`, projectId);
-    this.flush();
+    queue(this, { type: 'project-updated', project: visible });
+    pushFeed(this, 'discover', `Project path recovered: ${project.name}`, projectId);
+    flush(this);
     return visible;
   }
 
@@ -471,7 +472,7 @@ class Tracker extends EventEmitter {
         firstSeen: saved.firstSeen || Date.now(),
       };
       this.projects.set(id, project);
-      this.queue({ type: 'project-added', project: liveProject(project) });
+      queue(this, { type: 'project-added', project: liveProject(project) });
     } else {
       let changed = false;
       // Security follow-up: only adopt a path that survived preferredProjectPath (never null).
@@ -482,7 +483,7 @@ class Tracker extends EventEmitter {
         changed = true;
       }
       if (activity > project.lastActivity) project.lastActivity = activity;
-      if (changed) this.queue({ type: 'project-updated', project: liveProject(project) });
+      if (changed) queue(this, { type: 'project-updated', project: liveProject(project) });
     }
     this.projectPathIndex.set(key, id);
     this.pathIds[key] = id;
@@ -636,8 +637,8 @@ class Tracker extends EventEmitter {
           ship.lastEvent = Math.max(ship.lastEvent, st.mtimeMs);
           ship.status = 'Working';
           ship.detail = null;
-          this.queue({ type: 'ship-updated', ship: liveShip(ship) });
-          this.queue({
+          queue(this, { type: 'ship-updated', ship: liveShip(ship) });
+          queue(this, {
             type: 'activity', project: project.id, shipId: ship.id,
             tool: 'signal', status: 'Working', detail: null, ts: st.mtimeMs,
           });
@@ -651,8 +652,8 @@ class Tracker extends EventEmitter {
       const ship = this.ships.get(shipId);
       if (!ship) continue;
       this.ships.delete(shipId);
-      this.queue({ type: 'ship-departed', shipId, ts: now });
-      this.pushFeed('depart', `${ship.name} signal disappeared`, ship.project);
+      queue(this, { type: 'ship-departed', shipId, ts: now });
+      pushFeed(this, 'depart', `${ship.name} signal disappeared`, ship.project);
     }
   }
 
@@ -725,7 +726,7 @@ class Tracker extends EventEmitter {
       if (tail.catchup && tail.offset >= st.size) tail.catchup = false;
     }
     this.evaluateAttention(now);
-    this.flush();
+    flush(this);
   }
 
   pollProviderFile(fp, tail, st) {
@@ -838,25 +839,25 @@ class Tracker extends EventEmitter {
       if (signal.type === 'task-claim') {
         if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(signal.taskId || '')) {
           ship.taskId = signal.taskId.toLowerCase();
-          this.queue({ type: 'ship-updated', ship: liveShip(ship) });
+          queue(this, { type: 'ship-updated', ship: liveShip(ship) });
         }
       } else if (signal.type === 'turn-start') {
         ship.turnDone = false;
         ship.turnOutcome = 'running';
         ship.status = 'Working';
         ship.detail = null;
-        this.queue({ type: 'ship-updated', ship: liveShip(ship) });
+        queue(this, { type: 'ship-updated', ship: liveShip(ship) });
       } else if (signal.type === 'turn-done' || signal.type === 'turn-complete' || signal.type === 'turn-end') {
         ship.turnDone = true;
         ship.turnOutcome = 'completed';
         ship.detail = null;
-        this.queue({ type: 'ship-updated', ship: liveShip(ship) });
+        queue(this, { type: 'ship-updated', ship: liveShip(ship) });
       } else if (signal.type === 'turn-aborted') {
         ship.turnDone = false;
         ship.turnOutcome = 'aborted';
         ship.status = 'Working';
         ship.detail = null;
-        this.queue({ type: 'ship-updated', ship: liveShip(ship) });
+        queue(this, { type: 'ship-updated', ship: liveShip(ship) });
       } else if (signal.type === 'tool-use' || signal.type === 'tool-start') {
         const pendingId = `${provider}:${sessionId}:${signal.id || signal.callId || signal.key || ts}`;
         const classified = classifyTool(signal.tool);
@@ -865,9 +866,9 @@ class Tracker extends EventEmitter {
         ship.detail = null;
         ship.turnDone = false;
         this.addPending(ship, pendingId, tool, ts);
-        this.queue({ type: 'ship-updated', ship: liveShip(ship) });
+        queue(this, { type: 'ship-updated', ship: liveShip(ship) });
         if (!tail.catchup) {
-          this.queue({
+          queue(this, {
             type: 'activity', project: ship.project, shipId: ship.id,
             tool, status: ship.status, detail: null, ts,
           });
@@ -880,9 +881,9 @@ class Tracker extends EventEmitter {
       } else if (signal.type === 'activity' || signal.type === 'heartbeat' || signal.type === 'status') {
         if (signal.status) ship.status = signal.status;
         ship.detail = null;
-        this.queue({ type: 'ship-updated', ship: liveShip(ship) });
+        queue(this, { type: 'ship-updated', ship: liveShip(ship) });
         if (!tail.catchup && signal.type !== 'heartbeat') {
-          this.queue({
+          queue(this, {
             type: 'activity', project: ship.project, shipId: ship.id,
             tool: signal.tool || 'Activity', status: ship.status, detail: null, ts,
           });
@@ -898,7 +899,7 @@ class Tracker extends EventEmitter {
     if (owner) {
       owner.pending.delete(pendingId);
       owner.lastEvent = Math.max(owner.lastEvent, ts);
-      this.queue({ type: 'ship-updated', ship: liveShip(owner) });
+      queue(this, { type: 'ship-updated', ship: liveShip(owner) });
     }
     this.pendingIndex.delete(pendingId);
   }
@@ -924,12 +925,12 @@ class Tracker extends EventEmitter {
     ship.builds += 1;
     this.systemCache.delete(project.id);
     if (catchup) return;
-    this.queue({
+    queue(this, {
       type: 'build', project: project.id, bucket, file: rel,
       shipId: ship.id, isNew, ts,
     });
-    if (isNew) this.pushFeed('form', `Planet formation started: ${bucket} in ${project.name}`, project.id);
-    this.pushFeed('build', `${ship.name} building ${rel} in ${project.name}`, project.id);
+    if (isNew) pushFeed(this, 'form', `Planet formation started: ${bucket} in ${project.name}`, project.id);
+    pushFeed(this, 'build', `${ship.name} building ${rel} in ${project.name}`, project.id);
   }
 
   addPending(ship, pendingId, tool, ts) {
@@ -992,7 +993,7 @@ class Tracker extends EventEmitter {
       project.exists = isProjectDirectory(session.cwd);
       this.indexProjectPath(project);
       this.systemCache.delete(project.id);
-      this.queue({ type: 'project-updated', project: liveProject(project) });
+      queue(this, { type: 'project-updated', project: liveProject(project) });
     }
     if (ts > project.lastActivity) project.lastActivity = ts;
     const ship = this.ensureShip(tail.project, tail.session, session.kind === 'drone', ts);
@@ -1013,12 +1014,12 @@ class Tracker extends EventEmitter {
     ship.status = status;
     const rel = signal.filePath === null ? null : relativeInside(project.path, signal.filePath);
     ship.detail = signal.filePath === null ? signal.detail : rel || path.basename(signal.filePath);
-    this.queue({ type: 'ship-updated', ship: liveShip(ship) });
+    queue(this, { type: 'ship-updated', ship: liveShip(ship) });
 
     if (build && rel) {
       this.addBuild(project, ship, rel, ts, catchup);
     } else if (!catchup) {
-      this.queue({
+      queue(this, {
         type: 'activity',
         project: project.id, shipId: ship.id, tool, status: ship.status, detail: ship.detail, ts,
       });
@@ -1026,7 +1027,7 @@ class Tracker extends EventEmitter {
         this.spawnDrone(project, ship, signal.callId, ts);
       } else if (Math.random() < 0.12) {
         // Sample non-build activity into the feed so it stays readable.
-        this.pushFeed('info', `${ship.name} ${ship.status.toLowerCase()} in ${project.name}`, project.id);
+        pushFeed(this, 'info', `${ship.name} ${ship.status.toLowerCase()} in ${project.name}`, project.id);
       }
     }
   }
@@ -1043,8 +1044,8 @@ class Tracker extends EventEmitter {
     const drone = this.ships.get(droneId);
     if (drone) {
       this.ships.delete(droneId);
-      this.queue({ type: 'ship-departed', shipId: droneId, ts });
-      this.pushFeed('depart', `${drone.name} returned to ${drone.parentName}`, drone.project);
+      queue(this, { type: 'ship-departed', shipId: droneId, ts });
+      pushFeed(this, 'depart', `${drone.name} returned to ${drone.parentName}`, drone.project);
     }
   }
 
@@ -1057,8 +1058,8 @@ class Tracker extends EventEmitter {
       parentName: parent.name, lastEvent: ts, local: parent.local === true,
     });
     this.ships.set(id, drone);
-    this.queue({ type: 'ship-spawned', ship: liveShip(drone) });
-    this.pushFeed('spawn', `${parent.name} launched ${drone.name} in ${project.name}`, project.id);
+    queue(this, { type: 'ship-spawned', ship: liveShip(drone) });
+    pushFeed(this, 'spawn', `${parent.name} launched ${drone.name} in ${project.name}`, project.id);
   }
 
   ensureShip(projectId, session, sidechain, ts) {
@@ -1071,8 +1072,8 @@ class Tracker extends EventEmitter {
         kind: sidechain ? 'drone' : 'main', lastEvent: ts,
       });
       this.ships.set(id, ship);
-      this.queue({ type: 'ship-spawned', ship: liveShip(ship) });
-      this.pushFeed('spawn', `${ship.name} entered ${project ? project.name : projectId}`, projectId);
+      queue(this, { type: 'ship-spawned', ship: liveShip(ship) });
+      pushFeed(this, 'spawn', `${ship.name} entered ${project ? project.name : projectId}`, projectId);
     }
     return ship;
   }
@@ -1085,7 +1086,7 @@ class Tracker extends EventEmitter {
   setLocal(ship, local) {
     if (!ship || typeof local !== 'boolean' || ship.local === local) return;
     ship.local = local;
-    this.queue({ type: 'ship-updated', ship: liveShip(ship) });
+    queue(this, { type: 'ship-updated', ship: liveShip(ship) });
   }
 
   ensureProviderShip(providerValue, projectId, sessionId, kind, ts, parentSessionId) {
@@ -1103,9 +1104,9 @@ class Tracker extends EventEmitter {
         kind: kind === 'drone' ? 'drone' : 'main', parentName: parent ? parent.name : null, lastEvent: ts,
       });
       this.ships.set(id, ship);
-      this.queue({ type: 'ship-spawned', ship: liveShip(ship) });
+      queue(this, { type: 'ship-spawned', ship: liveShip(ship) });
       const project = this.projects.get(projectId);
-      this.pushFeed('spawn', `${ship.name} entered ${project ? project.name : projectId}`, projectId);
+      pushFeed(this, 'spawn', `${ship.name} entered ${project ? project.name : projectId}`, projectId);
     } else {
       ship.project = projectId;
       if (kind === 'drone') ship.kind = 'drone';
@@ -1120,19 +1121,19 @@ class Tracker extends EventEmitter {
 
       ship.attention = next;
       ship.attentionSince = next ? now : null;
-      this.queue({ type: 'ship-updated', ship: liveShip(ship) });
+      queue(this, { type: 'ship-updated', ship: liveShip(ship) });
 
       if (!next) continue;
       const project = this.projects.get(ship.project);
       const projectName = project ? project.name : ship.project;
       if (next === 'question') {
-        this.pushFeed('attention', `${ship.name} is asking you something in ${projectName}`, ship.project);
+        pushFeed(this, 'attention', `${ship.name} is asking you something in ${projectName}`, ship.project);
       } else if (next === 'permission') {
-        this.pushFeed('attention', `${ship.name} needs permission in ${projectName}`, ship.project);
+        pushFeed(this, 'attention', `${ship.name} needs permission in ${projectName}`, ship.project);
       } else if (next === 'stalled') {
-        this.pushFeed('info', `${ship.name} may be stuck in ${projectName}`, ship.project);
+        pushFeed(this, 'info', `${ship.name} may be stuck in ${projectName}`, ship.project);
       } else if (next === 'done') {
-        this.pushFeed('done', `${ship.name} finished its task in ${projectName}`, ship.project);
+        pushFeed(this, 'done', `${ship.name} finished its task in ${projectName}`, ship.project);
       }
     }
   }
@@ -1151,11 +1152,11 @@ class Tracker extends EventEmitter {
           if (this.pendingIndex.get(toolUseId) === id) this.pendingIndex.delete(toolUseId);
         }
         this.ships.delete(id);
-        this.queue({ type: 'ship-departed', shipId: id, ts: now });
-        this.pushFeed('depart', `${ship.name} warped out`, ship.project);
+        queue(this, { type: 'ship-departed', shipId: id, ts: now });
+        pushFeed(this, 'depart', `${ship.name} warped out`, ship.project);
       }
     }
-    this.flush();
+    flush(this);
   }
 
   // ---------- derived views ----------
@@ -1165,7 +1166,7 @@ class Tracker extends EventEmitter {
     return {
       projects: [...this.projects.values()].map(liveProject),
       ships: [...this.ships.values()].map(liveShip),
-      feed: this.feed.slice(-FEED_LIMIT),
+      feed: recentFeed(this),
       eventSequence: this.eventSequence,
     };
   }
@@ -1260,25 +1261,8 @@ class Tracker extends EventEmitter {
     return { ...base, files, sizeKb, subdirs, resources };
   }
 
-  // ---------- event plumbing ----------
-
-  queue(ev) {
-    ev.seq = ++this.eventSequence;
-    this.pending.push(ev);
-  }
-
-  pushFeed(kind, text, projectId) {
-    const entry = { kind, text, project: projectId, ts: Date.now() };
-    this.feed.push(entry);
-    if (this.feed.length > FEED_LIMIT * 2) this.feed = this.feed.slice(-FEED_LIMIT);
-    this.queue({ type: 'feed', entry });
-  }
-
   flush() {
-    if (this.pending.length === 0) return;
-    const batch = this.pending;
-    this.pending = [];
-    this.emit('events', batch);
+    flush(this);
   }
 }
 
