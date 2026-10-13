@@ -8,9 +8,8 @@
 // per-source record readers, the merge, the model they rebuild, and seek checkpoints.
 
 const { EventEmitter } = require('events');
-const {
-  createCheckpointStore, planCheckpointTimes, seekThrough, staleCheckpoint,
-} = require('./history/checkpoints');
+const { planCheckpointTimes } = require('./history/checkpoint-plan');
+const { createCheckpointStore, seekThrough, staleCheckpoint } = require('./history/checkpoints');
 const { collectIndexEntries, orderIndex } = require('./history/index-builder');
 const { parseTimestamp, safeTimestamp } = require('./history/jsonl');
 const { mergeThrough } = require('./history/merge');

@@ -5,7 +5,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { createHistoryModel } = require('../src/main/history/model');
-const { createCheckpointStore, planCheckpointTimes } = require('../src/main/history/checkpoints');
+const { planCheckpointTimes } = require('../src/main/history/checkpoint-plan');
+const { createCheckpointStore } = require('../src/main/history/checkpoints');
 const {
   SEC, MIN, T0, SLUG, CLAUDE_SESSION, iso, appendJsonl, createWorld, claude, codex,
 } = require('./support/transcripts');

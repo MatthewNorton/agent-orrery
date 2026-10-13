@@ -7,16 +7,14 @@
 // A record that is not (one parked behind a later-stamped line that a seek to C stops at)
 // marks the checkpoint stale for that target, and the seek runs cold instead.
 
-const v8 = require('v8');
+const { MAX_CHECKPOINTS } = require('./checkpoint-plan');
 const { safeExists } = require('./model');
 
 /**
- * @import { IndexEntry } from './index-builder'
  * @import { HistoryModel, ModelState } from './model'
  * @import { SourceCursor } from './record-reader'
  */
 
-const MAX_CHECKPOINTS = 32;
 const CHECKPOINT_BUDGET_BYTES = 64 * 1024 * 1024;
 
 /**
@@ -28,41 +26,6 @@ const CHECKPOINT_BUDGET_BYTES = 64 * 1024 * 1024;
  * @property {Map<string, SourceCursor>} cursors
  * @property {number} bytes
  */
-
-/**
- * Up to `count` times inside (minMs, maxMs) that split the indexed bytes evenly, taking each
- * source's bytes as spread evenly over its time range.
- * @param {IndexEntry[]} entries
- * @param {number | null} minMs
- * @param {number | null} maxMs
- * @returns {number[]}
- */
-function planCheckpointTimes(entries, minMs, maxMs, count = MAX_CHECKPOINTS) {
-  if (minMs === null || maxMs === null || !(maxMs - minMs > 1)) return [];
-  const total = entries.reduce((sum, entry) => sum + entry.size, 0);
-  if (!(total > 0)) return [];
-  const bytesBy = (time) => {
-    let sum = 0;
-    for (const entry of entries) {
-      if (time >= entry.endMs) sum += entry.size;
-      else if (time > entry.startMs) sum += (entry.size * (time - entry.startMs)) / (entry.endMs - entry.startMs);
-    }
-    return sum;
-  };
-  const times = [];
-  for (let index = 1; index <= count; index++) {
-    const goal = (total * index) / (count + 1);
-    let low = minMs;
-    let high = maxMs;
-    while (high - low > 1) {
-      const middle = Math.floor((low + high) / 2);
-      if (bytesBy(middle) >= goal) high = middle;
-      else low = middle;
-    }
-    if (high > minMs && high < maxMs && high !== times[times.length - 1]) times.push(high);
-  }
-  return times;
-}
 
 /**
  * A copy that shares only what the model never mutates: feed entries and pending-call values.
@@ -127,9 +90,21 @@ function restoreCheckpoint(checkpoint, model) {
   return cloneCursors(checkpoint.cursors);
 }
 
-/** @param {Checkpoint} checkpoint */
-function measureCheckpoint(checkpoint) {
-  return v8.serialize({ state: checkpoint.state, cursors: checkpoint.cursors }).length;
+/**
+ * The heap a checkpoint holds, from what it contains; calibrated against measured heap.
+ * @param {Checkpoint} checkpoint
+ */
+function estimateCheckpointBytes({ state, cursors }) {
+  let pending = 0;
+  for (const cursor of cursors.values()) pending += cursor.pendingRecords.length;
+  let buckets = 0;
+  for (const project of state.projects.values()) buckets += Object.keys(project.buckets).length;
+  let calls = 0;
+  for (const ship of state.ships.values()) calls += ship.pending.size;
+  return cursors.size * 500 + pending * 8 + state.runtimeBySource.size * 160 +
+    state.projects.size * 300 + buckets * 60 + state.ships.size * 300 + calls * 80 +
+    state.feed.length * 8 + (state.projectIdByPath.size + state.seenBuildSignals.size +
+    state.providerCounters.size) * 40;
 }
 
 /**
@@ -138,7 +113,7 @@ function measureCheckpoint(checkpoint) {
  * @param {{ maxCount?: number, maxBytes?: number, measure?: (checkpoint: Checkpoint) => number }} [options]
  */
 function createCheckpointStore({
-  maxCount = MAX_CHECKPOINTS, maxBytes = CHECKPOINT_BUDGET_BYTES, measure = measureCheckpoint,
+  maxCount = MAX_CHECKPOINTS, maxBytes = CHECKPOINT_BUDGET_BYTES, measure = estimateCheckpointBytes,
 } = {}) {
   /** @type {{ time: number, ordinal: number }[]} */
   let plan = [];
@@ -294,9 +269,7 @@ async function seekThrough(ctx, target) {
 }
 
 module.exports = {
-  MAX_CHECKPOINTS,
   CHECKPOINT_BUDGET_BYTES,
-  planCheckpointTimes,
   createCheckpointStore,
   restoreCheckpoint,
   staleCheckpoint,
