@@ -520,7 +520,7 @@
             Math.sin(r.bob + t * AUR.MOTION.systemShipBobRate) * AUR.MOTION.systemShipBobAmount,
             Math.sin(r.a) * r.r
           );
-          shipLookTarget.set(Math.cos(r.a + 0.025) * r.r, 0, Math.sin(r.a + 0.025) * r.r);
+          shipLookTarget.set(Math.cos(r.a + Math.sign(r.speed) * 0.025) * r.r, 0, Math.sin(r.a + Math.sign(r.speed) * 0.025) * r.r);
           r.mesh.lookAt(shipLookTarget);
         } else if (r.mode === 'flyto') {
           const f = r.fly;
