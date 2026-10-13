@@ -295,9 +295,9 @@ const NODES = {
     job: 'Provider names, canonical path keys, rejection of UNC / device paths, the cross-provider tool vocabulary (classifyTool), Signal config, and adaptLine.' },
   transcripts: { label: 'transcripts/*.js', lines: 398, note: 'claude · codex · fields', layer: 'main', path: 'src/main/transcripts/',
     job: 'The one parser per provider: a transcript record becomes structural signals (session, turn end, message shape, tool start / end). Live and replay both read through it and each applies the signals with its own named rules.' },
-  replay: { label: 'replay-source.js + history/', lines: 340, note: 'façade · 9 history modules', layer: 'main', path: 'src/main/replay-source.js',
-    job: 'class ReplaySource is a façade over src/main/history/: index-builder indexes all history once at launch; record-reader, order and merge stream records in time order (256 KB chunks, k-way merge, 64 open handles max); historical-line and apply-record reduce them into history/model.js. Shares src/main/universe/ with live.',
-    issues: ['20 deliberate differences from live (galaxy keys, drone ids, no attention…), each named in the parity tests', 'Index built once: the scrubber end time is frozen until restart', 'Backward scrubs still replay from the first record (no seek checkpoints yet)'] },
+  replay: { label: 'replay-source.js + history/', lines: 359, note: 'façade · 11 history modules', layer: 'main', path: 'src/main/replay-source.js',
+    job: 'class ReplaySource is a façade over src/main/history/: index-builder indexes all history once at launch; record-reader, order and merge stream records in time order (256 KB chunks, k-way merge, 64 open handles max); historical-line and apply-record reduce them into history/model.js; checkpoints and checkpoint-plan keep up to 32 in-memory seek checkpoints so a seek replays only from the nearest one. Shares src/main/universe/ with live.',
+    issues: ['20 deliberate differences from live (galaxy keys, drone ids, no attention…), each named in the parity tests', 'Index built once: the scrubber end time is frozen until restart', 'Seeks before the first checkpoint stay cold; a stale checkpoint costs one wasted partial replay before the cold redo'] },
   coord: { label: 'root-task-coordinator.js', lines: 386, note: 'class', layer: 'main', path: 'src/main/root-task-coordinator.js',
     job: 'Assign / retry for an IDEAS item: append the goal to GOALS.md, start a run record, launch Codex.',
     issues: ['run() is 116 lines', 'completion-failed has no retry path'] },
@@ -688,7 +688,7 @@ const TRACES = {
   replay: { title: 'Scrubbing history (REPLAY)', steps: [
     ['br.replay', 'aplay', 'Dragging the scrubber calls AU.replay({action: "seek", ts}).'],
     ['mrc', 'br.replay', 'replay-control.js validates the command. While a seek is in flight, LIVE-only actions answer “REPLAY”.'],
-    ['replay', 'mrc', 'Forward seeks advance in place; backward seeks reset the model and replay from the first record.'],
+    ['replay', 'mrc', 'Forward seeks advance in place; other seeks restore the nearest in-memory checkpoint and replay from there.'],
     ['ext.claude', 'replay', 'The ReplaySource streams records from every transcript in time order.'],
     ['mrc', 'br.events', 'streamEpoch goes up and the reply carries a fresh snapshot; replay-state pushes follow.'],
     ['replay', 'mctx', 'ReplaySource batches reach the listener in ctx.start()…'],
@@ -1090,12 +1090,12 @@ for (const st of STRIPES) {
 
 // ---------- size charts ----------
 const SIZES_MAIN = [
-  ['tracker.js', 180], ['replay-source.js', 340],
+  ['tracker.js', 180], ['replay-source.js', 359],
   ['live/projects.js', 235], ['live/codex-source.js', 219], ['live/provider-records.js', 200], ['live/claude-records.js', 193],
   ['live/ships.js', 180], ['live/claude-source.js', 150], ['live/system-view.js', 139], ['live/model.js', 86], ['live/attention.js', 81],
   ['live/signal-source.js', 71], ['live/builds.js', 60], ['live/events.js', 53], ['live/state-file.js', 50],
-  ['history/model.js', 314], ['history/index-builder.js', 295], ['history/record-reader.js', 267], ['history/apply-record.js', 156],
-  ['history/historical-line.js', 120], ['history/options.js', 107], ['history/merge.js', 78], ['history/order.js', 74], ['history/jsonl.js', 73],
+  ['history/model.js', 314], ['history/index-builder.js', 295], ['history/checkpoints.js', 277], ['history/record-reader.js', 267], ['history/apply-record.js', 156],
+  ['history/historical-line.js', 120], ['history/options.js', 107], ['history/checkpoint-plan.js', 79], ['history/merge.js', 78], ['history/order.js', 74], ['history/jsonl.js', 73],
   ['universe/galaxy.js', 157], ['universe/public-shape.js', 79], ['universe/ships.js', 33], ['universe/planets.js', 27],
   ['build-buckets.js', 55], ['signal-sources.js', 76], ['provider-adapters.js', 368], ['transcripts/codex.js', 237],
   ['transcripts/claude.js', 116], ['transcripts/fields.js', 52], ['transcripts/model.js', 31], ['shared/hash.js', 47], ['task-runs.js', 397],
