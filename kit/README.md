@@ -29,7 +29,7 @@ kit/
     main-split/         PASS 2026-10-01 — main.js split into bootstrap + modules, no module-level state
   todo/                pending work, in intended order (see todo/README.md)
     09-ship-assets-gen.md stub — ready to distill from the landed manifest
-    12-standalone-installer.md parked — wanted later, not yet
+    12-standalone-installer.md declined — developers install with npm run setup
 ```
 
 ## Status
@@ -48,7 +48,7 @@ kit/
 | 09 Generated ship assets | **STUB** — Kit 08 manifest contract landed; ready to distill | none yet |
 | 10 Project tasks | **DONE** — PASS 2026-07-22; archived in `done/project-tasks/` | `node kit/done/project-tasks/grade-tasks.mjs` |
 | 11 Project search | **DONE** — PASS 2026-07-22; archived in `done/project-search/` | `node kit/done/project-search/grade-search.mjs` |
-| 12 Standalone installer | **PARKED** — wanted later, not yet; see `todo/12-standalone-installer.md` | none yet |
+| 12 Standalone installer | **DECLINED** 2026-10-13 — the users are developers; `npm run setup` is the install path. Notes kept in `todo/12-standalone-installer.md` | none |
 | 13 Structural cleanup | **DONE** — PASS 2026-09-28; `app.js` split into `AUR.app` modules, shared `src/main/path-safety.js`, `kit/repin.mjs`; §2.6 (observable-driven dispose) withdrawn, poll documented; archived in `done/structural-cleanup/` (Phase 5 of `docs/PUBLIC-RELEASE-TASKS.md`) | `node kit/done/structural-cleanup/grade-structure.mjs --full` |
 | 14 Main-process split | **DONE** — PASS 2026-10-01; `main.js` (2217 lines) is a 47-line bootstrap over `app-context.js`, `window.js`, `replay-control.js`, `ipc/*`, `harness/*`; zero module-level `let` in `src/main`; `main.js` unfrozen; project-tasks gate widened to the `src/main` layer (owner-authorized); archived in `done/main-split/` | `node kit/done/main-split/grade-main-split.mjs --full` |
 

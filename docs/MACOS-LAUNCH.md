@@ -17,11 +17,17 @@ itself makes no network requests.
 
 ## Install a Launchpad / Spotlight / Dock shortcut
 
-Double-click `Install Agent Orrery.command` in the repository root, or run
-`npm run setup`. It installs the dependencies when Electron is missing, runs
-the install command below, and opens the app. If the folder came from a
-downloaded ZIP rather than `git clone`, macOS may block the file the first
-time; right-click it and choose **Open**.
+From the repository root, run:
+
+```sh
+npm run setup
+```
+
+It installs the dependencies when Electron is missing, runs the install
+command below, and opens the app. In a `git clone`, double-clicking
+`Install Agent Orrery.command` in Finder does the same. A folder extracted
+from a downloaded ZIP is quarantined and macOS blocks the file; use
+`npm run setup` there instead.
 
 To do it by hand, after `npm install`, from the repository root:
 
@@ -41,8 +47,10 @@ bash scripts/macos-shortcuts.sh uninstall
 Uninstall removes only that bundle, and only if this script created it. It never
 deletes the repository, user data, or anything else in `~/Applications`.
 
-The bundle is unsigned. On first launch macOS may ask you to confirm opening an
-app from an unidentified developer; right-click the app and choose **Open**.
+The bundle is unsigned, but the script builds it on your Mac, so it carries no
+download quarantine and macOS normally opens it without asking. If macOS does
+block it, open System Settings → Privacy & Security and choose **Open Anyway**;
+since macOS 15, right-click → Open no longer gets past the block.
 
 ## Platform behavior
 
