@@ -6,9 +6,18 @@ Agent Orrery can install per-user shortcuts that launch Electron
 directly as a Windows GUI application. After the one-time setup, neither the
 Desktop nor Start-menu shortcut opens a terminal window.
 
+## Quick setup
+
+Double-click `Install Agent Orrery.cmd` in the repository root, or run
+`npm run setup`. It installs the dependencies when Electron is missing, runs
+the Install command below, and opens the app. Node.js 22.12 or newer must
+already be installed; the window says so if it is not. Run it again after
+moving the checkout. The rest of this page describes the shortcut script it runs.
+
 ## Prerequisite
 
-The repository and its dependencies must already be present. From the
+To run the shortcut script yourself, the repository and its dependencies
+must already be present. From the
 repository root, `node_modules/electron/dist/electron.exe` must exist; run
 `npm install` if it does not.
 
