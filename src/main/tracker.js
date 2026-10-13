@@ -44,6 +44,8 @@ const {
 } = require('./live/ships');
 const { addBuild } = require('./live/builds');
 const { pollProviderFile, applyProviderSignals } = require('./live/provider-records');
+const { pollClaudeFile, parseLine } = require('./live/claude-records');
+const { scanClaude, readCwd } = require('./live/claude-source');
 
 /**
  * @import { Attention, FeedEntry, PlanetData, Project, Ship, ShipStatus, SystemData }
@@ -61,14 +63,6 @@ const DEFAULT_CODEX_SESSION_DIRS = [
 const SCAN_INTERVAL_MS = 3000;   // discover new projects / session files
 const POLL_INTERVAL_MS = 1000;   // tail active session files
 const TICK_INTERVAL_MS = 5000;   // ship departure sweep
-
-// Live reads a typed prompt, assistant blocks, or user blocks that answer no tool call as the
-// agent working again. History has its own rule (historicalClaudeSignals).
-/** @param {ClaudeMessage} message */
-function resumesTurn(message) {
-  return (message.user && message.prompt) ||
-    (message.blocks && (message.assistant || (message.user && !message.toolResult)));
-}
 
 class Tracker extends EventEmitter {
   constructor(statePath, options = {}) {
@@ -139,116 +133,11 @@ class Tracker extends EventEmitter {
   // ---------- discovery ----------
 
   scan(isStartup) {
-    this.scanClaude(isStartup);
+    scanClaude(this, isStartup);
     this.scanCodex(isStartup);
     this.scanSignals(isStartup);
     refreshProjectExistence(this);
     flush(this);
-  }
-
-  scanClaude(isStartup) {
-    let dirs;
-    try {
-      dirs = fs.readdirSync(this.claudeProjectsDir, { withFileTypes: true }).filter((d) => d.isDirectory());
-    } catch {
-      return; // no ~/.claude/projects yet
-    }
-    const now = Date.now();
-    for (const d of dirs) {
-      const slug = d.name;
-      const dirPath = path.join(this.claudeProjectsDir, slug);
-      let entries;
-      try {
-        entries = fs.readdirSync(dirPath).filter((f) => f.endsWith('.jsonl'));
-      } catch {
-        continue;
-      }
-      if (entries.length === 0) continue;
-
-      let project = this.projects.get(slug);
-      let totalBytes = 0;
-      let newest = 0;
-      let newestFile = null;
-      const stats = [];
-      for (const f of entries) {
-        const fp = path.join(dirPath, f);
-        let st;
-        try { st = fs.statSync(fp); } catch { continue; }
-        totalBytes += st.size;
-        stats.push({ fp, st });
-        if (st.mtimeMs > newest) { newest = st.mtimeMs; newestFile = fp; }
-      }
-
-      if (!project) {
-        const discoveredPath = newestFile ? this.readCwd(newestFile) : null;
-        const pathKey = canonicalProjectPath(discoveredPath);
-        const mappedId = pathKey && (this.projectPathIndex.get(pathKey) || this.pathIds[pathKey]);
-        if (mappedId) project = this.projects.get(mappedId);
-        const projectId = project ? project.id : (mappedId || slug);
-        const projPath = preferredProjectPath(this, projectId, discoveredPath);
-        const saved = this.persisted.projects[projectId] || {};
-        if (!project) {
-          project = {
-            id: projectId,
-            path: projPath,
-            name: projPath ? path.basename(projPath) : slug,
-            exists: isProjectDirectory(projPath),
-            lastActivity: newest,
-            totalBytes,
-            claudeBytes: totalBytes,
-            codexBytes: 0,
-            buckets: saved.buckets || {},
-            totalBuilds: saved.totalBuilds || 0,
-            firstSeen: saved.firstSeen || now,
-          };
-          this.projects.set(projectId, project);
-          indexProjectPath(this, project);
-          queue(this, { type: 'project-added', project: liveProject(project) });
-          if (!isStartup) pushFeed(this, 'discover', `New system discovered: ${project.name}`, project.id);
-        }
-        if (pathKey) {
-          this.projectPathIndex.set(pathKey, project.id);
-          this.pathIds[pathKey] = project.id;
-        }
-      }
-      project.claudeBytes = totalBytes;
-      project.totalBytes = totalBytes + (project.codexBytes || 0);
-      if (newest > project.lastActivity) project.lastActivity = newest;
-      if (project.path) updateProjectExists(this, project);
-
-      // Tail any file fresh enough to matter; at startup, note where every file ends.
-      for (const { fp, st } of stats) {
-        const hot = now - st.mtimeMs <= HOT_WINDOW_MS;
-        if (this.files.has(fp) || !(hot || isStartup)) continue;
-        const tail = this.claudeTail(fp, project.id, st.size, isStartup);
-        if (!hot) continue;
-        this.files.set(fp, tail);
-        if (isStartup && now - st.mtimeMs < ACTIVE_WINDOW_MS) {
-          ensureShip(this, project.id, tail.session, false, st.mtimeMs);
-        }
-      }
-    }
-  }
-
-  /**
-   * A transcript keeps one tail for the whole run, so a session that goes cold and resumes
-   * reads on from where it stopped. Startup doesn't replay history: it tails from the end. A
-   * file appearing while we run (or replacing a longer one) is a new session: replay it from
-   * zero in catchup mode so its ship materializes with correct state.
-   * @param {string} fp
-   * @param {string} projectId
-   * @param {number} size
-   * @param {boolean} isStartup
-   */
-  claudeTail(fp, projectId, size, isStartup) {
-    const known = this.claudeTails.get(fp);
-    if (known && known.offset <= size) return known;
-    const tail = {
-      provider: 'claude', project: projectId, session: path.basename(fp, '.jsonl'),
-      offset: isStartup ? size : 0, catchup: !isStartup, remainder: '',
-    };
-    this.claudeTails.set(fp, tail);
-    return tail;
   }
 
   remapProjectPath(projectId, nextPath) {
@@ -430,20 +319,8 @@ class Tracker extends EventEmitter {
     }
   }
 
-  // Reads the head of a transcript to find the project's real cwd.
   readCwd(file) {
-    try {
-      const fd = fs.openSync(file, 'r');
-      const buf = Buffer.alloc(32768);
-      const n = fs.readSync(fd, buf, 0, buf.length, 0);
-      fs.closeSync(fd);
-      const m = buf.toString('utf8', 0, n).match(/"cwd":"((?:[^"\\]|\\.)*)"/);
-      if (m) {
-        const cwd = JSON.parse(`"${m[1]}"`);
-        return isLocalProjectPath(cwd) ? cwd : null;
-      }
-    } catch { /* unreadable head is fine */ }
-    return null;
+    return readCwd(file);
   }
 
   // ---------- tailing ----------
@@ -467,36 +344,7 @@ class Tracker extends EventEmitter {
         pollProviderFile(this, fp, tail, st);
         continue;
       }
-      if (st.size <= tail.offset) continue;
-      let chunk;
-      try {
-        const fd = fs.openSync(fp, 'r');
-        const len = st.size - tail.offset;
-        const buf = Buffer.alloc(Math.min(len, 8 * 1024 * 1024));
-        const n = fs.readSync(fd, buf, 0, buf.length, tail.offset);
-        fs.closeSync(fd);
-        chunk = buf.toString('utf8', 0, n);
-        tail.offset += n;
-      } catch {
-        continue;
-      }
-      if (tail.discardOversized) {
-        const newline = chunk.indexOf('\n');
-        if (newline < 0) continue;
-        chunk = chunk.slice(newline + 1);
-        tail.discardOversized = false;
-      }
-      const text = tail.remainder + chunk;
-      const lines = text.split('\n');
-      tail.remainder = lines.pop();
-      if (Buffer.byteLength(tail.remainder, 'utf8') > 1024 * 1024) {
-        tail.remainder = '';
-        tail.discardOversized = true;
-      }
-      for (const line of lines) {
-        if (Buffer.byteLength(line, 'utf8') <= 1024 * 1024 && line.trim()) this.parseLine(line, tail);
-      }
-      if (tail.catchup && tail.offset >= st.size) tail.catchup = false;
+      pollClaudeFile(this, fp, tail, st);
     }
     evaluateAttention(this, now);
     flush(this);
@@ -507,109 +355,7 @@ class Tracker extends EventEmitter {
   }
 
   parseLine(line, tail) {
-    let record;
-    try { record = JSON.parse(line); } catch { return; }
-    const project = this.projects.get(tail.project);
-    if (!project) return;
-    // Live stamps an undated record with the time it was read.
-    const parsedTs = record.timestamp ? Date.parse(record.timestamp) : NaN;
-    const ts = Number.isFinite(parsedTs) ? parsedTs : Date.now();
-    let ship = null;
-    let message = null;
-    for (const signal of claudeRecordToSignals(record)) {
-      if (signal.type === 'session') {
-        ship = this.applyClaudeSession(project, tail, signal, ts);
-      } else if (signal.type === 'turn-end') {
-        ship.turnDone = true;
-      } else if (signal.type === 'message') {
-        message = signal;
-        if (resumesTurn(signal)) ship.turnDone = false;
-        setLocal(this, ship, signal.local);
-      } else if (signal.type === 'tool-start') {
-        if (message.assistant && signal.callId) {
-          // A tool_use id belongs to the ship that issued it last.
-          const previousOwnerId = this.pendingIndex.get(signal.callId);
-          if (previousOwnerId && previousOwnerId !== ship.id) {
-            const previousOwner = this.ships.get(previousOwnerId);
-            if (previousOwner) previousOwner.pending.delete(signal.callId);
-          }
-          addPending(this, ship, signal.callId, signal.tool, ts);
-        }
-        this.onToolUse(project, ship, signal, ts, tail.catchup);
-      } else if (signal.type === 'tool-end' && signal.callId) {
-        this.onToolResult(signal.callId, ts);
-      }
-    }
-  }
-
-  /**
-   * @param {LiveProject} project
-   * @param {{ project: string, session: string }} tail
-   * @param {ClaudeSession} session
-   * @param {number} ts
-   * @returns {LiveShip}
-   */
-  applyClaudeSession(project, tail, session, ts) {
-    if (!project.path && canonicalProjectPath(session.cwd)) {
-      project.path = session.cwd;
-      project.name = path.basename(session.cwd);
-      project.exists = isProjectDirectory(session.cwd);
-      indexProjectPath(this, project);
-      this.systemCache.delete(project.id);
-      queue(this, { type: 'project-updated', project: liveProject(project) });
-    }
-    if (ts > project.lastActivity) project.lastActivity = ts;
-    const ship = ensureShip(this, tail.project, tail.session, session.kind === 'drone', ts);
-    ship.lastEvent = Math.max(ship.lastEvent, ts);
-    return ship;
-  }
-
-  /**
-   * @param {LiveProject} project
-   * @param {LiveShip} ship
-   * @param {ClaudeToolStart} signal
-   * @param {number} ts
-   * @param {boolean} catchup
-   */
-  onToolUse(project, ship, signal, ts, catchup) {
-    const tool = signal.tool || '?';
-    const { status, build, spawn } = claudeTool(tool);
-    ship.status = status;
-    const rel = signal.filePath === null ? null : relativeInside(project.path, signal.filePath);
-    ship.detail = signal.filePath === null ? signal.detail : rel || path.basename(signal.filePath);
-    queue(this, { type: 'ship-updated', ship: liveShip(ship) });
-
-    if (build && rel) {
-      addBuild(this, project, ship, rel, ts, catchup);
-    } else if (!catchup) {
-      queue(this, {
-        type: 'activity',
-        project: project.id, shipId: ship.id, tool, status: ship.status, detail: ship.detail, ts,
-      });
-      if (spawn) {
-        spawnDrone(this, project, ship, signal.callId, ts);
-      } else if (Math.random() < 0.12) {
-        // Sample non-build activity into the feed so it stays readable.
-        pushFeed(this, 'info', `${ship.name} ${ship.status.toLowerCase()} in ${project.name}`, project.id);
-      }
-    }
-  }
-
-  onToolResult(toolUseId, ts) {
-    const ownerId = this.pendingIndex.get(toolUseId);
-    if (ownerId) {
-      const owner = this.ships.get(ownerId);
-      if (owner) owner.pending.delete(toolUseId);
-      this.pendingIndex.delete(toolUseId);
-    }
-
-    const droneId = `drone:${toolUseId}`;
-    const drone = this.ships.get(droneId);
-    if (drone) {
-      this.ships.delete(droneId);
-      queue(this, { type: 'ship-departed', shipId: droneId, ts });
-      pushFeed(this, 'depart', `${drone.name} returned to ${drone.parentName}`, drone.project);
-    }
+    parseLine(this, line, tail);
   }
 
   sweepShips() {
