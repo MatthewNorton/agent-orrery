@@ -1,206 +1,157 @@
-/* topbar.css — Top bar: brand, recent projects, project search. Split from style.css on 2026-10-14; rules unchanged. */
-/* ---- top bar ---- */
+/* topbar.css — The top bar: brand, Go to, filters, the needs-you alarm, the clock, settings.
+   Values come from tokens.css only. */
 .topbar {
   position: fixed;
   top: 0; left: 0; right: 0;
-  height: var(--topbar-h);
+  height: var(--bar-h);
   display: flex;
   align-items: center;
-  padding: 0 22px;
+  gap: var(--space-4);
+  padding: 0 var(--space-3) 0 var(--space-4);
   z-index: 20;
-  background: linear-gradient(180deg, rgba(6, 8, 14, 0.92), rgba(6, 8, 14, 0.55));
-  border-bottom: 1px solid var(--panel-border);
+  background: var(--paper);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--hair);
   pointer-events: none;
 }
-.brand {
-  display: flex; align-items: center; gap: 14px;
-  flex: 0 0 auto; pointer-events: auto;
-}
-.logo-dot {
-  width: 26px; height: 26px; border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #b79bff, #6c4bd6 55%, #2a1d5e);
-  box-shadow: 0 0 14px 2px rgba(140, 110, 255, 0.75), 0 0 4px rgba(180,150,255,0.9) inset;
-}
+.topbar > * { pointer-events: auto; }
+.brand { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; white-space: nowrap; }
+.logo-dot { width: 24px; height: 24px; display: block; }
+.logo-dot circle { fill: none; stroke: var(--ink); stroke-width: 1.2; }
+.logo-dot path { fill: var(--ink); }
+.logo-dot circle.core { fill: var(--orange); stroke: none; }
 .brand-name {
-  font-size: 17px; font-weight: 600; letter-spacing: 3px; color: #f2f4fb;
-  white-space: nowrap;
+  font-size: 13px; font-weight: 700; letter-spacing: 0.1em; line-height: 1;
+  color: var(--ink); text-transform: uppercase;
 }
 .brand-badge {
-  font-size: 11px; font-weight: 600; letter-spacing: 1px;
-  color: #b9a8ff;
-  padding: 4px 11px; border-radius: 999px;
-  border: 1px solid rgba(140, 110, 255, 0.45);
-  background: rgba(90, 70, 180, 0.14);
-  white-space: nowrap;
+  font-family: var(--font-mono); font-size: 12px; font-weight: 500; line-height: 1;
+  letter-spacing: 0.04em; color: var(--ink-3);
 }
 
-/* ---- recent projects (universe view, top bar) ---- */
-.recent {
-  display: flex; align-items: center; gap: 10px;
-  margin-left: 28px; min-width: 0; overflow: hidden;
-  flex: 1 1 auto; pointer-events: auto;
-}
-.recent-label {
-  font-size: 10.5px; font-weight: 600; letter-spacing: 2px;
-  color: var(--muted); flex: 0 0 auto;
-}
-.recent-pills {
-  display: flex; align-items: center; gap: 8px;
-  min-width: 0; overflow: hidden;
-}
-.recent-pill {
-  display: flex; align-items: center; gap: 7px;
-  font-size: 11.5px; font-weight: 600; letter-spacing: 0.4px;
-  color: #c6d2f2;
-  padding: 4px 12px; border-radius: 999px;
-  border: 1px solid rgba(120, 140, 190, 0.3);
-  background: rgba(30, 40, 66, 0.35);
-  max-width: 170px; white-space: nowrap;
-  cursor: pointer; flex: 0 0 auto;
-}
-.recent-pill:hover {
-  border-color: rgba(108, 140, 255, 0.65);
-  background: rgba(108, 140, 255, 0.14);
-  color: #eef1f8;
-}
-.recent-pill .pill-name { overflow: hidden; text-overflow: ellipsis; }
-.recent-pill .pill-dot {
-  width: 7px; height: 7px; border-radius: 50%; flex: 0 0 auto;
-  background: #34d399; box-shadow: 0 0 6px #34d399;
-}
+/* recent projects are reached through Go to now; the nav stays in the DOM for its renderer */
+.recent { display: none; }
 
-/* ---- project search (universe view, top bar) ---- */
+/* Go to: the project search, centred */
 .project-search {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 9px;
-  flex: 0 0 auto;
-  margin-left: 18px;
-  pointer-events: auto;
+  flex: 0 1 380px;
+  margin: 0 auto;
+  min-width: 0;
 }
 .search-label {
-  color: var(--muted);
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 2px;
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap;
 }
-.search-control { position: relative; width: 210px; }
+.search-control { position: relative; width: 100%; }
+.search-control > svg {
+  position: absolute; left: 10px; top: 50%;
+  width: 16px; height: 16px; transform: translateY(-50%);
+  fill: none; stroke: var(--ink-3); stroke-width: 1.6; pointer-events: none;
+}
 .search-input {
   width: 100%;
-  height: 32px;
-  padding: 5px 11px;
-  color: #e8ecf6;
-  background: rgba(30, 40, 66, 0.44);
-  border: 1px solid rgba(120, 140, 190, 0.34);
-  border-radius: 999px;
+  height: var(--control-h-lg);
+  padding: 0 10px 0 34px;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--hair-2);
+  border-radius: var(--radius-0);
   outline: none;
   font: inherit;
-  font-size: 12px;
+  font-size: 13px;
   user-select: text;
   appearance: none;
 }
 .search-input::-webkit-search-cancel-button { display: none; }
-.search-input::placeholder { color: #7d869b; }
-.search-input:hover { border-color: rgba(108, 140, 255, 0.62); }
-.search-input:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(108, 140, 255, 0.22);
-}
+.search-input::placeholder { color: var(--ink-3); }
+.search-input:hover { border-color: var(--ink-3); }
+.search-input:focus { border-color: var(--orange); box-shadow: 0 0 0 2px var(--plate); }
 .search-results {
   position: absolute;
-  top: calc(100% + 10px);
-  right: 0;
-  width: 320px;
+  top: calc(100% + 6px);
+  left: 0; right: 0;
   max-height: 392px;
   overflow-y: auto;
-  padding: 6px;
+  padding: 4px;
   z-index: 30;
+  background: var(--paper-solid);
+  border: 1px solid var(--hair-2);
+  border-radius: var(--radius-0);
+  backdrop-filter: none;
+  box-shadow: none;
 }
 .search-result {
   width: 100%;
   display: grid;
-  grid-template-columns: 10px minmax(0, 1fr);
-  gap: 9px;
+  grid-template-columns: 7px minmax(0, 1fr);
+  gap: 10px;
   align-items: center;
-  padding: 9px 10px;
-  color: #dfe4f0;
+  padding: 8px 10px;
+  color: var(--ink);
   background: transparent;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--radius-0);
   font: inherit;
   text-align: left;
   cursor: pointer;
 }
-.search-result:hover, .search-result.selected {
-  color: #fff;
-  background: rgba(108, 140, 255, 0.18);
-}
-.search-result:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.search-result-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: rgba(139, 147, 168, 0.3);
-}
-.search-result-dot.live { background: #34d399; box-shadow: 0 0 6px #34d399; }
+.search-result:hover, .search-result.selected { background: var(--plate); }
+.search-result:focus-visible { outline: 2px solid var(--orange); outline-offset: -2px; }
+.search-result-dot { width: 7px; height: 7px; border-radius: var(--radius-dot); background: var(--hair-2); }
+.search-result-dot.live { background: var(--green); box-shadow: 0 0 0 3px var(--green-ring); }
 .search-result-copy { min-width: 0; }
 .search-result-name {
-  display: block;
-  overflow: hidden;
-  color: inherit;
-  font-size: 12px;
-  font-weight: 650;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: block; overflow: hidden; color: inherit;
+  font-size: 12.5px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap;
 }
 .search-result-meta {
-  display: block;
-  margin-top: 3px;
-  overflow: hidden;
-  color: var(--muted);
-  font-size: 10.5px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: block; margin-top: 2px; overflow: hidden; color: var(--ink-3);
+  font-family: var(--font-mono); font-size: 12px; text-overflow: ellipsis; white-space: nowrap;
 }
-.search-empty { padding: 12px 10px; color: var(--muted); font-size: 12px; }
+.search-empty { padding: 12px 10px; color: var(--ink-3); font-size: 12px; }
 
-.project-vcs-filter {
+/* the GitHub filter and the all-projects button: line buttons with a count */
+.project-vcs-filter, .project-directory-button {
+  margin-left: auto;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 32px;
-  padding: 0 9px;
-  border: 1px solid rgba(120, 140, 190, 0.3);
-  border-radius: 999px;
-  background: rgba(30, 40, 66, 0.38);
-  color: #aeb8cb;
-  font: 700 9px/1 var(--font-sans);
-  letter-spacing: 0.8px;
+  flex: 0 0 auto;
+  height: var(--control-h-lg);
+  margin: 0;
+  padding: 0 10px;
+  border: 1px solid var(--hair-2);
+  border-radius: var(--radius-0);
+  background: transparent;
+  color: var(--ink-2);
+  font: 600 12px/1 var(--font-sans);
+  letter-spacing: 0.02em;
   cursor: pointer;
 }
-.project-vcs-filter:hover {
-  color: #eef2fb;
-  border-color: rgba(108, 140, 255, 0.62);
-}
-.project-vcs-filter[aria-pressed='true'] {
-  color: #f3f6ff;
-  border-color: rgba(114, 223, 187, 0.58);
-  background: rgba(41, 128, 97, 0.2);
-  box-shadow: 0 0 0 2px rgba(41, 128, 97, 0.08);
-}
-.project-vcs-filter:focus-visible {
-  outline: 2px solid #93b4ff;
+.project-vcs-filter { margin-left: 8px; }
+.project-search:not(.hidden) ~ .project-directory-button { margin-left: 0; }
+.project-vcs-filter:hover, .project-directory-button:hover,
+.project-directory-button[aria-expanded="true"] { color: var(--ink); background: var(--plate); }
+.project-vcs-filter[aria-pressed='true'] { color: var(--ink); border-color: var(--green); }
+.project-vcs-filter:focus-visible, .project-directory-button:focus-visible,
+.settings-button:focus-visible, .needs-you-button:focus-visible {
+  outline: 2px solid var(--orange);
   outline-offset: 2px;
 }
-.project-vcs-filter-count {
+.project-vcs-filter-count, .project-directory-button-count {
   min-width: 18px;
-  padding: 3px 5px;
-  border-radius: 999px;
-  background: rgba(120, 140, 190, 0.16);
+  padding: 0;
+  border-radius: var(--radius-0);
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-mono); font-size: 12px; font-weight: 500;
   letter-spacing: 0;
   text-align: center;
 }
+.project-directory-button-icon { color: var(--ink-3); font-size: 14px; line-height: 1; }
 
 .universe-vcs-layer {
   position: fixed;
@@ -213,53 +164,37 @@
   position: absolute;
   transform: translate(10px, -50%);
   transform-origin: left center;
-  transition: opacity 120ms ease;
+  transition: opacity var(--dur-fast) var(--ease);
   will-change: left, top, opacity;
 }
-.universe-project-vcs-marker .project-vcs-marker {
-  width: 18px;
-  height: 18px;
-  border-radius: 5px;
-}
-.universe-project-vcs-marker .project-vcs-marker svg {
-  width: 11px;
-  height: 11px;
-}
+.universe-project-vcs-marker .project-vcs-marker { width: 18px; height: 18px; border-radius: var(--radius-0); }
+.universe-project-vcs-marker .project-vcs-marker svg { width: 11px; height: 11px; }
 
-.project-directory-button {
-  display: flex;
-  align-items: center;
-  gap: 7px;
+/* right side: the alarm, the clock, settings */
+.topbar .needs-you-button { flex: 0 0 auto; font-size: 12.5px; font-weight: 600; }
+.clock { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; white-space: nowrap; }
+.clock-mode { color: var(--ink-3); font-size: 12px; font-weight: 500; }
+.clock-time { font-family: var(--font-mono); font-size: 13px; font-weight: 500; color: var(--ink); font-variant-numeric: tabular-nums; }
+.settings-button {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
   flex: 0 0 auto;
-  height: 32px;
-  margin-left: 10px;
-  padding: 0 10px;
-  border: 1px solid rgba(120, 140, 190, 0.3);
-  border-radius: 999px;
-  background: rgba(30, 40, 66, 0.38);
-  color: #c9d2e6;
-  font: 700 9.5px/1 var(--font-sans);
-  letter-spacing: 1.2px;
+  width: var(--control-h-lg); height: var(--control-h-lg);
+  padding: 0;
+  border: 1px solid var(--hair-2);
+  border-radius: var(--radius-0);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
   cursor: pointer;
-  pointer-events: auto;
 }
-.project-directory-button:hover, .project-directory-button[aria-expanded="true"] {
-  color: #fff;
-  border-color: rgba(108, 140, 255, 0.62);
-  background: rgba(108, 140, 255, 0.14);
-}
-.project-directory-button:focus-visible {
-  outline: 2px solid #93b4ff;
-  outline-offset: 2px;
-}
-.project-directory-button-icon { color: #93b4ff; font-size: 15px; line-height: 1; }
-.project-directory-button-count {
-  min-width: 20px;
-  padding: 3px 5px;
-  border-radius: 999px;
-  background: rgba(108, 140, 255, 0.18);
-  color: #dce5ff;
-  font-size: 9.5px;
-  letter-spacing: 0;
-  text-align: center;
+.settings-button:hover { background: var(--plate); }
+.settings-glyph { font-size: 16px; line-height: 1; }
+.settings-count {
+  position: absolute; top: -6px; right: -6px;
+  min-width: 16px; height: 16px; padding: 0 4px;
+  display: grid; place-items: center;
+  background: var(--red-fill); color: var(--on-red);
+  font-family: var(--font-mono); font-size: 12px; line-height: 1;
 }

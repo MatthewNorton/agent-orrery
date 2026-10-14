@@ -172,6 +172,7 @@
     }
     count.textContent = needsYou > 0 ? needsYou + ' need you' : ships.length + ' Running';
     count.classList.toggle('needs-you', needsYou > 0);
+    A.renderNeedsYou(ships);
     AUR.clear(list);
     if (ships.length === 0) {
       list.appendChild(AUR.el('div', 'empty-note', 'No agents in flight'));
@@ -274,8 +275,8 @@
 
   function statBlock(num, label) {
     const b = AUR.el('div', 'stat');
-    b.appendChild(AUR.el('div', 'stat-num', String(num)));
     b.appendChild(AUR.el('div', 'stat-label', label));
+    b.appendChild(AUR.el('div', 'stat-num', String(num)));
     return b;
   }
 
@@ -293,10 +294,14 @@
       title = 'UNIVERSE SUMMARY';
       stats = universeSummaryStats();
     }
-    card.appendChild(AUR.el('div', 'summary-title', title));
-    const row = AUR.el('div', 'summary-stats');
+    const head = AUR.el('header', 'mod-h');
+    head.appendChild(AUR.el('span', 'mod-i index'));
+    head.appendChild(AUR.el('h2', 'mod-title summary-title', title));
+    card.appendChild(head);
+    const row = AUR.el('div', 'summary-stats stats');
     for (const [n, l] of stats) row.appendChild(statBlock(n, l));
     card.appendChild(row);
+    A.renderViewTitle();
   };
 
   function universeSummaryStats() {
@@ -304,7 +309,7 @@
     const active = S.store.ships.size;
     const online = new Set();
     for (const s of S.store.ships.values()) online.add(s.project);
-    return [[projects, 'Projects'], [active, 'Active Agents'], [online.size, 'Systems Online']];
+    return [[projects, 'Projects'], [active, 'Agents'], [online.size, 'Online']];
   }
 
   A.shipsInProject = function shipsInProject(projectId) {
@@ -321,7 +326,7 @@
       else if (s.status === 'Gathering Resources') gathering++;
       else if (s.status === 'Exploring' || s.status === 'Scanning') exploring++;
     }
-    return [[ships.length, 'Active Agents'], [building, 'Building'],
+    return [[ships.length, 'Agents'], [building, 'Building'],
       [gathering, 'Gathering'], [exploring, 'Exploring']];
   }
 
@@ -331,7 +336,7 @@
     const structures = pd ? pd.subdirs : 0;
     const resources = pd && pd.resources ? pd.resources.length : 0;
     const builds = pd ? pd.builds : 0;
-    return [[ships.length, 'Active Agents'], [structures, 'Structures'],
+    return [[ships.length, 'Agents'], [structures, 'Structures'],
       [resources, 'Resources'], [builds, 'Builds']];
   }
 
