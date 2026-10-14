@@ -32,7 +32,10 @@ Frozen files: the **Frozen files** bullet in `CLAUDE.md` is the one authoritativ
    - `../../node_modules/babylonjs/babylon.js`
    - `../../node_modules/babylonjs-gui/babylon.gui.min.js`
 4. The renderer is fully offline. Zero network requests, no CDN, no fonts from
-   the web. Use the `system-ui, 'Segoe UI', sans-serif` stack.
+   the web. The two UI faces (Archivo, IBM Plex Mono; OFL) ship as WOFF2 under
+   `src/renderer/fonts/` with their licences and are declared in
+   `styles/tokens.css`; Babylon GUI labels keep the
+   `system-ui, 'Segoe UI', sans-serif` stack until their width estimates are retuned.
 5. `contextIsolation` is on. The ONLY way to reach the main process is
    `window.AU` (documented below). No `require`, no `process`.
 6. New renderer files live flat in `src/renderer/` (the gates scan only the top level).

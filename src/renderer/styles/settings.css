@@ -97,7 +97,7 @@
   background: transparent;
   border: 1px solid rgba(120, 140, 190, 0.2);
   border-radius: 8px;
-  font: 24px/1 system-ui, sans-serif;
+  font: 24px/1 var(--font-sans);
   cursor: pointer;
 }
 .settings-close:hover { color: #fff; background: rgba(108, 140, 255, 0.14); }
@@ -205,7 +205,7 @@
 .settings-project-path {
   margin-top: 4px;
   color: #7f899f;
-  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 10px;
   line-height: 1.45;
   overflow-wrap: anywhere;
@@ -226,7 +226,7 @@
   min-width: 0;
   flex: 1 1 auto;
   color: #a8b5ca;
-  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 9.5px;
   overflow-wrap: anywhere;
   user-select: text;
