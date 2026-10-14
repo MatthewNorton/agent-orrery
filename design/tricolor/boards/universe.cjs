@@ -10,7 +10,7 @@ const SW = 784, SH = 764;
 const px = (x) => ((x / SW) * 100).toFixed(2) + '%'; const py = (y) => ((y / SH) * 100).toFixed(2) + '%';
 const SYS = [
   { n: 'orion-api', x: 420, y: 572, sun: 'gold', s: 1.25, planets: 4, seed: 11, lock: [60, 'red', true], l: ['mid', 0, 66, ['214 today · 3 agents', ['Claude-4 waiting 9m', 'red']]] },
-  { n: 'nebula-dashboard', x: 190, y: 640, sun: 'blue', s: 0.95, planets: 2, seed: 37, lock: [44, 'yellow'], l: ['mid', 0, 48, ['96 today', ['Codex-1 permission 7m', 'yellow']]] },
+  { n: 'nebula-dashboard', x: 190, y: 640, sun: 'blue', s: 0.95, planets: 2, seed: 37, lock: [44, 'orange'], l: ['mid', 0, 48, ['96 today', ['Codex-1 permission 7m', 'orange']]] },
   { n: 'pulsar-gateway', x: 268, y: 488, sun: 'gold', s: 0.6, planets: 1, seed: 83, quiet: true, l: ['end', -20, -8] },
   { n: 'comet-billing', x: 640, y: 628, sun: 'blue', s: 0.6, planets: 1, seed: 97, quiet: true, l: ['mid', 0, 18] },
   { n: 'vega-charts', x: 566, y: 214, sun: 'blue', s: 1.05, planets: 3, seed: 23, l: ['end', -44, -42, ['141 today · 2 agents']] },
@@ -90,7 +90,7 @@ function screen(theme, w, h, title) {
   </div>
   <div class="tools"><span class="hint mono">Drag to orbit · scroll to zoom</span><button class="icon-btn" type="button" aria-label="Fit all systems">${I.fit}</button></div>`,
     left: [mod({ id: 'summary', i: '01', title: 'Summary', meta: 'Today', body: stats }),
-      mod({ id: 'needs', i: '02', title: 'Needs you', meta: 'Oldest first', n: '02', cls: 'mod--alert', body: alert('q', 'Claude-4', 'Question', 'cr', '09:12', 'orion-api · waiting for an answer', 'Answer') + alert('p', 'Codex-1', 'Permission', 'cy', '07:03', 'nebula-dashboard · npm run migrate', 'Review') }),
+      mod({ id: 'needs', i: '02', title: 'Needs you', meta: 'Oldest first', n: '02', cls: 'mod--alert', body: alert('q', 'Claude-4', 'Question', 'cr', '09:12', 'orion-api · waiting for an answer', 'Answer') + alert('p', 'Codex-1', 'Permission', 'co', '07:03', 'nebula-dashboard · npm run migrate', 'Review') }),
       mod({ id: 'ideas', i: '03', title: 'Ideas', meta: 'None yet', n: '00', collapsed: true })].join('\n'),
     right: [mod({ id: 'fleet', i: '05', title: 'Fleet', meta: '6 Claude · 3 Codex', n: '09', body: crew }),
       mod({ id: 'galaxies', i: '06', title: 'Galaxies', meta: '564 builds today', n: '03', collapsed: true }),
@@ -98,6 +98,5 @@ function screen(theme, w, h, title) {
     dockHtml: dock('Builds per half hour · <b style="color: var(--ink)">564</b>', 1) });
 }
 
-const BOARDS = [['TriUniverse', 'light', 1440, 900, 'Agent Orrery, tricolor'], ['TriUniverseDark', 'dark', 1440, 900, 'Agent Orrery, tricolor, dark'],
-  ['TriWindow', 'light', 1024, 768, 'Agent Orrery, tricolor, 1024 window'], ['TriPhone', 'dark', 390, 844, 'Agent Orrery, tricolor, phone width']];
+const BOARDS = [['TriUniverse', 'dark', 1440, 900, 'Agent Orrery, tricolor'], ['TriWindow', 'dark', 1024, 768, 'Agent Orrery, tricolor, 1024 window'], ['TriPhone', 'dark', 390, 844, 'Agent Orrery, tricolor, phone width']];
 for (const [name, theme, w, h, title] of BOARDS) { fs.writeFileSync(path.join(DIR, name + '.dc.html'), screen(theme, w, h, title)); console.log('wrote', name); }

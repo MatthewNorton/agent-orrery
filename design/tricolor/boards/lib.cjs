@@ -35,7 +35,7 @@ const I = {
   folder: icon('<path d="M3 6h6l2 2h10v11H3z"></path>'),
   branch: icon('<circle cx="6" cy="5" r="2"></circle><circle cx="6" cy="19" r="2"></circle><circle cx="18" cy="8" r="2"></circle><path d="M6 7v10M18 10c0 4-12 2-12 7"></path>'),
 };
-const emblem = '<svg width="24" height="24" viewBox="-13 -13 26 26" aria-hidden="true"><circle r="11.5" fill="none" stroke="var(--ink)" stroke-width="1.2"></circle><path d="M0 -10 L2 -2 L10 0 L2 2 L0 10 L-2 2 L-10 0 L-2 -2 Z" fill="var(--blue)"></path><circle r="1.8" fill="var(--red)"></circle></svg>';
+const emblem = '<svg width="24" height="24" viewBox="-13 -13 26 26" aria-hidden="true"><circle r="11.5" fill="none" stroke="var(--ink)" stroke-width="1.2"></circle><path d="M0 -10 L2 -2 L10 0 L2 2 L0 10 L-2 2 L-10 0 L-2 -2 Z" fill="var(--ink)"></path><circle r="1.8" fill="var(--orange)"></circle></svg>';
 
 const TEX = ['ocean', 'rust', 'ice', 'bands', 'marble', 'dune', 'crystal', 'crater'];
 const SUN = { gold: ['#fff7e0', '#ffd27a', '#ff9d2e'], blue: ['#f2f7ff', '#b9d0ff', '#6f97ff'], red: ['#fff0e6', '#ffb08a', '#ff5f36'] };
@@ -57,9 +57,8 @@ function mod({ id, i, title, meta = '', n = '', cls = '', collapsed = false, bod
 </section>`;
 }
 
-const HAZARD = 'repeating-linear-gradient(-45deg, var(--yellow) 0 4px, var(--on-yellow) 4px 7px)';
-const tint = { q: 'var(--red)', p: HAZARD, d: 'var(--green)' };
-const tintInk = { q: 'var(--red)', p: 'var(--yellow-ink)', d: 'var(--green-ink)' };
+const tint = { q: 'var(--red)', p: 'var(--orange)', d: 'var(--green)' };
+const tintInk = { q: 'var(--red)', p: 'var(--orange-ink)', d: 'var(--green)' };
 const crewRow = ([n, hull, prov, att, status, where, age]) => `<div class="crew-row"${att ? ` style="--tint: ${tint[att]}"` : ''}><img src="${IMG}ship-${hull}.png" alt=""><span class="row-name">${n}<i class="dot" style="background: var(--${prov})"></i><em${att ? ` style="color: ${tintInk[att]}"` : ' class="c3"'}>${status}</em></span><span class="row-age mono">${age}</span><span class="row-sub">${where}</span></div>`;
 const feedRow = ([n, prov, verb, where, age]) => `<div class="feed-row"><i class="dot" style="background: var(--${prov})"></i><span class="feed-text"><b>${n}</b> ${verb}</span><span class="row-age mono">${age}</span><span class="row-sub">${where}</span></div>`;
 const alert = (kind, who, what, cls, wait, where, verb) => `<div class="alert alert--${kind}"><span class="alert-name">${who} <span class="${cls}">· ${what}</span></span><span class="alert-wait ${cls}">${wait}</span><span class="row-sub">${where}</span><div class="alert-act"><button class="btn" type="button">${I.term}${verb} in terminal</button><button class="btn btn--line btn--sq" type="button" aria-label="Locate ${who}">${I.locate}</button></div></div>`;
@@ -69,7 +68,7 @@ function bars(scale = 1) {
   const bins = histogramBins();
   let o = '<svg viewBox="0 0 480 20" preserveAspectRatio="none" aria-hidden="true">';
   for (let i = 0; i < 48; i++) { const v = i < 30 ? (bins.claude[i] + bins.codex[i]) * scale : 0; const h = i < 30 ? Math.max(1, (v / (57 * scale)) * 20) : 1; o += `<rect x="${i * 10 + 1.5}" y="${20 - h}" width="7" height="${h}" fill="${i < 30 ? 'var(--ink)' : 'var(--hair-2)'}"></rect>`; }
-  return o + `<rect x="${(NOW * 480 - 1).toFixed(1)}" y="0" width="2" height="20" fill="var(--cyan)" class="glow"></rect></svg>`;
+  return o + `<rect x="${(NOW * 480 - 1).toFixed(1)}" y="0" width="2" height="20" fill="var(--ink)"></rect></svg>`;
 }
 const hours = [0, 3, 6, 9, 12, 18, 21].map((h) => `<span class="mono" style="left: ${(h / 24) * 100}%">${String(h).padStart(2, '0')}:00</span>`).join('');
 const dock = (cap, scale) => `<section class="mod dock" aria-label="Timeline">
@@ -87,7 +86,7 @@ const dock = (cap, scale) => `<section class="mod dock" aria-label="Timeline">
 
 const bar = `<header class="bar">
   <span class="brand">${emblem}<span>Agent Orrery</span><small class="index">AO-01</small></span>
-  <button class="field body" type="button" aria-label="Go to a project, agent or file">${I.search}<span>Go to a project, agent or file</span><span class="kbd">CTRL</span><span class="kbd">K</span></button>
+  <button class="field body" type="button" aria-label="Go to a project, agent or file">${I.search}<span>Go to a project, agent or file</span><span class="kbd">Ctrl</span><span class="kbd">K</span></button>
   <button class="btn btn--alarm" type="button"><i></i>2 need you</button>
   <div class="clock"><span class="caps c3 live"><i></i>Live · Tue 13 Oct</span><b>14:32:07</b></div>
   <button class="icon-btn" type="button" aria-label="Settings">${I.sliders}</button>
@@ -144,4 +143,4 @@ class Component extends DCLogic {
 `;
 }
 
-module.exports = { OUT, IMG, mulberry32, I, emblem, TEX, SUN, defs, mod, HAZARD, tint, tintInk, crewRow, feedRow, alert, NOW, bars, hours, dock, bar, legend, page };
+module.exports = { OUT, IMG, mulberry32, I, emblem, TEX, SUN, defs, mod, tint, tintInk, crewRow, feedRow, alert, NOW, bars, hours, dock, bar, legend, page };
