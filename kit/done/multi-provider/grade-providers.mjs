@@ -94,7 +94,10 @@ const appSource = fs.readdirSync(path.join(root, 'src', 'renderer'))
 const universeSource = viewSource('universe');
 const systemSource = viewSource('system');
 const planetSource = viewSource('planet');
-const styleSource = read('src/renderer/style.css');
+// 2026-10-14: style.css was split into styles/*.css; grep them all.
+const styleSource = fs.readdirSync(path.join(root, 'src', 'renderer', 'styles'))
+  .filter((f) => f.endsWith('.css')).sort()
+  .map((f) => read(`src/renderer/styles/${f}`)).join('\n');
 const docsSource = read('docs/MULTI-PROVIDER.md');
 
 if (/MVP\s*·\s*CLAUDE ONLY/i.test(htmlSource) || !/MULTI-PROVIDER/.test(htmlSource)) {

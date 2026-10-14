@@ -43,6 +43,11 @@ Frozen files: the **Frozen files** bullet in `CLAUDE.md` is the one authoritativ
 
 ## 2. Renderer files
 
+Stylesheets live in `src/renderer/styles/`, one per concern (`base`, `topbar`, `settings`,
+`directory`, `rail`, `focus`, `focus-rooms`, `cards`, `history`), linked from `index.html`
+in that order, each under the same 300–400 line guideline as the JS. Gates that grep
+styling read every file in that folder.
+
 `index.html` loads, in order: the three Babylon UMD bundles (core, GUI,
 loaders), then:
 
