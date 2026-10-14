@@ -1,0 +1,55 @@
+/* base.css — Design tokens, base element rules, the shared panel. Split from style.css on 2026-10-14; rules unchanged. */
+:root {
+  --bg: #04050a;
+  --panel: rgba(13, 17, 28, 0.82);
+  --panel-solid: rgba(10, 13, 22, 0.92);
+  --panel-border: rgba(120, 140, 190, 0.14);
+  --text: #e8ecf6;
+  --muted: #8b93a8;
+  --accent: #6c8cff;
+  --radius: 10px;
+  --topbar-h: 56px;
+  --sidebar-w: 330px;
+  --sidebar-compact-w: 56px;
+  --sidebar-effective-w: var(--sidebar-w);
+  --pad: 16px;
+  --history-h: 76px;
+  font-family: system-ui, 'Segoe UI', sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+#renderCanvas {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  outline: none;
+  touch-action: none;
+  z-index: 0;
+  display: block;
+}
+
+.hidden { display: none !important; }
+
+/* ---- shared panel ---- */
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+}
