@@ -12,10 +12,9 @@
 
     function galaxyLabelText(spec, memberCount) {
       if (spec.key === 'graveyard') {
-        return 'GRAVEYARD · ' + memberCount + ' DERELICT' + (memberCount === 1 ? '' : 'S');
+        return 'GRAVEYARD · ' + memberCount;
       }
-      return 'GALAXY: ' + String(spec.label).toUpperCase() + ' · ' + memberCount +
-        ' SYSTEM' + (memberCount === 1 ? '' : 'S');
+      return 'GALAXY · ' + String(spec.label).toUpperCase() + ' · ' + memberCount;
     }
 
     function buildGalaxyVisual(spec, memberCount) {
@@ -43,7 +42,7 @@
       outline.metadata = { isGalaxyOutline: true, galaxyKey: spec.key };
 
       const label = AUR.label(gui, galaxyLabelText(spec, memberCount), {
-        fontSize: 14, weight: 'bold', color: colorHex, outline: 5,
+        fontSize: 12, weight: '700', color: colorHex, outline: 4,
       });
       label.name = 'galaxy-label:' + spec.key;
       label.linkWithMesh(outline);
@@ -54,7 +53,7 @@
         key: spec.key, labelText: spec.label, colorHex,
         x: spec.x, z: spec.z, radius: spec.radius, memberCount,
         region, material, outline, label,
-        labelWidth: Math.min(330, Math.max(130, label.text.length * 8.1)),
+        labelWidth: Math.min(260, Math.max(90, label.text.length * 7.8)),
         labelOffsetY: -12, labelScreen: null,
       };
       updateGalaxyVisual(record, spec, memberCount);
@@ -73,7 +72,7 @@
       record.outline.position.set(spec.x, 0, spec.z);
       record.outline.scaling.set(spec.radius, 1, spec.radius);
       record.label.text = galaxyLabelText(spec, memberCount);
-      record.labelWidth = Math.min(330, Math.max(130, record.label.text.length * 8.1));
+      record.labelWidth = Math.min(260, Math.max(90, record.label.text.length * 7.8));
     }
 
     function disposeGalaxyVisual(record) {

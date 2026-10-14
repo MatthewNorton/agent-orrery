@@ -52,7 +52,7 @@
       tmat.specularColor = new BABYLON.Color3(0, 0, 0);
       tmat.alpha = 0.24;
       trail.material = tmat;
-      const label = AUR.label(gui, s.name, { fontSize: 13, color: '#eaf0ff' });
+      const label = AUR.label(gui, s.name, { fontSize: 12, mono: true, color: '#eeece6' });
       label.linkWithMesh(mesh);
       label.linkOffsetY = -22;
       const suffix = AUR.label(gui, attentionSuffix(s.attention), {

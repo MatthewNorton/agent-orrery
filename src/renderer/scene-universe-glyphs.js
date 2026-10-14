@@ -81,10 +81,10 @@
     function refreshProjectLabel(g, project) {
       if (!g || !project) return;
       g.sun.metadata.projectExists = project.exists !== false;
-      const text = 'PROJECT: ' + String(project.name).toUpperCase();
+      const text = String(project.name);
       if (g.label.text !== text) {
         g.label.text = text;
-        g.labelWidth = Math.min(300, Math.max(88, text.length * 8.4));
+        g.labelWidth = Math.min(260, Math.max(60, text.length * 7.6));
       }
       if (g.markerHost) VCS.renderMarkers(g.markerHost, project);
     }
