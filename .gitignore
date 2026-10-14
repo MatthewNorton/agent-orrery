@@ -10,3 +10,6 @@ assets/staging/
 # Archived kit evidence (screenshots of the developer's real universe, result JSON).
 # Kept only in the private archive; no gate reads these folders.
 kit/done/*/output/
+
+# Tricolor design renders: regenerate with node design/tricolor/render.cjs; the design canvas holds the reference images.
+design/tricolor/renders/
