@@ -101,7 +101,7 @@ test('persists records atomically and reloads defensive public copies', () => {
   });
 });
 
-test('removes only unassigned ideas and persists the remaining order', () => {
+test('removes ideas unless their start is in flight, and persists the remaining order', () => {
   withTempStore(({ statePath }) => {
     const ids = [TASK_ID, OTHER_ID];
     let idIndex = 0;
@@ -116,10 +116,14 @@ test('removes only unassigned ideas and persists the remaining order', () => {
     assert.throws(() => store.remove(TASK_ID), (error) => error && error.code === 'NOT_FOUND');
 
     store.prepare(OTHER_ID, 'project-one');
+    store.markGoalWritten(OTHER_ID);
+    store.markLaunchRequested(OTHER_ID);
     assert.throws(() => store.remove(OTHER_ID), (error) => (
       error && error.code === 'INVALID_TRANSITION'
-    ));
-    assert.equal(store.get(OTHER_ID).phase, 'prepared');
+    ), 'a start in flight keeps its record');
+    store.markRunPhase(OTHER_ID, 'project-one', 'launch-failed');
+    assert.equal(store.remove(OTHER_ID).phase, 'launch-failed', 'an assigned idea goes once it is not starting');
+    assert.deepEqual(store.list(), []);
   });
 });
 

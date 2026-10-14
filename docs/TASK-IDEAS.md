@@ -9,9 +9,10 @@ not written into a repository and does not start an agent until the user picks
 an existing project and chooses **Assign & start**. Project assignment is
 permanent for that idea.
 
-An unassigned idea can be removed from the global queue after confirmation.
-Once assignment begins, the global record is protected so removing it cannot
-orphan a project goal or an active task run.
+Any idea can be removed from the global queue after confirmation, except while
+its start is in flight or its agent is working. Removing an assigned idea also
+removes its unfinished tagged `GOALS.md` line from the project when the project
+folder is reachable; a line that was already checked off stays.
 
 Assignment is available only in **LIVE** mode. Agent Orrery resolves the
 selected project through the live tracker, writes one tagged unchecked item to
