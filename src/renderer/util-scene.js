@@ -191,17 +191,30 @@
     return BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI('ui', true, scene);
   };
 
+  // Map labels use the chrome's faces (shipped under fonts/, declared in styles/tokens.css); the GUI
+  // measures text on a canvas, so app.js awaits loadLabelFonts() before the first scene draws.
+  AUR.LABEL_FONTS = {
+    sans: '"Archivo", system-ui, "Segoe UI", sans-serif',
+    mono: '"IBM Plex Mono", Consolas, monospace',
+  };
+  AUR.loadLabelFonts = function () {
+    if (!document.fonts || typeof document.fonts.load !== 'function') return Promise.resolve();
+    const wanted = ['600 13px "Archivo"', '700 12px "Archivo"', '400 12px "IBM Plex Mono"'];
+    const timeout = new Promise((resolve) => setTimeout(resolve, 1500));
+    return Promise.race([Promise.all(wanted.map((f) => document.fonts.load(f))).catch(() => null), timeout]);
+  };
+
   // A text label added to a GUI layer; call .linkWithMesh(mesh) after.
   AUR.label = function (gui, text, opts) {
     opts = opts || {};
     const tb = new BABYLON.GUI.TextBlock();
     tb.text = text;
-    tb.color = opts.color || '#e8ecf6';
-    tb.fontSize = opts.fontSize || 14;
-    tb.fontFamily = "system-ui, 'Segoe UI', sans-serif";
+    tb.color = opts.color || '#eeece6';
+    tb.fontSize = opts.fontSize || 13;
+    tb.fontFamily = opts.mono ? AUR.LABEL_FONTS.mono : AUR.LABEL_FONTS.sans;
     tb.fontStyle = opts.weight || '';
-    tb.outlineWidth = opts.outline == null ? 4 : opts.outline;
-    tb.outlineColor = 'rgba(3,5,10,0.85)';
+    tb.outlineWidth = opts.outline == null ? 3 : opts.outline;
+    tb.outlineColor = 'rgba(4,6,11,0.8)';
     tb.resizeToFit = true;
     gui.addControl(tb);
     return tb;

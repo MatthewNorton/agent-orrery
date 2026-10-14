@@ -77,6 +77,7 @@
       break;
     }
 
+    await AUR.loadLabelFonts();
     wireBackButton();
     A.showUniverse();
     A.refreshIdeas();
