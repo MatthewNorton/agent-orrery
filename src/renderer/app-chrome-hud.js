@@ -82,6 +82,63 @@
     });
   };
 
+  // ---------- galaxies: one row per group, with its systems, agents and builds ----------
+  A.renderGalaxies = function renderGalaxies() {
+    const list = document.getElementById('galaxies-list');
+    const count = document.getElementById('galaxies-count');
+    const GALAXY = window.AUR_GALAXY;
+    if (!list || !GALAXY) return;
+    const projects = [...S.store.projects.values()];
+    const layout = GALAXY.layoutGalaxyProjects(projects);
+    const keyOf = new Map(layout.projects.map((p) => [p.id, p.galaxyKey]));
+    const rows = new Map(layout.galaxies.map((g) => [g.key, { key: g.key, label: g.label, systems: 0, agents: 0, builds: 0 }]));
+    for (const p of projects) {
+      const row = rows.get(keyOf.get(String(p.id)));
+      if (row) { row.systems += 1; row.builds += p.totalBuilds || 0; }
+    }
+    for (const ship of S.store.ships.values()) {
+      const row = rows.get(keyOf.get(String(ship.project)));
+      if (row) row.agents += 1;
+    }
+    const els = S.commandRail.els;
+    if (els && els.galaxiesCompactCount) els.galaxiesCompactCount.textContent = String(rows.size);
+    if (count) count.textContent = rows.size + (rows.size === 1 ? ' galaxy' : ' galaxies');
+    AUR.clear(list);
+    if (rows.size === 0) { list.appendChild(AUR.el('div', 'empty-note', 'No galaxies yet')); return; }
+    for (const row of rows.values()) {
+      const el = AUR.el('div', 'galaxy-row');
+      const swatch = AUR.el('i', 'galaxy-swatch');
+      swatch.style.background = GALAXY.galaxyColor(row.key);
+      el.appendChild(swatch);
+      el.appendChild(AUR.el('span', 'galaxy-name', row.label));
+      el.appendChild(AUR.el('span', 'galaxy-builds', String(row.builds)));
+      el.appendChild(AUR.el('span', 'galaxy-sub',
+        row.systems + (row.systems === 1 ? ' system · ' : ' systems · ') + row.agents + (row.agents === 1 ? ' agent' : ' agents')));
+      list.appendChild(el);
+    }
+  };
+
+  // ---------- builds per half hour, under the timeline; live only ----------
+  A.renderBuildHistogram = function renderBuildHistogram() {
+    const svg = document.getElementById('history-histogram');
+    const total = document.getElementById('history-builds');
+    if (!svg) return;
+    const h = S.store.buildHistogram;
+    const bar = document.getElementById('history-bar');
+    const replay = Boolean(bar && bar.dataset.mode === 'replay');
+    if (!h || replay) { svg.innerHTML = ''; if (total) total.textContent = ''; return; }
+    const max = Math.max(1, ...h.bins);
+    const nowBin = Math.min(47, Math.max(0, Math.floor((Date.now() - h.day) / 1800000)));
+    let sum = 0, out = '';
+    h.bins.forEach((v, i) => {
+      sum += v;
+      const height = v > 0 ? Math.max(2, (v / max) * 20) : (i <= nowBin ? 1 : 0);
+      if (height) out += '<rect x="' + (i * 10 + 1.5) + '" y="' + (20 - height) + '" width="7" height="' + height + '"' + (i === nowBin ? ' class="now"' : '') + '></rect>';
+    });
+    svg.innerHTML = out;
+    if (total) total.textContent = sum ? sum + (sum === 1 ? ' build today' : ' builds today') : '';
+  };
+
   // ---------- the clock: live time, or the replayed time ----------
   function tickClock() {
     const time = document.getElementById('clock-time');

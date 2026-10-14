@@ -15,15 +15,15 @@
   A.chromeMaskFor = function chromeMaskFor(ev) {
     if (ev.type === 'ship-spawned' || ev.type === 'ship-updated' || ev.type === 'ship-departed') {
       return CHROME.AGENTS | CHROME.SUMMARY | CHROME.PROJECT | CHROME.PLANET |
-        CHROME.RECENT | CHROME.SEARCH | CHROME.DIRECTORY | CHROME.FOCUS;
+        CHROME.GALAXIES | CHROME.SEARCH | CHROME.DIRECTORY | CHROME.FOCUS;
     }
     if (ev.type === 'project-added' || ev.type === 'project-updated') {
       const projectChrome = CHROME.AGENTS | CHROME.FEED | CHROME.SUMMARY | CHROME.PROJECT |
-        CHROME.RECENT | CHROME.SEARCH | CHROME.SETTINGS | CHROME.DIRECTORY | CHROME.IDEAS;
+        CHROME.GALAXIES | CHROME.SEARCH | CHROME.SETTINGS | CHROME.DIRECTORY | CHROME.IDEAS;
       return ev.type === 'project-added' ? projectChrome | CHROME.HISTORY : projectChrome;
     }
     if (ev.type === 'feed') return CHROME.FEED;
-    if (ev.type === 'build') return CHROME.SUMMARY | CHROME.PROJECT | CHROME.PLANET;
+    if (ev.type === 'build') return CHROME.SUMMARY | CHROME.PROJECT | CHROME.PLANET | CHROME.GALAXIES;
     return 0;
   };
 
@@ -42,7 +42,7 @@
       if (next & CHROME.SUMMARY) A.renderSummary();
       if (next & CHROME.PROJECT) A.renderProjectCard();
       if (next & CHROME.PLANET) A.renderPlanetCard();
-      if (next & CHROME.RECENT) A.renderRecent();
+      if (next & CHROME.GALAXIES) A.renderGalaxies();
       if (next & CHROME.SEARCH) A.refreshProjectSearchFromStore();
       if (next & CHROME.SETTINGS) A.renderProjectSettings();
       if (next & CHROME.DIRECTORY) A.refreshProjectDirectoryFromStore();
@@ -60,7 +60,7 @@
     A.renderPlanetCard();
     A.renderTabbar();
     A.renderBackButton();
-    A.renderRecent();
+    A.renderGalaxies();
     A.renderProjectSearchVisibility();
     A.renderProjectDirectory();
     A.renderProjectSettings();

@@ -29,9 +29,6 @@
   letter-spacing: 0.04em; color: var(--ink-3);
 }
 
-/* recent projects are reached through Go to now; the nav stays in the DOM for its renderer */
-.recent { display: none; }
-
 /* Go to: the project search, centred */
 .project-search {
   position: relative;
@@ -86,7 +83,7 @@
 .search-result {
   width: 100%;
   display: grid;
-  grid-template-columns: 7px minmax(0, 1fr);
+  grid-template-columns: 7px minmax(0, 1fr) auto;
   gap: 10px;
   align-items: center;
   padding: 8px 10px;
@@ -111,6 +108,7 @@
   display: block; margin-top: 2px; overflow: hidden; color: var(--ink-3);
   font-family: var(--font-mono); font-size: 12px; text-overflow: ellipsis; white-space: nowrap;
 }
+.search-result-kind { color: var(--ink-3); font-family: var(--font-mono); font-size: 12px; }
 .search-empty { padding: 12px 10px; color: var(--ink-3); font-size: 12px; }
 
 /* the GitHub filter and the all-projects button: line buttons with a count */
