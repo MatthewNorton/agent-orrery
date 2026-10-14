@@ -35,6 +35,67 @@ function isProjectDirectory(projectPath) {
 }
 
 /**
+ * A new project record, announced. Build counts and first sight come from `fields` when an
+ * earlier run saved them.
+ * @param {LiveModel} model
+ * @param {string} id
+ * @param {string | null} projPath
+ * @param {Partial<LiveProject>} fields
+ * @returns {LiveProject}
+ */
+function createProject(model, id, projPath, fields) {
+  const project = {
+    id,
+    path: projPath,
+    name: fields.name || (projPath && path.basename(projPath)) || id,
+    exists: isProjectDirectory(projPath),
+    lastActivity: fields.lastActivity || 0,
+    totalBytes: fields.totalBytes || 0,
+    claudeBytes: fields.claudeBytes || 0,
+    codexBytes: fields.codexBytes || 0,
+    buckets: fields.buckets || {},
+    totalBuilds: fields.totalBuilds || 0,
+    firstSeen: fields.firstSeen || Date.now(),
+  };
+  model.projects.set(id, project);
+  indexProjectPath(model, project);
+  queue(model, { type: 'project-added', project: liveProject(project) });
+  return project;
+}
+
+/**
+ * A project that had no folder learns one.
+ * @param {LiveModel} model
+ * @param {LiveProject} project
+ * @param {string} projPath
+ */
+function adoptProjectPath(model, project, projPath) {
+  project.path = projPath;
+  project.name = path.basename(projPath) || project.name;
+  project.exists = isProjectDirectory(projPath);
+  indexProjectPath(model, project);
+  model.systemCache.delete(project.id);
+  queue(model, { type: 'project-updated', project: liveProject(project) });
+}
+
+/**
+ * Brings back every project an earlier run saved, before the first scan: a project outlives
+ * the transcripts it was found in.
+ * @param {LiveModel} model
+ */
+function restoreRememberedProjects(model) {
+  for (const [id, saved] of Object.entries(model.persisted.projects)) {
+    if (model.projects.has(id)) continue;
+    const projPath = preferredProjectPath(model, id, saved.path || null);
+    createProject(model, id, projPath, {
+      name: projPath ? undefined : saved.name,
+      lastActivity: saved.lastActivity || saved.firstSeen,
+      buckets: saved.buckets, totalBuilds: saved.totalBuilds, firstSeen: saved.firstSeen,
+    });
+  }
+}
+
+/**
  * Re-checks the project folder and announces a change.
  * @param {LiveModel} model
  * @param {LiveProject} project
@@ -190,34 +251,11 @@ function ensureProjectForPath(model, projectPath, fallbackId, activity, totalByt
   let project = model.projects.get(id);
   const preferredPath = preferredProjectPath(model, id, projectPath);
   if (!project) {
-    const saved = model.persisted.projects[id] || {};
-    project = {
-      id,
-      path: preferredPath,
-      // Security follow-up: never hand a null path to path.basename (throws in the poll tick).
-      name: preferredPath ? path.basename(preferredPath) || id : id,
-      exists: isProjectDirectory(preferredPath),
-      lastActivity: activity || 0,
-      totalBytes,
-      claudeBytes: 0,
-      codexBytes: totalBytes,
-      buckets: saved.buckets || {},
-      totalBuilds: saved.totalBuilds || 0,
-      firstSeen: saved.firstSeen || Date.now(),
-    };
-    model.projects.set(id, project);
-    queue(model, { type: 'project-added', project: liveProject(project) });
+    project = createProject(model, id, preferredPath, { lastActivity: activity, totalBytes, codexBytes: totalBytes });
   } else {
-    let changed = false;
-    // Security follow-up: only adopt a path that survived preferredProjectPath (never null).
-    if (!project.path && preferredPath) {
-      project.path = preferredPath;
-      project.name = path.basename(preferredPath) || project.name;
-      project.exists = isProjectDirectory(preferredPath);
-      changed = true;
-    }
     if (activity > project.lastActivity) project.lastActivity = activity;
-    if (changed) queue(model, { type: 'project-updated', project: liveProject(project) });
+    // Security follow-up: only adopt a path that survived preferredProjectPath (never null).
+    if (!project.path && preferredPath) adoptProjectPath(model, project, preferredPath);
   }
   model.projectPathIndex.set(key, id);
   model.pathIds[key] = id;
@@ -226,6 +264,9 @@ function ensureProjectForPath(model, projectPath, fallbackId, activity, totalByt
 
 module.exports = {
   isProjectDirectory,
+  createProject,
+  adoptProjectPath,
+  restoreRememberedProjects,
   updateProjectExists,
   refreshProjectExistence,
   indexProjectPath,

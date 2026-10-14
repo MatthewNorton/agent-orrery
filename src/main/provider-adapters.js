@@ -109,6 +109,17 @@ function canonicalProjectPath(value) {
 }
 
 /**
+ * The filesystem path a canonical key stands for; Windows keys lost their casing.
+ * @param {string} key
+ * @returns {string | null}
+ */
+function pathFromKey(key) {
+  if (key.startsWith('win:')) return path.win32.normalize(key.slice(4));
+  if (key.startsWith('posix:')) return key.slice(6);
+  return null;
+}
+
+/**
  * Accept only a local, absolutely rooted project path: a drive-letter root or a
  * single-slash POSIX root. Transcript content is attacker-controlled, and any
  * stat/exists/realpath on a UNC (`\\host\share`), `//host/share`, or `\\?\`
@@ -356,6 +367,7 @@ function toBuffer(value) {
 module.exports = {
   normalizeProvider,
   canonicalProjectPath,
+  pathFromKey,
   isLocalProjectPath,
   codexSessionIdFromFilename,
   classifyTool,
