@@ -19,6 +19,7 @@ const { saveState } = require('./live/state-file');
 const { getSystem, getPlanet } = require('./live/system-view');
 const {
   refreshProjectExistence, preferredProjectPath, remapProjectPath, ensureProjectForPath,
+  restoreRememberedProjects,
 } = require('./live/projects');
 const { departIdleShips } = require('./live/ships');
 const { pollProviderFile, applyProviderSignals } = require('./live/provider-records');
@@ -53,6 +54,7 @@ class Tracker extends EventEmitter {
     this.files = this.model.files;
     this.persisted = this.model.persisted;
     this.timers = [];
+    restoreRememberedProjects(this.model);
   }
 
   // ---------- lifecycle ----------

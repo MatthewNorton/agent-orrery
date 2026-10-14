@@ -9,10 +9,10 @@ const path = require('path');
 const { canonicalProjectPath } = require('../provider-adapters');
 const { claudeRecordToSignals, claudeTool } = require('../transcripts/claude');
 const { relativeInside } = require('../path-safety');
-const { liveProject, liveShip } = require('../universe/public-shape');
+const { liveShip } = require('../universe/public-shape');
 const { queue, pushFeed } = require('./events');
 const { READ_LIMIT_BYTES, LINE_LIMIT_BYTES } = require('./model');
-const { isProjectDirectory, indexProjectPath } = require('./projects');
+const { adoptProjectPath } = require('./projects');
 const { ensureShip, spawnDrone, setLocal, addPending } = require('./ships');
 const { addBuild } = require('./builds');
 
@@ -121,14 +121,7 @@ function parseLine(model, line, tail) {
  * @returns {LiveShip}
  */
 function applyClaudeSession(model, project, tail, session, ts) {
-  if (!project.path && canonicalProjectPath(session.cwd)) {
-    project.path = session.cwd;
-    project.name = path.basename(session.cwd);
-    project.exists = isProjectDirectory(session.cwd);
-    indexProjectPath(model, project);
-    model.systemCache.delete(project.id);
-    queue(model, { type: 'project-updated', project: liveProject(project) });
-  }
+  if (!project.path && canonicalProjectPath(session.cwd)) adoptProjectPath(model, project, session.cwd);
   if (ts > project.lastActivity) project.lastActivity = ts;
   const ship = ensureShip(model, tail.project, tail.session, session.kind === 'drone', ts);
   ship.lastEvent = Math.max(ship.lastEvent, ts);

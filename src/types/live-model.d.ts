@@ -42,9 +42,20 @@ export interface LiveShip {
   turnOutcome?: string;
 }
 
+/** One project as universe-state.json keeps it; files before version 2 lack path, name and lastActivity. */
+export interface PersistedProject {
+  path?: string | null;
+  name?: string;
+  lastActivity?: number;
+  buckets?: Record<string, number>;
+  totalBuilds?: number;
+  firstSeen?: number;
+}
+
 /** universe-state.json as an earlier run left it. */
 export interface PersistedState {
-  projects: Record<string, { buckets?: Record<string, number>; totalBuilds?: number; firstSeen?: number }>;
+  version?: number;
+  projects: Record<string, PersistedProject>;
   pathIds?: Record<string, string>;
   pathOverrides?: Record<string, string>;
 }
