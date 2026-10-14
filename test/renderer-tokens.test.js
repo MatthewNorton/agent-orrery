@@ -10,7 +10,7 @@ const read = (name) => fs.readFileSync(path.join(stylesDir, name), 'utf8');
 
 // The restyled stylesheets take every colour from tokens.css, so a new colour scheme is a change to
 // design/tricolor/tokens.json and a regenerate, never a hunt through component CSS.
-const TOKEN_ONLY = ['modules.css', 'topbar.css', 'hud.css', 'rail.css', 'cards.css', 'history.css'];
+const TOKEN_ONLY = ['modules.css', 'topbar.css', 'hud.css', 'rail.css', 'cards.css', 'history.css', 'directory.css', 'settings.css'];
 const LITERAL = /#[0-9a-f]{3,8}\b|\brgba?\(|\bhsla?\(|\bcolor-mix\(/i;
 
 test('restyled stylesheets contain no colour literals', () => {
