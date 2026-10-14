@@ -147,9 +147,10 @@ Ship = { id, name, provider, project, kind, status, detail, lastEvent,
 //   latest assistant message.model is not a Claude model. Drones inherit it from
 //   their parent; a change arrives as ship-updated. The provider stays claude/codex.
 // model: the model name the transcript last reported, as written (Claude
-//   message.model; Codex session_meta.model and each turn_context.model), printable
-//   ASCII cut to 64 chars, null until known. Any model, any provider; the renderer
-//   prints it and never interprets it. Drones inherit it; a change is a ship-updated.
+//   message.model; Codex session_meta.model and each turn_context.model, which the
+//   adapter emits as a `turn-context` signal), control characters dropped, cut to 64
+//   chars, null until known. Any model, any provider; the renderer prints it and never
+//   interprets it. Drones inherit it; a change is a ship-updated.
 
 FeedEntry = { kind, text, project, ts }
 // kind: 'discover'|'form'|'build'|'info'|'spawn'|'depart'|'attention'|'done'

@@ -5,7 +5,7 @@
 
 const { normalizeProvider } = require('../provider-adapters');
 const { liveShip } = require('../universe/public-shape');
-const { createShipRecord } = require('../universe/ships');
+const { createShipRecord, assignModel } = require('../universe/ships');
 const { queue, pushFeed } = require('./events');
 const { ACTIVE_WINDOW_MS } = require('./model');
 
@@ -62,19 +62,13 @@ function spawnDrone(model, project, parent, toolUseId, ts) {
 }
 
 /**
- * Records what a ship's transcript says about its model, the name and whether it is served
- * locally, and announces a change. Either fact may still be unknown.
+ * Announces a ship's model facts when they change.
  * @param {LiveModel} model
  * @param {LiveShip | null} ship
- * @param {unknown} local
- * @param {unknown} name
+ * @param {{ local?: unknown, model?: unknown }} facts
  */
-function setModel(model, ship, local, name) {
-  if (!ship) return;
-  let changed = false;
-  if (typeof local === 'boolean' && ship.local !== local) { ship.local = local; changed = true; }
-  if (typeof name === 'string' && ship.model !== name) { ship.model = name; changed = true; }
-  if (changed) queue(model, { type: 'ship-updated', ship: liveShip(ship) });
+function setModel(model, ship, facts) {
+  if (ship && assignModel(ship, facts)) queue(model, { type: 'ship-updated', ship: liveShip(ship) });
 }
 
 /**

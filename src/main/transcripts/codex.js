@@ -65,7 +65,7 @@ function codexRecordToSignals(record) {
   // Each turn restates the model, which the user may switch mid-session.
   if (recordType === 'turn_context') {
     const model = modelName(payload.model);
-    return model === null ? [] : [withTs({ type: 'model', model })];
+    return model === null ? [] : [withTs({ type: 'turn-context', model })];
   }
 
   if (recordType === 'response_item') {

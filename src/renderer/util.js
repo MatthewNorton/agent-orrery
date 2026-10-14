@@ -91,6 +91,9 @@
   // Provider color is fleet identity, red for a local model. It never varies by agent or hull.
   AUR.shipColor = (ship) => (ship && ship.local === true
     ? AUR.LOCAL_MODEL.color : AUR.providerMeta(ship && ship.provider).color);
+  // What the chrome says about a ship's model: 'Local · <model>', either half alone, or ''.
+  AUR.modelLabel = (ship) => [ship && ship.local === true ? AUR.LOCAL_MODEL.label.split(' ')[0] : null,
+    ship && ship.model].filter(Boolean).join(' · ');
   AUR.shipTint = (shipId, provider) => {
     const ship = typeof AUR.shipLookup === 'function' ? AUR.shipLookup(shipId) : null;
     return AUR.shipColor(ship && ship.local === true ? ship : { provider });

@@ -19,26 +19,27 @@ function codexProviderIsLocal(provider) {
 }
 
 /**
- * Whether a Claude Code assistant message came from a model other than Claude, which only a
- * local endpoint serves; null when the record names no model (or Claude Code's '<synthetic>').
- * @param {unknown} model
- * @returns {boolean | null}
- */
-function claudeModelIsLocal(model) {
-  if (typeof model !== 'string' || !model.trim() || model === '<synthetic>') return null;
-  return !/claude/i.test(model);
-}
-
-/**
- * The model a record names, as the chrome may print it: printable ASCII, at most
- * MODEL_NAME_LIMIT characters; null when absent or Claude Code's '<synthetic>'.
+ * The model a record names, as the chrome may print it: no control or format characters, at
+ * most MODEL_NAME_LIMIT characters; null when absent.
  * @param {unknown} value
  * @returns {string | null}
  */
 function modelName(value) {
   if (typeof value !== 'string') return null;
-  const name = value.replace(/[^\x20-\x7e]/g, '').trim().slice(0, MODEL_NAME_LIMIT);
-  return name && name !== '<synthetic>' ? name : null;
+  return value.replace(/\p{C}/gu, '').trim().slice(0, MODEL_NAME_LIMIT) || null;
 }
 
-module.exports = { codexProviderIsLocal, claudeModelIsLocal, modelName };
+/**
+ * What a Claude Code assistant message says about its model: the name, and whether it is a
+ * model other than Claude, which only a local endpoint serves. Both null when the message
+ * names no model, including Claude Code's own '<synthetic>' messages.
+ * @param {unknown} value
+ * @returns {{ local: boolean | null, model: string | null }}
+ */
+function claudeModel(value) {
+  const model = modelName(value);
+  if (model === null || model === '<synthetic>') return { local: null, model: null };
+  return { local: !/claude/i.test(model), model };
+}
+
+module.exports = { codexProviderIsLocal, claudeModel, modelName };

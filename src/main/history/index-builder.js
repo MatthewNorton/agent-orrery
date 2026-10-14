@@ -186,7 +186,7 @@ async function inspectCodexFile(filePath, priority, safeTimestamp) {
       kind: signal.kind,
       parentSessionId: codexParentSessionId(record.payload),
       local: signal.local === true,
-      model: typeof signal.model === 'string' ? signal.model : null,
+      model: signal.model || null,
     };
     break;
   }

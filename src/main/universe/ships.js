@@ -33,4 +33,19 @@ function createShipRecord({
   };
 }
 
-module.exports = { createShipRecord };
+/**
+ * Takes what a transcript says about a ship's model, the name and whether it is served locally,
+ * from any carrier of those fields (a signal, a tail, a session's metadata, history's runtime).
+ * Returns whether the ship changed. Either fact may still be unknown.
+ * @param {LiveShip} ship
+ * @param {{ local?: unknown, model?: unknown }} facts
+ * @returns {boolean}
+ */
+function assignModel(ship, facts) {
+  let changed = false;
+  if (typeof facts.local === 'boolean' && ship.local !== facts.local) { ship.local = facts.local; changed = true; }
+  if (typeof facts.model === 'string' && ship.model !== facts.model) { ship.model = facts.model; changed = true; }
+  return changed;
+}
+
+module.exports = { createShipRecord, assignModel };

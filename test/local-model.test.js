@@ -6,7 +6,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
-const { codexProviderIsLocal, claudeModelIsLocal, modelName } = require('../src/main/transcripts/model');
+const { codexProviderIsLocal, claudeModel, modelName } = require('../src/main/transcripts/model');
 const {
   SEC, MIN, T0, SLUG, CLAUDE_SESSION, CODEX_SESSION, appendJsonl, createWorld, ofType, claude, codex,
 } = require('./support/transcripts');
@@ -18,10 +18,12 @@ const shipLocal = (snapshot, id) => snapshot.ships.find((ship) => ship.id === id
 const shipModel = (snapshot, id) => snapshot.ships.find((ship) => ship.id === id).model;
 
 test('model names are printed as written, trimmed and capped, for any provider', () => {
-  for (const name of ['claude-opus-5-5', 'gpt-6-astra', 'qwen3-coder:30b', 'opus']) assert.equal(modelName(name), name);
-  assert.equal(modelName('  llama-3.3\u0007 '), 'llama-3.3');
+  for (const name of ['claude-opus-5-5', 'gpt-6-astra', 'qwen3-coder:30b', 'opus', 'Qwen3-Coder-480B-A35B-Instruct-FP8', 'ñandú-7b']) {
+    assert.equal(modelName(name), name);
+  }
+  assert.equal(modelName('  llama-3.3\u0007​ '), 'llama-3.3');
   assert.equal(modelName('m'.repeat(100)).length, 64);
-  for (const value of [undefined, '', '   ', '<synthetic>', 42]) assert.equal(modelName(value), null);
+  for (const value of [undefined, '', '   ', 42]) assert.equal(modelName(value), null);
 });
 
 test('model family: the Codex providers and Claude models that count as local', () => {
@@ -30,11 +32,11 @@ test('model family: the Codex providers and Claude models that count as local', 
   }
   for (const provider of ['openai', 'azure', 'openrouter']) assert.equal(codexProviderIsLocal(provider), false, provider);
   for (const provider of [undefined, '', 42]) assert.equal(codexProviderIsLocal(provider), null);
-  assert.equal(claudeModelIsLocal('qwen3-coder:30b'), true);
+  assert.deepEqual(claudeModel('qwen3-coder:30b'), { local: true, model: 'qwen3-coder:30b' });
   for (const model of ['claude-opus-5-5', 'us.anthropic.claude-sonnet-5-5-v1:0']) {
-    assert.equal(claudeModelIsLocal(model), false, model);
+    assert.deepEqual(claudeModel(model), { local: false, model }, model);
   }
-  for (const model of [undefined, '', '<synthetic>']) assert.equal(claudeModelIsLocal(model), null);
+  for (const model of [undefined, '', '<synthetic>']) assert.deepEqual(claudeModel(model), { local: null, model: null });
 });
 
 test('live: a Claude session turns local when a non-Claude model answers, its drone too, and back', (t) => {

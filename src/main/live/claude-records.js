@@ -94,7 +94,7 @@ function parseLine(model, line, tail) {
     } else if (signal.type === 'message') {
       message = signal;
       if (resumesTurn(signal)) ship.turnDone = false;
-      setModel(model, ship, signal.local, signal.model);
+      setModel(model, ship, signal);
     } else if (signal.type === 'tool-start') {
       if (message.assistant && signal.callId) {
         // A tool_use id belongs to the ship that issued it last.

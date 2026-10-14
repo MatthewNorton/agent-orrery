@@ -2,7 +2,7 @@
 'use strict';
 
 const { plainObject } = require('./fields');
-const { claudeModelIsLocal, modelName } = require('./model');
+const { claudeModel } = require('./model');
 
 const TOOL_STATUS = Object.freeze({
   Edit: 'Building', Write: 'Building', NotebookEdit: 'Building', MultiEdit: 'Building',
@@ -82,8 +82,7 @@ function claudeRecordToSignals(value) {
     blocks: Array.isArray(content),
     text: blocks.some((block) => block.type === 'text'),
     toolResult: blocks.some((block) => block.type === 'tool_result'),
-    local: assistant ? claudeModelIsLocal(message.model) : null,
-    model: assistant ? modelName(message.model) : null,
+    ...(assistant ? claudeModel(message.model) : { local: null, model: null }),
   });
   for (const block of blocks) {
     if (block.type === 'tool_use') signals.push(toolStart(block));

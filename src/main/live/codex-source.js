@@ -82,7 +82,7 @@ function scanCodex(model, isStartup) {
       if (isStartup && now - st.mtimeMs < ACTIVE_WINDOW_MS) {
         setModel(model, ensureProviderShip(
           model, 'codex', project.id, sessionId, meta.kind, st.mtimeMs, meta.parentSessionId
-        ), meta.local, meta.model);
+        ), meta);
       }
     } else {
       tail.project = project.id;
@@ -206,7 +206,7 @@ function readCodexOwnMetadata(file, sessionId) {
         parentSessionId: codexParentSessionId(payload),
         kind: session.kind,
         local: session.local,
-        model: typeof session.model === 'string' ? session.model : null,
+        model: session.model || null,
         timestamp: session.ts || 0,
       };
       if (recordSessionId === sessionId) return result;
