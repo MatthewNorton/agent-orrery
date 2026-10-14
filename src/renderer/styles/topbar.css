@@ -175,7 +175,7 @@
   border-radius: 999px;
   background: rgba(30, 40, 66, 0.38);
   color: #aeb8cb;
-  font: 700 9px/1 system-ui, 'Segoe UI', sans-serif;
+  font: 700 9px/1 var(--font-sans);
   letter-spacing: 0.8px;
   cursor: pointer;
 }
@@ -238,7 +238,7 @@
   border-radius: 999px;
   background: rgba(30, 40, 66, 0.38);
   color: #c9d2e6;
-  font: 700 9.5px/1 system-ui, 'Segoe UI', sans-serif;
+  font: 700 9.5px/1 var(--font-sans);
   letter-spacing: 1.2px;
   cursor: pointer;
   pointer-events: auto;
