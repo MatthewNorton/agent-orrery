@@ -108,9 +108,7 @@ class RootTaskStore {
     const index = this.records.findIndex((entry) => entry.id === normalizedId);
     if (index === -1) throw storeError('Root task not found', 'NOT_FOUND');
     const record = this.records[index];
-    if (record.phase !== 'idea' || record.projectId !== null) {
-      throw invalidTransition(record.phase, 'removed');
-    }
+    if (record.phase === 'launch-requested') throw invalidTransition(record.phase, 'removed');
     this.commit(this.records.filter((entry) => entry.id !== normalizedId));
     return publicRecord(record);
   }

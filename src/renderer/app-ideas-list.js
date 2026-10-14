@@ -31,6 +31,12 @@
     return { label: 'Idea', css: '' };
   }
 
+  // Anything not mid-start or mid-run can go; the coordinator refuses the rest.
+  function removableIdeaPhase(phase) {
+    return phase !== 'launch-requested' && phase !== 'agent-working' &&
+      phase !== 'waiting-for-agent' && phase !== 'running' && phase !== 'completing';
+  }
+
   function retryableIdeaPhase(phase) {
     return phase === 'launch-failed' || phase === 'agent-aborted' ||
       phase === 'agent-departed' || phase === 'agent-not-found' ||
@@ -159,16 +165,18 @@
           heading.appendChild(taskText);
           const meta = ideaPhaseMeta(item.phase);
           heading.appendChild(AUR.el('span', `idea-phase ${meta.css}`.trim(), meta.label));
-          if (item.phase === 'idea') {
+          if (removableIdeaPhase(item.phase)) {
             const remove = AUR.el('button', 'idea-remove', '×');
             remove.type = 'button';
             remove.dataset.ideaAction = 'remove';
             remove.setAttribute('aria-label', 'Remove idea');
             remove.setAttribute('aria-describedby', taskText.id);
             remove.title = 'Remove idea';
+            const prompt = item.projectId
+              ? 'Remove this idea? Its unfinished GOALS.md entry is removed from the project too.'
+              : 'Remove this unassigned idea?';
             remove.addEventListener('click', () => {
-              if (ideaMutationsDisabled() ||
-                  !A.confirmRemoval('Remove this unassigned idea?', item.text)) return;
+              if (ideaMutationsDisabled() || !A.confirmRemoval(prompt, item.text)) return;
               if (!ideaMutationsDisabled()) A.removeIdea(item);
             });
             heading.appendChild(remove);
