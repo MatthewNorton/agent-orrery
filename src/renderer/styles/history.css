@@ -50,6 +50,11 @@
   color: var(--green); font-family: var(--font-mono); font-size: 12px; text-align: right;
 }
 .history-track { position: relative; grid-row: 2; min-width: 0; }
+.history-histogram { position: absolute; z-index: 0; left: 7px; right: 7px; top: 0; width: calc(100% - 14px); height: 20px; pointer-events: none; }
+.history-histogram rect { fill: var(--ink-3); }
+.history-histogram rect.now { fill: var(--ink); }
+.history-builds { color: var(--ink-2); font-family: var(--font-mono); font-size: 12px; white-space: nowrap; }
+.history-builds:empty { display: none; }
 .history-markers { position: absolute; z-index: 1; top: 6px; left: 7px; right: 7px; height: 8px; pointer-events: none; }
 .history-marker {
   position: absolute; top: 2px;

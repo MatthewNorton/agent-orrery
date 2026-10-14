@@ -114,6 +114,8 @@ export interface LiveModel {
   /** Events queued since the last flush. */
   pending: AUEvent[];
   feed: FeedEntry[];
+  /** Builds per half hour of the current local day (src/main/shared/build-histogram.js). */
+  buildHistogram: { day: number; bins: number[] };
   /** seq of the last queued event. */
   eventSequence: number;
   /** Hands a flushed batch to the Tracker's 'events' listeners. */

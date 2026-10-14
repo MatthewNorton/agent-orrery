@@ -29,16 +29,12 @@
       <span class="brand-name">Agent Orrery</span>
       <span class="brand-badge">MULTI-PROVIDER</span>
     </div>
-    <nav class="recent hidden" id="recent">
-      <span class="recent-label">RECENT</span>
-      <div class="recent-pills" id="recent-pills"></div>
-    </nav>
     <div class="project-search hidden" id="project-search">
       <label class="search-label" for="search-input">Go to</label>
       <div class="search-control">
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
         <input class="search-input" id="search-input" type="search"
-          placeholder="Go to a project" autocomplete="off" role="combobox"
+          placeholder="Go to a project, agent or folder" autocomplete="off" role="combobox"
           aria-autocomplete="list" aria-controls="search-results" aria-expanded="false" />
         <div class="panel search-results hidden" id="search-results" role="listbox"
           aria-label="Project search results"></div>
@@ -175,6 +171,11 @@
         <span class="compact-rail-icon" aria-hidden="true">▲</span>
         <span class="compact-rail-count" id="compact-agents-count">0</span>
       </button>
+      <button class="compact-rail-button" id="compact-galaxies-button" type="button"
+        aria-label="Show galaxies" title="Galaxies">
+        <span class="compact-rail-icon" aria-hidden="true">◎</span>
+        <span class="compact-rail-count" id="compact-galaxies-count">0</span>
+      </button>
       <button class="compact-rail-button" id="compact-feed-button" type="button"
         aria-label="Show event feed" title="Event feed">
         <span class="compact-rail-icon" aria-hidden="true">◉</span>
@@ -199,6 +200,20 @@
         </span>
       </header>
       <div class="agents-list" id="agents-list"></div>
+    </section>
+    <section class="panel mod command-section galaxies-panel" id="galaxies-panel" aria-label="Galaxies">
+      <header class="mod-h panel-head">
+        <span class="mod-i index" aria-hidden="true"></span>
+        <h2 class="mod-title panel-title">Galaxies</h2>
+        <span class="panel-head-actions">
+          <span class="panel-note" id="galaxies-count">0 galaxies</span>
+          <button class="command-section-toggle" id="galaxies-panel-toggle" type="button"
+            aria-label="Collapse galaxies" aria-controls="galaxies-list" aria-expanded="true">
+            <span aria-hidden="true">⌃</span>
+          </button>
+        </span>
+      </header>
+      <div class="galaxies-list" id="galaxies-list"></div>
     </section>
     <section class="panel mod command-section feed-panel" id="feed-panel">
       <header class="mod-h panel-head">
@@ -341,10 +356,12 @@
     <div class="history-timeline">
       <div class="history-readout">
         <time class="history-time" id="history-time">LIVE</time>
+        <span class="history-builds" id="history-builds"></span>
         <output class="history-project-event hidden" id="history-project-event"
           aria-live="polite"></output>
       </div>
       <div class="history-track">
+        <svg class="history-histogram" id="history-histogram" viewBox="0 0 480 20" preserveAspectRatio="none" aria-hidden="true"></svg>
         <div class="history-markers" id="history-markers" aria-hidden="true"></div>
         <input class="history-scrubber" id="history-scrubber" type="range"
           min="0" max="10000" step="1" value="10000" aria-label="History time" disabled />

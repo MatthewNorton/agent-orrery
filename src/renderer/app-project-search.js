@@ -165,9 +165,15 @@
     const extras = matches.filter((project) => !rankedIds.has(project.id)).sort((a, b) =>
       String(a.name || a.id).localeCompare(String(b.name || b.id))
     );
-    S.projectSearch.results = [...ranked, ...extras].slice(0, 8);
+    const projectEntries = [...ranked, ...extras].slice(0, 6)
+      .map((project) => ({ kind: 'project', key: 'p:' + project.id, project }));
+    const agentEntries = AUR.searchAgents([...S.store.ships.values()], query, 4)
+      .map((ship) => ({ kind: 'agent', key: 'a:' + ship.id, ship }));
+    const planetEntries = AUR.searchPlanets(projects, query, 4)
+      .map((hit) => ({ kind: 'planet', key: 'f:' + hit.project.id + '/' + hit.planet, project: hit.project, planet: hit.planet }));
+    S.projectSearch.results = [...projectEntries, ...agentEntries, ...planetEntries].slice(0, 10);
     const previousIndex = previous
-      ? S.projectSearch.results.findIndex((project) => project.id === previous.id)
+      ? S.projectSearch.results.findIndex((entry) => entry.key === previous.key)
       : -1;
     S.projectSearch.selected = queryChanged ? 0 : previousIndex >= 0
       ? previousIndex : Math.min(S.projectSearch.selected, Math.max(0, S.projectSearch.results.length - 1));
@@ -201,25 +207,35 @@
       return;
     }
     if (S.projectSearch.results.length === 0) {
-      els.results.appendChild(AUR.el('div', 'search-empty', 'No systems found'));
+      els.results.appendChild(AUR.el('div', 'search-empty', 'Nothing found'));
       els.input.removeAttribute('aria-activedescendant');
       return;
     }
 
-    S.projectSearch.results.forEach((project, index) => {
+    S.projectSearch.results.forEach((entry, index) => {
       const selected = index === S.projectSearch.selected;
       const row = AUR.el('button', 'search-result' + (selected ? ' selected' : ''));
       row.type = 'button';
       row.id = 'search-result-' + index;
       row.setAttribute('role', 'option');
       row.setAttribute('aria-selected', String(selected));
-      const dot = AUR.el('span', 'search-result-dot' +
-        (A.shipsInProject(project.id).length > 0 ? ' live' : ''));
+      const live = entry.kind === 'project' && A.shipsInProject(entry.project.id).length > 0;
+      const dot = AUR.el('span', 'search-result-dot' + (live ? ' live' : ''));
+      if (entry.kind === 'agent') dot.style.background = AUR.providerMeta(entry.ship.provider).color;
       const copy = AUR.el('span', 'search-result-copy');
-      copy.appendChild(AUR.el('span', 'search-result-name', project.name || project.id));
-      copy.appendChild(AUR.el('span', 'search-result-meta', A.projectSearchSubtitle(project)));
+      let name, meta, kind;
+      if (entry.kind === 'agent') {
+        name = entry.ship.name; meta = entry.ship.status + ' · ' + A.projectName(entry.ship.project); kind = 'Agent';
+      } else if (entry.kind === 'planet') {
+        name = entry.planet; meta = entry.project.name || entry.project.id; kind = 'Folder';
+      } else {
+        name = entry.project.name || entry.project.id; meta = A.projectSearchSubtitle(entry.project); kind = 'Project';
+      }
+      copy.appendChild(AUR.el('span', 'search-result-name', name));
+      copy.appendChild(AUR.el('span', 'search-result-meta', meta));
       row.appendChild(dot);
       row.appendChild(copy);
+      row.appendChild(AUR.el('span', 'search-result-kind', kind));
       row.addEventListener('click', () => activateProjectSearchResult(index));
       els.results.appendChild(row);
     });
@@ -229,9 +245,11 @@
   }
 
   function activateProjectSearchResult(index) {
-    const project = S.projectSearch.results[index] || S.projectSearch.results[0];
-    if (!project) return;
+    const entry = S.projectSearch.results[index] || S.projectSearch.results[0];
+    if (!entry) return;
     A.clearProjectSearch();
-    A.openSystem(project.id);
+    if (entry.kind === 'agent') A.enterAgentFocus(entry.ship.id);
+    else if (entry.kind === 'planet') A.openPlanet(entry.project.id, entry.planet);
+    else A.openSystem(entry.project.id);
   }
 })();

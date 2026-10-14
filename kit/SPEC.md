@@ -75,7 +75,8 @@ shared `store`. Views may expose extras the app layer probes for
 ```js
 AU.snapshot()  -> Promise<{ projects: Project[], ships: Ship[], feed: FeedEntry[],
                             eventSequence: number, streamEpoch: number,
-                            playback: PlaybackStatus }>
+                            playback: PlaybackStatus,
+                            buildHistogram?: { day: number, bins: number[] } }>  // LIVE: builds per half hour today
 AU.getSystem(projectId)          -> Promise<SystemData | null>
 AU.getPlanet(projectId, name)    -> Promise<PlanetData | null>
 AU.openProject(projectId)        -> Promise<void>   // opens folder in Explorer

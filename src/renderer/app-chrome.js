@@ -1,5 +1,5 @@
 // @ts-check
-// app-chrome.js — collapsible command rail, recent strip, agents/feed/summary renderers, tab bar.
+// app-chrome.js — collapsible command rail, agents/feed/summary renderers, tab bar.
 'use strict';
 
 (function () {
@@ -17,6 +17,7 @@
       S.commandRail.ideasCollapsed = value.ideasCollapsed === true;
       S.commandRail.agentsCollapsed = value.agentsCollapsed === true;
       S.commandRail.feedCollapsed = value.feedCollapsed === true;
+      S.commandRail.galaxiesCollapsed = value.galaxiesCollapsed === true;
     } catch (error) { /* use the roomy default */ }
   }
 
@@ -27,6 +28,7 @@
         ideasCollapsed: S.commandRail.ideasCollapsed,
         agentsCollapsed: S.commandRail.agentsCollapsed,
         feedCollapsed: S.commandRail.feedCollapsed,
+        galaxiesCollapsed: S.commandRail.galaxiesCollapsed,
       }));
     } catch (error) { /* persistence is a convenience, never a requirement */ }
   }
@@ -47,6 +49,10 @@
       feedToggle: document.getElementById('feed-panel-toggle'),
       feedCompact: document.getElementById('compact-feed-button'),
       feedCompactCount: document.getElementById('compact-feed-count'),
+      galaxiesPanel: document.getElementById('galaxies-panel'),
+      galaxiesToggle: document.getElementById('galaxies-panel-toggle'),
+      galaxiesCompact: document.getElementById('compact-galaxies-button'),
+      galaxiesCompactCount: document.getElementById('compact-galaxies-count'),
     };
     const els = S.commandRail.els;
     if (!els.root || !els.toggle || !els.ideasPanel || !els.ideasToggle ||
@@ -76,6 +82,14 @@
     els.ideasCompact.addEventListener('click', () => expandCommandRailSection('ideas'));
     els.agentsCompact.addEventListener('click', () => expandCommandRailSection('agents'));
     els.feedCompact.addEventListener('click', () => expandCommandRailSection('feed'));
+    if (els.galaxiesToggle) {
+      els.galaxiesToggle.addEventListener('click', () => {
+        S.commandRail.galaxiesCollapsed = !S.commandRail.galaxiesCollapsed;
+        applyCommandRailState();
+        saveCommandRailState();
+      });
+    }
+    if (els.galaxiesCompact) els.galaxiesCompact.addEventListener('click', () => expandCommandRailSection('galaxies'));
     applyCommandRailState();
   };
 
@@ -84,6 +98,7 @@
     if (section === 'ideas') S.commandRail.ideasCollapsed = false;
     if (section === 'agents') S.commandRail.agentsCollapsed = false;
     if (section === 'feed') S.commandRail.feedCollapsed = false;
+    if (section === 'galaxies') S.commandRail.galaxiesCollapsed = false;
     applyCommandRailState();
     saveCommandRailState();
   }
@@ -109,6 +124,11 @@
       els.feedPanel, els.feedToggle, S.commandRail.feedCollapsed,
       'event feed'
     );
+    if (els.galaxiesPanel && els.galaxiesToggle) {
+      applyCommandSectionState(
+        els.galaxiesPanel, els.galaxiesToggle, S.commandRail.galaxiesCollapsed, 'galaxies'
+      );
+    }
   }
 
   function applyCommandSectionState(panel, toggle, collapsed, label) {
@@ -116,27 +136,6 @@
     toggle.setAttribute('aria-expanded', String(!collapsed));
     toggle.setAttribute('aria-label', (collapsed ? 'Expand ' : 'Collapse ') + label);
   }
-
-  const RECENT_MAX = 5;
-  A.renderRecent = function renderRecent() {
-    const nav = document.getElementById('recent');
-    if (S.current.view !== 'universe') { nav.classList.add('hidden'); return; }
-    const pills = document.getElementById('recent-pills');
-    const recent = [...S.store.projects.values()]
-      .sort((a, b) => (b.lastActivity || 0) - (a.lastActivity || 0))
-      .slice(0, RECENT_MAX);
-    if (recent.length === 0) { nav.classList.add('hidden'); return; }
-    nav.classList.remove('hidden');
-    AUR.clear(pills);
-    for (const p of recent) {
-      const pill = AUR.el('div', 'recent-pill');
-      pill.title = p.path || p.name;
-      if (A.shipsInProject(p.id).length > 0) pill.appendChild(AUR.el('span', 'pill-dot'));
-      pill.appendChild(AUR.el('span', 'pill-name', p.name));
-      pill.addEventListener('click', () => A.jumpToProject(p.id));
-      pills.appendChild(pill);
-    }
-  };
 
   // ---------- agents / feed / summary renderers ----------
   function shipsSorted() {
@@ -302,6 +301,7 @@
     for (const [n, l] of stats) row.appendChild(statBlock(n, l));
     card.appendChild(row);
     A.renderViewTitle();
+    A.renderBuildHistogram();
   };
 
   function universeSummaryStats() {

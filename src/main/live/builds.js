@@ -7,6 +7,7 @@ const path = require('path');
 const { relativeInside } = require('../path-safety');
 const { bucketOf, countBuild } = require('../build-buckets');
 const { queue, pushFeed } = require('./events');
+const { countBuild: countHistogramBuild } = require('../shared/build-histogram');
 
 /** @import { LiveModel, LiveProject, LiveShip } from '../../types/live-model' */
 
@@ -27,6 +28,7 @@ function addBuild(model, project, ship, rel, ts, catchup) {
   project.totalBuilds += 1;
   ship.builds += 1;
   model.systemCache.delete(project.id);
+  countHistogramBuild(model.buildHistogram, ts);
   if (catchup) return;
   queue(model, {
     type: 'build', project: project.id, bucket, file: rel,

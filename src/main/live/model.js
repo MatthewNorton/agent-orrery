@@ -1,6 +1,8 @@
 // @ts-check
 'use strict';
 
+const { createHistogram } = require('../shared/build-histogram');
+
 // The live model: every map and counter the live modules share, with its time windows and read
 // limits. The Tracker creates one and passes it to each live function.
 
@@ -72,6 +74,7 @@ function createLiveModel(statePath, options, publish) {
     pendingIndex: new Map(),
     pending: [],
     feed: [],
+    buildHistogram: createHistogram(Date.now()),
     eventSequence: 0,
     publish,
   };
