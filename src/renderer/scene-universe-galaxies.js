@@ -8,14 +8,13 @@
   const GALAXY = window.AUR_GALAXY;
 
   AUR.sceneParts.universe.galaxies = function (view) {
-    const { scene, camera, gui, store, glyphs, galaxies } = view;
+    const { scene, camera, canvas, gui, store, glyphs, galaxies } = view;
 
     function galaxyLabelText(spec, memberCount) {
       if (spec.key === 'graveyard') {
-        return 'GRAVEYARD · ' + memberCount + ' DERELICT' + (memberCount === 1 ? '' : 'S');
+        return 'GRAVEYARD · ' + memberCount;
       }
-      return 'GALAXY: ' + String(spec.label).toUpperCase() + ' · ' + memberCount +
-        ' SYSTEM' + (memberCount === 1 ? '' : 'S');
+      return 'GALAXY · ' + String(spec.label).toUpperCase() + ' · ' + memberCount;
     }
 
     function buildGalaxyVisual(spec, memberCount) {
@@ -43,7 +42,7 @@
       outline.metadata = { isGalaxyOutline: true, galaxyKey: spec.key };
 
       const label = AUR.label(gui, galaxyLabelText(spec, memberCount), {
-        fontSize: 14, weight: 'bold', color: colorHex, outline: 5,
+        fontSize: 12, weight: '700', color: colorHex, outline: 4,
       });
       label.name = 'galaxy-label:' + spec.key;
       label.linkWithMesh(outline);
@@ -54,7 +53,7 @@
         key: spec.key, labelText: spec.label, colorHex,
         x: spec.x, z: spec.z, radius: spec.radius, memberCount,
         region, material, outline, label,
-        labelWidth: Math.min(330, Math.max(130, label.text.length * 8.1)),
+        labelWidth: Math.min(260, Math.max(90, label.text.length * 7.8)),
         labelOffsetY: -12, labelScreen: null,
       };
       updateGalaxyVisual(record, spec, memberCount);
@@ -73,7 +72,7 @@
       record.outline.position.set(spec.x, 0, spec.z);
       record.outline.scaling.set(spec.radius, 1, spec.radius);
       record.label.text = galaxyLabelText(spec, memberCount);
-      record.labelWidth = Math.min(330, Math.max(130, record.label.text.length * 8.1));
+      record.labelWidth = Math.min(260, Math.max(90, record.label.text.length * 7.8));
     }
 
     function disposeGalaxyVisual(record) {
@@ -118,6 +117,8 @@
       frameCamera();
     }
 
+    const framed = { radius: NaN, x: NaN, z: NaN };
+
     function frameCamera() {
       if (galaxies.size === 0) return;
       let minX = Infinity; let maxX = -Infinity;
@@ -130,16 +131,49 @@
       }
       const cx = (minX + maxX) / 2;
       const cz = (minZ + maxZ) / 2;
-      const extent = Math.max((maxX - minX) / 2, (maxZ - minZ) / 2);
-      // ArcRotate perspective and the reserved overlay gutters need more than
-      // a diameter-only fit. Keep every region edge on canvas even when a
-      // peripheral Graveyard makes the world bounds strongly asymmetric.
-      const desiredRadius = Math.max(90, extent * 2.55 + 44);
+      const extentX = (maxX - minX) / 2;
+      const extentZ = (maxZ - minZ) / 2;
+      // Fit the world into the part of the canvas the chrome leaves clear. The near edge of the
+      // tilted ground sits closest to the camera, so it decides the radius; the target then
+      // shifts so the world's centre lands in the middle of the clear area, not of the canvas.
+      const bounds = AUR.chromeBounds(canvas);
+      const width = canvas.clientWidth;
+      const height = canvas.clientHeight;
+      if (height < 10 || bounds.width < 10 || bounds.height < 10) {
+        const desiredRadius = Math.max(90, Math.max(extentX, extentZ) * 2.55 + 44);
+        camera.upperRadiusLimit = Math.max(320, desiredRadius * 1.25);
+        camera.setTarget(new BABYLON.Vector3(cx, 0, cz));
+        camera.radius = Math.min(desiredRadius, camera.upperRadiusLimit);
+        return;
+      }
+      const tanFov = Math.tan(camera.fov / 2);
+      const sinB = Math.sin(camera.beta);
+      const cosB = Math.max(0.2, Math.cos(camera.beta));
+      const rx = extentZ * sinB + extentX * height / (bounds.width * tanFov);
+      const rz = extentZ * sinB + extentZ * cosB * height / (bounds.height * tanFov);
+      const desiredRadius = Math.max(90, Math.max(rx, rz) * 1.02 + 12);
       camera.upperRadiusLimit = Math.max(320, desiredRadius * 1.25);
-      camera.setTarget(new BABYLON.Vector3(cx, 0, cz));
       camera.radius = Math.min(desiredRadius, camera.upperRadiusLimit);
+      const unit = 2 * camera.radius * tanFov / height;
+      const dx = (bounds.x + bounds.width / 2 - width / 2) * unit;
+      const dy = (bounds.y + bounds.height / 2 - height / 2) * unit / cosB;
+      const right = camera.getDirection(BABYLON.Axis.X);
+      const forward = camera.getDirection(BABYLON.Axis.Z);
+      const ground = new BABYLON.Vector3(forward.x, 0, forward.z).normalize();
+      camera.setTarget(new BABYLON.Vector3(
+        cx - right.x * dx + ground.x * dy, 0, cz - right.z * dx + ground.z * dy));
+      framed.radius = camera.radius;
+      framed.x = camera.target.x;
+      framed.z = camera.target.z;
     }
 
-    return { rebuildGalaxyLayout };
+    // Re-fit after the chrome or the window changes size, unless the viewer has moved the camera.
+    function reframeCamera() {
+      const untouched = Math.abs(camera.radius - framed.radius) < 0.5 &&
+        Math.abs(camera.target.x - framed.x) < 0.5 && Math.abs(camera.target.z - framed.z) < 0.5;
+      if (untouched) frameCamera();
+    }
+
+    return { rebuildGalaxyLayout, reframeCamera };
   };
 })();

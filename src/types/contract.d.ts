@@ -31,6 +31,8 @@ export interface Project {
   vcs?: ProjectVcsStatus | null;
   /** Replay only: build counts per planet. */
   buckets?: Record<string, number>;
+  /** LIVE: the top-level folders with builds, the system's planets, for Go to. */
+  planets?: string[];
 }
 
 export interface Ship {
@@ -99,6 +101,12 @@ export interface PlaybackStatus {
   truncated: boolean;
 }
 
+/** Builds per half hour of one local day: `day` is its midnight, `bins` has 48 entries. */
+export interface BuildHistogram {
+  day: number;
+  bins: number[];
+}
+
 export interface Snapshot {
   projects: Project[];
   ships: Ship[];
@@ -106,6 +114,8 @@ export interface Snapshot {
   eventSequence: number;
   streamEpoch: number;
   playback: PlaybackStatus;
+  /** LIVE only; replay snapshots carry none. */
+  buildHistogram?: BuildHistogram;
 }
 
 // ---- events ----

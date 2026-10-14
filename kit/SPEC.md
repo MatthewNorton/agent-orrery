@@ -46,8 +46,8 @@ Frozen files: the **Frozen files** bullet in `CLAUDE.md` is the one authoritativ
 
 ## 2. Renderer files
 
-Stylesheets live in `src/renderer/styles/`, one per concern (`base`, `topbar`, `settings`,
-`directory`, `rail`, `focus`, `focus-rooms`, `cards`, `history`), linked from `index.html`
+Stylesheets live in `src/renderer/styles/`, one per concern (`tokens`, `base`, `modules`, `topbar`, `settings`,
+`directory`, `rail`, `focus`, `focus-rooms`, `cards`, `hud`, `history`), linked from `index.html`
 in that order, each under the same 300–400 line guideline as the JS. Gates that grep
 styling read every file in that folder.
 
@@ -59,7 +59,7 @@ loaders), then:
 | Shared libraries | `util.js` (creates `window.AUR`; `fnv1a`/`mulberry32` copied from `src/main/shared/hash.js` so seeds agree), `util-scene.js` (Babylon helpers), `procedural-worlds.js`, `ship-assets.js` + `ship-assets-hulls.js` + `ship-assets-api.js` (`AUR.ships`), `polish-math.js` and `galaxy-layout.js` (pure UMD), `search-core.js`, `components/project-vcs-status.js` |
 | Views | `scene-common.js` (`AUR.sceneParts`), then each view's parts before the view: `scene-universe-{galaxies,glyphs,labels,ships,stats}.js` → `scene-universe.js`, `scene-system-{belt,focus,ships}.js` → `scene-system.js`, then `scene-planet.js` |
 | App state | `app-state.js` — the only file that assigns `AUR.app` (`state`, `const`) |
-| App modules | `app-agent-focus.js`, `app-chrome.js`, `app-chrome-queue.js`, `app-history-metrics.js`, `app-ideas.js`, `app-ideas-list.js`, `app-playback.js`, `app-project-control.js`, `app-project-directory.js`, `app-project-search.js`, `app-project-settings.js`, `app-project-tasks.js`, `app-replay.js`, `app-store.js` |
+| App modules | `app-agent-focus.js`, `app-chrome.js`, `app-chrome-hud.js`, `app-chrome-queue.js`, `app-history-metrics.js`, `app-ideas.js`, `app-ideas-list.js`, `app-playback.js`, `app-project-control.js`, `app-project-directory.js`, `app-project-search.js`, `app-project-settings.js`, `app-project-tasks.js`, `app-replay.js`, `app-store.js` |
 | Boot | `app.js` — boot, event routing, view switching, debug hooks |
 
 View contract: each `scene-*.js` registers
@@ -75,7 +75,8 @@ shared `store`. Views may expose extras the app layer probes for
 ```js
 AU.snapshot()  -> Promise<{ projects: Project[], ships: Ship[], feed: FeedEntry[],
                             eventSequence: number, streamEpoch: number,
-                            playback: PlaybackStatus }>
+                            playback: PlaybackStatus,
+                            buildHistogram?: { day: number, bins: number[] } }>  // LIVE: builds per half hour today
 AU.getSystem(projectId)          -> Promise<SystemData | null>
 AU.getPlanet(projectId, name)    -> Promise<PlanetData | null>
 AU.openProject(projectId)        -> Promise<void>   // opens folder in Explorer

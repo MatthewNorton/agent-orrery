@@ -13,6 +13,7 @@ const provider = require('./harness/modes/provider');
 const polish = require('./harness/modes/polish');
 const { createAppContext } = require('./app-context');
 const { createWindow } = require('./window');
+const { installAppMenu } = require('./menu');
 const { createReplayControl } = require('./replay-control');
 const { createTerminalIpc } = require('./ipc/terminal');
 const { createTasksIpc } = require('./ipc/tasks');
@@ -41,6 +42,7 @@ ctx.harness.runTestMode = () => {
 };
 
 app.whenReady().then(() => {
+  installAppMenu();
   ctx.win = createWindow(ctx);
   ctx.start();
 });

@@ -132,7 +132,7 @@
       const a0 = rand() * Math.PI * 2;
       mesh.position.set(Math.cos(a0) * r, 0, Math.sin(a0) * r);
 
-      const label = AUR.label(gui, pd.name, { fontSize: 13, color: '#dbe1f0' });
+      const label = AUR.label(gui, pd.name, { fontSize: 12.5, weight: '600', color: '#eeece6' });
       label.linkWithMesh(mesh);
       label.linkOffsetY = -(18 + dia * 5);
       const persistent = topNames.indexOf(pd.name) >= 0;

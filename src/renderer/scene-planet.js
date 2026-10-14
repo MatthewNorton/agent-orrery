@@ -122,7 +122,7 @@
       else mesh.scaling.setAll(scale);
       const provider = AUR.markShipMesh(mesh, s);
       const rand = AUR.mulberry32(AUR.fnv1a(s.id));
-      const label = AUR.label(gui, s.name, { fontSize: 13, color: '#eaf0ff' });
+      const label = AUR.label(gui, s.name, { fontSize: 12, mono: true, color: '#eeece6' });
       label.linkWithMesh(mesh);
       label.linkOffsetY = -20;
       const rec = {

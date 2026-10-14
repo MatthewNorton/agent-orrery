@@ -127,8 +127,7 @@
         });
       }
 
-      const label = AUR.label(gui, 'PROJECT: ' + String(p.name).toUpperCase(),
-        { fontSize: 15, weight: 'bold', color: '#e9edf8' });
+      const label = AUR.label(gui, String(p.name), { fontSize: 13, weight: '600', color: '#eeece6' });
       label.name = 'project-label:' + p.id;
       label.linkWithMesh(sun);
       const labelOffsetY = -(24 + sunR * 6);
@@ -147,7 +146,7 @@
         galaxyKey: null,
         halo, haloMat, attention: null,
         lastActivity: p.lastActivity || 0, recencyRank: Number.MAX_SAFE_INTEGER,
-        labelBaseAlpha: 0.8, labelWidth: Math.min(300, Math.max(88, label.text.length * 8.4)),
+        labelBaseAlpha: 0.85, labelWidth: Math.min(260, Math.max(60, label.text.length * 7.6)),
         labelOffsetY, labelScreen: null,
         sunR, pulseUntil: 0, phase: rand() * Math.PI * 2, appear: 0,
         derelict: false, searchFactor: 1, searchLabelFactor: 1,
@@ -259,6 +258,7 @@
       scene,
       update,
       setSearchMatches: view.setSearchMatches,
+      resize: view.reframeCamera,
       dispose() {
         view.cancelLabelLayout();
         scene.onBeforeRenderObservable.clear();

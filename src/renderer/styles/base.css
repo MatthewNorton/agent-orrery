@@ -9,12 +9,12 @@
   --muted: var(--ink-3);
   --accent: var(--orange);
   --radius: var(--radius-0);
-  --topbar-h: 56px;
-  --sidebar-w: 330px;
+  --topbar-h: var(--bar-h);
+  --sidebar-w: var(--rail-r);
   --sidebar-compact-w: 56px;
   --sidebar-effective-w: var(--sidebar-w);
-  --pad: 16px;
-  --history-h: 76px;
+  --pad: var(--space-3);
+  --history-h: var(--dock-h);
   font-family: var(--font-sans);
 }
 
@@ -51,6 +51,6 @@ html, body {
   background: var(--panel);
   border: 1px solid var(--panel-border);
   border-radius: var(--radius);
-  backdrop-filter: blur(8px);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow-plate);
 }

@@ -84,7 +84,8 @@ const rendererSrc = fs.readdirSync(rendererDir).filter((f) => f.endsWith('.js') 
   .map((f) => fs.readFileSync(path.join(rendererDir, f), 'utf8')).join('\n');
 if (!mainSrc.includes('au:tasks-get') || !mainSrc.includes('au:task-add')) fail('T3: tasks IPC handlers missing in main.js');
 if (!preloadSrc.includes('tasksGet') || !preloadSrc.includes('taskAdd')) fail('T3: tasksGet/taskAdd missing in preload.js');
-if (!/TASKS/.test(rendererSrc) || !/taskAdd|tasksGet/.test(rendererSrc)) fail('T3: TASKS panel not wired in renderer');
+// 2026-10-14: the panel title is sentence case in the source and uppercased by CSS.
+if (!/TASKS/i.test(rendererSrc) || !/taskAdd|tasksGet/.test(rendererSrc)) fail('T3: TASKS panel not wired in renderer');
 console.log('T3 PASS  IPC + preload + renderer wiring present');
 
 // ---- T4 regression ----
