@@ -244,6 +244,23 @@ function completeAssignedGoal(projectRoot, item) {
   return { ...after, item: completed, changed: true };
 }
 
+// Drops the tagged line an assignment wrote, unless the goal is already checked off: finished
+// work stays in the file. A goal that is not there, or whose text changed, is left alone.
+function removeAssignedGoal(projectRoot, item) {
+  const assigned = normalizeAssignedGoal(item);
+  const before = readGoalsFile(projectRoot);
+  const goal = before.items.find((entry) => entry.id === assigned.id);
+  if (!goal || goal.done || goal.text !== assigned.text) return { ...before, item: goal || null, changed: false };
+
+  const lines = splitSourceLines(before.originalText);
+  lines.splice(goal.line, 1);
+  const nextText = lines.map((line) => line.content + line.ending).join('');
+  replaceGoalsIfUnchanged(projectRoot, before, nextText);
+  const after = readGoalsFile(projectRoot);
+  if (after.items.some((entry) => entry.id === assigned.id)) throw new Error('Assigned goal was not removed');
+  return { ...after, item: goal, changed: true };
+}
+
 function appendGoal(projectRoot, text) {
   const normalized = normalizeGoalItems([{ text, done: false }])[0];
   if (normalized.text.trim().length === 0) throw new Error('Goal text is empty');
@@ -345,6 +362,7 @@ module.exports = {
   writeGoalsFile,
   ensureAssignedGoal,
   completeAssignedGoal,
+  removeAssignedGoal,
   appendGoal,
   setGoalDone,
   removeGoal,

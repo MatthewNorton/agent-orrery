@@ -79,7 +79,7 @@ function markerCount(project, taskId) {
 }
 
 test('removes an unlocked idea and emits a bounded deletion notification', async () => {
-  await withWorkflow({}, async ({ store, coordinator, changes }) => {
+  await withWorkflow({}, async ({ store, coordinator, changes, projects }) => {
     const created = coordinator.create('Remove from the global queue');
     assert.equal(created.ok, true);
 
@@ -96,11 +96,19 @@ test('removes an unlocked idea and emits a bounded deletion notification', async
     assert.deepEqual(coordinator.remove(OTHER_ID), { ok: false, code: 'FAILED' });
     store.remove = originalRemove;
     store.prepare(OTHER_ID, 'project-one');
-    assert.deepEqual(coordinator.remove(OTHER_ID), {
-      ok: false,
-      code: 'INVALID_TRANSITION',
-    });
+    store.markGoalWritten(OTHER_ID);
+    store.markLaunchRequested(OTHER_ID);
+    assert.deepEqual(coordinator.remove(OTHER_ID), { ok: false, code: 'INVALID_TRANSITION' },
+      'a start in flight keeps its record');
     assert.equal(coordinator.snapshot().items[0].id, kept.item.id);
+
+    store.markRunPhase(OTHER_ID, 'project-one', 'launch-failed');
+    const project = projects.get('project-one');
+    ensureAssignedGoal(project, { id: OTHER_ID, text: kept.item.text });
+    assert.equal(markerCount(project, OTHER_ID), 1);
+    assert.equal(coordinator.remove(OTHER_ID).ok, true, 'an assigned idea goes once it is not starting');
+    assert.deepEqual(coordinator.snapshot(), { items: [] });
+    assert.equal(markerCount(project, OTHER_ID), 0, 'its unfinished GOALS.md line goes with it');
   });
 });
 

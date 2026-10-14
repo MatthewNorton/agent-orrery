@@ -2,7 +2,7 @@
 'use strict';
 
 const path = require('node:path');
-const { ensureAssignedGoal, validGoalId } = require('./goals');
+const { ensureAssignedGoal, removeAssignedGoal, validGoalId } = require('./goals');
 const { validProjectId } = require('./shared/ids');
 
 /** @import { RootTaskItem, Ship } from '../types/contract' */
@@ -61,6 +61,7 @@ const PUBLIC_FAILURE_CODES = new Set([
  * @property {(projectId: string) => string | null} [resolveProjectRoot]
  * @property {(projectId: string) => Pick<Ship, 'id' | 'provider' | 'project' | 'kind'>[]} [listShips]
  * @property {typeof ensureAssignedGoal} [ensureGoal]
+ * @property {typeof removeAssignedGoal} [removeGoal]
  * @property {(change: { reason: string, item: RootTaskItem | null }) => void} [onChange]
  */
 
@@ -73,6 +74,7 @@ class RootTaskCoordinator {
         typeof options.resolveProjectRoot !== 'function' ||
         typeof options.listShips !== 'function' ||
         (options.ensureGoal != null && typeof options.ensureGoal !== 'function') ||
+        (options.removeGoal != null && typeof options.removeGoal !== 'function') ||
         (options.onChange != null && typeof options.onChange !== 'function')) {
       throw new TypeError('RootTaskCoordinator requires its task workflow dependencies');
     }
@@ -82,6 +84,7 @@ class RootTaskCoordinator {
     this.resolveProjectRoot = options.resolveProjectRoot;
     this.listShips = options.listShips;
     this.ensureGoal = options.ensureGoal || ensureAssignedGoal;
+    this.removeGoal = options.removeGoal || removeAssignedGoal;
     this.onChange = options.onChange || (() => {});
     this.taskLocks = new Set();
     this.projectLocks = new Set();
@@ -107,13 +110,22 @@ class RootTaskCoordinator {
     if (this.taskLocks.has(canonicalId)) return failure('BUSY');
     const run = this.taskRuns.get(canonicalId);
     if (run && ACTIVE_RUN_PHASES.has(run.phase)) return failure('BUSY');
+    let item;
     try {
-      const item = this.store.remove(canonicalId);
-      this.changed(canonicalId, 'removed', item);
-      return success(item);
+      item = this.store.remove(canonicalId);
     } catch (error) {
       return failure(storeFailureCode(error));
     }
+    // The tagged GOALS.md line goes with it when the project is reachable; the queue entry is
+    // gone either way.
+    if (item.projectId) {
+      try {
+        const cwd = this.resolveProjectRoot(item.projectId);
+        if (typeof cwd === 'string' && path.isAbsolute(cwd)) this.removeGoal(cwd, { id: item.id, text: item.text });
+      } catch { /* the file changed or is unreachable */ }
+    }
+    this.changed(canonicalId, 'removed', item);
+    return success(item);
   }
 
   observeRun(run) {
