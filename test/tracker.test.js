@@ -1004,7 +1004,13 @@ test('saveState()/loadState() round-trip buckets, totals, firstSeen and path ids
   assert.equal(session.tracker.saveState(), true);
 
   assert.deepEqual(JSON.parse(fs.readFileSync(world.statePath, 'utf8')), {
-    projects: { [SLUG]: { buckets: { src: 2 }, totalBuilds: 2, firstSeen: T0 } },
+    version: 2,
+    projects: {
+      [SLUG]: {
+        path: dir, name: 'demo', lastActivity: T0 + 2 * SEC,
+        buckets: { src: 2 }, totalBuilds: 2, firstSeen: T0,
+      },
+    },
     pathIds: { [canonicalProjectPath(dir)]: SLUG },
     pathOverrides: {},
   });
@@ -1026,5 +1032,5 @@ test('loadState() treats an unreadable state file as empty', (t) => {
   fs.mkdirSync(path.dirname(world.statePath), { recursive: true });
   fs.writeFileSync(world.statePath, 'not json');
   const { tracker } = world.live();
-  assert.deepEqual(tracker.persisted, { projects: {} });
+  assert.deepEqual(tracker.persisted, { version: 2, projects: {} });
 });
