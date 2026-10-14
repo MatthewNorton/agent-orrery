@@ -339,8 +339,9 @@ Data: `AU.getSystem(projectId)`.
 - IDEAS panel (global command rail): captures root-level to-do ideas before a
   project is selected. In LIVE mode the user can assign one to an existing
   project, which idempotently adds an internally tagged `GOALS.md` item and
-  starts Codex. Unassigned ideas can be removed after confirmation; assigned
-  records remain protected. The task shows Agent working while correlated work
+  starts Codex. Any idea that is not mid-start or mid-run can be removed after
+  confirmation; removing an assigned one also drops its unfinished tagged
+  `GOALS.md` line when the project is reachable. The task shows Agent working while correlated work
   is active and Ready for review after successful agent completion marks it
   checked.
 - Summary card: `PROJECT SUMMARY` — Active Agents / Building / Gathering /
