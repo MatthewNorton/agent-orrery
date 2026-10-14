@@ -25,7 +25,10 @@ test('a version 1 file with no transcripts left still yields its projects, folde
       'demo-app': { buckets: { src: 4, docs: 1 }, totalBuilds: 5, firstSeen: 1000 },
       'gone:1': { buckets: { lib: 2 }, totalBuilds: 2, firstSeen: 2000 },
     },
-    pathIds: { [canonicalProjectPath(projectDir)]: 'demo-app', 'win:c:/no/such/folder': 'gone:1' },
+    pathIds: {
+      [canonicalProjectPath(projectDir)]: 'demo-app',
+      [canonicalProjectPath(path.join(w.root, 'no', 'such', 'folder'))]: 'gone:1',
+    },
   });
   const { tracker } = w.live();
   tracker.start();
