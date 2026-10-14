@@ -137,7 +137,8 @@
   }
 
   A.confirmRemoval = function confirmRemoval(prompt, text) {
-    const value = String(text || '');
+    // Security: a line break in the text could mimic the dialog's own copy.
+    const value = String(text || '').replace(/[\u0000-\u001f\u007f-\u009f]+/g, ' ');
     const summary = value.length > 160 ? value.slice(0, 157) + '…' : value;
     return window.confirm(`${prompt}\n\n${summary}\n\nThis cannot be undone.`);
   };

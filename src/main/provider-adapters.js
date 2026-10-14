@@ -114,9 +114,11 @@ function canonicalProjectPath(value) {
  * @returns {string | null}
  */
 function pathFromKey(key) {
-  if (key.startsWith('win:')) return path.win32.normalize(key.slice(4));
-  if (key.startsWith('posix:')) return key.slice(6);
-  return null;
+  const p = key.startsWith('win:') ? path.win32.normalize(key.slice(4))
+    : key.startsWith('posix:') ? key.slice(6) : null;
+  // Security: a key from a state file is not trusted more than a transcript cwd; a UNC or
+  // device path would otherwise reach realpath at startup.
+  return isLocalProjectPath(p) ? p : null;
 }
 
 /**

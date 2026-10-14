@@ -10,6 +10,7 @@ const { writeFileAtomic } = require('./shared/atomic-write');
 const LEGACY_FOLDER = 'agent-universe-lite';
 const STATE_FILES = ['providers.json', 'root-tasks.json', 'task-runs.json', 'universe-state.json'];
 const COMPLETE_MARKER = 'universe-state.json';
+const MAX_STATE_BYTES = 8 * 1024 * 1024;
 
 /**
  * Copies the app's own state files from the legacy data folder the first time the app runs under
@@ -29,7 +30,10 @@ function adoptLegacyUserData(app, { fsImpl = fs } = {}) {
   const copied = [];
   for (const name of STATE_FILES) {
     const from = path.join(legacy, name);
-    if (!fsImpl.existsSync(from)) continue;
+    // Security: copy only a plain file of sane size, never through a link planted in the folder.
+    let st;
+    try { st = fsImpl.lstatSync(from); } catch { continue; }
+    if (!st.isFile() || st.size > MAX_STATE_BYTES) continue;
     writeFileAtomic(path.join(target, name), fsImpl.readFileSync(from, 'utf8'), { fsImpl });
     copied.push(name);
   }

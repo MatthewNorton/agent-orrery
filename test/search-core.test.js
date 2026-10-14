@@ -30,6 +30,15 @@ test('agents: by name, then status; the one that needs you first', () => {
   assert.deepEqual(searchAgents(ships, 'c', 1).map((s) => s.id), ['s1']);
 });
 
+test('queries are plain text: regex characters and huge strings neither match wrongly nor throw', () => {
+  for (const q of ['(', '[', '.*', '(?:', 'a'.repeat(10_000)]) {
+    assert.deepEqual(searchProjects(projects, q), []);
+    assert.deepEqual(searchAgents(ships, q), []);
+    assert.deepEqual(searchPlanets(projects, q), []);
+  }
+  assert.equal(searchProjects(projects, '\\').length, 3, 'a backslash is a path character, not a regex escape');
+});
+
 test('planets: across every project that lists them', () => {
   const hits = searchPlanets(projects, 'src').map((h) => h.project.id + '/' + h.planet);
   assert.deepEqual(hits, ['b/src', 'a/src']);
