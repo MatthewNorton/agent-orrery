@@ -249,8 +249,9 @@ function completeAssignedGoal(projectRoot, item) {
 function removeAssignedGoal(projectRoot, item) {
   const assigned = normalizeAssignedGoal(item);
   const before = readGoalsFile(projectRoot);
-  const goal = before.items.find((entry) => entry.id === assigned.id);
-  if (!goal || goal.done || goal.text !== assigned.text) return { ...before, item: goal || null, changed: false };
+  const matches = before.items.filter((entry) => entry.id === assigned.id);
+  const goal = matches.length === 1 ? matches[0] : null;
+  if (!goal || goal.done || goal.text !== assigned.text) return { ...before, item: goal, changed: false };
 
   const lines = splitSourceLines(before.originalText);
   lines.splice(goal.line, 1);

@@ -52,6 +52,18 @@ test('a version 1 file with no transcripts left still yields its projects, folde
   assert.equal(saved.projects['gone:1'].lastActivity, 2000);
 });
 
+test('migration never touches a UNC or device path from a state file key', (t) => {
+  const w = createWorld(t);
+  writeState(w.statePath, {
+    projects: { share: { totalBuilds: 1 }, device: { totalBuilds: 1 }, local: { totalBuilds: 1 } },
+    pathIds: { 'win://evil/share/x': 'share', 'win:\\\\?\\c:/x': 'device', 'win:c:/no/such/dir': 'local' },
+  });
+  const state = loadState(w.statePath);
+  assert.equal(state.projects.share.path, undefined);
+  assert.equal(state.projects.device.path, undefined);
+  assert.equal(path.win32.normalize(String(state.projects.local.path)), 'c:\\no\\such\\dir');
+});
+
 test('loading keeps the file it found as the backup for the whole run', (t) => {
   const w = createWorld(t);
   writeState(w.statePath, { version: 2, projects: { kept: { totalBuilds: 3, firstSeen: 1 } } });
