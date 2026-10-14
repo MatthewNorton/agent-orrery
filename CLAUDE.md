@@ -19,7 +19,7 @@ Electron + Babylon.js desktop app that passively visualizes Claude Code / Codex 
 
 ## Hard constraints (from kit/SPEC.md — read it before renderer work)
 
-- **Frozen files** — change only when the owner asks: `assets/*`, the mockup PNGs, `src/preload.js` (the renderer's only bridge; see `kit/SPEC.md` §3), and `package.json` (no new dependencies or scripts without asking; `typescript` is a dev-only checker). `main.js` is a bootstrap; concerns live in `app-context.js`, `window.js`, `replay-control.js`, `ipc/`, `harness/`.
+- **Frozen files** — change only when the owner asks: `assets/*`, the mockup PNGs, `src/preload.js` (the renderer's only bridge; see `kit/SPEC.md` §3), and `package.json` (no new dependencies or scripts without asking; `typescript` is a dev-only checker). `main.js` is a bootstrap; concerns live in `app-context.js`, `window.js`, `menu.js`, `replay-control.js`, `ipc/`, `harness/`.
 - Security fixes stay minimal and carry a `// Security` comment at the edit site.
 - Renderer is plain JS with classic `<script>` tags — **no ES modules** (file:// CORS), no `.ts` files (types are JSDoc checked by `npm run typecheck`), no bundler, no npm installs. Renderer code attaches to the single `window.AUR` namespace; script load order in `src/renderer/index.html` provides globals.
 - Babylon loads from local UMD bundles in `node_modules` (`BABYLON`, `BABYLON.GUI` globals). Renderer is fully offline — zero network requests; the UI fonts ship locally under `src/renderer/fonts/` (OFL, declared in `styles/tokens.css`, generated from `design/tricolor/tokens.json`), and Babylon GUI labels keep the system font stack.

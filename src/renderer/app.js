@@ -32,10 +32,17 @@
         }
       }
     });
-    window.addEventListener('resize', () => {
+    const onChromeResize = () => {
       S.engine.resize();
       A.positionTasksPanel();
-    });
+      if (S.activeView && S.activeView.resize) S.activeView.resize();
+    };
+    window.addEventListener('resize', onChromeResize);
+    const chromeObserver = new ResizeObserver(onChromeResize);
+    for (const id of ['topbar', 'rail-left', 'sidebar', 'history-bar']) {
+      const el = document.getElementById(id);
+      if (el) chromeObserver.observe(el);
+    }
     A.wireHistoryBar();
     A.wireTasksPanel();
     A.wireIdeasPanel();
