@@ -68,3 +68,12 @@ If a genuine free-flight itch persists after warp transitions and orbit mode
 exist, it becomes a **separate toy project in its own repo** — not a feature
 of this one. This project's identity is: small, passive by default, narrowly
 actionable, tail-the-transcripts, glanceable.
+
+## Update, 2026-10-14: the Tricolor chrome
+
+The universe metaphor stands. The HUD around it was redesigned as "Tricolor": a quiet
+dark palette with one orange accent, Archivo and IBM Plex Mono shipped locally, numbered
+modules in two rails, and every colour and size held in `design/tricolor/tokens.json`
+(renderer CSS is generated from it, so the scheme can change in one place). The source,
+boards and rationale live in `design/tricolor/README.md`; planet close-ups keep their
+realistic materials on purpose.
