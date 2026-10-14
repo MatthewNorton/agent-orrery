@@ -12,6 +12,8 @@
 
   /** @param {Snapshot} snap */
   A.seedStore = function seedStore(snap) {
+    S.store.buildHistogram = snap && snap.buildHistogram
+      ? { day: snap.buildHistogram.day, bins: snap.buildHistogram.bins.slice() } : null;
     S.store.projects.clear();
     S.store.ships.clear();
     S.store.feed = [];
@@ -57,6 +59,11 @@
         // send none), so the stored count follows build events too.
         const ship = S.store.ships.get(ev.shipId);
         if (ship) S.store.ships.set(ship.id, { ...ship, builds: (ship.builds || 0) + 1 });
+        // Same binning as src/main/shared/build-histogram.js: half hours of the snapshot's day.
+        const h = S.store.buildHistogram;
+        if (h && Number.isFinite(ev.ts) && ev.ts >= h.day && ev.ts < h.day + 86400000) {
+          h.bins[Math.min(47, Math.floor((ev.ts - h.day) / 1800000))] += 1;
+        }
         break;
       }
       default: break;

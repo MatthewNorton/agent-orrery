@@ -1,0 +1,110 @@
+/* hud.css — The screen: two rails over the universe, the view's name set onto the sky, the legend.
+   Values come from tokens.css only. */
+.rail {
+  position: fixed;
+  top: calc(var(--bar-h) + var(--space-3));
+  bottom: calc(var(--dock-h) + 2 * var(--space-3));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  z-index: 15;
+  pointer-events: none;
+}
+.rail > * { pointer-events: auto; }
+.rail--l { left: var(--space-3); width: var(--rail-l); }
+
+/* the view's name over the universe; the back button sits above it on system and planet */
+.view-title {
+  position: fixed;
+  top: calc(var(--bar-h) + var(--space-3));
+  left: calc(var(--rail-l) + 2 * var(--space-3));
+  z-index: 14;
+  padding: var(--space-2) 0 0 var(--space-2);
+  color: var(--chart-ink);
+  pointer-events: none;
+}
+.view-title > * { pointer-events: auto; }
+.view-title .back-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: var(--control-h); margin: 0 0 10px; padding: 0 10px;
+  border: 1px solid var(--hair-2); border-radius: var(--radius-0);
+  background: var(--paper); color: var(--ink);
+  font: 600 12.5px/1 var(--font-sans); cursor: pointer;
+}
+.view-title .back-btn:hover { background: var(--plate); }
+.view-title .back-btn:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
+.title-cat {
+  display: flex; align-items: center; gap: 8px;
+  color: var(--chart-ink-2);
+  font-size: 12px; font-weight: 600; letter-spacing: 0.08em; line-height: 16px; text-transform: uppercase;
+}
+.title-cat .tag {
+  display: inline-grid; place-items: center;
+  width: var(--tag-w); height: 20px;
+  background: var(--orange); color: var(--on-orange);
+  font-family: var(--font-mono); font-size: 12px; font-weight: 500; letter-spacing: 0;
+}
+.title-cat .tag::before { counter-increment: mod; content: counter(mod, decimal-leading-zero); }
+.headline {
+  margin: 8px 0 0 -1px;
+  font-size: 48px; font-weight: 700; line-height: 0.9; letter-spacing: -0.015em;
+  text-transform: uppercase;
+  text-shadow: 0 1px 10px var(--chart-vignette);
+}
+.headline.is-long { font-size: 36px; }
+.title-box {
+  display: inline-block;
+  margin-top: 10px;
+  padding: 3px 8px;
+  border: 1px solid var(--chart-ink-2);
+  font-size: 12px; font-weight: 600; letter-spacing: 0.08em; line-height: 16px; text-transform: uppercase;
+  text-shadow: 0 0 4px var(--space);
+}
+.title-box:empty { display: none; }
+.legend {
+  display: flex; flex-wrap: wrap; gap: 6px 14px;
+  margin-top: 10px;
+  color: var(--chart-ink-2);
+  font-size: 12px; font-weight: 500; line-height: 16px;
+  text-shadow: 0 0 4px var(--space);
+}
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 8px; height: 8px; }
+.legend i.claude { background: var(--claude); }
+.legend i.codex { background: var(--codex); }
+.legend svg { width: 12px; height: 12px; fill: none; stroke: var(--chart-red); stroke-width: 1.5; }
+.view-hint {
+  position: fixed;
+  right: calc(var(--rail-r) + 2 * var(--space-3));
+  bottom: calc(var(--dock-h) + 2 * var(--space-3));
+  z-index: 14;
+  color: var(--chart-ink-3);
+  font-family: var(--font-mono); font-size: 12px;
+  text-shadow: 0 0 4px var(--space);
+  pointer-events: none;
+}
+body.command-rail-is-compact .view-hint { right: calc(var(--sidebar-compact-w) + 2 * var(--space-3)); }
+
+/* needs you: one row per agent waiting on you, oldest first */
+.needs-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  row-gap: 2px;
+  width: 100%;
+  padding: 8px 12px 8px 18px;
+  border: 0; border-bottom: 1px solid var(--hair);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.needs-row:last-child { border-bottom: 0; }
+.needs-row::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 6px; background: var(--tint); }
+.needs-row:hover { background: var(--plate); }
+.needs-row:focus-visible { outline: 2px solid var(--orange); outline-offset: -2px; }
+.needs-name { font-size: 13px; font-weight: 600; line-height: 16px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.needs-name em { font-style: normal; color: var(--tint); }
+.needs-wait { grid-row: 1; grid-column: 2; font-family: var(--font-mono); font-size: 13px; font-weight: 500; color: var(--tint); }
+.needs-sub { grid-column: 1 / -1; font-family: var(--font-mono); font-size: 12px; line-height: 15px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

@@ -37,7 +37,7 @@
       SUMMARY: 1 << 2,
       PROJECT: 1 << 3,
       PLANET: 1 << 4,
-      RECENT: 1 << 5,
+      GALAXIES: 1 << 5,
       SEARCH: 1 << 6,
       SETTINGS: 1 << 7,
       DIRECTORY: 1 << 8,
@@ -52,7 +52,7 @@
     store: {
       projects: new Map(), // id -> Project
       ships: new Map(),    // id -> Ship
-      feed: [],            // chronological FeedEntry[], capped
+      feed: [], buildHistogram: null,            // chronological FeedEntry[], capped
     },
 
     notificationByShip: new Map(),
@@ -143,6 +143,7 @@
       compact: false,
       ideasCollapsed: false,
       agentsCollapsed: false,
+      galaxiesCollapsed: false,
       feedCollapsed: false,
       els: null,
     },

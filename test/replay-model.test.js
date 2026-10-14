@@ -84,7 +84,7 @@ test('replay: a seek inside the history rebuilds the model silently', async (t) 
   assert.deepEqual(snapshot.projects, [{
     id: SLUG, path: world.projectDir, name: 'demo', exists: true,
     firstSeen: T0, lastActivity: T0 + 30 * SEC, totalBytes: 0, totalBuilds: 1,
-    buckets: { src: 1 }, seed: fnv1a(SLUG), galaxy: historyGalaxy(world.projectDir),
+    buckets: { src: 1 }, seed: fnv1a(SLUG), galaxy: historyGalaxy(world.projectDir), planets: ['src'],
   }]);
   assert.deepEqual(snapshot.ships, [
     {

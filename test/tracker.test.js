@@ -21,7 +21,7 @@ const {
 const SHIP_ID = `ship:${SLUG}:${CLAUDE_SESSION}`;
 const CODEX_SHIP_ID = `ship:codex:${CODEX_SESSION}`;
 const PROJECT_KEYS = [
-  'exists', 'firstSeen', 'galaxy', 'id', 'lastActivity', 'name', 'path', 'seed',
+  'exists', 'firstSeen', 'galaxy', 'id', 'lastActivity', 'name', 'path', 'planets', 'seed',
   'totalBuilds', 'totalBytes',
 ];
 const SHIP_KEYS = [
@@ -93,7 +93,7 @@ test('claude: startup discovers the project from slug dir + cwd and docks a ship
   assert.deepEqual(startup[0].project, {
     id: SLUG, path: world.projectDir, name: 'demo', exists: true,
     firstSeen: T0, lastActivity: T0, totalBytes: fs.statSync(file).size, totalBuilds: 0,
-    seed: fnv1a(SLUG), galaxy: { key: 'workspace:demo', label: 'Demo' },
+    seed: fnv1a(SLUG), galaxy: { key: 'workspace:demo', label: 'Demo' }, planets: [],
   });
   assert.deepEqual(Object.keys(startup[1].ship).sort(), SHIP_KEYS);
   assert.deepEqual(startup[1].ship, {
@@ -547,7 +547,7 @@ test('codex: session_meta at startup creates a project keyed by canonical cwd an
   assert.deepEqual(startup[0].project, {
     id: projectId, path: world.projectDir, name: 'demo', exists: true,
     firstSeen: T0, lastActivity: T0, totalBytes: 0, totalBuilds: 0,
-    seed: fnv1a(projectId), galaxy: { key: 'workspace:demo', label: 'Demo' },
+    seed: fnv1a(projectId), galaxy: { key: 'workspace:demo', label: 'Demo' }, planets: [],
   });
   assert.deepEqual(startup[1].ship, {
     id: CODEX_SHIP_ID, name: 'Codex-1', project: projectId, kind: 'main', provider: 'codex',
@@ -932,7 +932,8 @@ test('snapshot(), getSystem() and getPlanet() public shapes for a project on dis
   const { tracker } = session;
 
   const snapshot = tracker.snapshot();
-  assert.deepEqual(Object.keys(snapshot).sort(), ['eventSequence', 'feed', 'projects', 'ships']);
+  assert.deepEqual(Object.keys(snapshot).sort(), ['buildHistogram', 'eventSequence', 'feed', 'projects', 'ships']);
+  assert.equal(snapshot.buildHistogram.bins.length, 48);
   assert.equal(snapshot.eventSequence, events.at(-1).seq);
   assert.deepEqual(Object.keys(snapshot.projects[0]).sort(), PROJECT_KEYS);
   assert.deepEqual(Object.keys(snapshot.ships[0]).sort(), SHIP_KEYS);

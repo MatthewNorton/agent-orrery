@@ -6,6 +6,8 @@
 // The Tracker owns the timers and the public API; the work lives in src/main/live/.
 'use strict';
 
+const { snapshotHistogram } = require('./shared/build-histogram');
+
 const fs = require('fs');
 const { EventEmitter } = require('events');
 const { deriveGalaxy } = require('./universe/galaxy');
@@ -26,7 +28,7 @@ const { scanCodex } = require('./live/codex-source');
 const { scanSignals } = require('./live/signal-source');
 
 /**
- * @import { FeedEntry, PlanetData, Project, Ship, SystemData } from '../types/contract'
+ * @import { BuildHistogram, FeedEntry, PlanetData, Project, Ship, SystemData } from '../types/contract'
  * @import { LiveModel, LiveModelOptions } from '../types/live-model'
  */
 
@@ -113,13 +115,14 @@ class Tracker extends EventEmitter {
 
   // ---------- views ----------
 
-  /** @returns {{ projects: Project[], ships: Ship[], feed: FeedEntry[], eventSequence: number }} */
+  /** @returns {{ projects: Project[], ships: Ship[], feed: FeedEntry[], eventSequence: number, buildHistogram: BuildHistogram }} */
   snapshot() {
     return {
       projects: [...this.projects.values()].map(liveProject),
       ships: [...this.ships.values()].map(liveShip),
       feed: recentFeed(this.model),
       eventSequence: this.model.eventSequence,
+      buildHistogram: snapshotHistogram(this.model.buildHistogram, Date.now()),
     };
   }
 

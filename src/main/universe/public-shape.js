@@ -23,6 +23,7 @@ function liveProject(p) {
     firstSeen: p.firstSeen, lastActivity: p.lastActivity, totalBytes: p.totalBytes,
     totalBuilds: p.totalBuilds, seed: fnv1a(p.id),
     galaxy: deriveGalaxy(p.path, p.id, p.exists),
+    planets: Object.keys(p.buckets || {}),
   };
 }
 
@@ -55,6 +56,7 @@ function historyProject(project) {
     buckets: { ...project.buckets },
     seed: fnv1a(project.id),
     galaxy: historyGalaxy(project.path, project.exists),
+    planets: Object.keys(project.buckets),
   };
 }
 

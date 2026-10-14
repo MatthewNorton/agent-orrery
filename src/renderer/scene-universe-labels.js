@@ -68,7 +68,7 @@
       labelLayoutDirty = false;
       const width = canvas.clientWidth;
       const height = canvas.clientHeight;
-      const bounds = { x: 8, y: 64, width: Math.max(1, width - 354), height: Math.max(1, height - 72) };
+      const bounds = AUR.chromeBounds(canvas);
       const renderEngine = scene.getEngine();
       const activeCamera = scene.activeCamera;
       const renderWidth = renderEngine.getRenderWidth();

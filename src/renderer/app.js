@@ -32,15 +32,24 @@
         }
       }
     });
-    window.addEventListener('resize', () => {
+    const onChromeResize = () => {
       S.engine.resize();
       A.positionTasksPanel();
-    });
+      if (S.activeView && S.activeView.resize) S.activeView.resize();
+    };
+    window.addEventListener('resize', onChromeResize);
+    const chromeObserver = new ResizeObserver(onChromeResize);
+    for (const id of ['topbar', 'rail-left', 'sidebar', 'history-bar']) {
+      const el = document.getElementById(id);
+      if (el) chromeObserver.observe(el);
+    }
     A.wireHistoryBar();
     A.wireTasksPanel();
     A.wireIdeasPanel();
     A.wireCommandRail();
     A.wireAgentFocus();
+    A.wireNeedsYou();
+    A.startClock();
     A.wireProjectSearch();
     A.wireProjectDirectory();
     A.wireProjectSettings();
@@ -75,6 +84,7 @@
       break;
     }
 
+    await AUR.loadLabelFonts();
     wireBackButton();
     A.showUniverse();
     A.refreshIdeas();
@@ -222,6 +232,7 @@
     S.activeView = next;
     S.activeScene = next.scene;
     S.current.view = name;
+    document.body.dataset.view = name;
     A.stopTasksView();
     if (old && old.dispose) disposeSettled(old);
     A.renderChrome();
