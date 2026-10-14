@@ -3,7 +3,8 @@
 @font-face { font-family: "IBM Plex Mono"; src: url("../fonts/IBMPlexMono-Regular.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
 @font-face { font-family: "IBM Plex Mono"; src: url("../fonts/IBMPlexMono-Medium.woff2") format("woff2"); font-weight: 500; font-style: normal; font-display: swap; }
 .ao, .ao[data-theme="dark"] {
-  --paper: #262d2e;
+  --paper: rgba(38, 45, 46, 0.86);
+  --paper-solid: #262d2e;
   --plate: #303839;
   --space: #04060b;
   --ink: #e9e7e1;
@@ -118,7 +119,7 @@
 .field svg { flex: none; width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; }
 
 /* module: an armour plate. Square, one 45° cut top right, an index, a 32px header and a body. */
-.mod { --cut: polygon(0 0, calc(100% - var(--chamfer)) 0, 100% var(--chamfer), 100% 100%, 0 100%); position: relative; display: flex; flex-direction: column; flex: none; min-height: 0; background: var(--paper); border: 1px solid var(--hair); box-shadow: var(--shadow-plate); clip-path: var(--cut); }
+.mod { --cut: polygon(0 0, calc(100% - var(--chamfer)) 0, 100% var(--chamfer), 100% 100%, 0 100%); position: relative; display: flex; flex-direction: column; flex: none; min-height: 0; background: var(--paper); border: 1px solid var(--hair); box-shadow: var(--shadow-plate); backdrop-filter: blur(10px); clip-path: var(--cut); }
 .mod::after { content: ""; position: absolute; top: -1px; right: -1px; width: var(--chamfer); height: var(--chamfer); background: linear-gradient(to top right, transparent calc(50% - 1px), var(--hair) calc(50% - 1px), var(--hair) 50%, transparent 50%); pointer-events: none; }
 .mod-h { display: flex; flex: none; align-items: center; gap: 8px; height: var(--header-h); padding-right: 4px; border-bottom: 1px solid var(--hair); }
 .mod-i { display: grid; place-items: center; flex: none; align-self: stretch; width: var(--tag-w); margin-left: 2px; color: var(--ink-3); }

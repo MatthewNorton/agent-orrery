@@ -41,6 +41,8 @@
     A.wireIdeasPanel();
     A.wireCommandRail();
     A.wireAgentFocus();
+    A.wireNeedsYou();
+    A.startClock();
     A.wireProjectSearch();
     A.wireProjectDirectory();
     A.wireProjectSettings();
@@ -222,6 +224,7 @@
     S.activeView = next;
     S.activeScene = next.scene;
     S.current.view = name;
+    document.body.dataset.view = name;
     A.stopTasksView();
     if (old && old.dispose) disposeSettled(old);
     A.renderChrome();

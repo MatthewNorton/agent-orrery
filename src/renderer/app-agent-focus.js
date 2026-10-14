@@ -13,6 +13,7 @@
   const AGENT_FOCUS_INERT_IDS = [
     'topbar', 'sidebar', 'back-btn', 'project-card', 'tasks-panel',
     'planet-card', 'summary-card', 'tabbar', 'history-bar',
+    'rail-left', 'view-title', 'view-hint', 'needs-you-panel',
   ];
 
   A.wireAgentFocus = function wireAgentFocus() {

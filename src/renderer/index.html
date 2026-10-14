@@ -7,6 +7,7 @@
   <title>Agent Orrery</title>
   <link rel="stylesheet" href="styles/tokens.css" />
   <link rel="stylesheet" href="styles/base.css" />
+  <link rel="stylesheet" href="styles/modules.css" />
   <link rel="stylesheet" href="styles/topbar.css" />
   <link rel="stylesheet" href="styles/settings.css" />
   <link rel="stylesheet" href="styles/directory.css" />
@@ -14,6 +15,7 @@
   <link rel="stylesheet" href="styles/focus.css" />
   <link rel="stylesheet" href="styles/focus-rooms.css" />
   <link rel="stylesheet" href="styles/cards.css" />
+  <link rel="stylesheet" href="styles/hud.css" />
   <link rel="stylesheet" href="styles/history.css" />
   <link rel="stylesheet" href="components/project-vcs-status.css" />
 </head>
@@ -23,8 +25,8 @@
   <!-- Top bar -->
   <header class="topbar" id="topbar">
     <div class="brand">
-      <span class="logo-dot"></span>
-      <span class="brand-name">AGENT ORRERY</span>
+      <svg class="logo-dot" viewBox="-13 -13 26 26" aria-hidden="true"><circle r="11.5"></circle><path d="M0 -10 L2 -2 L10 0 L2 2 L0 10 L-2 2 L-10 0 L-2 -2 Z"></path><circle class="core" r="1.8"></circle></svg>
+      <span class="brand-name">Agent Orrery</span>
       <span class="brand-badge">MULTI-PROVIDER</span>
     </div>
     <nav class="recent hidden" id="recent">
@@ -32,10 +34,11 @@
       <div class="recent-pills" id="recent-pills"></div>
     </nav>
     <div class="project-search hidden" id="project-search">
-      <label class="search-label" for="search-input">SEARCH</label>
+      <label class="search-label" for="search-input">Go to</label>
       <div class="search-control">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
         <input class="search-input" id="search-input" type="search"
-          placeholder="Search projects…" autocomplete="off" role="combobox"
+          placeholder="Go to a project" autocomplete="off" role="combobox"
           aria-autocomplete="list" aria-controls="search-results" aria-expanded="false" />
         <div class="panel search-results hidden" id="search-results" role="listbox"
           aria-label="Project search results"></div>
@@ -51,12 +54,17 @@
       </button>
     </div>
     <button class="project-directory-button" id="project-directory-button" type="button"
-      aria-label="Open all projects" aria-haspopup="dialog" aria-controls="project-directory"
+      aria-haspopup="dialog" aria-controls="project-directory"
       aria-expanded="false" title="All projects">
       <span class="project-directory-button-icon" aria-hidden="true">☷</span>
       <span>PROJECTS</span>
       <span class="project-directory-button-count" id="project-directory-button-count">0</span>
     </button>
+    <button class="btn btn--alarm needs-you-button hidden" id="needs-you" type="button"><i aria-hidden="true"></i><span id="needs-you-count">0</span> need you</button>
+    <div class="clock" aria-live="off">
+      <span class="clock-mode live"><i aria-hidden="true"></i><span id="clock-mode">Live</span> · <span id="clock-date"></span></span>
+      <time class="clock-time" id="clock-time"></time>
+    </div>
     <button class="settings-button" id="settings-button" type="button"
       aria-label="Project path settings" aria-haspopup="dialog"
       aria-controls="settings-dialog" aria-expanded="false" title="Settings">
@@ -121,33 +129,40 @@
     </footer>
   </section>
 
-  <!-- Back control (system + planet views) -->
-  <button class="back-btn hidden" id="back-btn">← Universe</button>
+  <!-- Left rail: the project, what needs you, tasks, the planet, the summary -->
+  <div class="rail rail--l" id="rail-left">
+    <section class="panel mod project-card hidden" id="project-card"></section>
+    <section class="mod mod--alert hidden" id="needs-you-panel" aria-label="Agents that need you">
+      <header class="mod-h"><span class="mod-i index" aria-hidden="true"></span><h2 class="mod-title">Needs you</h2><span class="mod-m">Oldest first</span><span class="mod-n count" id="needs-you-panel-count">00</span></header>
+      <div class="mod-b" id="needs-you-list"></div>
+    </section>
+    <section class="panel mod tasks-panel hidden" id="tasks-panel" aria-label="Project tasks">
+      <header class="mod-h tasks-head"><span class="mod-i index" aria-hidden="true"></span><h2 class="mod-title panel-title">Tasks</h2><span class="panel-head-actions"><span class="panel-note" id="tasks-count">0 / 0 done</span></span></header>
+      <div class="tasks-list" id="tasks-list"></div>
+      <p class="tasks-status" id="tasks-status" role="status" aria-live="polite"></p>
+      <form class="tasks-form" id="tasks-form">
+        <input class="tasks-input" id="tasks-input" type="text" placeholder="Add a goal…"
+          aria-label="Add a goal" autocomplete="off" />
+        <button class="tasks-add" id="tasks-add" type="submit">Add</button>
+      </form>
+    </section>
+    <section class="panel mod planet-card hidden" id="planet-card"></section>
+    <section class="panel mod summary-card" id="summary-card"></section>
+  </div>
 
-  <!-- Project card (system + planet views) -->
-  <section class="panel project-card hidden" id="project-card"></section>
-
-  <!-- Project goals (system view only) -->
-  <section class="panel tasks-panel hidden" id="tasks-panel" aria-label="Project tasks">
-    <div class="panel-head tasks-head">
-      <span class="panel-title">TASKS</span>
-      <span class="panel-note" id="tasks-count">0 / 0 done</span>
-    </div>
-    <div class="tasks-list" id="tasks-list"></div>
-    <p class="tasks-status" id="tasks-status" role="status" aria-live="polite"></p>
-    <form class="tasks-form" id="tasks-form">
-      <input class="tasks-input" id="tasks-input" type="text" placeholder="Add a goal…"
-        aria-label="Add a goal" autocomplete="off" />
-      <button class="tasks-add" id="tasks-add" type="submit">Add</button>
-    </form>
-  </section>
-
-  <!-- Planet card + status (planet view) -->
-  <section class="panel planet-card hidden" id="planet-card"></section>
+  <!-- The view's name, set onto the universe; back goes above it on system and planet -->
+  <div class="view-title" id="view-title">
+    <button class="back-btn hidden" id="back-btn">← Universe</button>
+    <div class="title-cat"><span class="tag" aria-hidden="true"></span><span id="view-kind">Star chart · live view</span></div>
+    <h1 class="headline" id="view-name">Universe</h1>
+    <div class="title-box" id="view-sub"></div>
+    <div class="legend" aria-label="Legend"><span><i class="claude"></i>Claude</span><span><i class="codex"></i>Codex</span><span><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M1 4V1h3M8 1h3v3M11 8v3H8M4 11H1V8"></path></svg>Needs you</span></div>
+  </div>
+  <span class="view-hint" id="view-hint" aria-hidden="true">Drag to orbit · scroll to zoom</span>
 
   <!-- Right command rail -->
   <aside class="sidebar command-rail" id="sidebar" aria-label="Command rail">
-    <div class="panel command-rail-head">
+    <div class="command-rail-head">
       <span class="command-rail-title">COMMAND RAIL</span>
       <button class="command-rail-toggle" id="command-rail-toggle" type="button"
         aria-label="Collapse command rail" aria-expanded="true" title="Collapse command rail">
@@ -155,11 +170,6 @@
       </button>
     </div>
     <nav class="command-rail-compact" id="command-rail-compact" aria-label="Command rail sections">
-      <button class="compact-rail-button" id="compact-ideas-button" type="button"
-        aria-label="Show task ideas" title="Task ideas">
-        <span class="compact-rail-icon" aria-hidden="true">✦</span>
-        <span class="compact-rail-count" id="compact-ideas-count">0</span>
-      </button>
       <button class="compact-rail-button" id="compact-agents-button" type="button"
         aria-label="Show active agents" title="Active agents">
         <span class="compact-rail-icon" aria-hidden="true">▲</span>
@@ -170,32 +180,16 @@
         <span class="compact-rail-icon" aria-hidden="true">◉</span>
         <span class="compact-rail-count" id="compact-feed-count">0</span>
       </button>
+      <button class="compact-rail-button" id="compact-ideas-button" type="button"
+        aria-label="Show task ideas" title="Task ideas">
+        <span class="compact-rail-icon" aria-hidden="true">✦</span>
+        <span class="compact-rail-count" id="compact-ideas-count">0</span>
+      </button>
     </nav>
-    <section class="panel command-section ideas-panel" id="ideas-panel" aria-label="Task ideas">
-      <div class="panel-head">
-        <span class="panel-title">IDEAS</span>
-        <span class="panel-head-actions">
-          <span class="panel-note" id="ideas-count">0 ideas</span>
-          <button class="command-section-toggle" id="ideas-panel-toggle" type="button"
-            aria-label="Collapse task ideas" aria-controls="ideas-list" aria-expanded="true">
-            <span aria-hidden="true">⌃</span>
-          </button>
-        </span>
-      </div>
-      <div class="ideas-list" id="ideas-list"></div>
-      <form class="ideas-form" id="ideas-form">
-        <label class="ideas-label" for="ideas-input">New to-do idea</label>
-        <div class="ideas-create-row">
-          <input class="ideas-input" id="ideas-input" type="text" maxlength="10000"
-            placeholder="Capture an idea…" autocomplete="off" />
-          <button class="ideas-create" id="ideas-create" type="submit">Create</button>
-        </div>
-      </form>
-      <p class="ideas-status" id="ideas-status" role="status" aria-live="polite"></p>
-    </section>
-    <section class="panel command-section agents-panel" id="agents-panel">
-      <div class="panel-head">
-        <span class="panel-title">ACTIVE AGENTS</span>
+    <section class="panel mod command-section agents-panel" id="agents-panel">
+      <header class="mod-h panel-head">
+        <span class="mod-i index" aria-hidden="true"></span>
+        <h2 class="mod-title panel-title">Fleet</h2>
         <span class="panel-head-actions">
           <span class="panel-note" id="agents-count">0 Running</span>
           <button class="command-section-toggle" id="agents-panel-toggle" type="button"
@@ -203,28 +197,50 @@
             <span aria-hidden="true">⌃</span>
           </button>
         </span>
-      </div>
+      </header>
       <div class="agents-list" id="agents-list"></div>
     </section>
-    <section class="panel command-section feed-panel" id="feed-panel">
-      <div class="panel-head">
-        <span class="panel-title">EVENT FEED</span>
+    <section class="panel mod command-section feed-panel" id="feed-panel">
+      <header class="mod-h panel-head">
+        <span class="mod-i index" aria-hidden="true"></span>
+        <h2 class="mod-title panel-title">Event feed</h2>
         <span class="panel-head-actions">
           <span class="panel-note feed-mode live" id="feed-mode">
-            <span id="feed-mode-label">Live</span><span class="live-dot"></span>
+            <span class="live-dot"></span><span id="feed-mode-label">Live</span>
           </span>
           <button class="command-section-toggle" id="feed-panel-toggle" type="button"
             aria-label="Collapse event feed" aria-controls="feed-list" aria-expanded="true">
             <span aria-hidden="true">⌃</span>
           </button>
         </span>
-      </div>
+      </header>
       <div class="feed-list" id="feed-list"></div>
+    </section>
+    <section class="panel mod command-section ideas-panel" id="ideas-panel" aria-label="Task ideas">
+      <header class="mod-h panel-head">
+        <span class="mod-i index" aria-hidden="true"></span>
+        <h2 class="mod-title panel-title">Ideas</h2>
+        <span class="panel-head-actions">
+          <span class="panel-note" id="ideas-count">0 ideas</span>
+          <button class="command-section-toggle" id="ideas-panel-toggle" type="button"
+            aria-label="Collapse task ideas" aria-controls="ideas-list" aria-expanded="true">
+            <span aria-hidden="true">⌃</span>
+          </button>
+        </span>
+      </header>
+      <div class="ideas-list" id="ideas-list"></div>
+      <form class="ideas-form" id="ideas-form">
+        <label class="ideas-label" for="ideas-input">New to-do idea</label>
+        <div class="ideas-create-row">
+          <input class="ideas-input" id="ideas-input" type="text" maxlength="10000"
+            placeholder="Capture an idea…" autocomplete="off" />
+          <button class="ideas-create" id="ideas-create" type="submit">Add</button>
+        </div>
+      </form>
+      <p class="ideas-status" id="ideas-status" role="status" aria-live="polite"></p>
     </section>
   </aside>
 
-  <!-- Bottom-left summary card -->
-  <section class="panel summary-card" id="summary-card"></section>
 
   <!-- Bottom-center tab bar (planet view) -->
   <nav class="tabbar hidden" id="tabbar"></nav>
@@ -308,20 +324,26 @@
     </div>
   </section>
 
-  <!-- Persistent live/history controls -->
-  <section class="panel history-bar" id="history-bar" data-mode="live" data-playing="false"
+  <!-- Persistent live/history controls: the timeline dock -->
+  <section class="panel mod history-bar" id="history-bar" data-mode="live" data-playing="false"
     aria-label="History playback">
-    <button class="history-btn history-play" id="history-play" type="button"
-      aria-label="Play history" disabled>Play</button>
-    <button class="history-btn history-speed" id="history-speed" type="button"
-      aria-label="Playback speed" disabled>1x</button>
-    <div class="history-readout">
+    <span class="mod-i index" aria-hidden="true"></span>
+    <div class="history-head">
+      <h2 class="mod-title">Timeline</h2>
       <span class="history-context" id="history-context">LIVE TIMELINE</span>
-      <time class="history-time" id="history-time">LIVE</time>
+    </div>
+    <div class="history-controls">
+      <button class="history-btn history-play" id="history-play" type="button"
+        aria-label="Play history" disabled>Play</button>
+      <button class="history-btn history-speed" id="history-speed" type="button"
+        aria-label="Playback speed" disabled>1x</button>
     </div>
     <div class="history-timeline">
-      <output class="history-project-event hidden" id="history-project-event"
-        aria-live="polite"></output>
+      <div class="history-readout">
+        <time class="history-time" id="history-time">LIVE</time>
+        <output class="history-project-event hidden" id="history-project-event"
+          aria-live="polite"></output>
+      </div>
       <div class="history-track">
         <div class="history-markers" id="history-markers" aria-hidden="true"></div>
         <input class="history-scrubber" id="history-scrubber" type="range"
@@ -367,6 +389,7 @@
   <script src="app-agent-focus.js"></script>
   <script src="app-chrome.js"></script>
   <script src="app-chrome-queue.js"></script>
+  <script src="app-chrome-hud.js"></script>
   <script src="app-history-metrics.js"></script>
   <script src="app-ideas.js"></script>
   <script src="app-ideas-list.js"></script>

@@ -14,11 +14,7 @@
     function measuredLabelStats() {
       const scaleX = canvas.clientWidth / engine.getRenderWidth();
       const scaleY = canvas.clientHeight / engine.getRenderHeight();
-      const bounds = {
-        x: 8, y: 64,
-        width: Math.max(1, canvas.clientWidth - 354),
-        height: Math.max(1, canvas.clientHeight - 72),
-      };
+      const bounds = AUR.chromeBounds(canvas);
       const measured = [];
       const combined = [];
       let chromeOcclusions = 0;
