@@ -87,7 +87,10 @@ const appSource = fs.readdirSync(path.join(root, 'src', 'renderer'))
   .filter((f) => /^app.*\.js$/.test(f)).sort()
   .map((f) => read(`src/renderer/${f}`)).join('\n');
 const htmlSource = read('src/renderer/index.html');
-const styleSource = read('src/renderer/style.css');
+// 2026-10-14: style.css was split into styles/*.css; grep them all.
+const styleSource = fs.readdirSync(path.join(root, 'src', 'renderer', 'styles'))
+  .filter((f) => f.endsWith('.css')).sort()
+  .map((f) => read(`src/renderer/styles/${f}`)).join('\n');
 // 2026-10-13: renderer files may be split. A view's source is its scene-<view>*.js files plus the
 // shared scene helpers and ship-assets*.js; util source is util.js plus util-*.js.
 const rendererJs = fs.readdirSync(path.join(root, 'src', 'renderer')).filter((f) => f.endsWith('.js')).sort();

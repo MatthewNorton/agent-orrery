@@ -1,0 +1,192 @@
+/* history.css — Live and history playback bar. Split from style.css on 2026-10-14; rules unchanged. */
+/* ---- live/history playback ---- */
+.history-bar {
+  position: fixed;
+  left: var(--pad);
+  right: var(--pad);
+  bottom: 12px;
+  height: 64px;
+  z-index: 19;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: rgba(9, 13, 23, 0.94);
+}
+.history-bar[data-mode='replay'] {
+  border-color: rgba(96, 165, 250, 0.34);
+}
+.history-bar.busy { cursor: wait; }
+.history-btn {
+  flex: 0 0 auto;
+  min-width: 56px;
+  height: 32px;
+  padding: 0 11px;
+  border: 1px solid rgba(120, 140, 190, 0.28);
+  border-radius: 7px;
+  background: rgba(43, 55, 88, 0.34);
+  color: #dce3f3;
+  font: 650 11px/1 system-ui, 'Segoe UI', sans-serif;
+  letter-spacing: 0.45px;
+  cursor: pointer;
+}
+.history-btn:hover:not(:disabled) {
+  color: #fff;
+  border-color: rgba(108, 140, 255, 0.62);
+  background: rgba(72, 94, 158, 0.42);
+}
+.history-btn:focus-visible,
+.history-scrubber:focus-visible {
+  outline: 2px solid #93b4ff;
+  outline-offset: 2px;
+}
+.history-btn:disabled { opacity: 0.42; cursor: default; }
+.history-play { min-width: 64px; }
+.history-speed { min-width: 54px; color: #a9c4ff; }
+.history-live {
+  min-width: 60px;
+  color: #8b93a8;
+}
+.history-live.active {
+  color: #86efac;
+  border-color: rgba(52, 211, 153, 0.42);
+  background: rgba(25, 115, 82, 0.2);
+}
+.history-readout {
+  flex: 0 0 152px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.history-context {
+  color: #73809a;
+  font-size: 8.5px;
+  font-weight: 750;
+  letter-spacing: 1.25px;
+  white-space: nowrap;
+}
+.history-time {
+  width: 100%;
+  overflow: hidden;
+  color: #cbd5e1;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.history-timeline {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 100px;
+  height: 48px;
+  display: grid;
+  grid-template-rows: 12px 23px 13px;
+}
+.history-project-event {
+  grid-row: 1;
+  overflow: hidden;
+  color: #86efac;
+  font: 750 8.5px/12px system-ui, 'Segoe UI', sans-serif;
+  letter-spacing: 0.8px;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.history-track {
+  position: relative;
+  grid-row: 2;
+  min-width: 0;
+}
+.history-markers {
+  position: absolute;
+  z-index: 1;
+  top: 7px;
+  left: 9px;
+  right: 9px;
+  height: 8px;
+  pointer-events: none;
+}
+.history-marker {
+  position: absolute;
+  top: 1px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #8da2d8;
+  box-shadow: 0 0 0 2px rgba(8, 12, 22, 0.92);
+  transform: translateX(-50%);
+}
+.history-marker.new {
+  width: 7px;
+  height: 7px;
+  top: 0;
+  background: #34d399;
+  box-shadow: 0 0 0 2px rgba(8, 12, 22, 0.92), 0 0 8px #34d399;
+  animation: history-marker-pulse 1.8s ease-out infinite;
+}
+@keyframes history-marker-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(8, 12, 22, 0.92), 0 0 4px #34d399; }
+  50% { box-shadow: 0 0 0 2px rgba(8, 12, 22, 0.92), 0 0 11px #34d399; }
+}
+.history-range-labels {
+  grid-row: 3;
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 8px;
+  overflow: hidden;
+  color: #667189;
+  font-size: 8px;
+  font-weight: 650;
+  letter-spacing: 0.55px;
+  white-space: nowrap;
+}
+.history-range-labels time { color: #8994aa; }
+.history-scrubber {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: 22px;
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+.history-scrubber::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(to right,
+    #6c8cff 0 var(--history-progress, 100%),
+    rgba(108, 125, 168, 0.3) var(--history-progress, 100%) 100%);
+  box-shadow: 0 0 0 1px rgba(120, 140, 190, 0.13);
+}
+.history-scrubber::-webkit-slider-thumb {
+  width: 14px;
+  height: 14px;
+  margin-top: -5px;
+  border: 2px solid #dbe6ff;
+  border-radius: 50%;
+  appearance: none;
+  -webkit-appearance: none;
+  background: #6c8cff;
+  box-shadow: 0 0 0 3px rgba(108, 140, 255, 0.2), 0 0 8px rgba(108, 140, 255, 0.75);
+}
+.history-scrubber:disabled { opacity: 0.38; cursor: default; }
+
+@media (max-width: 1280px) {
+  .history-bar { gap: 7px; padding-inline: 9px; }
+  .history-readout { flex-basis: 118px; }
+  .history-time { font-size: 10.5px; }
+  .history-range-labels span { display: none; }
+  .history-btn { padding-inline: 8px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .history-marker.new { animation: none; }
+}
+
+/* GUI text uses Babylon canvas; nothing needed here. */

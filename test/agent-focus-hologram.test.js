@@ -10,6 +10,11 @@ const renderer = (name) => fs.readFileSync(
   'utf8'
 );
 
+// 2026-10-14: style.css was split into styles/*.css; grep them all.
+const styles = () => fs.readdirSync(path.join(__dirname, '..', 'src', 'renderer', 'styles'))
+  .filter((f) => f.endsWith('.css')).sort()
+  .map((f) => renderer(path.join('styles', f))).join('\n');
+
 // 2026-09-27 kit 13: app.js split into app-*.js modules; grep the whole app layer.
 const appLayer = () => fs.readdirSync(path.join(__dirname, '..', 'src', 'renderer'))
   .filter((f) => /^app.*\.js$/.test(f)).sort()
@@ -18,7 +23,7 @@ const appLayer = () => fs.readdirSync(path.join(__dirname, '..', 'src', 'rendere
 test('first-person environments render a live orbital hologram', () => {
   const html = renderer('index.html');
   const app = appLayer();
-  const css = renderer('style.css');
+  const css = styles();
 
   assert.match(html, /id="agent-focus-hologram-system"/);
   assert.match(html, /id="agent-focus-hologram-ship"/);
@@ -48,7 +53,7 @@ test('POV environment registry keeps each generated foreground distinct', () => 
 
 test('POV foreground covers the viewport without distorting its native aspect ratio', () => {
   const html = renderer('index.html');
-  const css = renderer('style.css');
+  const css = styles();
 
   assert.match(html, /class="agent-focus-stage"/);
   assert.match(css, /\.agent-focus-stage\s*\{[^}]*width:\s*max\(100vw, 177\.6833vh\);/s);
