@@ -9,19 +9,23 @@ const path = require('node:path');
 
 const load = () => import('../scripts/leak-check.mjs');
 
+// The samples are assembled at runtime so this file passes its own check.
+const who = ['jor', 'dan'].join('');
+const win = (user) => ['C:', 'Users', user, 'x'].join('\\');
+
 test('the rules flag real home folders, addresses and credentials, and allow the fixtures', async () => {
   const { scanText } = await load();
   const rules = (text) => scanText(text).map((f) => f.rule);
-  assert.deepEqual(rules('C:\\Users\\jordan\\Documents\\x'), ['home-path']);
-  assert.deepEqual(rules('c:/users/jordan/x and /home/jordan/x and /Users/jordan/x'), ['home-path', 'home-path', 'home-path']);
-  assert.deepEqual(rules('C--Users-jordan--claude'), ['home-path']);
-  assert.deepEqual(rules('C:\\Users\\alice\\x /home/coder/x /Users/sam/x C:\\Users\\<you>\\x $HOME/x'), []);
-  assert.deepEqual(rules('someone@example.com'), ['email']);
+  assert.deepEqual(rules(win(who)), ['home-path']);
+  assert.deepEqual(rules(`c:/users/${who}/x and /home/${who}/x and /Users/${who}/x`), ['home-path', 'home-path', 'home-path']);
+  assert.deepEqual(rules(`C--Users-${who}--claude`), ['home-path']);
+  assert.deepEqual(rules(`${win('alice')} /home/coder/x /Users/sam/x ${win('<you>')} $HOME/x`), []);
+  assert.deepEqual(rules(`${who}.smith@${['gmail', 'com'].join('.')}`), ['email']);
   assert.deepEqual(rules('1234+someone@users.noreply.github.com git@github.com fixture@example.invalid a@example.com'), []);
   assert.deepEqual(rules('ghp_' + 'a'.repeat(36)), ['credential']);
-  assert.deepEqual(rules('-----BEGIN OPENSSH PRIVATE KEY-----'), ['credential']);
+  assert.deepEqual(rules(['-----BEGIN', 'OPENSSH PRIVATE KEY-----'].join(' ')), ['credential']);
   assert.deepEqual(rules('sk-ant-' + 'b'.repeat(20)), ['credential']);
-  assert.equal(scanText('x\ny\nC:\\Users\\jordan', 'f.js')[0].line, 3);
+  assert.equal(scanText(`x\ny\n${win(who)}`, 'f.js')[0].line, 3);
 });
 
 test('no tracked file leaks', async () => {
