@@ -1,0 +1,234 @@
+/* settings.css — Settings dialog and project path recovery. Split from style.css on 2026-10-14; rules unchanged. */
+/* ---- settings / project path recovery ---- */
+.settings-button {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  margin-left: 12px;
+  padding: 0;
+  flex: 0 0 auto;
+  pointer-events: auto;
+  color: #aab3c8;
+  background: rgba(30, 40, 66, 0.4);
+  border: 1px solid rgba(120, 140, 190, 0.28);
+  border-radius: 50%;
+  cursor: pointer;
+}
+.recent.hidden ~ .project-directory-button { margin-left: auto; }
+.recent.hidden ~ .settings-button { margin-left: 8px; }
+.settings-button:hover, .settings-button[aria-expanded="true"] {
+  color: #eef1f8;
+  border-color: rgba(108, 140, 255, 0.68);
+  background: rgba(108, 140, 255, 0.16);
+}
+.settings-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.settings-glyph { display: block; font-size: 19px; line-height: 30px; }
+.settings-count {
+  position: absolute;
+  top: -6px;
+  right: -7px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  color: #fff;
+  background: #d95668;
+  border: 2px solid #090c14;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 750;
+  line-height: 14px;
+  text-align: center;
+}
+
+.settings-dialog {
+  width: min(680px, calc(100vw - 40px));
+  max-width: none;
+  max-height: calc(100vh - 96px);
+  padding: 0;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  overflow: visible;
+}
+.settings-dialog::backdrop {
+  background: rgba(1, 3, 8, 0.72);
+  backdrop-filter: blur(3px);
+}
+.settings-shell {
+  width: 100%;
+  max-height: calc(100vh - 96px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: rgba(10, 13, 22, 0.98);
+  border-color: rgba(120, 140, 190, 0.28);
+}
+.settings-head {
+  min-height: 76px;
+  padding: 18px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--panel-border);
+}
+.settings-head h2, .settings-head p, .settings-summary-row h3,
+.settings-summary-row p, .settings-status { margin: 0; }
+.settings-head h2 {
+  color: #f2f4fb;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 2.2px;
+}
+.settings-head p {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 1.8px;
+}
+.settings-close {
+  width: 34px;
+  height: 34px;
+  padding: 0 0 3px;
+  color: #9da7bb;
+  background: transparent;
+  border: 1px solid rgba(120, 140, 190, 0.2);
+  border-radius: 8px;
+  font: 24px/1 system-ui, sans-serif;
+  cursor: pointer;
+}
+.settings-close:hover { color: #fff; background: rgba(108, 140, 255, 0.14); }
+.settings-close:focus-visible, .settings-primary:focus-visible,
+.settings-locate:focus-visible, .settings-candidate-use:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.settings-body {
+  min-height: 0;
+  padding: 20px;
+  overflow-y: auto;
+}
+.settings-summary-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+.settings-summary-row h3 { color: #e8ecf6; font-size: 15px; }
+.settings-summary-row p { margin-top: 6px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.settings-summary {
+  padding: 5px 9px;
+  flex: 0 0 auto;
+  color: #f4b4bd;
+  background: rgba(217, 86, 104, 0.12);
+  border: 1px solid rgba(217, 86, 104, 0.28);
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.settings-summary.clear {
+  color: #8de0bd;
+  background: rgba(52, 211, 153, 0.1);
+  border-color: rgba(52, 211, 153, 0.25);
+}
+.settings-actions {
+  margin-top: 18px;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(30, 40, 66, 0.28);
+  border: 1px solid rgba(120, 140, 190, 0.14);
+  border-radius: 9px;
+}
+.settings-actions span { color: var(--muted); font-size: 10.5px; line-height: 1.4; }
+.settings-primary, .settings-locate, .settings-candidate-use {
+  flex: 0 0 auto;
+  color: #dfe5f4;
+  background: rgba(108, 140, 255, 0.14);
+  border: 1px solid rgba(108, 140, 255, 0.38);
+  border-radius: 7px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.settings-primary { min-width: 108px; height: 34px; padding: 0 13px; }
+.settings-locate, .settings-candidate-use { min-height: 30px; padding: 5px 10px; }
+.settings-primary:hover, .settings-locate:hover, .settings-candidate-use:hover {
+  color: #fff;
+  background: rgba(108, 140, 255, 0.24);
+  border-color: rgba(108, 140, 255, 0.7);
+}
+.settings-primary:disabled, .settings-locate:disabled, .settings-candidate-use:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.settings-status {
+  min-height: 18px;
+  padding: 10px 1px 0;
+  color: #9fb0d0;
+  font-size: 11px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+.settings-status.error { color: #ff8b99; }
+.settings-projects { margin-top: 4px; display: grid; gap: 10px; }
+.settings-empty {
+  padding: 34px 18px;
+  color: #8de0bd;
+  background: rgba(52, 211, 153, 0.055);
+  border: 1px dashed rgba(52, 211, 153, 0.22);
+  border-radius: 9px;
+  font-size: 12px;
+  text-align: center;
+}
+.settings-project-row {
+  padding: 13px;
+  background: rgba(18, 24, 40, 0.72);
+  border: 1px solid rgba(120, 140, 190, 0.15);
+  border-radius: 9px;
+}
+.settings-project-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.settings-project-copy { min-width: 0; }
+.settings-project-name { color: #e4e9f5; font-size: 12px; font-weight: 700; }
+.settings-project-path {
+  margin-top: 4px;
+  color: #7f899f;
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 10px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+.settings-candidates { margin-top: 11px; display: grid; gap: 6px; }
+.settings-candidates-label { color: #8f9ab0; font-size: 9.5px; font-weight: 700; letter-spacing: 1px; }
+.settings-candidate {
+  padding: 7px 8px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: rgba(52, 211, 153, 0.055);
+  border: 1px solid rgba(52, 211, 153, 0.16);
+  border-radius: 7px;
+}
+.settings-candidate-path {
+  min-width: 0;
+  flex: 1 1 auto;
+  color: #a8b5ca;
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 9.5px;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+.settings-no-match { margin-top: 9px; color: #7f899f; font-size: 10px; }
