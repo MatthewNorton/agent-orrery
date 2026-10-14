@@ -41,12 +41,12 @@ function orrery() {
 
 // ---------- modules ----------
 const project = `<dl class="stats">
-  <div><dt class="caps">State</dt><dd class="stat-word" style="color: var(--blue-line)">Building</dd></div><div><dt class="caps">Agents</dt><dd class="stat">3</dd></div><div><dt class="caps">Need you</dt><dd class="stat cr">1</dd></div>
+  <div><dt class="caps">State</dt><dd class="stat-word" class="cg">Building</dd></div><div><dt class="caps">Agents</dt><dd class="stat">3</dd></div><div><dt class="caps">Need you</dt><dd class="stat cr">1</dd></div>
   <div><dt class="caps">Builds today</dt><dd class="stat">214</dd></div><div><dt class="caps">Planets</dt><dd class="stat">4</dd></div><div><dt class="caps">Signal</dt><dd class="stat">2s</dd></div>
 </dl>
 <div class="kv"><span class="caps">Branch</span><span class="mono">feat/search-limits</span></div>
 <div class="kv"><span class="caps">Worktree</span><span class="stat-word cy">Dirty · 3 files</span></div>
-<div class="kv"><span class="caps">PR</span><span class="stat-word" style="color: var(--blue-line)">#42 open · checks passing</span></div>
+<div class="kv"><span class="caps">PR</span><span class="stat-word">#42 open · <span class="cg">checks passing</span></span></div>
 <div class="mod-act"><button class="btn" type="button">${I.term}Open terminal</button><button class="btn btn--line btn--sq" type="button" aria-label="Open folder">${I.folder}</button></div>`;
 
 const tasks = `<div class="task-row is-done"><span class="box"></span><span class="feed-text">Cap results at 50 per page</span><span class="row-age mono">Codex-2</span></div>
@@ -80,5 +80,5 @@ function screen(theme, w, h, title) {
     dockHtml: dock('Builds per half hour · <b style="color: var(--ink)">214</b> · orion-api', 214 / 564) });
 }
 
-const BOARDS = [['TriSystem', 'light', 1440, 900, 'Agent Orrery, tricolor, system'], ['TriSystemDark', 'dark', 1440, 900, 'Agent Orrery, tricolor, system, dark']];
+const BOARDS = [['TriSystem', 'dark', 1440, 900, 'Agent Orrery, tricolor, system']];
 for (const [name, theme, w, h, title] of BOARDS) { fs.writeFileSync(path.join(DIR, name + '.dc.html'), screen(theme, w, h, title)); console.log('wrote', name); }

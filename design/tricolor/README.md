@@ -1,6 +1,6 @@
 # Tricolor
 
-The chosen visual direction for Agent Orrery (design pass 7, 2026-10-14): armour plates bolted over a full-screen universe. White plates in light mode, hangar gunmetal in dark; ultramarine marks structure and the primary action, red is a question, a yellow-and-black hazard stripe is a permission request, cyan is live. Nothing is set under 12px.
+The chosen visual direction for Agent Orrery (design pass 7, 2026-10-14): armour plates bolted over a full-screen universe. Dark only for now. Plates are slate charcoal, text is warm off-white, the primary action is an off-white armour plate; orange is the one accent (the catalogue tag, focus, a permission), red means a question, green means live or done. Bold is kept for the headline and module titles; everything else is 400–600 and sentence case. Nothing is set under 12px.
 
 This folder is the source of truth for the look. The mockups on the design canvas are generated from it; the renderer implementation will take its tokens from it.
 
@@ -29,14 +29,14 @@ Environment variables let the same generators write the canvas copies: `TRI_OUT`
 
 | Board | What it shows |
 |---|---|
-| `TriUniverse`, `TriUniverseDark` | The universe, 1440 × 900, both themes |
+| `TriUniverse` | The universe, 1440 × 900 |
 | `TriWindow` | The same screen in a 1024 × 768 window: one rail, most urgent first |
 | `TriPhone` | 390 × 844: the universe on top, the modules as a sheet below |
-| `TriSystem`, `TriSystemDark` | One project as a solar system: folders as planets, the agents working in it |
+| `TriSystem` | One project as a solar system: folders as planets, the agents working in it |
 
 ## Rules the renderer inherits
 
-- Scene colours stay: `claude` and `codex` equal `AUR.PROVIDERS`; the scene's `AUR.ATTENTION` hexes stay. The chrome's `red`, `yellow` and `green` are separate tokens.
-- The headline is Archivo at 112% width, 56px (40px at phone width, and for project names over ten characters).
-- Capitals are set by CSS (`caps`, `mod-title`, `btn`, …); source text is sentence case.
+- Scene colours stay: `claude` and `codex` equal `AUR.PROVIDERS`; the scene's `AUR.ATTENTION` hexes stay. The chrome's `red`, `orange` and `green` are separate tokens.
+- The headline is Archivo 700 at 48px (36px at phone width, and for project names over twelve characters).
+- Capitals are set by CSS on `mod-title`, `sub`, `brand` and `map-galaxy` only; source text is sentence case.
 - Only real data fields. No invented metrics.
