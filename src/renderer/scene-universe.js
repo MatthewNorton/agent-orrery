@@ -258,6 +258,7 @@
       scene,
       update,
       setSearchMatches: view.setSearchMatches,
+      resize: view.reframeCamera,
       dispose() {
         view.cancelLabelLayout();
         scene.onBeforeRenderObservable.clear();
