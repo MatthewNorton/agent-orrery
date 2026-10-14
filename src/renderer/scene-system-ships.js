@@ -56,7 +56,7 @@
       label.linkWithMesh(mesh);
       label.linkOffsetY = -22;
       const suffix = AUR.label(gui, attentionSuffix(s.attention), {
-        fontSize: 13, color: AUR.attentionColor(s.attention),
+        fontSize: 12, mono: true, color: AUR.attentionColor(s.attention),
       });
       suffix.linkWithMesh(mesh);
       suffix.linkOffsetY = -22;
