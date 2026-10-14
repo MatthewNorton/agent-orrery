@@ -2,7 +2,7 @@
 'use strict';
 
 const { plainObject } = require('./fields');
-const { claudeModelIsLocal } = require('./model');
+const { claudeModelIsLocal, modelName } = require('./model');
 
 const TOOL_STATUS = Object.freeze({
   Edit: 'Building', Write: 'Building', NotebookEdit: 'Building', MultiEdit: 'Building',
@@ -35,6 +35,7 @@ const SPAWN_TOOLS = new Set(['Agent', 'Task']);
  * @property {boolean} toolResult A block is a tool result.
  * @property {boolean | null} local An assistant message from a non-Claude (local) model; null
  *   when the message names no model.
+ * @property {string | null} model The assistant message's model as written; null when absent.
  *
  * @typedef {object} ClaudeToolStart
  * @property {'tool-start'} type
@@ -82,6 +83,7 @@ function claudeRecordToSignals(value) {
     text: blocks.some((block) => block.type === 'text'),
     toolResult: blocks.some((block) => block.type === 'tool_result'),
     local: assistant ? claudeModelIsLocal(message.model) : null,
+    model: assistant ? modelName(message.model) : null,
   });
   for (const block of blocks) {
     if (block.type === 'tool_use') signals.push(toolStart(block));

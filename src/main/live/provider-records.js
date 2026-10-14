@@ -18,7 +18,7 @@ const { liveShip } = require('../universe/public-shape');
 const { queue } = require('./events');
 const { READ_LIMIT_BYTES, LINE_LIMIT_BYTES } = require('./model');
 const { ensureProjectForPath } = require('./projects');
-const { ensureProviderShip, setLocal, addPending, clearPending } = require('./ships');
+const { ensureProviderShip, setModel, addPending, clearPending } = require('./ships');
 const { applyProviderBuildFiles } = require('./builds');
 
 /** @import { LiveModel, LiveTail } from '../../types/live-model' */
@@ -122,15 +122,17 @@ function applyProviderSignals(model, signals, tail) {
         if (project) tail.project = project.id;
       }
       if (typeof signal.local === 'boolean') tail.local = signal.local;
+      if (typeof signal.model === 'string') tail.model = signal.model;
       if (tail.project) {
-        setLocal(model, ensureProviderShip(
+        setModel(model, ensureProviderShip(
           model, provider, tail.project, sessionId,
           signal.kind || tail.kind || 'main', ts,
           signal.parentSessionId || tail.parentSessionId
-        ), tail.local);
+        ), tail.local, tail.model);
       }
       continue;
     }
+    if (signal.type === 'model' && typeof signal.model === 'string') tail.model = signal.model;
 
     const ship = ensureProviderShip(
       model, provider, tail.project, sessionId,
@@ -138,7 +140,7 @@ function applyProviderSignals(model, signals, tail) {
       signal.parentSessionId || tail.parentSessionId
     );
     if (!ship) continue;
-    setLocal(model, ship, tail.local);
+    setModel(model, ship, tail.local, tail.model);
     ship.lastEvent = Math.max(ship.lastEvent, ts);
 
     if (signal.type === 'task-claim') {

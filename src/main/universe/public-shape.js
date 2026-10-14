@@ -37,6 +37,7 @@ function liveShip(s) {
     provider: normalizeProvider(s.provider || 'claude'),
     status: /** @type {ShipStatus} */ (s.status), detail: s.detail, lastEvent: s.lastEvent,
     attention: s.attention, attentionSince: s.attentionSince, builds: s.builds, local: s.local === true,
+    model: typeof s.model === 'string' ? s.model : null,
     taskId: typeof s.taskId === 'string' ? s.taskId : null,
     turnOutcome: typeof s.turnOutcome === 'string' ? s.turnOutcome : null,
   };
@@ -75,6 +76,7 @@ function historyShip(ship) {
     attentionSince: ship.attentionSince,
     builds: ship.builds,
     local: ship.local === true,
+    model: typeof ship.model === 'string' ? ship.model : null,
   };
 }
 

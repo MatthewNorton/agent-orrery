@@ -222,6 +222,7 @@
         badge.style.backgroundColor = attention.color + '1f';
         nameLine.appendChild(badge);
       }
+      if (s.local || s.model) nameLine.appendChild(A.modelTag(s));
       const sub = AUR.el('div', 'agent-sub');
       const providerTag = AUR.el('span', 'agent-provider-tag', provider.label.toUpperCase());
       providerTag.dataset.provider = provider.key;
@@ -239,6 +240,14 @@
       row.appendChild(body);
       list.appendChild(row);
     }
+  };
+
+  // The model a ship reports, whatever its provider; a local one is named as such and flies red.
+  A.modelTag = function modelTag(ship) {
+    const tag = AUR.el('span', 'agent-model-tag' + (ship.local ? ' local' : ''),
+      (ship.local ? 'Local' + (ship.model ? ' · ' : '') : '') + (ship.model || ''));
+    tag.title = ship.local ? 'Served from this machine' : 'Model';
+    return tag;
   };
 
   A.renderFeed = function renderFeed() {

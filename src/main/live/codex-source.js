@@ -17,7 +17,7 @@ const { codexParentSessionId } = require('../transcripts/codex');
 const { hex8 } = require('../shared/hash');
 const { ACTIVE_WINDOW_MS, HOT_WINDOW_MS } = require('./model');
 const { ensureProjectForPath } = require('./projects');
-const { ensureProviderShip, setLocal } = require('./ships');
+const { ensureProviderShip, setModel } = require('./ships');
 
 /** @import { LiveModel, LiveTail } from '../../types/live-model' */
 
@@ -80,9 +80,9 @@ function scanCodex(model, isStartup) {
       model.files.set(fp, tail);
       model.codexTailsBySession.set(sessionId, tail);
       if (isStartup && now - st.mtimeMs < ACTIVE_WINDOW_MS) {
-        setLocal(model, ensureProviderShip(
+        setModel(model, ensureProviderShip(
           model, 'codex', project.id, sessionId, meta.kind, st.mtimeMs, meta.parentSessionId
-        ), meta.local);
+        ), meta.local, meta.model);
       }
     } else {
       tail.project = project.id;
@@ -148,6 +148,7 @@ function newCodexTail(fp, projectId, sessionId, meta, st, isStartup) {
     kind: meta.kind,
     parentSessionId: meta.parentSessionId || null,
     local: meta.local,
+    model: meta.model,
   };
 }
 
@@ -205,6 +206,7 @@ function readCodexOwnMetadata(file, sessionId) {
         parentSessionId: codexParentSessionId(payload),
         kind: session.kind,
         local: session.local,
+        model: typeof session.model === 'string' ? session.model : null,
         timestamp: session.ts || 0,
       };
       if (recordSessionId === sessionId) return result;

@@ -118,6 +118,11 @@ body.command-rail-is-compact { --sidebar-effective-w: var(--sidebar-compact-w); 
   font-size: 12px; font-weight: 500; line-height: 15px; letter-spacing: 0.02em;
 }
 .agent-sub-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agent-model-tag {
+  flex: 0 1 auto; margin-left: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--font-mono); font-size: 12px; font-weight: 400; line-height: 15px; color: var(--ink-3);
+}
+.agent-model-tag.local { color: var(--local); }
 
 /* galaxies: a swatch, the name, builds at the right, systems and agents under */
 .galaxies-list { overflow-y: auto; min-height: 0; scrollbar-width: thin; }

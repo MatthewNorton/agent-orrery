@@ -38,6 +38,8 @@ export interface LiveShip {
   builds: number;
   /** Learned from the transcript (Codex session_meta.model_provider, Claude message.model). */
   local: boolean;
+  /** The model name the transcript last reported; null until known. */
+  model: string | null;
   taskId?: string;
   turnOutcome?: string;
 }
@@ -79,6 +81,7 @@ export interface LiveTail {
   kind?: 'main' | 'drone';
   parentSessionId?: string | null;
   local?: boolean;
+  model?: string | null;
   seenSignals?: Set<string>;
   missingScans?: number;
 }

@@ -143,7 +143,7 @@ function createHistoryModel({ batchSize, onBatch, preferredProjectId }) {
         id, name: `${runtime.provider === 'codex' ? 'Codex' : 'Claude'}-${number}`,
         provider: runtime.provider, project: runtime.projectId,
         kind: runtime.kind === 'drone' ? 'drone' : 'main', parentName: parent ? parent.name : null,
-        lastEvent: ts, local: runtime.local,
+        lastEvent: ts, local: runtime.local, model: runtime.model,
       });
       state.ships.set(id, ship);
       queue({ type: 'ship-spawned', ship: historyShip(ship) }, emit);
@@ -161,7 +161,7 @@ function createHistoryModel({ batchSize, onBatch, preferredProjectId }) {
     state.providerCounters.set('claude', number);
     const drone = createShipRecord({
       id, name: `Claude-${number}`, provider: 'claude', project: project.id, kind: 'drone',
-      parentName: parent.name, lastEvent: ts, local: parent.local === true,
+      parentName: parent.name, lastEvent: ts, local: parent.local === true, model: parent.model,
     });
     state.ships.set(id, drone);
     queue({ type: 'ship-spawned', ship: historyShip(drone) }, emit);

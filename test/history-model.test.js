@@ -61,7 +61,7 @@ test('history model: the feed keeps the last FEED_LIMIT entries', () => {
   for (let index = 0; index < FEED_LIMIT + 10; index++) {
     model.ensureShip({
       provider: 'claude', sessionId: `s${index}`, projectPath: PROJECT_DIR, kind: 'main',
-      parentSessionId: null, projectIdHint: 'demo', projectId: 'demo', local: false,
+      parentSessionId: null, projectIdHint: 'demo', projectId: 'demo', local: false, model: null,
     }, T0 + index, false);
   }
   const { feed } = model.snapshot();

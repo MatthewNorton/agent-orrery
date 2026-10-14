@@ -54,7 +54,7 @@ function spawnDrone(model, project, parent, toolUseId, ts) {
   if (model.ships.has(id)) return;
   const drone = createShipRecord({
     id, name: `Claude-${++model.shipCounter}`, provider: 'claude', project: project.id, kind: 'drone',
-    parentName: parent.name, lastEvent: ts, local: parent.local === true,
+    parentName: parent.name, lastEvent: ts, local: parent.local === true, model: parent.model,
   });
   model.ships.set(id, drone);
   queue(model, { type: 'ship-spawned', ship: liveShip(drone) });
@@ -62,15 +62,19 @@ function spawnDrone(model, project, parent, toolUseId, ts) {
 }
 
 /**
- * Records whether a ship runs a local model, learned from its transcript, and announces a change.
+ * Records what a ship's transcript says about its model, the name and whether it is served
+ * locally, and announces a change. Either fact may still be unknown.
  * @param {LiveModel} model
  * @param {LiveShip | null} ship
  * @param {unknown} local
+ * @param {unknown} name
  */
-function setLocal(model, ship, local) {
-  if (!ship || typeof local !== 'boolean' || ship.local === local) return;
-  ship.local = local;
-  queue(model, { type: 'ship-updated', ship: liveShip(ship) });
+function setModel(model, ship, local, name) {
+  if (!ship) return;
+  let changed = false;
+  if (typeof local === 'boolean' && ship.local !== local) { ship.local = local; changed = true; }
+  if (typeof name === 'string' && ship.model !== name) { ship.model = name; changed = true; }
+  if (changed) queue(model, { type: 'ship-updated', ship: liveShip(ship) });
 }
 
 /**
@@ -172,7 +176,7 @@ function departIdleShips(model, now) {
 module.exports = {
   ensureShip,
   spawnDrone,
-  setLocal,
+  setModel,
   ensureProviderShip,
   addPending,
   clearPending,

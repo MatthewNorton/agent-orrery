@@ -6,6 +6,7 @@
 const LOCAL_CODEX_PROVIDERS = new Set([
   'oss', 'ollama', 'lmstudio', 'lm-studio', 'llamacpp', 'llama.cpp', 'llama-cpp', 'vllm', 'localai', 'local',
 ]);
+const MODEL_NAME_LIMIT = 64;
 
 /**
  * Whether a Codex rollout's `model_provider` runs locally; null when the rollout does not say.
@@ -28,4 +29,16 @@ function claudeModelIsLocal(model) {
   return !/claude/i.test(model);
 }
 
-module.exports = { codexProviderIsLocal, claudeModelIsLocal };
+/**
+ * The model a record names, as the chrome may print it: printable ASCII, at most
+ * MODEL_NAME_LIMIT characters; null when absent or Claude Code's '<synthetic>'.
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+function modelName(value) {
+  if (typeof value !== 'string') return null;
+  const name = value.replace(/[^\x20-\x7e]/g, '').trim().slice(0, MODEL_NAME_LIMIT);
+  return name && name !== '<synthetic>' ? name : null;
+}
+
+module.exports = { codexProviderIsLocal, claudeModelIsLocal, modelName };

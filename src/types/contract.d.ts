@@ -50,6 +50,8 @@ export interface Ship {
   builds: number;
   /** The session runs a local model (a Codex local model_provider, or a non-Claude model in Claude Code); tints the ship red. */
   local: boolean;
+  /** The model the session reports (Claude message.model; Codex session_meta and turn_context model), for any provider; null until known. */
+  model: string | null;
   /** LIVE only. */
   taskId?: string | null;
   /** LIVE only. */

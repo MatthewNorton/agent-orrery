@@ -25,6 +25,7 @@ const { historyProject, historyShip } = require('../universe/public-shape');
  * @property {string | null} projectIdHint
  * @property {string | null} projectId
  * @property {boolean} local
+ * @property {string | null} model
  */
 
 /**
@@ -44,8 +45,10 @@ function applyRecord(model, record, emit) {
     projectIdHint: record.entry.projectIdHint,
     projectId: null,
     local: record.entry.local === true,
+    model: typeof record.entry.model === 'string' ? record.entry.model : null,
   };
   if (typeof signal.local === 'boolean') runtime.local = signal.local;
+  if (typeof signal.model === 'string') runtime.model = signal.model;
   if (signal.type === 'session') {
     runtime.sessionId = safeId(signal.sessionId) || runtime.sessionId;
     runtime.projectPath = safePath(signal.cwd) || runtime.projectPath;
@@ -60,8 +63,9 @@ function applyRecord(model, record, emit) {
   model.state.runtimeBySource.set(record.sourceKey, runtime);
   const ship = model.ensureShip(runtime, record.ts, emit);
   if (!ship) return;
-  if (ship.local !== runtime.local) {
+  if (ship.local !== runtime.local || ship.model !== runtime.model) {
     ship.local = runtime.local;
+    ship.model = runtime.model;
     model.queue({ type: 'ship-updated', ship: historyShip(ship) }, emit);
   }
   ship.lastEvent = Math.max(ship.lastEvent, record.ts);

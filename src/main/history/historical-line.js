@@ -98,8 +98,10 @@ function historicalClaudeSignals(entry, record, lineOffset, ts, sessionEmitted) 
       signals.push(signal('turn-end'));
     } else if (fact.type === 'message') {
       message = fact;
-      const local = fact.assistant && typeof fact.local === 'boolean' ? { local: fact.local } : {};
-      if ((fact.user && fact.prompt) || fact.assistant) signals.push(signal('turn-start', local));
+      const known = {};
+      if (fact.assistant && typeof fact.local === 'boolean') known.local = fact.local;
+      if (fact.assistant && fact.model) known.model = fact.model;
+      if ((fact.user && fact.prompt) || fact.assistant) signals.push(signal('turn-start', known));
       if (fact.blocks && fact.user && fact.text) signals.push(signal('turn-start'));
     } else if (fact.type === 'tool-start' && message.assistant) {
       const callId = safeId(fact.callId) || `line-${lineOffset.toString(16)}`;
