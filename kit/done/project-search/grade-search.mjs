@@ -24,16 +24,16 @@ console.log('P1 PASS  searchProjects exported');
 // ---- P2 fixtures ----
 const P = (id, name, p, galaxy) => ({ id, name, path: p, galaxy });
 const PROJECTS = [
-  P('a', 'agent-universe-lite', 'C:\\workspace\\code\\experimental\\agent-universe-lite', 'experimental'),
-  P('b', 'agent-universe', 'C:\\workspace\\code\\experimental\\agent-universe', 'experimental'),
-  P('c', 'lora-training', 'C:\\workspace\\code\\experimental\\lora-training', 'experimental'),
-  P('d', 'portfolio-website', 'C:\\workspace\\code\\personal\\portfolio-website-claude', 'personal'),
-  P('e', 'stock-market-rotation', 'C:\\workspace\\code\\personal\\stock-market-rotation', 'personal'),
-  P('f', 'video-showcase', 'C:\\workspace\\code\\personal\\video-showcase', 'personal'),
+  P('a', 'agent-universe-lite', 'C:\\projects\\experimental\\agent-universe-lite', 'experimental'),
+  P('b', 'agent-universe', 'C:\\projects\\experimental\\agent-universe', 'experimental'),
+  P('c', 'lyra-training', 'C:\\projects\\experimental\\lyra-training', 'experimental'),
+  P('d', 'orion-site', 'C:\\projects\\personal\\orion-site', 'personal'),
+  P('e', 'vega-charts', 'C:\\projects\\personal\\vega-charts', 'personal'),
+  P('f', 'quasar-notes', 'C:\\projects\\personal\\quasar-notes', 'personal'),
   P('g', 'universe-map-tests', 'C:\\tests\\universe-map-tests', 'tests'),
-  P('h', 'Desktop', 'C:\\Users\\matt\\Desktop', 'home'),
-  P('i', 'matt', 'C:\\Users\\matt', 'home'),
-  P('j', 'experimental', 'C:\\workspace\\code\\experimental', 'experimental'),
+  P('h', 'Desktop', 'C:\\home\\sam\\Desktop', 'home'),
+  P('i', 'sam', 'C:\\home\\sam', 'home'),
+  P('j', 'experimental', 'C:\\projects\\experimental', 'experimental'),
 ];
 
 let bad = 0;
@@ -44,7 +44,7 @@ const check = (name, cond, detail) => {
 
 check('empty query -> []', search(PROJECTS, '').length === 0 && search(PROJECTS, '   ').length === 0, 'nonempty');
 check('non-string safe', Array.isArray(search(PROJECTS, null)) && search(PROJECTS, null).length === 0, 'threw or nonempty');
-check('case-insensitive name match', search(PROJECTS, 'LORA').some((r) => r.id === 'c'), 'lora-training not found');
+check('case-insensitive name match', search(PROJECTS, 'LYRA').some((r) => r.id === 'c'), 'lyra-training not found');
 
 const uni = search(PROJECTS, 'universe');
 check('prefix rank: universe-map-tests first', uni.length > 0 && uni[0].id === 'g',
