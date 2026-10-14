@@ -7,11 +7,10 @@
 const fs = require('fs');
 const path = require('path');
 const { canonicalProjectPath, isLocalProjectPath } = require('../provider-adapters');
-const { liveProject } = require('../universe/public-shape');
-const { queue, pushFeed } = require('./events');
+const { pushFeed } = require('./events');
 const { ACTIVE_WINDOW_MS, HOT_WINDOW_MS } = require('./model');
 const {
-  isProjectDirectory, updateProjectExists, indexProjectPath, preferredProjectPath,
+  createProject, adoptProjectPath, updateProjectExists, preferredProjectPath,
 } = require('./projects');
 const { ensureShip } = require('./ships');
 
@@ -56,32 +55,18 @@ function scanClaude(model, isStartup) {
       if (st.mtimeMs > newest) { newest = st.mtimeMs; newestFile = fp; }
     }
 
-    if (!project) {
+    if (!project || (!project.path && newest > project.lastActivity)) {
       const discoveredPath = newestFile ? readCwd(newestFile) : null;
       const pathKey = canonicalProjectPath(discoveredPath);
       const mappedId = pathKey && (model.projectPathIndex.get(pathKey) || model.pathIds[pathKey]);
       if (mappedId) project = model.projects.get(mappedId);
       const projectId = project ? project.id : (mappedId || slug);
       const projPath = preferredProjectPath(model, projectId, discoveredPath);
-      const saved = model.persisted.projects[projectId] || {};
       if (!project) {
-        project = {
-          id: projectId,
-          path: projPath,
-          name: projPath ? path.basename(projPath) : slug,
-          exists: isProjectDirectory(projPath),
-          lastActivity: newest,
-          totalBytes,
-          claudeBytes: totalBytes,
-          codexBytes: 0,
-          buckets: saved.buckets || {},
-          totalBuilds: saved.totalBuilds || 0,
-          firstSeen: saved.firstSeen || now,
-        };
-        model.projects.set(projectId, project);
-        indexProjectPath(model, project);
-        queue(model, { type: 'project-added', project: liveProject(project) });
+        project = createProject(model, projectId, projPath, { lastActivity: newest, totalBytes, claudeBytes: totalBytes });
         if (!isStartup) pushFeed(model, 'discover', `New system discovered: ${project.name}`, project.id);
+      } else if (projPath) {
+        adoptProjectPath(model, project, projPath);
       }
       if (pathKey) {
         model.projectPathIndex.set(pathKey, project.id);
