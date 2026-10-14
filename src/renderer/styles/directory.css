@@ -41,7 +41,7 @@
   border-radius: 7px;
   background: transparent;
   color: #8f9ab0;
-  font: 20px/1 system-ui, sans-serif;
+  font: 20px/1 var(--font-sans);
   cursor: pointer;
 }
 .project-directory-close:hover { color: #fff; background: rgba(108, 140, 255, 0.14); }
@@ -73,7 +73,7 @@
   outline: none;
   background: transparent;
   color: #edf1f9;
-  font: 12.5px/1 system-ui, 'Segoe UI', sans-serif;
+  font: 12.5px/1 var(--font-sans);
   user-select: text;
   appearance: none;
 }

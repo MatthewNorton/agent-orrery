@@ -12,6 +12,7 @@ This folder is the source of truth for the look. The mockups on the design canva
 - `boards/` — one generator per screen (`universe.cjs`, `system.cjs`) and the shared chrome (`lib.cjs`). Each writes `.dc.html` boards (the design-canvas format; they also open directly in a browser). `img/` holds the textures the boards use: planet and sky images derived from `assets/planets` and `assets/skyboxes`, ship decals from the fleet QA renders.
 - `fonts/` — Archivo and IBM Plex Mono, see `FONTS.md`.
 - `render.cjs` — screenshots a board headless to `renders/` at any window size.
+- `renderer.cjs` — writes `src/renderer/styles/tokens.css` for the app: the `@font-face` rules, every token on `:root`, and a `.t-<style>` class per type style. Run it after any change to `tokens.json`.
 
 ## Build
 

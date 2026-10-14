@@ -45,7 +45,7 @@
 
 .project-vcs-details {
   color: #dce4f3;
-  font: 12px/1.35 system-ui, 'Segoe UI', sans-serif;
+  font: 12px/1.35 var(--font-sans);
 }
 
 .project-vcs-details-head {
