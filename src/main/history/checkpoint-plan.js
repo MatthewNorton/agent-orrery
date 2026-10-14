@@ -4,6 +4,7 @@
 /** @import { IndexEntry } from './index-builder' */
 
 const MAX_CHECKPOINTS = 32;
+const MAX_CORRECTION_STEPS = 4096;
 
 /**
  * Up to `count` times inside (minMs, maxMs) that split the indexed bytes evenly, taking each
@@ -68,9 +69,11 @@ function planCheckpointTimes(entries, minMs, maxMs, count = MAX_CHECKPOINTS) {
       cross();
     }
     // The first whole millisecond at which the goal is reached, exact despite rounding above.
+    // Bounded: a checkpoint is an optimisation, so a few milliseconds off is harmless.
     let time = Math.ceil(at);
-    while (time - 1 > minMs && bytesBy(time - 1) >= goal) time--;
-    while (time < maxMs && bytesBy(time) < goal) time++;
+    let steps = 0;
+    while (time - 1 > minMs && bytesBy(time - 1) >= goal && steps++ < MAX_CORRECTION_STEPS) time--;
+    while (time < maxMs && bytesBy(time) < goal && steps++ < MAX_CORRECTION_STEPS) time++;
     if (time > minMs && time < maxMs && time !== times[times.length - 1]) times.push(time);
   }
   return times;
