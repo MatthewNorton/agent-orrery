@@ -12,8 +12,9 @@
 
   /** @param {Snapshot} snap */
   A.seedStore = function seedStore(snap) {
-    S.store.buildHistogram = snap && snap.buildHistogram
-      ? { day: snap.buildHistogram.day, bins: snap.buildHistogram.bins.slice() } : null;
+    const h = snap && snap.buildHistogram;
+    S.store.buildHistogram = h && Array.isArray(h.bins) && h.bins.length === 48 && h.bins.every(Number.isFinite)
+      ? { day: h.day, bins: h.bins.slice() } : null;
     S.store.projects.clear();
     S.store.ships.clear();
     S.store.feed = [];
