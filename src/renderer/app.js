@@ -44,6 +44,7 @@
       if (el) chromeObserver.observe(el);
     }
     A.wireHistoryBar();
+    A.wireModules();
     A.wireTasksPanel();
     A.wireIdeasPanel();
     A.wireCommandRail();

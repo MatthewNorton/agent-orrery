@@ -13,6 +13,7 @@ async function runShotMode(ctx, driver) {
   fs.mkdirSync(outDir, { recursive: true });
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   await wait(4000);
+  let leftRailState = null;
   for (const view of ['universe', 'system', 'planet']) {
     const ready = new Promise((resolve) => ipcMain.once('au:debug-ready', resolve));
     ctx.win.webContents.send('au:debug-view', view);
@@ -21,6 +22,30 @@ async function runShotMode(ctx, driver) {
     const img = await ctx.win.webContents.capturePage();
     fs.writeFileSync(path.join(outDir, `shot-${view}.png`), img.toPNG());
     console.log(`captured ${view}`);
+    if (view === 'planet') {
+      // Every left-rail module folds to its header from its chevron, and unfolds again.
+      const folded = await rendererEval(`(() => {
+        const sections = Array.from(document.querySelectorAll('.rail--l .mod[data-module]:not(.hidden)'));
+        for (const section of sections) section.querySelector('.mod-h .mod-x')?.click();
+        const headerH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--header-h'));
+        return {
+          modules: sections.map((section) => section.dataset.module),
+          folded: sections.length > 0 && sections.every((section) => section.classList.contains('is-collapsed') &&
+            Math.abs(section.getBoundingClientRect().height - headerH) <= 3),
+        };
+      })()`);
+      await wait(350);
+      const foldedImage = await ctx.win.webContents.capturePage();
+      fs.writeFileSync(path.join(outDir, 'shot-left-rail-folded.png'), foldedImage.toPNG());
+      console.log('captured left rail folded');
+      const unfolded = await rendererEval(`(() => {
+        for (const section of document.querySelectorAll('.rail--l .mod.is-collapsed')) {
+          section.querySelector('.mod-h .mod-x')?.click();
+        }
+        return document.querySelectorAll('.rail--l .mod.is-collapsed').length === 0;
+      })()`);
+      leftRailState = { ...folded, unfolded };
+    }
     if (view === 'system') {
       const asteroidPreview = await rendererEval(`(() => {
         const scene = BABYLON.EngineStore.LastCreatedScene;
@@ -108,6 +133,7 @@ async function runShotMode(ctx, driver) {
       directory: directoryState,
       directorySearch: directorySearchState,
       commandRail: compactRailState,
+      leftRail: leftRailState,
     }, null, 2)
   );
   fs.writeFileSync(path.join(outDir, 'state.json'), JSON.stringify(ctx.tracker.snapshot(), null, 2));

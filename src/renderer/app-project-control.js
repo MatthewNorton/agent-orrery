@@ -125,12 +125,9 @@
     card.dataset.view = S.current.view;
     AUR.clear(card);
 
-    const head = AUR.el('div', 'pc-head');
     const mark = document.createElement('span');
     mark.innerHTML = projectMarkSvg();
-    head.appendChild(mark.firstChild);
-    head.appendChild(AUR.el('div', 'pc-title', 'PROJECT: ' + p.name));
-    card.appendChild(head);
+    card.appendChild(A.moduleHead(card, 'PROJECT: ' + p.name, { lead: mark.firstChild }));
 
     const ships = A.shipsInProject(p.id);
     const needsYou = ships.some(
@@ -203,30 +200,25 @@
     const ships = A.shipsInProject(S.current.projectId);
     const active = ships.length > 0;
 
-    const titleLine = AUR.el('div', 'plc-title-line');
-    titleLine.appendChild(AUR.el('div', 'plc-title', 'PLANET: ' + String(pd.name).toUpperCase()));
-    card.appendChild(titleLine);
-
-    const status = AUR.el('div', 'plc-status');
+    const status = AUR.el('span', 'mod-m plc-status');
     const sdot = AUR.el('span', 'agent-dot');
     sdot.style.background = active ? '#34d399' : '#8b93a8';
     sdot.style.boxShadow = active ? '0 0 7px #34d399' : 'none';
     status.appendChild(sdot);
     status.appendChild(document.createTextNode(active ? 'Active' : 'Dormant'));
-    card.appendChild(status);
+    card.appendChild(A.moduleHead(card, 'PLANET: ' + String(pd.name).toUpperCase(), { extras: [status] }));
 
-    const rows = AUR.el('div', 'plc-rows');
-    rows.appendChild(pcRow('TYPE', pd.procedural ? 'Unknown' : 'Terrestrial'));
-    rows.appendChild(pcRow('RESOURCES', (pd.resources && pd.resources.length) ? pd.resources.join(', ') : '—'));
-    rows.appendChild(pcRow('MASS', (pd.files || 0) + ' files'));
-    rows.appendChild(pcRow('DIAMETER', (pd.sizeKb || 0) + ' KB'));
-    rows.appendChild(pcRow('STRUCTURES', String(pd.subdirs || 0)));
-    card.appendChild(rows);
-
-    card.appendChild(AUR.el('div', 'bars-title', 'PLANET STATUS'));
-    card.appendChild(bar('Infrastructure', (pd.subdirs || 0) / 10));
-    card.appendChild(bar('Resources', (pd.files || 0) / 500));
-    card.appendChild(bar('Build Energy', (pd.builds || 0) / 50));
+    const body = AUR.el('div', 'mod-b plc-body');
+    body.appendChild(pcRow('TYPE', pd.procedural ? 'Unknown' : 'Terrestrial'));
+    body.appendChild(pcRow('RESOURCES', (pd.resources && pd.resources.length) ? pd.resources.join(', ') : '—'));
+    body.appendChild(pcRow('MASS', (pd.files || 0) + ' files'));
+    body.appendChild(pcRow('DIAMETER', (pd.sizeKb || 0) + ' KB'));
+    body.appendChild(pcRow('STRUCTURES', String(pd.subdirs || 0)));
+    body.appendChild(AUR.el('div', 'bars-title', 'PLANET STATUS'));
+    body.appendChild(bar('Infrastructure', (pd.subdirs || 0) / 10));
+    body.appendChild(bar('Resources', (pd.files || 0) / 500));
+    body.appendChild(bar('Build Energy', (pd.builds || 0) / 50));
+    card.appendChild(body);
   };
 
   function bar(key, frac) {

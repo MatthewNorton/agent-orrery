@@ -186,7 +186,7 @@ body.command-rail-is-compact { --sidebar-effective-w: var(--sidebar-compact-w); 
 }
 @media (prefers-reduced-motion: reduce) {
   .agent-dot.attention-pulse { animation: none; }
-  .sidebar, .command-section, .command-section-toggle, .command-rail-toggle { transition: none; }
+  .sidebar, .command-section, .command-section-toggle, .command-rail-toggle, .mod-x svg { transition: none; }
 }
 
 /* feed row: a square provider mark, the sentence, the age */

@@ -293,10 +293,7 @@
       title = 'UNIVERSE SUMMARY';
       stats = universeSummaryStats();
     }
-    const head = AUR.el('header', 'mod-h');
-    head.appendChild(AUR.el('span', 'mod-i index'));
-    head.appendChild(AUR.el('h2', 'mod-title summary-title', title));
-    card.appendChild(head);
+    card.appendChild(A.moduleHead(card, title));
     const row = AUR.el('div', 'summary-stats stats');
     for (const [n, l] of stats) row.appendChild(statBlock(n, l));
     card.appendChild(row);

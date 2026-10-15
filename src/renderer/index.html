@@ -127,13 +127,13 @@
 
   <!-- Left rail: the project, what needs you, tasks, the planet, the summary -->
   <div class="rail rail--l" id="rail-left">
-    <section class="panel mod project-card hidden" id="project-card"></section>
-    <section class="mod mod--alert hidden" id="needs-you-panel" aria-label="Agents that need you">
-      <header class="mod-h"><span class="mod-i index" aria-hidden="true"></span><h2 class="mod-title">Needs you</h2><span class="mod-m">Oldest first</span><span class="mod-n count" id="needs-you-panel-count">00</span></header>
+    <section class="panel mod project-card hidden" id="project-card" data-module="project"></section>
+    <section class="mod mod--alert hidden" id="needs-you-panel" data-module="needs-you" aria-label="Agents that need you">
+      <header class="mod-h"><span class="mod-i index" aria-hidden="true"></span><h2 class="mod-title">Needs you</h2><span class="mod-m">Oldest first</span><span class="mod-n count" id="needs-you-panel-count">00</span><button class="mod-x" type="button" aria-expanded="true" aria-label="Collapse Needs you"></button></header>
       <div class="mod-b" id="needs-you-list"></div>
     </section>
-    <section class="panel mod tasks-panel hidden" id="tasks-panel" aria-label="Project tasks">
-      <header class="mod-h tasks-head"><span class="mod-i index" aria-hidden="true"></span><h2 class="mod-title panel-title">Tasks</h2><span class="panel-head-actions"><span class="panel-note" id="tasks-count">0 / 0 done</span></span></header>
+    <section class="panel mod tasks-panel hidden" id="tasks-panel" data-module="tasks" aria-label="Project tasks">
+      <header class="mod-h tasks-head"><span class="mod-i index" aria-hidden="true"></span><h2 class="mod-title panel-title">Tasks</h2><span class="panel-head-actions"><span class="panel-note" id="tasks-count">0 / 0 done</span><button class="mod-x" type="button" aria-expanded="true" aria-label="Collapse Tasks"></button></span></header>
       <div class="tasks-list" id="tasks-list"></div>
       <p class="tasks-status" id="tasks-status" role="status" aria-live="polite"></p>
       <form class="tasks-form" id="tasks-form">
@@ -142,8 +142,8 @@
         <button class="tasks-add" id="tasks-add" type="submit">Add</button>
       </form>
     </section>
-    <section class="panel mod planet-card hidden" id="planet-card"></section>
-    <section class="panel mod summary-card" id="summary-card"></section>
+    <section class="panel mod planet-card hidden" id="planet-card" data-module="planet"></section>
+    <section class="panel mod summary-card" id="summary-card" data-module="summary"></section>
   </div>
 
   <!-- The view's name, set onto the universe; back goes above it on system and planet -->
@@ -193,10 +193,8 @@
         <h2 class="mod-title panel-title">Fleet</h2>
         <span class="panel-head-actions">
           <span class="panel-note" id="agents-count">0 Running</span>
-          <button class="command-section-toggle" id="agents-panel-toggle" type="button"
-            aria-label="Collapse active agents" aria-controls="agents-list" aria-expanded="true">
-            <span aria-hidden="true">⌃</span>
-          </button>
+          <button class="mod-x command-section-toggle" id="agents-panel-toggle" type="button"
+            aria-label="Collapse active agents" aria-controls="agents-list" aria-expanded="true"></button>
         </span>
       </header>
       <div class="agents-list" id="agents-list"></div>
@@ -207,10 +205,8 @@
         <h2 class="mod-title panel-title">Galaxies</h2>
         <span class="panel-head-actions">
           <span class="panel-note" id="galaxies-count">0 galaxies</span>
-          <button class="command-section-toggle" id="galaxies-panel-toggle" type="button"
-            aria-label="Collapse galaxies" aria-controls="galaxies-list" aria-expanded="true">
-            <span aria-hidden="true">⌃</span>
-          </button>
+          <button class="mod-x command-section-toggle" id="galaxies-panel-toggle" type="button"
+            aria-label="Collapse galaxies" aria-controls="galaxies-list" aria-expanded="true"></button>
         </span>
       </header>
       <div class="galaxies-list" id="galaxies-list"></div>
@@ -223,10 +219,8 @@
           <span class="panel-note feed-mode live" id="feed-mode">
             <span class="live-dot"></span><span id="feed-mode-label">Live</span>
           </span>
-          <button class="command-section-toggle" id="feed-panel-toggle" type="button"
-            aria-label="Collapse event feed" aria-controls="feed-list" aria-expanded="true">
-            <span aria-hidden="true">⌃</span>
-          </button>
+          <button class="mod-x command-section-toggle" id="feed-panel-toggle" type="button"
+            aria-label="Collapse event feed" aria-controls="feed-list" aria-expanded="true"></button>
         </span>
       </header>
       <div class="feed-list" id="feed-list"></div>
@@ -237,10 +231,8 @@
         <h2 class="mod-title panel-title">Ideas</h2>
         <span class="panel-head-actions">
           <span class="panel-note" id="ideas-count">0 ideas</span>
-          <button class="command-section-toggle" id="ideas-panel-toggle" type="button"
-            aria-label="Collapse task ideas" aria-controls="ideas-list" aria-expanded="true">
-            <span aria-hidden="true">⌃</span>
-          </button>
+          <button class="mod-x command-section-toggle" id="ideas-panel-toggle" type="button"
+            aria-label="Collapse task ideas" aria-controls="ideas-list" aria-expanded="true"></button>
         </span>
       </header>
       <div class="ideas-list" id="ideas-list"></div>
@@ -403,6 +395,7 @@
   <script src="scene-system.js"></script>
   <script src="scene-planet.js"></script>
   <script src="app-state.js"></script>
+  <script src="app-modules.js"></script>
   <script src="app-agent-focus.js"></script>
   <script src="app-chrome.js"></script>
   <script src="app-chrome-queue.js"></script>

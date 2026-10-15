@@ -52,7 +52,7 @@ body { counter-reset: mod; }
 .mod-i, .index { font-family: var(--font-mono); font-size: 12px; font-weight: 500; line-height: 1; }
 .mod--alert .mod-i { color: var(--red); }
 .mod-title {
-  margin: 0; color: var(--ink); white-space: nowrap; text-transform: uppercase;
+  min-width: 0; margin: 0; overflow: hidden; color: var(--ink); white-space: nowrap; text-overflow: ellipsis; text-transform: uppercase;
   font-size: 12px; font-weight: 700; letter-spacing: 0.1em; line-height: 1;
 }
 .mod-m { min-width: 0; overflow: hidden; color: var(--ink-3); font-size: 12px; font-weight: 500; white-space: nowrap; text-overflow: ellipsis; }
@@ -72,8 +72,12 @@ body { counter-reset: mod; }
 }
 .mod-x:hover { background: var(--plate); color: var(--ink); }
 .mod-x:focus-visible { outline: 2px solid var(--orange); outline-offset: -2px; }
+.mod-x svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.8; transition: transform var(--dur-collapse) var(--ease); }
 .mod-b { flex: 1 1 auto; min-height: 0; overflow: auto; scrollbar-width: thin; }
+/* a collapsed module is its header; the chevron turns to point down */
 .mod.is-collapsed .mod-h, .mod.collapsed .mod-h { border-bottom: 0; }
+.mod.is-collapsed > :not(.mod-h) { display: none; }
+.mod.is-collapsed .mod-x svg { transform: rotate(180deg); }
 
 /* controls shared by the chrome */
 .btn {
