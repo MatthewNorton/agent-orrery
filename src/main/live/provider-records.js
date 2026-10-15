@@ -18,7 +18,7 @@ const { liveShip } = require('../universe/public-shape');
 const { queue } = require('./events');
 const { READ_LIMIT_BYTES, LINE_LIMIT_BYTES } = require('./model');
 const { ensureProjectForPath } = require('./projects');
-const { ensureProviderShip, setLocal, addPending, clearPending } = require('./ships');
+const { ensureProviderShip, setModel, addPending, clearPending } = require('./ships');
 const { applyProviderBuildFiles } = require('./builds');
 
 /** @import { LiveModel, LiveTail } from '../../types/live-model' */
@@ -113,6 +113,9 @@ function applyProviderSignals(model, signals, tail) {
     const provider = normalizeProvider(signal.provider || tail.provider);
     const sessionId = signal.sessionId || tail.session;
     const ts = Number.isFinite(signal.ts) ? signal.ts : Date.now();
+    // Any signal may restate the session's model facts; the tail remembers the latest.
+    if (typeof signal.local === 'boolean') tail.local = signal.local;
+    if (typeof signal.model === 'string') tail.model = signal.model;
 
     if (signal.type === 'session' || signal.type === 'project') {
       // Security follow-up: UNC/relative cwds have no project key; skip the association, never fnv1a(null).
@@ -121,13 +124,12 @@ function applyProviderSignals(model, signals, tail) {
         const project = ensureProjectForPath(model, signal.cwd, `project:${hex8(projectKey)}`, ts, 0);
         if (project) tail.project = project.id;
       }
-      if (typeof signal.local === 'boolean') tail.local = signal.local;
       if (tail.project) {
-        setLocal(model, ensureProviderShip(
+        setModel(model, ensureProviderShip(
           model, provider, tail.project, sessionId,
           signal.kind || tail.kind || 'main', ts,
           signal.parentSessionId || tail.parentSessionId
-        ), tail.local);
+        ), tail);
       }
       continue;
     }
@@ -138,7 +140,7 @@ function applyProviderSignals(model, signals, tail) {
       signal.parentSessionId || tail.parentSessionId
     );
     if (!ship) continue;
-    setLocal(model, ship, tail.local);
+    setModel(model, ship, tail);
     ship.lastEvent = Math.max(ship.lastEvent, ts);
 
     if (signal.type === 'task-claim') {

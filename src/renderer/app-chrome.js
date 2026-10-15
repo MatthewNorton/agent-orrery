@@ -121,6 +121,8 @@
         badge.style.backgroundColor = attention.color + '1f';
         nameLine.appendChild(badge);
       }
+      const modelLabel = AUR.modelLabel(s);
+      if (modelLabel) nameLine.appendChild(AUR.el('span', 'agent-model-tag' + (s.local ? ' local' : ''), modelLabel));
       const sub = AUR.el('div', 'agent-sub');
       const providerTag = AUR.el('span', 'agent-provider-tag', provider.label.toUpperCase());
       providerTag.dataset.provider = provider.key;

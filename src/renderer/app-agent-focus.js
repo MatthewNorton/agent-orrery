@@ -219,7 +219,7 @@
       ' · ' + (project ? project.name : ship.project);
     renderAgentFocusHologram(project);
     A.renderAgentFocusFlightTarget();
-    els.provider.textContent = provider.label;
+    els.provider.textContent = [provider.label, AUR.modelLabel(ship)].filter(Boolean).join(' · ');
     els.status.textContent = attention ? attention.label : ship.status;
     els.project.textContent = project ? project.name : ship.project;
     els.folder.disabled = !project || project.exists === false;

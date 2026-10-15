@@ -150,6 +150,7 @@ const codex = {
     timestamp: iso(ts), type: 'session_meta',
     payload: { id, session_id: id, cwd, thread_source: 'user', ...extra },
   }),
+  turnContext: (ts, model) => ({ timestamp: iso(ts), type: 'turn_context', payload: { model } }),
   call: (ts, callId, name) => ({
     timestamp: iso(ts), type: 'response_item',
     payload: { type: 'function_call', call_id: callId, name, arguments: '{"cmd":"private"}' },

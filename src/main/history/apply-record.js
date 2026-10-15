@@ -8,6 +8,7 @@ const { classifyTool } = require('../provider-adapters');
 const { fnv1a } = require('../shared/hash');
 const { safeId, safePath } = require('../transcripts/fields');
 const { historyProject, historyShip } = require('../universe/public-shape');
+const { assignModel } = require('../universe/ships');
 
 /**
  * @import { HistoryModel } from './model'
@@ -25,6 +26,7 @@ const { historyProject, historyShip } = require('../universe/public-shape');
  * @property {string | null} projectIdHint
  * @property {string | null} projectId
  * @property {boolean} local
+ * @property {string | null} model
  */
 
 /**
@@ -44,8 +46,10 @@ function applyRecord(model, record, emit) {
     projectIdHint: record.entry.projectIdHint,
     projectId: null,
     local: record.entry.local === true,
+    model: record.entry.model || null,
   };
   if (typeof signal.local === 'boolean') runtime.local = signal.local;
+  if (typeof signal.model === 'string') runtime.model = signal.model;
   if (signal.type === 'session') {
     runtime.sessionId = safeId(signal.sessionId) || runtime.sessionId;
     runtime.projectPath = safePath(signal.cwd) || runtime.projectPath;
@@ -60,10 +64,7 @@ function applyRecord(model, record, emit) {
   model.state.runtimeBySource.set(record.sourceKey, runtime);
   const ship = model.ensureShip(runtime, record.ts, emit);
   if (!ship) return;
-  if (ship.local !== runtime.local) {
-    ship.local = runtime.local;
-    model.queue({ type: 'ship-updated', ship: historyShip(ship) }, emit);
-  }
+  if (assignModel(ship, runtime)) model.queue({ type: 'ship-updated', ship: historyShip(ship) }, emit);
   ship.lastEvent = Math.max(ship.lastEvent, record.ts);
   if (record.ts > project.lastActivity) {
     project.lastActivity = record.ts;

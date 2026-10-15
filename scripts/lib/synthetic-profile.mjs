@@ -61,7 +61,7 @@ export function claudeLine(projectDir, sessionId, ts, body, sidechain = false) {
 
 export function editPair(projectDir, dirs, pick, sessionId, ts, id, sidechain = false) {
   const file = path.join(projectDir, pick(dirs), pick(FILES));
-  return claudeLine(projectDir, sessionId, ts, { type: 'assistant', message: { role: 'assistant', content: [
+  return claudeLine(projectDir, sessionId, ts, { type: 'assistant', message: { role: 'assistant', model: 'claude-opus-5-5', content: [
     { type: 'tool_use', id, name: id.endsWith('5') ? 'Write' : 'Edit', input: { file_path: file, new_string: '// demo' } }] } }, sidechain)
     + claudeLine(projectDir, sessionId, ts + 700, { type: 'user', message: { role: 'user', content: [
       { type: 'tool_result', tool_use_id: id, content: 'ok' }] } }, sidechain);
@@ -70,7 +70,7 @@ export function editPair(projectDir, dirs, pick, sessionId, ts, id, sidechain = 
 // A tool_use that never gets a tool_result, timestamped well past the 10 s threshold:
 // the app shows "Needs permission".
 export function pendingPermissionLine(projectDir, sessionId, ts, id) {
-  return claudeLine(projectDir, sessionId, ts - 45_000, { type: 'assistant', message: { role: 'assistant', content: [
+  return claudeLine(projectDir, sessionId, ts - 45_000, { type: 'assistant', message: { role: 'assistant', model: 'claude-opus-5-5', content: [
     { type: 'tool_use', id, name: 'Bash', input: { command: 'npm test' } }] } });
 }
 
@@ -172,7 +172,7 @@ export function createSyntheticProfile({ prefix = 'agent-universe-synthetic-', s
         const sessionId = uuid(n++);
         const file = path.join(codexDay, `rollout-2026-09-29T12-00-00-${sessionId}.jsonl`);
         fs.writeFileSync(file, [
-          { timestamp: iso(now - 3 * 60_000), type: 'session_meta', payload: { id: sessionId, session_id: sessionId, cwd: projectDir, thread_source: 'user' } },
+          { timestamp: iso(now - 3 * 60_000), type: 'session_meta', payload: { id: sessionId, session_id: sessionId, cwd: projectDir, thread_source: 'user', model: 'gpt-6-astra', model_provider: 'openai' } },
           { timestamp: iso(now - 3 * 60_000 + 1000), type: 'event_msg', payload: { type: 'task_started' } },
         ].map(line).join(''));
         live.push({ kind: 'codex', file, projectDir, dirs, sessionId });

@@ -5,7 +5,7 @@
 
 const { normalizeProvider } = require('../provider-adapters');
 const { liveShip } = require('../universe/public-shape');
-const { createShipRecord } = require('../universe/ships');
+const { createShipRecord, assignModel } = require('../universe/ships');
 const { queue, pushFeed } = require('./events');
 const { ACTIVE_WINDOW_MS } = require('./model');
 
@@ -54,7 +54,7 @@ function spawnDrone(model, project, parent, toolUseId, ts) {
   if (model.ships.has(id)) return;
   const drone = createShipRecord({
     id, name: `Claude-${++model.shipCounter}`, provider: 'claude', project: project.id, kind: 'drone',
-    parentName: parent.name, lastEvent: ts, local: parent.local === true,
+    parentName: parent.name, lastEvent: ts, local: parent.local === true, model: parent.model,
   });
   model.ships.set(id, drone);
   queue(model, { type: 'ship-spawned', ship: liveShip(drone) });
@@ -62,15 +62,13 @@ function spawnDrone(model, project, parent, toolUseId, ts) {
 }
 
 /**
- * Records whether a ship runs a local model, learned from its transcript, and announces a change.
+ * Announces a ship's model facts when they change.
  * @param {LiveModel} model
  * @param {LiveShip | null} ship
- * @param {unknown} local
+ * @param {{ local?: unknown, model?: unknown }} facts
  */
-function setLocal(model, ship, local) {
-  if (!ship || typeof local !== 'boolean' || ship.local === local) return;
-  ship.local = local;
-  queue(model, { type: 'ship-updated', ship: liveShip(ship) });
+function setModel(model, ship, facts) {
+  if (ship && assignModel(ship, facts)) queue(model, { type: 'ship-updated', ship: liveShip(ship) });
 }
 
 /**
@@ -172,7 +170,7 @@ function departIdleShips(model, now) {
 module.exports = {
   ensureShip,
   spawnDrone,
-  setLocal,
+  setModel,
   ensureProviderShip,
   addPending,
   clearPending,

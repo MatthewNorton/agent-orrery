@@ -13,7 +13,7 @@ const { liveShip } = require('../universe/public-shape');
 const { queue, pushFeed } = require('./events');
 const { READ_LIMIT_BYTES, LINE_LIMIT_BYTES } = require('./model');
 const { adoptProjectPath } = require('./projects');
-const { ensureShip, spawnDrone, setLocal, addPending } = require('./ships');
+const { ensureShip, spawnDrone, setModel, addPending } = require('./ships');
 const { addBuild } = require('./builds');
 
 /**
@@ -94,7 +94,7 @@ function parseLine(model, line, tail) {
     } else if (signal.type === 'message') {
       message = signal;
       if (resumesTurn(signal)) ship.turnDone = false;
-      setLocal(model, ship, signal.local);
+      setModel(model, ship, signal);
     } else if (signal.type === 'tool-start') {
       if (message.assistant && signal.callId) {
         // A tool_use id belongs to the ship that issued it last.

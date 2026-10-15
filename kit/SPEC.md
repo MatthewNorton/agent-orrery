@@ -131,7 +131,7 @@ Project = { id, path, name, exists, firstSeen, lastActivity, totalBytes, totalBu
 // deleted paths use key `graveyard` with label `Graveyard`.
 
 Ship = { id, name, provider, project, kind, status, detail, lastEvent,
-         attention, attentionSince, builds, local, taskId?, turnOutcome? }   // ?: LIVE only
+         attention, attentionSince, builds, local, model, taskId?, turnOutcome? }   // ?: LIVE only
 // provider: 'claude'|'codex'|'generic'; names use Claude-/Codex-/Signal-.
 // kind: 'main' | 'drone' (drone = subagent, render smaller);
 // status: 'Building'|'Exploring'|'Gathering Resources'|'Scanning'|'Delegating'|
@@ -146,6 +146,11 @@ Ship = { id, name, provider, project, kind, status, detail, lastEvent,
 //   local server (oss, ollama, lmstudio, llama.cpp, vllm, localai). Claude: the
 //   latest assistant message.model is not a Claude model. Drones inherit it from
 //   their parent; a change arrives as ship-updated. The provider stays claude/codex.
+// model: the model name the transcript last reported, as written (Claude
+//   message.model; Codex session_meta.model and each turn_context.model, which the
+//   adapter emits as a `turn-context` signal), control characters dropped, cut to 64
+//   chars, null until known. Any model, any provider; the renderer prints it and never
+//   interprets it. Drones inherit it; a change is a ship-updated.
 
 FeedEntry = { kind, text, project, ts }
 // kind: 'discover'|'form'|'build'|'info'|'spawn'|'depart'|'attention'|'done'
@@ -241,7 +246,10 @@ Design tokens (put in `:root`):
 - Provider colors (`AUR.PROVIDERS`): Claude neon purple `#b026ff`, Codex blue
   `#2f7dff`, generic Signal `#94a3b8`; a `local` ship of either provider is red
   `#ff3344` (`AUR.LOCAL_MODEL`). `AUR.shipColor(ship)` and `AUR.shipTint(id,
-  provider)` both resolve local, so hulls, agent rows and focus mode agree.
+  provider)` both resolve local, so hulls, agent rows and focus mode agree. The
+  chrome says it too: a fleet row ends with the ship's `model` (`.agent-model-tag`,
+  "Local · <model>" in `--local` red when local), the focus telemetry appends it to
+  the provider, and the universe legend lists "Local model".
   Missing provider values in legacy fixtures normalize to Claude; raw/unknown
   values normalize to Signal.
 - Fleet hulls wear a livery: graphite hull and armor, the structure (ivory)

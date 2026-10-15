@@ -34,6 +34,7 @@ const INDEX_BLOCK_BYTES = 256 * 1024;
  * @property {'main' | 'drone'} kind
  * @property {string | null} parentSessionId
  * @property {boolean} [local]
+ * @property {string | null} [model]
  * @property {number} startMs
  * @property {number} endMs
  * @property {number} size bytes captured at index time
@@ -185,6 +186,7 @@ async function inspectCodexFile(filePath, priority, safeTimestamp) {
       kind: signal.kind,
       parentSessionId: codexParentSessionId(record.payload),
       local: signal.local === true,
+      model: signal.model || null,
     };
     break;
   }
@@ -206,6 +208,7 @@ async function inspectCodexFile(filePath, priority, safeTimestamp) {
     kind: metadata.kind === 'drone' ? 'drone' : 'main',
     parentSessionId: metadata.parentSessionId,
     local: metadata.local,
+    model: metadata.model,
     startMs,
     endMs,
     size: inspected.size,

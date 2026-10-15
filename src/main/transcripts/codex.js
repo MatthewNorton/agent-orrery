@@ -2,7 +2,7 @@
 'use strict';
 
 const { plainObject, safeId, safePath, firstTrimmed } = require('./fields');
-const { codexProviderIsLocal } = require('./model');
+const { codexProviderIsLocal, modelName } = require('./model');
 
 const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/ig;
 const MAX_BUILD_FILES = 256;
@@ -55,7 +55,17 @@ function codexRecordToSignals(record) {
       && Boolean(safePath(payload.agent_path) || safeId(payload.parent_thread_id) || nestedSubagent);
     const kind = threadSource === 'subagent' || fallbackDrone ? 'drone' : 'main';
     const local = codexProviderIsLocal(payload.model_provider);
-    return [withTs({ type: 'session', sessionId, cwd, kind, ...(local === null ? {} : { local }) })];
+    const model = modelName(payload.model);
+    return [withTs({
+      type: 'session', sessionId, cwd, kind,
+      ...(local === null ? {} : { local }), ...(model === null ? {} : { model }),
+    })];
+  }
+
+  // Each turn restates the model, which the user may switch mid-session.
+  if (recordType === 'turn_context') {
+    const model = modelName(payload.model);
+    return model === null ? [] : [withTs({ type: 'turn-context', model })];
   }
 
   if (recordType === 'response_item') {
