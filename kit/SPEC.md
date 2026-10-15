@@ -297,12 +297,16 @@ Design tokens (put in `:root`):
   history; a project moves inward when it is worked on. The largest galaxy anchors the
   cluster and each other one touches a placed galaxy at the free slot nearest the
   cluster's centre, with a positive gap; every galaxy is lifted and tilted on its own
-  pivot, which its glyphs (and so their ships, pulses and labels) ride. Each galaxy
-  renders a body of thousands of star sprites on the same arms (exponential density,
-  warm at the core, blue-white on the arms), a stacked luminous core, dust along the
-  arms in the galaxy's colour, a faint non-pickable halo disc (excluded from the glow
-  layer), a faint outline, and a `GALAXY: <LABEL> · N SYSTEMS` label; Graveyard is
-  muted and peripheral. Galaxy and project labels share the 6px screen-space
+  pivot, which everything of its rides: the glyphs (and so their ships, pulses and
+  labels) and the body.
+- **Galaxy body**: a point cloud of stars on the same arms, a bright core and dust in
+  the galaxy's colour, all children of the pivot, rebuilt only when the spiral changes,
+  none of it in the glow layer. A faint non-pickable halo disc fills under the stars;
+  a faint outline carries the label anchor, the camera bounds and the colour proof, and
+  a `GALAXY: <LABEL> · N SYSTEMS` label sits on it. Stars never exceed a sun's size,
+  so a glyph stays legible inside the field, and the body's alpha is budgeted so the
+  backdrop luma gate above still holds. Graveyard is muted and peripheral.
+  Galaxy and project labels share the 6px screen-space
   declutter pass. Camera framing uses the world-space bounds of every outline, lift
   and tilt included. ArcRotateCamera keeps
   wheel zoom + drag rotation and a dynamically sufficient radius clamp.

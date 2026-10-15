@@ -53,7 +53,7 @@
       label.isVisible = false;
 
       const record = {
-        key: spec.key, colorHex, pivot, region, material, outline, label,
+        key: spec.key, colorHex, color, dim, pivot, region, material, outline, label,
         labelOffsetY: -12, labelScreen: null,
       };
       updateGalaxyVisual(record, spec, memberCount);
@@ -188,6 +188,16 @@
       if (untouched) frameCamera();
     }
 
-    return { rebuildGalaxyLayout, reframeCamera };
+    // One galaxy up close, the first unless a key is given: the kit's proof shot of a body.
+    function frameGalaxy(key) {
+      const galaxy = key ? galaxies.get(key) : galaxies.values().next().value;
+      if (!galaxy) return false;
+      camera.setTarget(galaxy.pivot.getAbsolutePosition().clone());
+      camera.radius = Math.max(camera.lowerRadiusLimit, galaxy.radius * 2.2);
+      camera.beta = 1;
+      return true;
+    }
+
+    return { rebuildGalaxyLayout, reframeCamera, frameGalaxy };
   };
 })();

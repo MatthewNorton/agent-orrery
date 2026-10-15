@@ -1,96 +1,146 @@
-// scene-universe-stars.js — the body of a galaxy: thousands of stars on the spiral arms its systems
-// follow, a thick luminous core, and dust along the arms in the galaxy's colour. Sprites, so a
-// galaxy costs two draw calls and never enters the glow pass.
+// scene-universe-stars.js — the body of a galaxy, in the galaxy's own space so it rides the pivot:
+// thousands of stars as a point cloud on the spiral arms its systems follow (a point shader draws
+// each as a soft disc of its own size), and a luminous core and dust along the arms as flat soft
+// discs in the disc plane. Two draw calls per galaxy, outside the glow pass, rebuilt only when
+// the spiral itself changes.
 'use strict';
 
 (function () {
   const AUR = window.AUR;
   const GALAXY = window.AUR_GALAXY;
 
-  const CORE_COLORS = ['#ffe9c4', '#ffd9a0', '#fff3dc', '#ffc98a'];
-  const ARM_COLORS = ['#dfe8ff', '#ffffff', '#c9d8ff', '#f4f6ff', '#ffe6d0'];
-  const NEBULA_COLOR = '#ff9fb4';
+  const STARS = { base: 600, perMember: 400, perUnit: 20, max: 12000 };
+  const FIELD_SHARE = 0.12;
+  const NEBULA_SHARE = 0.04;
+  const BRIGHT_SHARE = 0.08;
+  const DUST_PER_ARM = 16;
+  const CORE_HEX = ['#ffe9c4', '#ffd9a0', '#fff3dc', '#ffc98a'];
+  const ARM_HEX = ['#dfe8ff', '#ffffff', '#c9d8ff', '#f4f6ff', '#ffe6d0'];
+  const NEBULA_HEX = '#ff9fb4';
+  // The core: stacked glows, [size as a fraction of the radius, alpha, core colour], warm to white-hot.
+  const CORE_GLOWS = [[0.7, 0.12, 3], [0.36, 0.26, 1], [0.16, 0.45, 0], [0.06, 0.7, 2]];
+
+  const VERTEX_SHADER = `
+    precision highp float;
+    attribute vec3 position;
+    attribute vec4 color;
+    attribute float size;
+    uniform mat4 worldViewProjection;
+    uniform mat4 worldView;
+    uniform float pixelsPerUnit;
+    varying vec4 vColor;
+    void main() {
+      vec4 viewPosition = worldView * vec4(position, 1.0);
+      gl_Position = worldViewProjection * vec4(position, 1.0);
+      gl_PointSize = clamp(size * pixelsPerUnit / max(1.0, abs(viewPosition.z)), 1.0, 256.0);
+      vColor = color;
+    }`;
+  const FRAGMENT_SHADER = `
+    precision highp float;
+    varying vec4 vColor;
+    void main() {
+      float soft = smoothstep(1.0, 0.0, length(gl_PointCoord - vec2(0.5)) * 2.0);
+      gl_FragColor = vec4(vColor.rgb, vColor.a * soft * soft);
+    }`;
 
   AUR.sceneParts.universe.stars = function (view) {
-    const { scene, softDisc } = view;
-    const dustUrl = softDisc.getContext().canvas.toDataURL();
-    // Stars want a hard point inside a short glow, not the galaxy's wide falloff.
-    const starDisc = AUR.softDiscTexture(scene, [[0, 1], [0.12, 0.9], [0.35, 0.2], [1, 0]]);
-    const starUrl = starDisc.getContext().canvas.toDataURL();
-    starDisc.dispose();
+    const { scene, engine, camera, glow } = view;
+    BABYLON.Effect.ShadersStore.galaxyStarsVertexShader = VERTEX_SHADER;
+    BABYLON.Effect.ShadersStore.galaxyStarsFragmentShader = FRAGMENT_SHADER;
 
     const pick = (rand, list) => list[Math.floor(rand() * list.length)];
     const gaussian = (rand) => Math.sqrt(-2 * Math.log(1 - rand())) * Math.cos(2 * Math.PI * rand());
+    const CORE_COLORS = CORE_HEX.map(AUR.color3);
+    const ARM_COLORS = ARM_HEX.map(AUR.color3);
+    const NEBULA_COLOR = AUR.color3(NEBULA_HEX);
 
-    function spriteManager(name, url, capacity, additive) {
-      const manager = new BABYLON.SpriteManager(name, url, capacity, { width: 128, height: 128 }, scene);
-      manager.isPickable = false;
-      manager.disableDepthWrite = true;
-      if (additive) manager.blendMode = BABYLON.Constants.ALPHA_ADD;
-      return manager;
+    // One point material for every galaxy; a star's pixel size follows the viewport each frame.
+    const starMaterial = new BABYLON.ShaderMaterial('galaxy-stars', scene, 'galaxyStars', {
+      attributes: ['position', 'color', 'size'],
+      uniforms: ['worldViewProjection', 'worldView', 'pixelsPerUnit'],
+      needAlphaBlending: true,
+    });
+    starMaterial.pointsCloud = true;
+    starMaterial.alphaMode = BABYLON.Constants.ALPHA_ADD;
+    starMaterial.disableDepthWrite = true;
+    starMaterial.backFaceCulling = false;
+    scene.onBeforeRenderObservable.add(() => {
+      starMaterial.setFloat('pixelsPerUnit', engine.getRenderHeight() / (2 * Math.tan(camera.fov / 2)));
+    });
+
+    function starColor(rand, core) {
+      if (core) return pick(rand, CORE_COLORS);
+      return rand() < NEBULA_SHARE ? NEBULA_COLOR : pick(rand, ARM_COLORS);
     }
 
-    function sprite(manager, position, hex, alpha, size) {
-      const s = new BABYLON.Sprite('star', manager);
-      s.position = position;
-      const c = BABYLON.Color3.FromHexString(hex);
-      s.color = new BABYLON.Color4(c.r, c.g, c.b, alpha);
-      s.size = size;
-      return s;
-    }
-
-    // Sprites live in world space, so the galaxy's tilt and lift are applied here.
-    function buildGalaxyStars(record, spec) {
-      disposeGalaxyStars(record);
+    // One point cloud holds the stars, the stacked core glows and the dust along the arms: the
+    // glows are just large, faint points of the same shader.
+    function starCloud(record, spec) {
       const { spiral } = spec;
-      const dim = spec.key === 'graveyard';
+      const R = spec.radius;
       const rand = AUR.mulberry32(AUR.fnv1a('stars:' + spec.key));
-      const world = record.pivot.computeWorldMatrix(true);
-      const at = (x, y, z) => BABYLON.Vector3.TransformCoordinates(new BABYLON.Vector3(x, y, z), world);
-      const R = spiral.radius;
-      const count = Math.round(Math.min(12000, 2000 + R * 60));
-
-      const stars = spriteManager('galaxy-stars:' + spec.key, starUrl, count, true);
-      for (let i = 0; i < count; i++) {
-        // Half the stars crowd the core, half spread evenly over the disc; most trace an arm,
-        // the rest fill the field between them.
+      const fade = record.dim ? 0.35 : 1;
+      const stars = Math.round(Math.min(STARS.max,
+        STARS.base + record.memberCount * STARS.perMember + R * STARS.perUnit));
+      const dust = DUST_PER_ARM * spiral.arms;
+      const count = stars + CORE_GLOWS.length + dust;
+      const positions = new Float32Array(count * 3);
+      const colors = new Float32Array(count * 4);
+      const sizes = new Float32Array(count);
+      const indices = new Uint32Array(count);
+      let k = 0;
+      const put = (x, y, z, size, color, alpha) => {
+        positions.set([x, y, z], k * 3);
+        colors.set([color.r, color.g, color.b, alpha * fade], k * 4);
+        sizes[k] = size;
+        indices[k] = k;
+        k++;
+      };
+      for (let i = 0; i < stars; i++) {
+        // Half the stars crowd the core, half spread evenly over the disc; most trace an arm.
         const u = rand();
         const r = Math.min(R, rand() < 0.5 ? -R * 0.3 * Math.log(1 - u) : R * Math.sqrt(u));
-        const field = rand() < 0.12;
-        const angle = field ? rand() * Math.PI * 2
+        const angle = rand() < FIELD_SHARE ? rand() * Math.PI * 2
           : GALAXY.armAngle(spiral, i % spiral.arms, r) + gaussian(rand) * (0.04 + 0.14 * (r / R));
-        const y = gaussian(rand) * GALAXY.discThickness(spiral, r) * 0.8;
-        const core = r < R * 0.22;
-        const hex = core ? pick(rand, CORE_COLORS) : (rand() < 0.04 ? NEBULA_COLOR : pick(rand, ARM_COLORS));
-        const alpha = (dim ? 0.3 : 0.8) * (0.3 + 0.7 * rand());
-        const bright = rand() < 0.08;
-        sprite(stars, at(Math.cos(angle) * r, y, Math.sin(angle) * r), hex, alpha,
-          bright ? 0.9 + rand() * 0.9 : 0.25 + rand() * rand() * 0.7);
+        put(Math.cos(angle) * r, gaussian(rand) * GALAXY.discThickness(spiral, r) * 0.8, Math.sin(angle) * r,
+          rand() < BRIGHT_SHARE ? 1.2 + rand() * 1.2 : 0.35 + rand() * rand() * 0.9,
+          starColor(rand, r < spiral.core), 0.9 * (0.3 + 0.7 * rand()));
       }
-
-      // The luminous core (stacked warm glows) and dust along the arms in the galaxy's own colour.
-      const perArm = 48;
-      const glows = spriteManager('galaxy-dust:' + spec.key, dustUrl, perArm * spiral.arms + 4, false);
-      for (const [size, alpha, hex] of [[R * 0.7, 0.12, CORE_COLORS[3]], [R * 0.36, 0.26, CORE_COLORS[1]],
-        [R * 0.16, 0.45, CORE_COLORS[0]], [R * 0.06, 0.7, CORE_COLORS[2]]]) {
-        sprite(glows, at(0, 0, 0), hex, dim ? alpha * 0.4 : alpha, size);
-      }
-      for (let i = 0; i < perArm * spiral.arms; i++) {
-        const r = spiral.core + (R * 0.95 - spiral.core) * ((i % perArm) + 0.5) / perArm;
+      for (const [fraction, alpha, core] of CORE_GLOWS) put(0, 0, 0, R * fraction, CORE_COLORS[core], alpha);
+      for (let i = 0; i < dust; i++) {
+        const r = GALAXY.armRadius(spiral, ((i % DUST_PER_ARM) + 0.5) / DUST_PER_ARM);
         const angle = GALAXY.armAngle(spiral, i % spiral.arms, r) + gaussian(rand) * 0.08;
-        const size = R * (0.06 + rand() * 0.08);
-        sprite(glows, at(Math.cos(angle) * r, gaussian(rand) * 0.6, Math.sin(angle) * r),
-          record.colorHex, dim ? 0.05 : 0.14, size);
+        put(Math.cos(angle) * r, gaussian(rand) * 0.6, Math.sin(angle) * r, R * (0.1 + rand() * 0.1),
+          record.color, 0.12);
       }
-      record.stars = stars;
-      record.dust = glows;
+      const mesh = new BABYLON.Mesh('galaxy-stars:' + spec.key, scene);
+      const data = new BABYLON.VertexData();
+      data.positions = positions;
+      data.colors = colors;
+      data.indices = indices;
+      data.applyToMesh(mesh);
+      mesh.setVerticesData('size', sizes, false, 1);
+      mesh.material = starMaterial;
+      mesh.isPickable = false;
+      mesh.parent = record.pivot;
+      glow.addExcludedMesh(mesh);
+      return mesh;
+    }
+
+    // The body depends only on the spiral, the member count and the radius; a pivot that
+    // merely moves keeps its stars.
+    function buildGalaxyStars(record, spec) {
+      const bodyKey = [spec.spiral.arms, spec.spiral.phase, record.memberCount, spec.radius].join(':');
+      if (record.bodyKey === bodyKey) return;
+      disposeGalaxyStars(record);
+      record.body = starCloud(record, spec);
+      record.bodyKey = bodyKey;
     }
 
     function disposeGalaxyStars(record) {
-      if (record.stars) record.stars.dispose();
-      if (record.dust) record.dust.dispose();
-      record.stars = null;
-      record.dust = null;
+      if (record.body) record.body.dispose();
+      record.body = null;
+      record.bodyKey = null;
     }
 
     return { buildGalaxyStars, disposeGalaxyStars };

@@ -264,6 +264,7 @@
     scene.metadata = {
       view: 'universe',
       galaxyStats: view.galaxyStats,
+      frameGalaxy: view.frameGalaxy,
       providerStats() {
         return AUR.sceneProviderStats(scene);
       },
