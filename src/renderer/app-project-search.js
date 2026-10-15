@@ -1,5 +1,5 @@
 // @ts-check
-// app-project-search.js — universe project search: topbar query, GitHub filter, match highlighting.
+// app-project-search.js — project search in every view: topbar query, GitHub filter, universe match highlighting.
 'use strict';
 
 (function () {
@@ -9,7 +9,7 @@
   if (!A) throw new Error('app-state.js must load before app-project-search.js');
   const S = A.state, C = A.const;
 
-  // ---------- universe project search ----------
+  // ---------- project search ----------
   A.wireProjectSearch = function wireProjectSearch() {
     S.projectSearch.els = {
       root: document.getElementById('project-search'),
@@ -96,13 +96,7 @@
     }
   };
 
-  A.renderProjectSearchVisibility = function renderProjectSearchVisibility() {
-    const els = S.projectSearch.els;
-    if (!els) return;
-    els.root.classList.toggle('hidden', S.current.view !== 'universe');
-    renderProjectVcsFilter();
-  };
-
+  A.renderProjectVcsFilter = renderProjectVcsFilter;
   function renderProjectVcsFilter() {
     const els = S.projectSearch.els;
     if (!els || !els.filter) return;
@@ -120,8 +114,8 @@
 
   A.refreshProjectSearchFromStore = function refreshProjectSearchFromStore() {
     const els = S.projectSearch.els;
-    A.renderProjectSearchVisibility();
-    if (!els || S.current.view !== 'universe') return;
+    if (!els) return;
+    renderProjectVcsFilter();
     if (els.input.value.trim() || S.projectSearch.filter !== VCS.FILTERS.ALL) updateProjectSearch();
     else A.syncUniverseProjectMatches();
   };
@@ -144,7 +138,7 @@
 
   function updateProjectSearch() {
     const els = S.projectSearch.els;
-    if (!els || S.current.view !== 'universe') return;
+    if (!els) return;
     const query = els.input.value.trim();
     const queryChanged = query !== S.projectSearch.query;
     const previous = queryChanged ? null : S.projectSearch.results[S.projectSearch.selected];
@@ -198,7 +192,7 @@
   function renderProjectSearchResults() {
     const els = S.projectSearch.els;
     if (!els) return;
-    const open = S.current.view === 'universe' && Boolean(els.input.value.trim());
+    const open = Boolean(els.input.value.trim());
     els.results.classList.toggle('hidden', !open);
     els.input.setAttribute('aria-expanded', String(open));
     AUR.clear(els.results);

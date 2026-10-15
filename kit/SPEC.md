@@ -202,7 +202,7 @@ Design tokens (put in `:root`):
   jumping to that project's system view on click.
   A `SEARCH` glass field follows the strip: case-insensitive ranked project
   matches appear in a keyboard-accessible dropdown and Enter/click opens the
-  existing guarded system route. It clears and closes outside universe view.
+  existing guarded system route. It is present in every view; a view switch clears it.
   A persistent gear opens `SETTINGS · PROJECT PATHS`: missing project folders
   can be recovered with a bounded scan beneath a user-chosen parent or a
   native `Locate…` picker. Scan matches require explicit confirmation, remaps

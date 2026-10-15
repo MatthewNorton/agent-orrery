@@ -113,7 +113,6 @@
 
 /* the GitHub filter and the all-projects button: line buttons with a count */
 .project-vcs-filter, .project-directory-button {
-  margin-left: auto;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -130,7 +129,6 @@
   cursor: pointer;
 }
 .project-vcs-filter { margin-left: 8px; }
-.project-search:not(.hidden) ~ .project-directory-button { margin-left: 0; }
 .project-vcs-filter:hover, .project-directory-button:hover,
 .project-directory-button[aria-expanded="true"] { color: var(--ink); background: var(--plate); }
 .project-vcs-filter[aria-pressed='true'] { color: var(--ink); border-color: var(--green); }
