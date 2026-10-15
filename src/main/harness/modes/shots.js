@@ -22,6 +22,25 @@ async function runShotMode(ctx, driver) {
     const img = await ctx.win.webContents.capturePage();
     fs.writeFileSync(path.join(outDir, `shot-${view}.png`), img.toPNG());
     console.log(`captured ${view}`);
+    if (view === 'universe') {
+      // One galaxy up close: the next view switch rebuilds the scene, so nothing needs restoring.
+      const framed = await rendererEval(`(() => {
+        const scene = BABYLON.EngineStore.LastCreatedScene;
+        const camera = scene && scene.activeCamera;
+        const pivot = scene && scene.transformNodes.find((node) => node.name.startsWith('galaxy:'));
+        if (!camera || !pivot) return false;
+        camera.setTarget(pivot.getAbsolutePosition());
+        camera.radius = 120;
+        camera.beta = 1.0;
+        return true;
+      })()`);
+      if (framed) {
+        await wait(700);
+        const closeImage = await ctx.win.webContents.capturePage();
+        fs.writeFileSync(path.join(outDir, 'shot-galaxy-close.png'), closeImage.toPNG());
+        console.log('captured galaxy close-up');
+      }
+    }
     if (view === 'planet') {
       // Every left-rail module folds to its header from its chevron, and unfolds again.
       const folded = await rendererEval(`(() => {

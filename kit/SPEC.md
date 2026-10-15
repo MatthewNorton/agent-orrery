@@ -57,7 +57,7 @@ loaders), then:
 | Layer | Files |
 |---|---|
 | Shared libraries | `util.js` (creates `window.AUR`; `fnv1a`/`mulberry32` copied from `src/main/shared/hash.js` so seeds agree), `util-scene.js` (Babylon helpers), `procedural-worlds.js`, `ship-assets.js` + `ship-assets-hulls.js` + `ship-assets-api.js` (`AUR.ships`), `polish-math.js` and `galaxy-layout.js` (pure UMD), `search-core.js`, `components/project-vcs-status.js` |
-| Views | `scene-common.js` (`AUR.sceneParts`), then each view's parts before the view: `scene-universe-{galaxies,glyphs,labels,ships,stats}.js` → `scene-universe.js`, `scene-system-{belt,focus,ships}.js` → `scene-system.js`, then `scene-planet.js` |
+| Views | `scene-common.js` (`AUR.sceneParts`), then each view's parts before the view: `scene-universe-{galaxies,glyphs,labels,ships,stars,stats}.js` → `scene-universe.js`, `scene-system-{belt,focus,ships}.js` → `scene-system.js`, then `scene-planet.js` |
 | App state | `app-state.js` — the only file that assigns `AUR.app` (`state`, `const`) |
 | App modules | `app-agent-focus.js`, `app-chrome.js`, `app-chrome-hud.js`, `app-chrome-queue.js`, `app-history-metrics.js`, `app-ideas.js`, `app-ideas-list.js`, `app-modules.js`, `app-playback.js`, `app-project-control.js`, `app-project-directory.js`, `app-project-search.js`, `app-project-settings.js`, `app-project-tasks.js`, `app-replay.js`, `app-store.js` |
 | Boot | `app.js` — boot, event routing, view switching, debug hooks |
@@ -289,16 +289,20 @@ Design tokens (put in `:root`):
   the camera zooms in, and reruns only when camera/viewport, hover, project,
   galaxy, or ship state becomes dirty.
 - **Deterministic galaxy layout** (persistent universe — same every launch):
-  group projects by their additive `galaxy.key`; inside a galaxy the most recently
-  active projects sit at the core and dormant ones drift to the rim, on a jittered
-  hash-rotated spiral (the same layout for the same activity history; a project moves
-  inward when it is worked on). The largest galaxy anchors the cluster and each other
-  one touches a placed galaxy at the free slot nearest the cluster's centre, with a
-  positive gap; every galaxy is lifted and tilted on its own pivot, which its glyphs
-  (and so their ships, pulses and labels) ride. Render a soft non-pickable
-  hashed-color disc (excluded from the glow layer), an outline, and a
-  `GALAXY: <LABEL> · N SYSTEMS` label for each group; Graveyard is muted and
-  peripheral. Galaxy and project labels share the 6px screen-space
+  group projects by their additive `galaxy.key`. A galaxy is a spiral: two to four
+  arms (by member count) twisting out from a core, and its systems sit on those arms
+  by recency, the most recently active nearest the core, each on the next arm outward,
+  with a per-project nudge off the arm and a lift that follows the disc's thickness
+  (a bulge at the core, thin at the rim). The same layout for the same activity
+  history; a project moves inward when it is worked on. The largest galaxy anchors the
+  cluster and each other one touches a placed galaxy at the free slot nearest the
+  cluster's centre, with a positive gap; every galaxy is lifted and tilted on its own
+  pivot, which its glyphs (and so their ships, pulses and labels) ride. Each galaxy
+  renders a body of thousands of star sprites on the same arms (exponential density,
+  warm at the core, blue-white on the arms), a stacked luminous core, dust along the
+  arms in the galaxy's colour, a faint non-pickable halo disc (excluded from the glow
+  layer), a faint outline, and a `GALAXY: <LABEL> · N SYSTEMS` label; Graveyard is
+  muted and peripheral. Galaxy and project labels share the 6px screen-space
   declutter pass. Camera framing uses the world-space bounds of every outline, lift
   and tilt included. ArcRotateCamera keeps
   wheel zoom + drag rotation and a dynamically sufficient radius clamp.

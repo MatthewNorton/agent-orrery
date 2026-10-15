@@ -1,6 +1,7 @@
 // scene-universe-galaxies.js — galaxy regions on the universe map: each galaxy is a tilted, lifted
-// pivot carrying a soft disc, an outline and its project glyphs; the project layout that places
-// each glyph in its galaxy; and the camera framing that keeps them all on screen.
+// pivot carrying a faint halo, an outline, its star body (scene-universe-stars.js) and its project
+// glyphs; the project layout that places each glyph in its galaxy; and the camera framing that
+// keeps them all on screen.
 'use strict';
 
 (function () {
@@ -32,12 +33,12 @@
       region.isPickable = false;
       region.metadata = { isGalaxyRegion: true, galaxyKey: spec.key };
       const material = AUR.softMaterial(scene, 'galaxy-region-mat:' + spec.key,
-        color.scale(dim ? 0.22 : 0.45), dim ? 0.2 : 0.3, softDisc);
+        color.scale(dim ? 0.2 : 0.4), dim ? 0.12 : 0.18, softDisc);
       material.backFaceCulling = false;
       region.material = material;
       glow.addExcludedMesh(region);
 
-      const outline = AUR.orbitRing(scene, 1, colorHex, dim ? 0.12 : 0.19, 0);
+      const outline = AUR.orbitRing(scene, 1, colorHex, dim ? 0.06 : 0.1, 0);
       outline.name = 'galaxy-outline:' + spec.key;
       outline.parent = pivot;
       outline.isPickable = false;
@@ -74,11 +75,13 @@
       record.outline.scaling.set(spec.radius, 1, spec.radius);
       record.label.text = galaxyLabelText(spec, memberCount);
       record.labelWidth = Math.min(260, Math.max(90, record.label.text.length * 7.8));
+      view.buildGalaxyStars(record, spec);
     }
 
     // Called once the galaxy's glyphs have moved to another pivot; disposing the pivot takes the
     // disc and the outline with it.
     function disposeGalaxyVisual(record) {
+      view.disposeGalaxyStars(record);
       record.label.dispose();
       record.pivot.dispose();
       record.material.dispose();

@@ -51,8 +51,8 @@
       skyLevel: UNIVERSE_SKY_LEVEL, searchMatchIds: null, hoveredProjectId: null,
     };
     const parts = AUR.sceneParts.universe;
-    Object.assign(view, parts.labels(view), parts.glyphs(view), parts.galaxies(view),
-      parts.ships(view), parts.stats(view));
+    Object.assign(view, parts.labels(view), parts.glyphs(view), parts.stars(view),
+      parts.galaxies(view), parts.ships(view), parts.stats(view));
 
     // ---- glyphs ----
     // Suns come in five colours, so five corona materials serve every glyph.

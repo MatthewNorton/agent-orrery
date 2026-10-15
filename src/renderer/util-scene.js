@@ -127,15 +127,14 @@
     return marker;
   };
 
-  // A soft radial disc, white at the centre and clear at the rim: the opacity of every glow.
-  AUR.softDiscTexture = function (scene) {
+  // A white radial disc whose alpha follows the given [offset, alpha] stops, soft by default:
+  // the opacity of every glow.
+  AUR.softDiscTexture = function (scene, stops = [[0, 1], [0.45, 0.45], [1, 0]]) {
     const size = 128;
     const texture = new BABYLON.DynamicTexture('soft-disc', size, scene, false);
     const context = texture.getContext();
     const gradient = context.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
-    gradient.addColorStop(0, 'rgba(255,255,255,1)');
-    gradient.addColorStop(0.45, 'rgba(255,255,255,0.45)');
-    gradient.addColorStop(1, 'rgba(255,255,255,0)');
+    for (const [offset, alpha] of stops) gradient.addColorStop(offset, 'rgba(255,255,255,' + alpha + ')');
     context.fillStyle = gradient;
     context.fillRect(0, 0, size, size);
     texture.hasAlpha = true;

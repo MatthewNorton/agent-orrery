@@ -9,11 +9,14 @@
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.AUR_GALAXY = api;
 })(typeof window !== 'undefined' ? window : globalThis, function () {
-  const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
   const MEMBER_STEP = 16;
-  const MEMBER_RADIUS_JITTER = 3;
-  const MEMBER_ANGLE_JITTER = 0.3;
+  const MEMBER_RADIUS_JITTER = 1.5;
+  const MEMBER_ANGLE_JITTER = 0.05;
   const MEMBER_LIFT = 1.5;
+  const CORE_LIFT = 3;
+  const CORE_RADIUS = 10;
+  const ARM_TWIST = 3;
+  const ARM_STRETCH = 1.4;
   const MEMBER_MARGIN = 10;
   const MIN_RADIUS = 24;
   const GALAXY_GAP = 20;
@@ -81,20 +84,46 @@
     return { key, label };
   }
 
-  // Core to rim by recency, on a jittered sunflower so the spacing stays even without the pattern.
+  // The spiral a galaxy's systems and stars share: a few arms twisting out from a core, sized so
+  // that systems spaced evenly along an arm stay a step apart.
+  function spiralFor(group) {
+    const n = group.members.length;
+    const arms = n < 8 ? 2 : n < 24 ? 3 : 4;
+    const perArm = Math.ceil(n / arms);
+    const rim = CORE_RADIUS + perArm * MEMBER_STEP / ARM_STRETCH;
+    return { arms, perArm, phase: hashAngle(group.key), twist: ARM_TWIST, core: CORE_RADIUS, rim,
+      radius: Math.max(MIN_RADIUS, rim + MEMBER_MARGIN) };
+  }
+
+  // Angle of a point on an arm at a given radius.
+  function armAngle(spiral, arm, radius) {
+    return spiral.phase + arm * Math.PI * 2 / spiral.arms + (radius / spiral.radius) * spiral.twist;
+  }
+
+  // How thick the disc is at a radius: a bulge at the core, thin at the rim.
+  function discThickness(spiral, radius) {
+    return MEMBER_LIFT + CORE_LIFT * Math.exp(-((radius / (spiral.radius * 0.28)) ** 2));
+  }
+
+  // Core to rim by recency along the arms: the most recent system sits nearest the core, the
+  // next on the next arm, and so on outward, each nudged off its arm by its own jitter.
   function memberLayout(group) {
-    const phase = hashAngle(group.key);
     group.members.sort((a, b) => (b.lastActivity - a.lastActivity) || a.id.localeCompare(b.id));
+    const spiral = spiralFor(group);
     let farthest = 0;
     group.members.forEach((project, index) => {
       const [radial, angular, lift] = seedJitter(project.seed);
-      const radius = index === 0 ? 0 : MEMBER_STEP * Math.sqrt(index) + radial * MEMBER_RADIUS_JITTER;
-      const angle = phase + index * GOLDEN_ANGLE + angular * MEMBER_ANGLE_JITTER;
+      const arm = index % spiral.arms;
+      const along = (Math.floor(index / spiral.arms) + 0.5) / spiral.perArm;
+      const radius = group.members.length === 1 ? 0
+        : spiral.core + along * (spiral.rim - spiral.core) + radial * MEMBER_RADIUS_JITTER;
+      const angle = armAngle(spiral, arm, radius) + angular * MEMBER_ANGLE_JITTER;
       project.localX = Math.cos(angle) * radius;
-      project.localY = lift * MEMBER_LIFT;
+      project.localY = lift * discThickness(spiral, radius);
       project.localZ = Math.sin(angle) * radius;
       farthest = Math.max(farthest, radius);
     });
+    group.spiral = spiral;
     group.radius = Math.max(MIN_RADIUS, farthest + MEMBER_MARGIN);
     group.y = signed('lift:' + group.key) * GALAXY_LIFT;
     group.tiltX = signed('tilt-x:' + group.key) * GALAXY_TILT;
@@ -222,11 +251,11 @@
       galaxies: groups.map((group) => ({
         key: group.key, label: group.label,
         x: group.x, z: group.z, radius: group.radius,
-        y: group.y, tiltX: group.tiltX, tiltZ: group.tiltZ,
+        y: group.y, tiltX: group.tiltX, tiltZ: group.tiltZ, spiral: group.spiral,
       })),
       projects: laidOutProjects,
     };
   }
 
-  return { layoutGalaxyProjects, galaxyColor, projectGalaxy };
+  return { layoutGalaxyProjects, galaxyColor, projectGalaxy, armAngle, discThickness };
 });
