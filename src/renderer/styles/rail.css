@@ -18,7 +18,7 @@ body.command-rail-is-compact { --sidebar-effective-w: var(--sidebar-compact-w); 
 .sidebar.compact { width: var(--sidebar-compact-w); }
 .command-rail-head { flex: 0 0 auto; display: flex; align-items: center; justify-content: flex-end; }
 .command-rail-title { display: none; }
-.command-rail-toggle, .compact-rail-button {
+.compact-rail-button {
   border: 1px solid transparent;
   border-radius: var(--radius-0);
   background: transparent;
@@ -26,16 +26,12 @@ body.command-rail-is-compact { --sidebar-effective-w: var(--sidebar-compact-w); 
   font: inherit;
   cursor: pointer;
 }
-.command-rail-toggle {
-  flex: 0 0 24px;
-  width: 24px; height: 24px;
-  font-size: 18px; line-height: 1;
-  transition: transform var(--dur-collapse) var(--ease);
-}
-.command-rail-toggle:hover, .compact-rail-button:hover { color: var(--ink); background: var(--plate); }
-.command-rail-toggle:focus-visible, .compact-rail-button:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
+/* the rail's own chevron points at the edge it folds to */
+.command-rail-toggle::before { transform: translateX(-2px) rotate(135deg); }
+.sidebar.compact .command-rail-toggle::before { transform: translateX(2px) rotate(-45deg); }
+.compact-rail-button:hover { color: var(--ink); background: var(--plate); }
+.compact-rail-button:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
 .sidebar.compact .command-rail-head { justify-content: center; }
-.sidebar.compact .command-rail-toggle { transform: rotate(180deg); }
 .sidebar .command-rail-compact { display: none; flex-direction: column; gap: var(--space-2); }
 .sidebar.compact .command-rail-compact { display: flex; }
 .compact-rail-button {
@@ -175,7 +171,7 @@ body.command-rail-is-compact { --sidebar-effective-w: var(--sidebar-compact-w); 
 }
 @media (prefers-reduced-motion: reduce) {
   .agent-dot.attention-pulse { animation: none; }
-  .sidebar, .command-section, .command-rail-toggle, .mod-x::before { transition: none; }
+  .sidebar, .command-section, .mod-x::before { transition: none; }
 }
 
 /* feed row: a square provider mark, the sentence, the age */
