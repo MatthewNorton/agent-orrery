@@ -28,13 +28,12 @@
       outline.name = 'galaxy-outline:' + spec.key;
       outline.parent = pivot;
       outline.isPickable = false;
-      outline.metadata = { isGalaxyOutline: true, galaxyKey: spec.key };
 
       const label = AUR.label(gui, galaxyLabelText(spec, memberCount), {
         fontSize: 12, weight: '700', color: colorHex, outline: 4,
       });
       label.name = 'galaxy-label:' + spec.key;
-      label.linkWithMesh(outline);
+      label.linkWithMesh(pivot);
       label.linkOffsetY = -12;
       label.isVisible = false;
 
@@ -48,8 +47,6 @@
     }
 
     function updateGalaxyVisual(record, spec, memberCount) {
-      record.x = spec.x;
-      record.z = spec.z;
       record.radius = spec.radius;
       record.memberCount = memberCount;
       record.labelText = spec.label;
@@ -108,15 +105,18 @@
 
     const framed = { radius: NaN, x: NaN, z: NaN };
 
-    // The world-space box of every galaxy's outline, tilt and lift included.
+    // The world-space box of every galaxy's disc, tilt and lift included.
     function galaxyBounds() {
       const min = new BABYLON.Vector3(Infinity, Infinity, Infinity);
       const max = new BABYLON.Vector3(-Infinity, -Infinity, -Infinity);
       for (const galaxy of galaxies.values()) {
-        galaxy.outline.computeWorldMatrix(true);
-        const box = galaxy.outline.getBoundingInfo().boundingBox;
-        min.minimizeInPlace(box.minimumWorld);
-        max.maximizeInPlace(box.maximumWorld);
+        const world = galaxy.pivot.computeWorldMatrix(true);
+        for (const [x, z] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+          const corner = BABYLON.Vector3.TransformCoordinates(
+            new BABYLON.Vector3(x * galaxy.radius, 0, z * galaxy.radius), world);
+          min.minimizeInPlace(corner);
+          max.maximizeInPlace(corner);
+        }
       }
       return { min, max };
     }

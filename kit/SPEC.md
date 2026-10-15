@@ -300,17 +300,20 @@ Design tokens (put in `:root`):
   pivot, which everything of its rides: the glyphs (and so their ships, pulses and
   labels) and the body.
 - **Galaxy body**: a spiral galaxy, after the Sidereal observatory. `galaxy-field.js`
-  computes an emission/dust atlas over the disc (cloudy arms on the spiral the systems
-  ride, a warm core, star-forming knots, dust lanes inside the arms, the arms leaning
-  toward the galaxy's colour) and draws the resolved stars from it. The renderer gives
-  each galaxy a non-pickable volume box (the region mesh) that raymarches the atlas
-  with a luminous bulge and dust extinction, and one point cloud of stars dimmed by the
-  dust in front of them; both are children of the pivot in the field's local frame
-  scaled to the radius, rebuilt only when the radius changes, added to the scene (so
-  glyphs inside stay legible) and outside the glow layer. No star is larger than the
-  smallest sun (`AUR.SUN_DIAMETER_MIN`) or 12px. A faint outline carries the label
-  anchor, the camera bounds and the colour proof, and a `GALAXY: <LABEL> · N SYSTEMS`
-  label sits on it. Exposure is a design value; the backdrop luma budget above is a
+  computes an emission/dust atlas over the disc (cloudy logarithmic arms from the
+  galaxy's spiral phase, a warm core, star-forming knots, dust lanes inside the arms,
+  the arms leaning toward the galaxy's colour) and draws the resolved stars from it; the
+  systems sit on their own, looser placement spiral, so the light winds as a galaxy's
+  does while neighbouring systems stay a step apart. The renderer gives each galaxy a
+  non-pickable volume box (the region mesh) that raymarches the atlas with a luminous
+  bulge and dust extinction, and one point cloud of stars dimmed by the dust column in
+  front of them; both are children of the pivot in the field's local frame scaled to the
+  radius, rebuilt only when the radius changes (the atlas pixels persist across view
+  switches in `AUR.app.state.galaxyFields`), added to the scene (so glyphs inside stay
+  legible) and outside the glow layer. No star is larger than the smallest sun
+  (`AUR.SUN_DIAMETER_MIN`) or 12px. The pivot carries the label anchor, the camera
+  bounds and the colour proof; a faint outline and a `GALAXY: <LABEL> · N SYSTEMS`
+  label sit on it. Exposure is a design value; the backdrop luma budget above is a
   ceiling it clears. Graveyard is muted and peripheral.
   Galaxy and project labels share the 6px screen-space
   declutter pass. Camera framing uses the world-space bounds of every outline, lift

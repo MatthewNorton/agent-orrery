@@ -10,14 +10,12 @@
   if (root) root.AUR_GALAXY = api;
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   const MEMBER_STEP = 16;
-  const MEMBER_RADIUS_JITTER = 1.5;
-  const MEMBER_ANGLE_JITTER = 0.05;
+  const MEMBER_JITTER = 1.5;
   const MEMBER_LIFT = 1.5;
   const CORE_LIFT = 3;
   const CORE_RADIUS = 10;
   const CORE_BULGE = 0.28;
-  const ARM_TWIST = 5.5;
-  const ARM_STRETCH = 1.4;
+  const ARM_TWIST = 3;
   const MEMBER_MARGIN = 10;
   const MIN_RADIUS = 24;
   const GALAXY_GAP = 20;
@@ -85,24 +83,48 @@
     return { key, label };
   }
 
-  // The spiral a galaxy's systems and stars share: a few arms twisting out from a core, sized so
-  // that systems spaced evenly along an arm stay a step apart. A lone system sits at the centre.
-  function spiralFor(key, count) {
-    const arms = count < 8 ? 2 : count < 24 ? 3 : 4;
-    const perArm = Math.ceil(count / arms);
-    const core = count === 1 ? 0 : CORE_RADIUS;
-    const rim = count === 1 ? 0 : core + perArm * MEMBER_STEP / ARM_STRETCH;
-    return { arms, perArm, phase: hashAngle(key), core, rim, radius: Math.max(MIN_RADIUS, rim + MEMBER_MARGIN) };
-  }
-
-  // Radius of a point a fraction of the way along an arm, from the core to the rim.
-  function armRadius(spiral, along) {
-    return spiral.core + along * (spiral.rim - spiral.core);
-  }
-
   // Angle of a point on an arm at a given radius.
   function armAngle(spiral, arm, radius) {
     return spiral.phase + arm * Math.PI * 2 / spiral.arms + (radius / spiral.radius) * ARM_TWIST;
+  }
+
+  // The radii of a galaxy's systems along one arm, each a MEMBER_STEP chord from the last.
+  function armRadii(spiral) {
+    const point = (r) => { const a = armAngle(spiral, 0, r); return [Math.cos(a) * r, Math.sin(a) * r]; };
+    const radii = [CORE_RADIUS + MEMBER_STEP * 0.35];
+    while (radii.length < spiral.perArm) {
+      const prev = radii[radii.length - 1];
+      const [px, pz] = point(prev);
+      let lo = prev;
+      let hi = prev + MEMBER_STEP;
+      for (let i = 0; i < 20; i++) {
+        const mid = (lo + hi) / 2;
+        const [x, z] = point(mid);
+        if (Math.hypot(x - px, z - pz) < MEMBER_STEP) lo = mid; else hi = mid;
+      }
+      radii.push(hi);
+    }
+    return radii;
+  }
+
+  // The spiral a galaxy's systems sit on: a few arms twisting out from a core, the systems a
+  // step apart along them, wound loosely enough that neighbouring arms stay a system apart (the
+  // galaxy's light winds tighter on its own; see galaxy-field.js). The twist is per radius and
+  // the radius follows the last system, so the two settle together. A lone system sits at the
+  // centre.
+  function spiralFor(key, count) {
+    const arms = count < 8 ? 2 : count < 24 ? 3 : 4;
+    const spiral = { arms, perArm: Math.ceil(count / arms), phase: hashAngle(key), radii: [0], radius: MIN_RADIUS };
+    if (count === 1) return spiral;
+    let radius = CORE_RADIUS + spiral.perArm * MEMBER_STEP + MEMBER_MARGIN;
+    for (let pass = 0; pass < 6; pass++) {
+      spiral.radius = radius;
+      spiral.radii = armRadii(spiral);
+      radius = Math.max(MIN_RADIUS, spiral.radii[spiral.perArm - 1] + MEMBER_MARGIN);
+      if (Math.abs(radius - spiral.radius) < 0.01) break;
+    }
+    spiral.radius = Math.max(spiral.radius, radius);
+    return spiral;
   }
 
   // How thick the disc is at a radius: a bulge at the core, thin at the rim.
@@ -111,15 +133,15 @@
   }
 
   // Core to rim by recency along the arms: the most recent system sits nearest the core, the
-  // next on the next arm, and so on outward, each nudged off its arm by its own jitter.
+  // next on the next arm, and so on outward, each nudged off its arm by its own jitter (a
+  // distance, so it stays small at any radius).
   function memberLayout(group) {
     const spiral = spiralFor(group.key, group.members.length);
     group.members.sort((a, b) => (b.lastActivity - a.lastActivity) || a.id.localeCompare(b.id));
     group.members.forEach((project, index) => {
       const [radial, angular, lift] = seedJitter(project.seed);
-      const along = (Math.floor(index / spiral.arms) + 0.5) / spiral.perArm;
-      const radius = armRadius(spiral, along) + radial * MEMBER_RADIUS_JITTER;
-      const angle = armAngle(spiral, index % spiral.arms, radius) + angular * MEMBER_ANGLE_JITTER;
+      const radius = spiral.radii[Math.floor(index / spiral.arms)] + radial * MEMBER_JITTER;
+      const angle = armAngle(spiral, index % spiral.arms, radius) + angular * MEMBER_JITTER / radius;
       project.localX = Math.cos(angle) * radius;
       project.localY = lift * discThickness(spiral, radius);
       project.localZ = Math.sin(angle) * radius;
@@ -258,5 +280,5 @@
     };
   }
 
-  return { layoutGalaxyProjects, galaxyColor, projectGalaxy, armRadius, armAngle, discThickness };
+  return { layoutGalaxyProjects, galaxyColor, projectGalaxy, armAngle };
 });

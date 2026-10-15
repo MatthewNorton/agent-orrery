@@ -47,6 +47,7 @@
     const galaxies = new Map(); // galaxy key -> rendered region record
     const view = {
       engine, scene, canvas, camera, gui, store, glyphs, ships, galaxies, glow,
+      fields: ctx.galaxyFields || new Map(),
       softDisc: AUR.softDiscTexture(scene), coronaMaterials: new Map(),
       skyLevel: UNIVERSE_SKY_LEVEL, searchMatchIds: null, hoveredProjectId: null,
     };

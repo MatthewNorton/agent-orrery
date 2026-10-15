@@ -120,7 +120,7 @@
 
       const clusters = [...galaxies.values()].map((galaxy) => {
         const members = assignments.filter((item) => item.galaxyKey === galaxy.key);
-        const actualColor = galaxy.outline.color.toHexString().toLowerCase();
+        const actualColor = galaxy.colorHex.toLowerCase();
         return {
           key: galaxy.key,
           label: galaxy.labelText,
@@ -132,7 +132,6 @@
             (value, item) => Math.max(value, item.distanceFromCenter), 0),
           color: actualColor,
           expectedColor: GALAXY.galaxyColor(galaxy.key).toLowerCase(),
-          regionPickable: galaxy.body.volume.isPickable,
           labelVisible: Boolean(galaxy.label.isVisible),
         };
       }).sort((a, b) => a.key.localeCompare(b.key));

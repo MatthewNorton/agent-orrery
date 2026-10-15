@@ -57,6 +57,7 @@
 
     notificationByShip: new Map(),
     liveProjectEvents: new Map(),
+    galaxyFields: new Map(), // galaxy key + spiral shape -> emission atlas pixels (galaxy-field.js)
     lastNotificationAt: -Infinity,
 
     // ---------- runtime ----------
