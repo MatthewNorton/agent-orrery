@@ -270,7 +270,6 @@
   };
 
   A.openSystem = async function openSystem(projectId) {
-    A.clearProjectSearch();
     const request = ++S.routeRequestGeneration;
     const requestedEpoch = S.streamEpoch;
     /** @type {SystemData} */
