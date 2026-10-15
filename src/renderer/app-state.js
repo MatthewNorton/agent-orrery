@@ -140,13 +140,9 @@
       selected: 0,
       els: null,
     },
-    modules: { collapsed: new Set() }, // data-module keys of the left rail cards folded to their header
+    modules: { collapsed: new Set() }, // data-module keys of the modules folded to their header
     commandRail: {
       compact: false,
-      ideasCollapsed: false,
-      agentsCollapsed: false,
-      galaxiesCollapsed: false,
-      feedCollapsed: false,
       els: null,
     },
     agentFocus: {

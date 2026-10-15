@@ -127,7 +127,7 @@
 
     const mark = document.createElement('span');
     mark.innerHTML = projectMarkSvg();
-    card.appendChild(A.moduleHead(card, 'PROJECT: ' + p.name, { lead: mark.firstChild }));
+    A.moduleHead(card, 'PROJECT: ' + p.name, { lead: mark.firstChild });
 
     const ships = A.shipsInProject(p.id);
     const needsYou = ships.some(
@@ -177,7 +177,6 @@
       status.setAttribute('aria-atomic', 'true');
       card.appendChild(status);
     }
-    A.positionTasksPanel();
   };
 
   function pcRow(key, val, accent, tone) {
@@ -200,13 +199,13 @@
     const ships = A.shipsInProject(S.current.projectId);
     const active = ships.length > 0;
 
-    const status = AUR.el('span', 'mod-m plc-status');
+    const status = AUR.el('span', 'mod-m panel-note');
     const sdot = AUR.el('span', 'agent-dot');
     sdot.style.background = active ? '#34d399' : '#8b93a8';
     sdot.style.boxShadow = active ? '0 0 7px #34d399' : 'none';
     status.appendChild(sdot);
     status.appendChild(document.createTextNode(active ? 'Active' : 'Dormant'));
-    card.appendChild(A.moduleHead(card, 'PLANET: ' + String(pd.name).toUpperCase(), { extras: [status] }));
+    A.moduleHead(card, 'PLANET: ' + String(pd.name).toUpperCase(), { extras: [status] });
 
     const body = AUR.el('div', 'mod-b plc-body');
     body.appendChild(pcRow('TYPE', pd.procedural ? 'Unknown' : 'Terrestrial'));

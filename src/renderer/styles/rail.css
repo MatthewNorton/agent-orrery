@@ -18,7 +18,7 @@ body.command-rail-is-compact { --sidebar-effective-w: var(--sidebar-compact-w); 
 .sidebar.compact { width: var(--sidebar-compact-w); }
 .command-rail-head { flex: 0 0 auto; display: flex; align-items: center; justify-content: flex-end; }
 .command-rail-title { display: none; }
-.command-rail-toggle, .command-section-toggle, .compact-rail-button {
+.command-rail-toggle, .compact-rail-button {
   border: 1px solid transparent;
   border-radius: var(--radius-0);
   background: transparent;
@@ -32,9 +32,8 @@ body.command-rail-is-compact { --sidebar-effective-w: var(--sidebar-compact-w); 
   font-size: 18px; line-height: 1;
   transition: transform var(--dur-collapse) var(--ease);
 }
-.command-rail-toggle:hover, .command-section-toggle:hover, .compact-rail-button:hover { color: var(--ink); background: var(--plate); }
-.command-rail-toggle:focus-visible, .command-section-toggle:focus-visible,
-.compact-rail-button:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
+.command-rail-toggle:hover, .compact-rail-button:hover { color: var(--ink); background: var(--plate); }
+.command-rail-toggle:focus-visible, .compact-rail-button:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
 .sidebar.compact .command-rail-head { justify-content: center; }
 .sidebar.compact .command-rail-toggle { transform: rotate(180deg); }
 .sidebar .command-rail-compact { display: none; flex-direction: column; gap: var(--space-2); }
@@ -62,19 +61,9 @@ body.command-rail-is-compact { --sidebar-effective-w: var(--sidebar-compact-w); 
 .galaxies-panel { flex: 0 1 auto; min-height: var(--header-h); max-height: 28%; }
 .ideas-panel { flex: 0 1 auto; min-height: var(--header-h); max-height: 30%; }
 .command-section.is-empty { flex: 0 0 auto; }
-.command-section.collapsed { flex: 0 0 var(--header-h); min-height: var(--header-h); }
-.command-section.collapsed .agents-list, .command-section.collapsed .feed-list,
-.command-section.collapsed .ideas-list, .command-section.collapsed .ideas-form, .command-section.collapsed .galaxies-list,
-.command-section.collapsed .ideas-status { display: none; }
 .sidebar.compact .command-section { display: none; }
 
 .panel-head-actions { display: flex; align-items: center; gap: var(--space-2); min-width: 0; margin-left: auto; }
-.command-section-toggle {
-  width: 24px; height: 24px;
-  font-size: 13px; line-height: 20px;
-  transition: transform var(--dur-collapse) var(--ease);
-}
-.command-section.collapsed .command-section-toggle { transform: rotate(180deg); }
 .panel-note { display: flex; align-items: center; gap: 7px; color: var(--ink-3); font-size: 12px; font-weight: 500; white-space: nowrap; }
 .panel-note.needs-you { color: var(--red); }
 .feed-mode.replay { color: var(--orange-ink); }
@@ -186,7 +175,7 @@ body.command-rail-is-compact { --sidebar-effective-w: var(--sidebar-compact-w); 
 }
 @media (prefers-reduced-motion: reduce) {
   .agent-dot.attention-pulse { animation: none; }
-  .sidebar, .command-section, .command-section-toggle, .command-rail-toggle, .mod-x svg { transition: none; }
+  .sidebar, .command-section, .command-rail-toggle, .mod-x::before { transition: none; }
 }
 
 /* feed row: a square provider mark, the sentence, the age */

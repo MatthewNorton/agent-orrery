@@ -72,12 +72,20 @@ body { counter-reset: mod; }
 }
 .mod-x:hover { background: var(--plate); color: var(--ink); }
 .mod-x:focus-visible { outline: 2px solid var(--orange); outline-offset: -2px; }
-.mod-x svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.8; transition: transform var(--dur-collapse) var(--ease); }
+.mod-x::before {
+  content: "";
+  width: 7px; height: 7px;
+  border-left: 1.8px solid currentColor;
+  border-top: 1.8px solid currentColor;
+  transform: translateY(2px) rotate(45deg);
+  transition: transform var(--dur-collapse) var(--ease);
+}
 .mod-b { flex: 1 1 auto; min-height: 0; overflow: auto; scrollbar-width: thin; }
-/* a collapsed module is its header; the chevron turns to point down */
-.mod.is-collapsed .mod-h, .mod.collapsed .mod-h { border-bottom: 0; }
+/* a folded module is its header; the chevron turns to point down */
+.mod.is-collapsed { flex: 0 0 var(--header-h); min-height: var(--header-h); }
+.mod.is-collapsed .mod-h { border-bottom: 0; }
 .mod.is-collapsed > :not(.mod-h) { display: none; }
-.mod.is-collapsed .mod-x svg { transform: rotate(180deg); }
+.mod.is-collapsed .mod-x::before { transform: translateY(-2px) rotate(225deg); }
 
 /* controls shared by the chrome */
 .btn {

@@ -34,7 +34,6 @@
     });
     const onChromeResize = () => {
       S.engine.resize();
-      A.positionTasksPanel();
       if (S.activeView && S.activeView.resize) S.activeView.resize();
     };
     window.addEventListener('resize', onChromeResize);

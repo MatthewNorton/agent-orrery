@@ -1,5 +1,5 @@
 // @ts-check
-// app-chrome.js — collapsible command rail, agents/feed/summary renderers, tab bar.
+// app-chrome.js — compact command rail, agents/feed/summary renderers, tab bar.
 'use strict';
 
 (function () {
@@ -8,99 +8,47 @@
   if (!A) throw new Error('app-state.js must load before app-chrome.js');
   const S = A.state, C = A.const;
 
-  // ---------- collapsible command rail ----------
-  function readCommandRailState() {
-    try {
-      const value = JSON.parse(localStorage.getItem(C.COMMAND_RAIL_STORAGE_KEY) || 'null');
-      if (!value || typeof value !== 'object') return;
-      S.commandRail.compact = value.compact === true;
-      S.commandRail.ideasCollapsed = value.ideasCollapsed === true;
-      S.commandRail.agentsCollapsed = value.agentsCollapsed === true;
-      S.commandRail.feedCollapsed = value.feedCollapsed === true;
-      S.commandRail.galaxiesCollapsed = value.galaxiesCollapsed === true;
-    } catch (error) { /* use the roomy default */ }
-  }
-
-  function saveCommandRailState() {
-    try {
-      localStorage.setItem(C.COMMAND_RAIL_STORAGE_KEY, JSON.stringify({
-        compact: S.commandRail.compact,
-        ideasCollapsed: S.commandRail.ideasCollapsed,
-        agentsCollapsed: S.commandRail.agentsCollapsed,
-        feedCollapsed: S.commandRail.feedCollapsed,
-        galaxiesCollapsed: S.commandRail.galaxiesCollapsed,
-      }));
-    } catch (error) { /* persistence is a convenience, never a requirement */ }
-  }
-
+  // ---------- command rail: compact mode; its sections fold through app-modules.js ----------
   A.wireCommandRail = function wireCommandRail() {
     S.commandRail.els = {
       root: document.getElementById('sidebar'),
       toggle: document.getElementById('command-rail-toggle'),
       ideasPanel: document.getElementById('ideas-panel'),
-      ideasToggle: document.getElementById('ideas-panel-toggle'),
       ideasCompact: document.getElementById('compact-ideas-button'),
       ideasCompactCount: document.getElementById('compact-ideas-count'),
       agentsPanel: document.getElementById('agents-panel'),
-      agentsToggle: document.getElementById('agents-panel-toggle'),
       agentsCompact: document.getElementById('compact-agents-button'),
       agentsCompactCount: document.getElementById('compact-agents-count'),
       feedPanel: document.getElementById('feed-panel'),
-      feedToggle: document.getElementById('feed-panel-toggle'),
       feedCompact: document.getElementById('compact-feed-button'),
       feedCompactCount: document.getElementById('compact-feed-count'),
       galaxiesPanel: document.getElementById('galaxies-panel'),
-      galaxiesToggle: document.getElementById('galaxies-panel-toggle'),
       galaxiesCompact: document.getElementById('compact-galaxies-button'),
       galaxiesCompactCount: document.getElementById('compact-galaxies-count'),
     };
     const els = S.commandRail.els;
-    if (!els.root || !els.toggle || !els.ideasPanel || !els.ideasToggle ||
-        !els.ideasCompact || !els.agentsPanel || !els.agentsToggle ||
-        !els.agentsCompact || !els.feedPanel || !els.feedToggle || !els.feedCompact) return;
-    readCommandRailState();
-    els.toggle.addEventListener('click', () => {
-      S.commandRail.compact = !S.commandRail.compact;
-      applyCommandRailState();
-      saveCommandRailState();
-    });
-    els.agentsToggle.addEventListener('click', () => {
-      S.commandRail.agentsCollapsed = !S.commandRail.agentsCollapsed;
-      applyCommandRailState();
-      saveCommandRailState();
-    });
-    els.ideasToggle.addEventListener('click', () => {
-      S.commandRail.ideasCollapsed = !S.commandRail.ideasCollapsed;
-      applyCommandRailState();
-      saveCommandRailState();
-    });
-    els.feedToggle.addEventListener('click', () => {
-      S.commandRail.feedCollapsed = !S.commandRail.feedCollapsed;
-      applyCommandRailState();
-      saveCommandRailState();
-    });
-    els.ideasCompact.addEventListener('click', () => expandCommandRailSection('ideas'));
-    els.agentsCompact.addEventListener('click', () => expandCommandRailSection('agents'));
-    els.feedCompact.addEventListener('click', () => expandCommandRailSection('feed'));
-    if (els.galaxiesToggle) {
-      els.galaxiesToggle.addEventListener('click', () => {
-        S.commandRail.galaxiesCollapsed = !S.commandRail.galaxiesCollapsed;
-        applyCommandRailState();
-        saveCommandRailState();
-      });
+    if (!els.root || !els.toggle || !els.ideasPanel || !els.ideasCompact ||
+        !els.agentsPanel || !els.agentsCompact || !els.feedPanel || !els.feedCompact) return;
+    S.commandRail.compact = AUR.storedJson(C.COMMAND_RAIL_STORAGE_KEY, {}).compact === true;
+    els.toggle.addEventListener('click', () => setCompact(!S.commandRail.compact));
+    const compactButtons = [[els.ideasCompact, 'ideas'], [els.agentsCompact, 'agents'],
+      [els.feedCompact, 'feed'], [els.galaxiesCompact, 'galaxies']];
+    for (const [button, key] of compactButtons) {
+      if (button) button.addEventListener('click', () => expandCommandRailSection(key));
     }
-    if (els.galaxiesCompact) els.galaxiesCompact.addEventListener('click', () => expandCommandRailSection('galaxies'));
     applyCommandRailState();
   };
 
-  function expandCommandRailSection(section) {
-    S.commandRail.compact = false;
-    if (section === 'ideas') S.commandRail.ideasCollapsed = false;
-    if (section === 'agents') S.commandRail.agentsCollapsed = false;
-    if (section === 'feed') S.commandRail.feedCollapsed = false;
-    if (section === 'galaxies') S.commandRail.galaxiesCollapsed = false;
+  function setCompact(compact) {
+    S.commandRail.compact = compact;
     applyCommandRailState();
-    saveCommandRailState();
+    AUR.storeJson(C.COMMAND_RAIL_STORAGE_KEY, { compact });
+  }
+
+  // A compact-rail button opens the rail on that section, unfolded.
+  function expandCommandRailSection(key) {
+    setCompact(false);
+    A.setModuleCollapsed(key, false);
   }
 
   function applyCommandRailState() {
@@ -112,29 +60,6 @@
     els.toggle.setAttribute('aria-label', S.commandRail.compact
       ? 'Expand command rail' : 'Collapse command rail');
     els.toggle.title = S.commandRail.compact ? 'Expand command rail' : 'Collapse command rail';
-    applyCommandSectionState(
-      els.ideasPanel, els.ideasToggle, S.commandRail.ideasCollapsed,
-      'task ideas'
-    );
-    applyCommandSectionState(
-      els.agentsPanel, els.agentsToggle, S.commandRail.agentsCollapsed,
-      'active agents'
-    );
-    applyCommandSectionState(
-      els.feedPanel, els.feedToggle, S.commandRail.feedCollapsed,
-      'event feed'
-    );
-    if (els.galaxiesPanel && els.galaxiesToggle) {
-      applyCommandSectionState(
-        els.galaxiesPanel, els.galaxiesToggle, S.commandRail.galaxiesCollapsed, 'galaxies'
-      );
-    }
-  }
-
-  function applyCommandSectionState(panel, toggle, collapsed, label) {
-    panel.classList.toggle('collapsed', collapsed);
-    toggle.setAttribute('aria-expanded', String(!collapsed));
-    toggle.setAttribute('aria-label', (collapsed ? 'Expand ' : 'Collapse ') + label);
   }
 
   // ---------- agents / feed / summary renderers ----------
@@ -293,7 +218,7 @@
       title = 'UNIVERSE SUMMARY';
       stats = universeSummaryStats();
     }
-    card.appendChild(A.moduleHead(card, title));
+    A.moduleHead(card, title);
     const row = AUR.el('div', 'summary-stats stats');
     for (const [n, l] of stats) row.appendChild(statBlock(n, l));
     card.appendChild(row);

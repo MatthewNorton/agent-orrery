@@ -268,19 +268,5 @@
         }
       }
     }
-    A.positionTasksPanel();
   }
-
-  A.positionTasksPanel = function positionTasksPanel() {
-    const els = S.taskPanel.els;
-    if (!els || !els.panel || els.panel.classList.contains('hidden')) return;
-    const project = document.getElementById('project-card');
-    const summary = document.getElementById('summary-card');
-    if (!project || project.classList.contains('hidden')) return;
-    const top = Math.ceil(project.getBoundingClientRect().bottom + 12);
-    const summaryTop = summary ? summary.getBoundingClientRect().top : window.innerHeight;
-    const available = Math.max(154, Math.floor(summaryTop - top - 12));
-    els.panel.style.top = top + 'px';
-    els.panel.style.maxHeight = available + 'px';
-  };
 })();

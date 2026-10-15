@@ -222,9 +222,10 @@ Design tokens (put in `:root`):
   of that entry's project (no-op if already viewing that system; pointer
   cursor + hover tint signal it).
 - **Bottom-left summary card** (panel): 3–4 big-number stats per view (below).
-- Every left-rail module (project card, needs-you, tasks, planet card, summary) folds to its
-  header from the chevron at the right of the header (`app-modules.js`); the set of folded
-  modules persists in localStorage. The right rail's sections keep their own toggles.
+- Every module on either rail (project card, needs-you, tasks, planet card, summary, fleet,
+  galaxies, event feed, ideas) folds to its header from the chevron at the right of the header
+  (`app-modules.js`); the set of folded modules persists in localStorage. The right rail's
+  compact mode is separate and keeps its own toggle.
 - **Back control** (system + planet views, top-left under the project card or
   above it): `← Universe` / `← Orion System` style button.
 - **History bar** (all views, fixed bottom): Play/Pause, `1x`/`10x`/`100x`/

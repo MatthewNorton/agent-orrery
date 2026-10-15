@@ -173,6 +173,17 @@
     return Math.floor(h / 24) + 'd ago';
   };
 
+  // ---- per-viewer preferences in localStorage; a missing or broken value is the fallback ----
+  AUR.storedJson = function storedJson(key, fallback) {
+    try {
+      const value = JSON.parse(localStorage.getItem(key) || 'null');
+      return value == null ? fallback : value;
+    } catch (error) { return fallback; }
+  };
+  AUR.storeJson = function storeJson(key, value) {
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch (error) { /* a convenience, never a requirement */ }
+  };
+
   // ---- tiny DOM helpers ----
   AUR.el = function el(tag, cls, text) {
     const n = document.createElement(tag);

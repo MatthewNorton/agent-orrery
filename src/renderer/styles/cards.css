@@ -7,7 +7,6 @@
 
 /* project card: header, key-value rows, repository, actions */
 .project-card { width: auto; padding: 0; }
-.project-card[data-view='system'] { width: auto; }
 .pc-mark { width: 14px; height: 14px; flex: none; }
 .pc-row {
   display: flex; justify-content: space-between; align-items: center; gap: 10px;
@@ -51,7 +50,7 @@
 .project-card[data-view='planet'] .pc-actions { padding-top: 8px; }
 
 /* tasks: the project's goals */
-.tasks-panel { position: static; width: auto; min-height: 0; max-height: 40%; padding: 0; overflow: hidden; }
+.tasks-panel { flex: 0 1 auto; width: auto; min-height: 0; max-height: 40%; padding: 0; overflow: hidden; }
 .tasks-panel.hidden { display: none; }
 .tasks-head { flex: 0 0 auto; }
 .tasks-list { flex: 1 1 auto; min-height: 36px; overflow-y: auto; padding: 0; scrollbar-width: thin; }
@@ -101,7 +100,6 @@
 /* planet card */
 .planet-card { flex: 0 1 auto; width: auto; min-height: 0; padding: 0; }
 .plc-body { padding-bottom: 10px; }
-.plc-status { display: flex; align-items: center; gap: 7px; }
 .bars-title { margin: 12px var(--space-3) 6px; font-size: 12px; font-weight: 500; color: var(--ink-3); }
 .bar-row { display: grid; grid-template-columns: minmax(0, 88px) minmax(0, 1fr) 36px; align-items: center; gap: 8px; margin: 6px var(--space-3); }
 .bar-key { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

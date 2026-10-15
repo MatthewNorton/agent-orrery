@@ -34,7 +34,7 @@ async function runShotMode(ctx, driver) {
             Math.abs(section.getBoundingClientRect().height - headerH) <= 3),
         };
       })()`);
-      await wait(350);
+      await wait(220);
       const foldedImage = await ctx.win.webContents.capturePage();
       fs.writeFileSync(path.join(outDir, 'shot-left-rail-folded.png'), foldedImage.toPNG());
       console.log('captured left rail folded');
