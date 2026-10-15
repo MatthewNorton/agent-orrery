@@ -15,7 +15,6 @@
     HISTORY_SLIDER_MAX: 10_000,
     HISTORY_MARKER_LIMIT: 24,
     SEARCH_DEBOUNCE_MS: 120,
-    COMMAND_RAIL_STORAGE_KEY: 'agent-universe.command-rail.v1',
     MODULES_STORAGE_KEY: 'agent-universe.modules.v1',
     AGENT_FOCUS_ENVIRONMENT_STORAGE_KEY: 'agent-universe.focus-environment.v1',
     AGENT_FOCUS_VANTAGE_STORAGE_KEY: 'agent-universe.focus-vantage.v1',
@@ -141,10 +140,7 @@
       els: null,
     },
     modules: { collapsed: new Set() }, // data-module keys of the modules folded to their header
-    commandRail: {
-      compact: false,
-      els: null,
-    },
+    commandRail: { els: null },
     agentFocus: {
       shipId: null,
       pendingShipId: null,

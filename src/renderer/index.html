@@ -61,6 +61,10 @@
       <span class="clock-mode live"><i aria-hidden="true"></i><span id="clock-mode">Live</span> · <span id="clock-date"></span></span>
       <time class="clock-time" id="clock-time"></time>
     </div>
+    <button class="settings-button panels-toggle" id="panels-toggle" type="button"
+      aria-label="Fold every panel" aria-pressed="false" title="Fold every panel">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="2.5" width="13" height="11"></rect><path d="M5 2.5v11M11 2.5v11"></path></svg>
+    </button>
     <button class="settings-button" id="settings-button" type="button"
       aria-label="Project path settings" aria-haspopup="dialog"
       aria-controls="settings-dialog" aria-expanded="false" title="Settings">
@@ -126,7 +130,8 @@
   </section>
 
   <!-- Left rail: the project, what needs you, tasks, the planet, the summary -->
-  <div class="rail rail--l" id="rail-left">
+  <div class="rail rail--l" id="rail-left" data-module="rail-left">
+    <div class="mod-h rail-head"><span class="mod-title rail-title">Left rail</span><button class="mod-x rail-toggle" id="rail-left-toggle" type="button"></button></div>
     <section class="panel mod project-card hidden" id="project-card" data-module="project"></section>
     <section class="mod mod--alert hidden" id="needs-you-panel" data-module="needs-you" aria-label="Agents that need you">
       <header class="mod-h"><span class="mod-i index" aria-hidden="true"></span><h2 class="mod-title">Needs you</h2><span class="mod-m">Oldest first</span><span class="mod-n count" id="needs-you-panel-count">00</span><button class="mod-x" type="button"></button></header>
@@ -157,13 +162,11 @@
   <span class="view-hint" id="view-hint" aria-hidden="true">Drag to orbit · scroll to zoom</span>
 
   <!-- Right command rail -->
-  <aside class="sidebar command-rail" id="sidebar" aria-label="Command rail">
-    <div class="command-rail-head">
-      <span class="command-rail-title">COMMAND RAIL</span>
-      <button class="mod-x command-rail-toggle" id="command-rail-toggle" type="button"
-        aria-label="Collapse command rail" aria-expanded="true" title="Collapse command rail"></button>
-    </div>
-    <nav class="command-rail-compact" id="command-rail-compact" aria-label="Command rail sections">
+  <aside class="sidebar command-rail" id="sidebar" data-module="rail-right" aria-label="Command rail">
+    <div class="mod-h rail-head">
+      <span class="mod-title rail-title">Command rail</span>
+      <button class="mod-x rail-toggle" id="command-rail-toggle" type="button"></button>
+      <nav class="command-rail-compact" id="command-rail-compact" aria-label="Command rail sections">
       <button class="compact-rail-button" id="compact-agents-button" type="button"
         aria-label="Show active agents" title="Active agents">
         <span class="compact-rail-icon" aria-hidden="true">▲</span>
@@ -184,7 +187,8 @@
         <span class="compact-rail-icon" aria-hidden="true">✦</span>
         <span class="compact-rail-count" id="compact-ideas-count">0</span>
       </button>
-    </nav>
+      </nav>
+    </div>
     <section class="panel mod command-section agents-panel" id="agents-panel" data-module="agents">
       <header class="mod-h panel-head">
         <span class="mod-i index" aria-hidden="true"></span>

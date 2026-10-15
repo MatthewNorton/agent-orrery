@@ -44,7 +44,22 @@ async function runShotMode(ctx, driver) {
         }
         return document.querySelectorAll('.rail--l .mod.is-collapsed').length === 0;
       })()`);
-      leftRailState = { ...folded, unfolded };
+      // The top bar's panels button folds both rails at once, and opens them again.
+      await rendererEval(`document.getElementById('panels-toggle').click()`);
+      const allFolded = await rendererEval(`(() => {
+        const rails = ['rail-left', 'sidebar'].map((id) => document.getElementById(id));
+        const title = document.getElementById('view-title').getBoundingClientRect();
+        return rails.every((rail) => rail.classList.contains('is-collapsed') && rail.getBoundingClientRect().width < 80) &&
+          title.left < 100;
+      })()`);
+      await wait(220);
+      const panelsImage = await ctx.win.webContents.capturePage();
+      fs.writeFileSync(path.join(outDir, 'shot-panels-folded.png'), panelsImage.toPNG());
+      console.log('captured panels folded');
+      await rendererEval(`document.getElementById('panels-toggle').click()`);
+      const allOpen = await rendererEval(
+        `['rail-left', 'sidebar'].every((id) => !document.getElementById(id).classList.contains('is-collapsed'))`);
+      leftRailState = { ...folded, unfolded, allFolded, allOpen };
     }
     if (view === 'system') {
       const asteroidPreview = await rendererEval(`(() => {
@@ -84,7 +99,7 @@ async function runShotMode(ctx, driver) {
   const compactRailState = await rendererEval(`(() => {
     const rail = document.getElementById('sidebar');
     return {
-      compact: Boolean(rail && rail.classList.contains('compact')),
+      compact: Boolean(rail && rail.classList.contains('is-collapsed')),
       compactButtons: document.querySelectorAll('.compact-rail-button').length,
     };
   })()`);
@@ -94,7 +109,7 @@ async function runShotMode(ctx, driver) {
   console.log('captured command rail compact');
   const railStillCompact = await rendererEval(`(() => {
     const rail = document.getElementById('sidebar');
-    return Boolean(rail && rail.classList.contains('compact'));
+    return Boolean(rail && rail.classList.contains('is-collapsed'));
   })()`);
   if (railStillCompact) await screenshotClick('#command-rail-toggle');
   await wait(350);

@@ -84,7 +84,7 @@ body { counter-reset: mod; }
 /* a folded module is its header; the chevron turns to point down */
 .mod.is-collapsed { flex: 0 0 var(--header-h); min-height: var(--header-h); }
 .mod.is-collapsed .mod-h { border-bottom: 0; }
-.mod.is-collapsed > :not(.mod-h) { display: none; }
+[data-module].is-collapsed > :not(.mod-h) { display: none; }
 .mod.is-collapsed .mod-x::before { transform: translateY(-2px) rotate(225deg); }
 
 /* controls shared by the chrome */

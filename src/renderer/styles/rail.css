@@ -14,10 +14,9 @@
   pointer-events: none;
 }
 .sidebar > * { pointer-events: auto; }
-body.command-rail-is-compact { --sidebar-effective-w: var(--sidebar-compact-w); }
-.sidebar.compact { width: var(--sidebar-compact-w); }
-.command-rail-head { flex: 0 0 auto; display: flex; align-items: center; justify-content: flex-end; }
-.command-rail-title { display: none; }
+body:has(#sidebar.is-collapsed) { --sidebar-effective-w: var(--sidebar-compact-w); }
+.sidebar.is-collapsed { width: var(--sidebar-compact-w); }
+.sidebar .rail-head { align-items: flex-end; }
 .compact-rail-button {
   border: 1px solid transparent;
   border-radius: var(--radius-0);
@@ -26,14 +25,11 @@ body.command-rail-is-compact { --sidebar-effective-w: var(--sidebar-compact-w); 
   font: inherit;
   cursor: pointer;
 }
-/* the rail's own chevron points at the edge it folds to */
-.command-rail-toggle::before { transform: translateX(-2px) rotate(135deg); }
-.sidebar.compact .command-rail-toggle::before { transform: translateX(2px) rotate(-45deg); }
 .compact-rail-button:hover { color: var(--ink); background: var(--plate); }
 .compact-rail-button:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
-.sidebar.compact .command-rail-head { justify-content: center; }
+.sidebar.is-collapsed .rail-head { align-items: center; }
 .sidebar .command-rail-compact { display: none; flex-direction: column; gap: var(--space-2); }
-.sidebar.compact .command-rail-compact { display: flex; }
+.sidebar.is-collapsed .command-rail-compact { display: flex; }
 .compact-rail-button {
   position: relative;
   width: var(--sidebar-compact-w);
@@ -57,7 +53,6 @@ body.command-rail-is-compact { --sidebar-effective-w: var(--sidebar-compact-w); 
 .galaxies-panel { flex: 0 1 auto; min-height: var(--header-h); max-height: 28%; }
 .ideas-panel { flex: 0 1 auto; min-height: var(--header-h); max-height: 30%; }
 .command-section.is-empty { flex: 0 0 auto; }
-.sidebar.compact .command-section { display: none; }
 
 .panel-head-actions { display: flex; align-items: center; gap: var(--space-2); min-width: 0; margin-left: auto; }
 .panel-note { display: flex; align-items: center; gap: 7px; color: var(--ink-3); font-size: 12px; font-weight: 500; white-space: nowrap; }

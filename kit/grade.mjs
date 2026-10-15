@@ -82,6 +82,8 @@ try {
   const rail = ux.leftRail || {};
   if (rail.folded !== true) failures.push(`M6: left-rail modules did not fold to their headers (${JSON.stringify(rail)})`);
   if (rail.unfolded !== true) failures.push('M6: left-rail modules did not unfold again');
+  if (rail.allFolded !== true) failures.push('M6: the panels button did not fold both rails');
+  if (rail.allOpen !== true) failures.push('M6: the panels button did not open both rails again');
 } catch (e) {
   failures.push(`M6: ux-state.json unreadable: ${e.message}`);
 }

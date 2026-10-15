@@ -8,11 +8,9 @@
   if (!A) throw new Error('app-state.js must load before app-chrome.js');
   const S = A.state, C = A.const;
 
-  // ---------- command rail: compact mode; its sections fold through app-modules.js ----------
+  // ---------- command rail: the rail and its sections fold through app-modules.js ----------
   A.wireCommandRail = function wireCommandRail() {
     S.commandRail.els = {
-      root: document.getElementById('sidebar'),
-      toggle: document.getElementById('command-rail-toggle'),
       ideasPanel: document.getElementById('ideas-panel'),
       ideasCompact: document.getElementById('compact-ideas-button'),
       ideasCompactCount: document.getElementById('compact-ideas-count'),
@@ -27,40 +25,16 @@
       galaxiesCompactCount: document.getElementById('compact-galaxies-count'),
     };
     const els = S.commandRail.els;
-    if (!els.root || !els.toggle || !els.ideasPanel || !els.ideasCompact ||
-        !els.agentsPanel || !els.agentsCompact || !els.feedPanel || !els.feedCompact) return;
-    S.commandRail.compact = AUR.storedJson(C.COMMAND_RAIL_STORAGE_KEY, {}).compact === true;
-    els.toggle.addEventListener('click', () => setCompact(!S.commandRail.compact));
     const compactButtons = [[els.ideasCompact, 'ideas'], [els.agentsCompact, 'agents'],
       [els.feedCompact, 'feed'], [els.galaxiesCompact, 'galaxies']];
     for (const [button, key] of compactButtons) {
-      if (button) button.addEventListener('click', () => expandCommandRailSection(key));
+      // A compact-rail button opens the rail on that section, unfolded.
+      if (button) button.addEventListener('click', () => {
+        A.setModuleCollapsed('rail-right', false);
+        A.setModuleCollapsed(key, false);
+      });
     }
-    applyCommandRailState();
   };
-
-  function setCompact(compact) {
-    S.commandRail.compact = compact;
-    applyCommandRailState();
-    AUR.storeJson(C.COMMAND_RAIL_STORAGE_KEY, { compact });
-  }
-
-  // A compact-rail button opens the rail on that section, unfolded.
-  function expandCommandRailSection(key) {
-    setCompact(false);
-    A.setModuleCollapsed(key, false);
-  }
-
-  function applyCommandRailState() {
-    const els = S.commandRail.els;
-    if (!els) return;
-    els.root.classList.toggle('compact', S.commandRail.compact);
-    document.body.classList.toggle('command-rail-is-compact', S.commandRail.compact);
-    els.toggle.setAttribute('aria-expanded', String(!S.commandRail.compact));
-    els.toggle.setAttribute('aria-label', S.commandRail.compact
-      ? 'Expand command rail' : 'Collapse command rail');
-    els.toggle.title = S.commandRail.compact ? 'Expand command rail' : 'Collapse command rail';
-  }
 
   // ---------- agents / feed / summary renderers ----------
   function shipsSorted() {
