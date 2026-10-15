@@ -105,10 +105,10 @@
         g.root.computeWorldMatrix(true);
         const position = g.root.getAbsolutePosition();
         const distance = galaxy
-          ? Math.hypot(position.x - galaxy.region.position.x, position.z - galaxy.region.position.z)
+          ? Math.hypot(position.x - galaxy.pivot.position.x, position.z - galaxy.pivot.position.z)
           : Infinity;
         if (g.galaxyKey !== expectedKey) assignmentMismatchCount++;
-        if (!galaxy || distance > galaxy.region.scaling.x + 1e-6) memberOutsideCount++;
+        if (!galaxy || distance > galaxy.radius + 1e-6) memberOutsideCount++;
         assignments.push({
           projectId: g.id, expectedGalaxyKey: expectedKey,
           galaxyKey: g.galaxyKey, x: position.x, y: position.y, z: position.z,
@@ -124,9 +124,9 @@
           key: galaxy.key,
           label: galaxy.labelText,
           memberCount: members.length,
-          x: galaxy.region.position.x,
-          z: galaxy.region.position.z,
-          radius: galaxy.region.scaling.x,
+          x: galaxy.pivot.position.x,
+          z: galaxy.pivot.position.z,
+          radius: galaxy.radius,
           maxMemberDistance: members.reduce(
             (value, item) => Math.max(value, item.distanceFromCenter), 0),
           color: actualColor,

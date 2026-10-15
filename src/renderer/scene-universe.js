@@ -77,6 +77,20 @@
       sunMat.specularColor = new BABYLON.Color3(0, 0, 0);
       sun.material = sunMat;
 
+      // A soft corona behind the sun, in its colour, always facing the camera.
+      const corona = BABYLON.MeshBuilder.CreatePlane('corona_' + p.id, { size: dia * 3.0 }, scene);
+      corona.parent = root;
+      corona.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
+      corona.isPickable = false;
+      const coronaMat = new BABYLON.StandardMaterial('coronam_' + p.id, scene);
+      coronaMat.emissiveColor = col.scale(0.85);
+      coronaMat.opacityTexture = view.softDisc;
+      coronaMat.diffuseColor = new BABYLON.Color3(0, 0, 0);
+      coronaMat.specularColor = new BABYLON.Color3(0, 0, 0);
+      coronaMat.disableLighting = true;
+      coronaMat.disableDepthWrite = true;
+      corona.material = coronaMat;
+
       // One reusable alert halo per glyph. It stays disabled until a main
       // ship in this project needs a question answered or permission granted.
       const halo = BABYLON.MeshBuilder.CreateTorus('alert_' + p.id, {
@@ -141,7 +155,7 @@
       vcsLayer.appendChild(markerHost);
 
       const g = {
-        id: p.id, root, sun, sunMat, baseEmissive: col, rings, dots, label,
+        id: p.id, root, sun, sunMat, coronaMat, baseEmissive: col, rings, dots, label,
         markerHost,
         galaxyKey: null,
         halo, haloMat, attention: null,

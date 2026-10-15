@@ -1,6 +1,6 @@
-// scene-universe-galaxies.js — deterministic galaxy regions on the universe
-// map: disc, outline and label per galaxy, the project layout that places each
-// glyph inside its galaxy, and the camera framing that keeps them all on screen.
+// scene-universe-galaxies.js — galaxy regions on the universe map: each galaxy is a tilted, lifted
+// pivot carrying a soft disc, an outline and its project glyphs; the project layout that places
+// each glyph in its galaxy; and the camera framing that keeps them all on screen.
 'use strict';
 
 (function () {
@@ -9,6 +9,20 @@
 
   AUR.sceneParts.universe.galaxies = function (view) {
     const { scene, camera, canvas, gui, store, glyphs, galaxies } = view;
+
+    // One soft radial disc, white at the centre and clear at the rim, shared by every galaxy
+    // region and every sun halo.
+    const softDisc = new BABYLON.DynamicTexture('soft-disc', 256, scene, false);
+    const ctx2d = softDisc.getContext();
+    const gradient = ctx2d.createRadialGradient(128, 128, 0, 128, 128, 128);
+    gradient.addColorStop(0, 'rgba(255,255,255,1)');
+    gradient.addColorStop(0.45, 'rgba(255,255,255,0.45)');
+    gradient.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx2d.fillStyle = gradient;
+    ctx2d.fillRect(0, 0, 256, 256);
+    softDisc.update();
+    softDisc.hasAlpha = true;
+    view.softDisc = softDisc;
 
     function galaxyLabelText(spec, memberCount) {
       if (spec.key === 'graveyard') {
@@ -20,24 +34,31 @@
     function buildGalaxyVisual(spec, memberCount) {
       const colorHex = GALAXY.galaxyColor(spec.key);
       const color = AUR.color3(colorHex);
+      const dim = spec.key === 'graveyard';
+      const pivot = new BABYLON.TransformNode('galaxy:' + spec.key, scene);
+
       const region = BABYLON.MeshBuilder.CreateDisc('galaxy-region:' + spec.key, {
         radius: 1, tessellation: 64, sideOrientation: BABYLON.Mesh.DOUBLESIDE,
       }, scene);
+      region.parent = pivot;
       region.rotation.x = Math.PI / 2;
+      region.position.y = -1.5;
       region.isPickable = false;
       region.metadata = { isGalaxyRegion: true, galaxyKey: spec.key };
       const material = new BABYLON.StandardMaterial('galaxy-region-mat:' + spec.key, scene);
-      material.emissiveColor = color.scale(spec.key === 'graveyard' ? 0.025 : 0.04);
+      material.emissiveColor = color.scale(dim ? 0.18 : 0.34);
+      material.opacityTexture = softDisc;
       material.diffuseColor = new BABYLON.Color3(0, 0, 0);
       material.specularColor = new BABYLON.Color3(0, 0, 0);
-      material.alpha = spec.key === 'graveyard' ? 0.045 : 0.055;
+      material.disableLighting = true;
+      material.alpha = dim ? 0.16 : 0.24;
       material.backFaceCulling = false;
       material.disableDepthWrite = true;
       region.material = material;
 
-      const outline = AUR.orbitRing(scene, 1, colorHex,
-        spec.key === 'graveyard' ? 0.12 : 0.19, -2.35);
+      const outline = AUR.orbitRing(scene, 1, colorHex, dim ? 0.12 : 0.19, 0);
       outline.name = 'galaxy-outline:' + spec.key;
+      outline.parent = pivot;
       outline.isPickable = false;
       outline.metadata = { isGalaxyOutline: true, galaxyKey: spec.key };
 
@@ -52,7 +73,7 @@
       const record = {
         key: spec.key, labelText: spec.label, colorHex,
         x: spec.x, z: spec.z, radius: spec.radius, memberCount,
-        region, material, outline, label,
+        pivot, region, material, outline, label,
         labelWidth: Math.min(260, Math.max(90, label.text.length * 7.8)),
         labelOffsetY: -12, labelScreen: null,
       };
@@ -67,9 +88,10 @@
       record.radius = spec.radius;
       record.memberCount = memberCount;
       record.labelText = spec.label;
-      record.region.position.set(spec.x, -2.5, spec.z);
-      record.region.scaling.set(spec.radius, spec.radius, 1);
-      record.outline.position.set(spec.x, 0, spec.z);
+      record.pivot.position.set(spec.x, spec.y, spec.z);
+      record.pivot.rotation.set(spec.tiltX, 0, spec.tiltZ);
+      // The disc fades out before the outline so the rim reads as a boundary, not a cut edge.
+      record.region.scaling.set(spec.radius * 1.08, spec.radius * 1.08, 1);
       record.outline.scaling.set(spec.radius, 1, spec.radius);
       record.label.text = galaxyLabelText(spec, memberCount);
       record.labelWidth = Math.min(260, Math.max(90, record.label.text.length * 7.8));
@@ -81,6 +103,7 @@
       if (record.outline) record.outline.dispose();
       if (record.region) record.region.dispose();
       if (record.material) record.material.dispose();
+      if (record.pivot) record.pivot.dispose();
     }
 
     function rebuildGalaxyLayout() {
@@ -104,12 +127,14 @@
         else buildGalaxyVisual(spec, count);
       }
 
+      // Glyphs ride their galaxy's pivot, so the tilt and lift reach them for free.
       for (const g of glyphs.values()) {
         const project = store.projects.get(g.id);
         const spec = projectSpecs.get(g.id);
-        if (!project || !spec) continue;
-        const y = ((((project.seed >>> 0) % 1009) / 1008) - 0.5) * 6;
-        g.root.position.set(spec.x, y, spec.z);
+        const galaxy = spec && galaxies.get(spec.galaxyKey);
+        if (!project || !spec || !galaxy) continue;
+        g.root.parent = galaxy.pivot;
+        g.root.position.set(spec.localX, spec.localY, spec.localZ);
         g.galaxyKey = spec.galaxyKey;
         view.refreshProjectLabel(g, project);
       }
@@ -151,7 +176,7 @@
       const cosB = Math.max(0.2, Math.cos(camera.beta));
       const rx = extentZ * sinB + extentX * height / (bounds.width * tanFov);
       const rz = extentZ * sinB + extentZ * cosB * height / (bounds.height * tanFov);
-      const desiredRadius = Math.max(90, Math.max(rx, rz) * 1.02 + 12);
+      const desiredRadius = Math.max(90, Math.max(rx, rz) * 1.06 + 16);
       camera.upperRadiusLimit = Math.max(320, desiredRadius * 1.25);
       camera.radius = Math.min(desiredRadius, camera.upperRadiusLimit);
       const unit = 2 * camera.radius * tanFov / height;

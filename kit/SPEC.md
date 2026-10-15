@@ -286,10 +286,13 @@ Design tokens (put in `:root`):
   the camera zooms in, and reruns only when camera/viewport, hover, project,
   galaxy, or ship state becomes dirty.
 - **Deterministic galaxy layout** (persistent universe — same every launch):
-  group projects by their additive `galaxy.key`, place members on a
-  hash-rotated spiral inside a galaxy disc, and collision-pack the discs with
-  a positive gap. Render a very faint non-pickable hashed-color region,
-  outline, and `GALAXY: <LABEL> · N SYSTEMS` label for each group; Graveyard is
+  group projects by their additive `galaxy.key`; inside a galaxy the most recently
+  active projects sit at the core and dormant ones drift to the rim, on a jittered
+  hash-rotated spiral. The largest galaxy anchors the cluster and the others gather
+  around it at hashed bearings with a positive gap; every galaxy is lifted (±14) and
+  tilted (±0.22 rad) on its own pivot, which its glyphs ride. Render a soft
+  non-pickable hashed-color disc, an outline, and a `GALAXY: <LABEL> · N SYSTEMS`
+  label for each group; each sun carries a soft corona in its colour; Graveyard is
   muted and peripheral. Galaxy and project labels share the 6px screen-space
   declutter pass. Camera framing uses all region extents. ArcRotateCamera keeps
   wheel zoom + drag rotation and a dynamically sufficient radius clamp.
