@@ -24,9 +24,7 @@
       const dim = spec.key === 'graveyard';
       const pivot = new BABYLON.TransformNode('galaxy:' + spec.key, scene);
 
-      const region = BABYLON.MeshBuilder.CreateDisc('galaxy-region:' + spec.key, {
-        radius: 1, tessellation: 64, sideOrientation: BABYLON.Mesh.DOUBLESIDE,
-      }, scene);
+      const region = BABYLON.MeshBuilder.CreateDisc('galaxy-region:' + spec.key, { radius: 1, tessellation: 64 }, scene);
       region.parent = pivot;
       region.rotation.x = Math.PI / 2;
       region.position.y = -1.5;
@@ -188,9 +186,9 @@
       if (untouched) frameCamera();
     }
 
-    // One galaxy up close, the first unless a key is given: the kit's proof shot of a body.
-    function frameGalaxy(key) {
-      const galaxy = key ? galaxies.get(key) : galaxies.values().next().value;
+    // The first galaxy up close: the kit's proof shot of a body.
+    function frameGalaxy() {
+      const galaxy = galaxies.values().next().value;
       if (!galaxy) return false;
       camera.setTarget(galaxy.pivot.getAbsolutePosition().clone());
       camera.radius = Math.max(camera.lowerRadiusLimit, galaxy.radius * 2.2);

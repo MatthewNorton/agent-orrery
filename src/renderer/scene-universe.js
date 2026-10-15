@@ -71,7 +71,7 @@
       const root = new BABYLON.TransformNode('g_' + p.id, scene);
       root.position.set(0, 0, 0);
 
-      const dia = 1.2 + Math.log10((p.totalBytes || 0) + 1) * 0.35;
+      const dia = AUR.SUN_DIAMETER_MIN + Math.log10((p.totalBytes || 0) + 1) * 0.35;
       const sunR = dia / 2;
       const sun = BABYLON.MeshBuilder.CreateSphere('sun_' + p.id, { diameter: dia, segments: 16 }, scene);
       sun.parent = root;
@@ -208,6 +208,7 @@
       if (view.cameraLayoutChanged()) view.markLabelLayoutDirty();
       view.animateGlyphs(dt, now, t);
       view.animateShips(dt, now, t);
+      view.animateStars();
     });
 
     // ---- live updates ----

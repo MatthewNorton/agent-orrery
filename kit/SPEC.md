@@ -299,13 +299,15 @@ Design tokens (put in `:root`):
   cluster's centre, with a positive gap; every galaxy is lifted and tilted on its own
   pivot, which everything of its rides: the glyphs (and so their ships, pulses and
   labels) and the body.
-- **Galaxy body**: a point cloud of stars on the same arms, a bright core and dust in
-  the galaxy's colour, all children of the pivot, rebuilt only when the spiral changes,
-  none of it in the glow layer. A faint non-pickable halo disc fills under the stars;
-  a faint outline carries the label anchor, the camera bounds and the colour proof, and
-  a `GALAXY: <LABEL> · N SYSTEMS` label sits on it. Stars never exceed a sun's size,
-  so a glyph stays legible inside the field, and the body's alpha is budgeted so the
-  backdrop luma gate above still holds. Graveyard is muted and peripheral.
+- **Galaxy body**: one point cloud per galaxy, a child of the pivot, rebuilt only when
+  the galaxy's radius changes, outside the glow layer: stars on the same arms, a bright
+  core and dust in the galaxy's colour as larger faint points. A faint non-pickable halo
+  disc under the stars gives the galaxy a hue at far zoom, where the points go
+  sub-pixel; a faint outline carries the label anchor, the camera bounds and the colour
+  proof, and a `GALAXY: <LABEL> · N SYSTEMS` label sits on it. No star is larger than
+  the smallest sun (`AUR.SUN_DIAMETER_MIN`), so a glyph stays legible inside the
+  field. The body's alphas are design values; the backdrop luma budget above is a
+  ceiling they clear. Graveyard is muted and peripheral.
   Galaxy and project labels share the 6px screen-space
   declutter pass. Camera framing uses the world-space bounds of every outline, lift
   and tilt included. ArcRotateCamera keeps
