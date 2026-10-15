@@ -34,7 +34,6 @@
     });
     const onChromeResize = () => {
       S.engine.resize();
-      A.positionTasksPanel();
       if (S.activeView && S.activeView.resize) S.activeView.resize();
     };
     window.addEventListener('resize', onChromeResize);
@@ -44,6 +43,7 @@
       if (el) chromeObserver.observe(el);
     }
     A.wireHistoryBar();
+    A.wireModules();
     A.wireTasksPanel();
     A.wireIdeasPanel();
     A.wireCommandRail();

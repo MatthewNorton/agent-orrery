@@ -59,7 +59,7 @@ loaders), then:
 | Shared libraries | `util.js` (creates `window.AUR`; `fnv1a`/`mulberry32` copied from `src/main/shared/hash.js` so seeds agree), `util-scene.js` (Babylon helpers), `procedural-worlds.js`, `ship-assets.js` + `ship-assets-hulls.js` + `ship-assets-api.js` (`AUR.ships`), `polish-math.js` and `galaxy-layout.js` (pure UMD), `search-core.js`, `components/project-vcs-status.js` |
 | Views | `scene-common.js` (`AUR.sceneParts`), then each view's parts before the view: `scene-universe-{galaxies,glyphs,labels,ships,stats}.js` → `scene-universe.js`, `scene-system-{belt,focus,ships}.js` → `scene-system.js`, then `scene-planet.js` |
 | App state | `app-state.js` — the only file that assigns `AUR.app` (`state`, `const`) |
-| App modules | `app-agent-focus.js`, `app-chrome.js`, `app-chrome-hud.js`, `app-chrome-queue.js`, `app-history-metrics.js`, `app-ideas.js`, `app-ideas-list.js`, `app-playback.js`, `app-project-control.js`, `app-project-directory.js`, `app-project-search.js`, `app-project-settings.js`, `app-project-tasks.js`, `app-replay.js`, `app-store.js` |
+| App modules | `app-agent-focus.js`, `app-chrome.js`, `app-chrome-hud.js`, `app-chrome-queue.js`, `app-history-metrics.js`, `app-ideas.js`, `app-ideas-list.js`, `app-modules.js`, `app-playback.js`, `app-project-control.js`, `app-project-directory.js`, `app-project-search.js`, `app-project-settings.js`, `app-project-tasks.js`, `app-replay.js`, `app-store.js` |
 | Boot | `app.js` — boot, event routing, view switching, debug hooks |
 
 View contract: each `scene-*.js` registers
@@ -222,6 +222,12 @@ Design tokens (put in `:root`):
   of that entry's project (no-op if already viewing that system; pointer
   cursor + hover tint signal it).
 - **Bottom-left summary card** (panel): 3–4 big-number stats per view (below).
+- Every module on either rail (project card, needs-you, tasks, planet card, summary, fleet,
+  galaxies, event feed, ideas) folds to its header from the chevron at the right of the header,
+  and each rail folds from the chevron at its top: the left rail to a strip, the right rail to
+  its compact section buttons. The top bar's panels button folds or opens both rails at once.
+  One mechanism (`app-modules.js`, `[data-module]` + `.is-collapsed`); the set of folded
+  keys persists in localStorage.
 - **Back control** (system + planet views, top-left under the project card or
   above it): `← Universe` / `← Orion System` style button.
 - **History bar** (all views, fixed bottom): Play/Pause, `1x`/`10x`/`100x`/

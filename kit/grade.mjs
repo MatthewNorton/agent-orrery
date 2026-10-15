@@ -76,6 +76,18 @@ if (!fs.existsSync(statePath)) {
   }
 }
 
+const uxPath = path.join(shotsDir, 'ux-state.json');
+try {
+  const ux = JSON.parse(fs.readFileSync(uxPath, 'utf8'));
+  const rail = ux.leftRail || {};
+  if (rail.folded !== true) failures.push(`M6: left-rail modules did not fold to their headers (${JSON.stringify(rail)})`);
+  if (rail.unfolded !== true) failures.push('M6: left-rail modules did not unfold again');
+  if (rail.allFolded !== true) failures.push('M6: the panels button did not fold both rails');
+  if (rail.allOpen !== true) failures.push('M6: the panels button did not open both rails again');
+} catch (e) {
+  failures.push(`M6: ux-state.json unreadable: ${e.message}`);
+}
+
 const errorLines = output.split('\n').filter((l) => ERROR_RE.test(l) && !NOISE_RE.test(l));
 if (errorLines.length > 0) {
   failures.push(`M4: error output detected:\n  ${errorLines.slice(0, 8).join('\n  ')}`);

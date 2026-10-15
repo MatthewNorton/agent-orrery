@@ -13,6 +13,7 @@ async function runShotMode(ctx, driver) {
   fs.mkdirSync(outDir, { recursive: true });
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   await wait(4000);
+  let leftRailState = null;
   for (const view of ['universe', 'system', 'planet']) {
     const ready = new Promise((resolve) => ipcMain.once('au:debug-ready', resolve));
     ctx.win.webContents.send('au:debug-view', view);
@@ -21,6 +22,45 @@ async function runShotMode(ctx, driver) {
     const img = await ctx.win.webContents.capturePage();
     fs.writeFileSync(path.join(outDir, `shot-${view}.png`), img.toPNG());
     console.log(`captured ${view}`);
+    if (view === 'planet') {
+      // Every left-rail module folds to its header from its chevron, and unfolds again.
+      const folded = await rendererEval(`(() => {
+        const sections = Array.from(document.querySelectorAll('.rail--l .mod[data-module]:not(.hidden)'));
+        for (const section of sections) section.querySelector('.mod-h .mod-x')?.click();
+        const headerH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--header-h'));
+        return {
+          modules: sections.map((section) => section.dataset.module),
+          folded: sections.length > 0 && sections.every((section) => section.classList.contains('is-collapsed') &&
+            Math.abs(section.getBoundingClientRect().height - headerH) <= 3),
+        };
+      })()`);
+      await wait(220);
+      const foldedImage = await ctx.win.webContents.capturePage();
+      fs.writeFileSync(path.join(outDir, 'shot-left-rail-folded.png'), foldedImage.toPNG());
+      console.log('captured left rail folded');
+      const unfolded = await rendererEval(`(() => {
+        for (const section of document.querySelectorAll('.rail--l .mod.is-collapsed')) {
+          section.querySelector('.mod-h .mod-x')?.click();
+        }
+        return document.querySelectorAll('.rail--l .mod.is-collapsed').length === 0;
+      })()`);
+      // The top bar's panels button folds both rails at once, and opens them again.
+      await rendererEval(`document.getElementById('panels-toggle').click()`);
+      const allFolded = await rendererEval(`(() => {
+        const rails = ['rail-left', 'sidebar'].map((id) => document.getElementById(id));
+        const title = document.getElementById('view-title').getBoundingClientRect();
+        return rails.every((rail) => rail.classList.contains('is-collapsed') && rail.getBoundingClientRect().width < 80) &&
+          title.left < 100;
+      })()`);
+      await wait(220);
+      const panelsImage = await ctx.win.webContents.capturePage();
+      fs.writeFileSync(path.join(outDir, 'shot-panels-folded.png'), panelsImage.toPNG());
+      console.log('captured panels folded');
+      await rendererEval(`document.getElementById('panels-toggle').click()`);
+      const allOpen = await rendererEval(
+        `['rail-left', 'sidebar'].every((id) => !document.getElementById(id).classList.contains('is-collapsed'))`);
+      leftRailState = { ...folded, unfolded, allFolded, allOpen };
+    }
     if (view === 'system') {
       const asteroidPreview = await rendererEval(`(() => {
         const scene = BABYLON.EngineStore.LastCreatedScene;
@@ -59,7 +99,7 @@ async function runShotMode(ctx, driver) {
   const compactRailState = await rendererEval(`(() => {
     const rail = document.getElementById('sidebar');
     return {
-      compact: Boolean(rail && rail.classList.contains('compact')),
+      compact: Boolean(rail && rail.classList.contains('is-collapsed')),
       compactButtons: document.querySelectorAll('.compact-rail-button').length,
     };
   })()`);
@@ -69,7 +109,7 @@ async function runShotMode(ctx, driver) {
   console.log('captured command rail compact');
   const railStillCompact = await rendererEval(`(() => {
     const rail = document.getElementById('sidebar');
-    return Boolean(rail && rail.classList.contains('compact'));
+    return Boolean(rail && rail.classList.contains('is-collapsed'));
   })()`);
   if (railStillCompact) await screenshotClick('#command-rail-toggle');
   await wait(350);
@@ -108,6 +148,7 @@ async function runShotMode(ctx, driver) {
       directory: directoryState,
       directorySearch: directorySearchState,
       commandRail: compactRailState,
+      leftRail: leftRailState,
     }, null, 2)
   );
   fs.writeFileSync(path.join(outDir, 'state.json'), JSON.stringify(ctx.tracker.snapshot(), null, 2));

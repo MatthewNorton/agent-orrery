@@ -11,6 +11,15 @@
   pointer-events: none;
 }
 .rail > * { pointer-events: auto; }
+
+/* each rail folds from its own chevron, which points at the edge it folds to */
+.rail-head.mod-h { flex: 0 0 auto; flex-direction: column; height: auto; padding: 0; border: 0; gap: var(--space-2); }
+.rail-title { display: none; }
+.rail--l .rail-head { align-items: flex-start; }
+.rail--l.is-collapsed { width: var(--sidebar-compact-w); }
+.rail--l .rail-toggle::before, .sidebar.is-collapsed .rail-toggle::before { transform: translateX(2px) rotate(-45deg); }
+.rail--l.is-collapsed .rail-toggle::before, .sidebar .rail-toggle::before { transform: translateX(-2px) rotate(135deg); }
+body:has(#rail-left.is-collapsed) .view-title { left: calc(var(--sidebar-compact-w) + 2 * var(--space-3)); }
 .rail--l { left: var(--space-3); width: var(--rail-l); }
 
 /* the view's name over the universe; the back button sits above it on system and planet */
@@ -83,7 +92,7 @@
   text-shadow: 0 0 4px var(--space);
   pointer-events: none;
 }
-body.command-rail-is-compact .view-hint { right: calc(var(--sidebar-compact-w) + 2 * var(--space-3)); }
+body:has(#sidebar.is-collapsed) .view-hint { right: calc(var(--sidebar-compact-w) + 2 * var(--space-3)); }
 
 /* needs you: one row per agent waiting on you, oldest first */
 .needs-row {

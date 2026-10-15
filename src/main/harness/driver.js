@@ -31,7 +31,7 @@ function createDriver(ctx) {
       return {
         view: (scene && scene.metadata && scene.metadata.view) || byCamera[cameraName] || null,
         camera: cameraName,
-        summary: document.querySelector('#summary-card .summary-title')?.textContent || '',
+        summary: document.querySelector('#summary-card .mod-title')?.textContent || '',
         projectCard: document.getElementById('project-card')?.textContent || '',
         planetCard: document.getElementById('planet-card')?.textContent || '',
         backText: document.getElementById('back-btn')?.textContent || '',

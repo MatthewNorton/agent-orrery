@@ -188,6 +188,8 @@
   cursor: pointer;
 }
 .settings-button:hover { background: var(--plate); }
+.panels-toggle svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.5; }
+.panels-toggle[aria-pressed="true"] { background: var(--plate); color: var(--ink-3); }
 .settings-glyph { font-size: 16px; line-height: 1; }
 .settings-count {
   position: absolute; top: -6px; right: -6px;

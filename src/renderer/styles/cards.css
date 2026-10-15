@@ -1,30 +1,13 @@
 /* cards.css — The left rail's modules: summary, project, tasks, planet; and the planet tab bar.
    Values come from tokens.css only. */
 .summary-card { min-width: 0; padding: 0; }
-.summary-title { overflow: hidden; text-overflow: ellipsis; }
 .summary-stats { display: grid; }
 .stat-num { font-size: 18px; font-weight: 600; line-height: 1; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
 .stat-label { font-size: 12px; font-weight: 500; line-height: 16px; }
 
 /* project card: header, key-value rows, repository, actions */
 .project-card { width: auto; padding: 0; }
-.project-card[data-view='system'] { width: auto; }
-.pc-head {
-  display: flex; align-items: center; gap: var(--space-2);
-  height: var(--header-h); padding-right: var(--space-3);
-  border-bottom: 1px solid var(--hair);
-}
-.pc-head::before {
-  counter-increment: mod; content: counter(mod, decimal-leading-zero);
-  display: grid; place-items: center; flex: none;
-  width: var(--tag-w); margin-left: 2px;
-  color: var(--ink-3); font-family: var(--font-mono); font-size: 12px; font-weight: 500;
-}
 .pc-mark { width: 14px; height: 14px; flex: none; }
-.pc-title {
-  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  font-size: 12px; font-weight: 700; letter-spacing: 0.1em; line-height: 1; color: var(--ink); text-transform: uppercase;
-}
 .pc-row {
   display: flex; justify-content: space-between; align-items: center; gap: 10px;
   height: 28px; margin: 0; padding: 0 var(--space-3);
@@ -67,7 +50,7 @@
 .project-card[data-view='planet'] .pc-actions { padding-top: 8px; }
 
 /* tasks: the project's goals */
-.tasks-panel { position: static; width: auto; min-height: 0; max-height: 40%; padding: 0; overflow: hidden; }
+.tasks-panel { flex: 0 1 auto; width: auto; min-height: 0; max-height: 40%; padding: 0; overflow: hidden; }
 .tasks-panel.hidden { display: none; }
 .tasks-head { flex: 0 0 auto; }
 .tasks-list { flex: 1 1 auto; min-height: 36px; overflow-y: auto; padding: 0; scrollbar-width: thin; }
@@ -115,13 +98,10 @@
 .tasks-input:disabled, .tasks-add:disabled { opacity: 0.55; cursor: default; }
 
 /* planet card */
-.planet-card { position: static; flex: 0 1 auto; width: auto; min-height: 0; padding: 10px var(--space-3); overflow: hidden auto; scrollbar-width: thin; }
-.plc-title-line { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
-.plc-title { font-size: 12px; font-weight: 700; letter-spacing: 0.1em; color: var(--ink); text-transform: uppercase; }
-.plc-status { display: flex; align-items: center; gap: 7px; margin-bottom: 10px; font-size: 12px; color: var(--ink-3); }
-.plc-rows { border-top: 1px solid var(--hair); padding-top: 8px; }
-.bars-title { margin: 12px 0 6px; font-size: 12px; font-weight: 500; color: var(--ink-3); }
-.bar-row { display: grid; grid-template-columns: minmax(0, 88px) minmax(0, 1fr) 36px; align-items: center; gap: 8px; margin: 6px 0; }
+.planet-card { flex: 0 1 auto; width: auto; min-height: 0; padding: 0; }
+.plc-body { padding-bottom: 10px; }
+.bars-title { margin: 12px var(--space-3) 6px; font-size: 12px; font-weight: 500; color: var(--ink-3); }
+.bar-row { display: grid; grid-template-columns: minmax(0, 88px) minmax(0, 1fr) 36px; align-items: center; gap: 8px; margin: 6px var(--space-3); }
 .bar-key { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bar-key { font-size: 12px; color: var(--ink-3); }
 .bar-track { height: 4px; background: var(--hair); overflow: hidden; }
