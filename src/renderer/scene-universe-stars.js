@@ -1,24 +1,69 @@
-// scene-universe-stars.js — the body of a galaxy, in the galaxy's own space so it rides the pivot:
-// one point cloud of stars on the spiral arms its systems follow, with the luminous core and the
-// dust along the arms as large faint points of the same cloud. A point shader draws each as a soft
-// disc of its own size. One draw call per galaxy, outside the glow pass, rebuilt only when the
-// galaxy's radius changes.
+// scene-universe-stars.js — the body of a galaxy: a volume of starlight and dust raymarched
+// through the galaxy's emission atlas, and resolved stars drawn from the same atlas, both in the
+// galaxy-field.js local frame scaled to the galaxy's radius and riding its pivot. The light is
+// added to the scene, so the solar-system glyphs inside stay legible. One volume and one point
+// cloud per galaxy, outside the glow pass, rebuilt only when the galaxy's radius changes.
 'use strict';
 
 (function () {
   const AUR = window.AUR;
-  const GALAXY = window.AUR_GALAXY;
+  const FIELD = window.AUR_FIELD;
 
-  const STARS_MAX = 12000;
-  const DUST_PER_ARM = 16;
-  const SHARE = { field: 0.12, nebula: 0.04 };
-  const CORE_HEX = ['#ffe9c4', '#ffd9a0', '#fff3dc', '#ffc98a'];
-  const ARM_HEX = ['#dfe8ff', '#ffffff', '#c9d8ff', '#f4f6ff', '#ffe6d0'];
-  const NEBULA_HEX = '#ff9fb4';
-  // The core: stacked glows, [size as a fraction of the radius, alpha, colour], warm to white-hot.
-  const CORE_GLOWS = [[0.36, 0.26, '#ffd9a0'], [0.16, 0.45, '#ffe9c4'], [0.06, 0.7, '#fff3dc']];
+  const EXPOSURE = 0.65;
+  const STARS_MIN = 4000;
+  const STARS_MAX = 120000;
+  const STARS_PER_AREA = 12;
 
-  const VERTEX_SHADER = `
+  const VOLUME_VERTEX = `
+    precision highp float;
+    attribute vec3 position;
+    uniform mat4 worldViewProjection;
+    varying vec3 localPosition;
+    void main() {
+      localPosition = position;
+      gl_Position = worldViewProjection * vec4(position, 1.0);
+    }`;
+  // The exit face of the box integrates emission and extinction along the viewing ray, so the
+  // camera may sit inside the volume. Dithering the first step hides the slab banding.
+  const VOLUME_FRAGMENT = `
+    precision highp float;
+    varying vec3 localPosition;
+    uniform vec3 cameraLocal;
+    uniform sampler2D atlas;
+    uniform float exposure;
+    uniform vec2 diskHeight;
+    float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+    void main() {
+      if (gl_FrontFacing) discard;
+      vec3 ray = normalize(localPosition - cameraLocal);
+      vec3 inverseRay = 1.0 / (ray + vec3(0.000001));
+      vec3 nearPlane = (vec3(-25.0, -4.0, -25.0) - cameraLocal) * inverseRay;
+      vec3 farPlane = (vec3(25.0, 4.0, 25.0) - cameraLocal) * inverseRay;
+      vec3 lo = min(nearPlane, farPlane), hi = max(nearPlane, farPlane);
+      float entry = max(max(lo.x, lo.y), max(lo.z, 0.0));
+      float exit = min(min(hi.x, hi.y), hi.z);
+      if (exit <= entry) discard;
+      float stepLength = (exit - entry) / 64.0;
+      float along = entry + stepLength * hash(gl_FragCoord.xy);
+      vec3 radiance = vec3(0.0);
+      float transmission = 1.0;
+      for (int i = 0; i < 64; i++) {
+        vec3 p = cameraLocal + ray * along;
+        vec4 field = texture2D(atlas, p.xz / 50.0 + 0.5);
+        float height = diskHeight.x + length(p.xz) * diskHeight.y;
+        float bulge = exp(-length(p * vec3(0.51, 1.38, 0.51)) * 1.65) * 2.9;
+        vec3 emission = field.rgb * exp(-abs(p.y) / height) * 1.75 + vec3(1.0, 0.76, 0.5) * bulge;
+        float extinction = field.a * exp(-abs(p.y) / (height * 0.46)) * 5.5 + bulge * 0.055;
+        radiance += transmission * emission * stepLength;
+        transmission *= exp(-extinction * stepLength);
+        along += stepLength;
+      }
+      vec3 light = pow(1.0 - exp(-radiance * exposure * 1.5), vec3(0.9));
+      if (max(light.r, max(light.g, light.b)) < 0.003) discard;
+      gl_FragColor = vec4(light, 1.0);
+    }`;
+  // A star is a soft point sized by its distance, dimmed by the dust between it and the camera.
+  const STAR_VERTEX = `
     precision highp float;
     attribute vec3 position;
     attribute vec4 color;
@@ -26,115 +71,132 @@
     uniform mat4 worldViewProjection;
     uniform mat4 worldView;
     uniform float pixelsPerUnit;
+    uniform float exposure;
+    uniform vec2 diskHeight;
+    uniform vec3 cameraLocal;
+    uniform sampler2D atlas;
     varying vec4 vColor;
     void main() {
       vec4 viewPosition = worldView * vec4(position, 1.0);
       gl_Position = worldViewProjection * vec4(position, 1.0);
-      gl_PointSize = clamp(size * pixelsPerUnit / max(1.0, abs(viewPosition.z)), 1.0, 256.0);
-      vColor = color;
+      gl_PointSize = clamp(size * pixelsPerUnit / max(1.0, abs(viewPosition.z)), 0.8, 12.0);
+      vec3 direction = normalize(cameraLocal - position);
+      float stepLength = min(24.0, (diskHeight.x * 4.0 + 0.5) / max(0.025, abs(direction.y))) / 8.0;
+      float opticalDepth = 0.0;
+      for (int i = 0; i < 8; i++) {
+        vec3 p = position + direction * (float(i) + 0.5) * stepLength;
+        float height = (diskHeight.x + length(p.xz) * diskHeight.y) * 0.46;
+        opticalDepth += texture2D(atlas, p.xz / 50.0 + 0.5).a * exp(-abs(p.y) / height) * stepLength * 5.5;
+      }
+      vColor = vec4(color.rgb * exposure, color.a * exp(-opticalDepth));
     }`;
-  const FRAGMENT_SHADER = `
+  const STAR_FRAGMENT = `
     precision highp float;
     varying vec4 vColor;
     void main() {
-      float soft = smoothstep(1.0, 0.25, length(gl_PointCoord - vec2(0.5)) * 2.0);
-      gl_FragColor = vec4(vColor.rgb, vColor.a * soft);
+      vec2 uv = gl_PointCoord * 2.0 - 1.0;
+      float r2 = dot(uv, uv);
+      if (r2 > 1.0) discard;
+      gl_FragColor = vec4(vColor.rgb, vColor.a * exp(-r2 * 5.5) * (1.0 - smoothstep(0.5, 1.0, r2)));
     }`;
 
   AUR.sceneParts.universe.stars = function (view) {
-    const { scene, camera, glow } = view;
-    // Babylon and the colour helper exist only once the renderer runs, so the shader registration
-    // and the palettes live here rather than at load.
-    BABYLON.Effect.ShadersStore.galaxyStarsVertexShader = VERTEX_SHADER;
-    BABYLON.Effect.ShadersStore.galaxyStarsFragmentShader = FRAGMENT_SHADER;
-    const CORE_COLORS = CORE_HEX.map(AUR.color3);
-    const ARM_COLORS = ARM_HEX.map(AUR.color3);
-    const NEBULA_COLOR = AUR.color3(NEBULA_HEX);
-    const pick = (rand, list) => list[Math.floor(rand() * list.length)];
-    const gaussian = (rand) => Math.sqrt(-2 * Math.log(1 - rand())) * Math.cos(2 * Math.PI * rand());
+    const { scene, camera, glow, galaxies } = view;
+    const store = BABYLON.Effect.ShadersStore;
+    store.galaxyVolumeVertexShader = VOLUME_VERTEX;
+    store.galaxyVolumeFragmentShader = VOLUME_FRAGMENT;
+    store.galaxyStarsVertexShader = STAR_VERTEX;
+    store.galaxyStarsFragmentShader = STAR_FRAGMENT;
+    const diskHeight = BABYLON.Vector2.FromArray(FIELD.DISK_HEIGHT);
 
-    // One point material for every galaxy.
-    const starMaterial = new BABYLON.ShaderMaterial('galaxy-stars', scene, 'galaxyStars', {
-      attributes: ['position', 'color', 'size'],
-      uniforms: ['worldViewProjection', 'worldView', 'pixelsPerUnit'],
-      needAlphaBlending: true,
-    });
-    starMaterial.pointsCloud = true;
-    starMaterial.alphaMode = BABYLON.Constants.ALPHA_ADD;
-    starMaterial.disableDepthWrite = true;
-    starMaterial.backFaceCulling = false;
-
-    // A star's pixel size follows the viewport; one uniform write in the view's frame loop.
-    function animateStars() {
-      starMaterial.setFloat('pixelsPerUnit',
-        scene.getEngine().getRenderHeight() / (2 * Math.tan(camera.fov / 2)));
+    function shader(name, key, shaderName, attributes, uniforms, body) {
+      const material = new BABYLON.ShaderMaterial(name + ':' + key, scene, shaderName, {
+        attributes, uniforms: [...uniforms, 'exposure', 'diskHeight', 'cameraLocal'],
+        samplers: ['atlas'], needAlphaBlending: true,
+      });
+      material.backFaceCulling = false;
+      material.disableDepthWrite = true;
+      material.alphaMode = BABYLON.Constants.ALPHA_ADD;
+      material.setTexture('atlas', body.atlas);
+      material.setFloat('exposure', body.exposure);
+      material.setVector2('diskHeight', diskHeight);
+      material.setVector3('cameraLocal', body.cameraLocal);
+      return material;
     }
 
-    function starCloud(record, spiral) {
+    function buildBody(record, spiral) {
       const R = spiral.radius;
-      const rand = AUR.mulberry32(AUR.fnv1a('stars:' + record.key));
-      const fade = record.dim ? 0.35 : 1;
-      const stars = Math.min(STARS_MAX, Math.round(600 + R * R * 0.5));
-      const dust = DUST_PER_ARM * spiral.arms;
-      const count = stars + CORE_GLOWS.length + dust;
-      const positions = new Float32Array(count * 3);
-      const colors = new Float32Array(count * 4);
-      const sizes = new Float32Array(count);
-      let k = 0;
-      const put = (x, y, z, size, color, alpha) => {
-        positions[k * 3] = x;
-        positions[k * 3 + 1] = y;
-        positions[k * 3 + 2] = z;
-        colors[k * 4] = color.r;
-        colors[k * 4 + 1] = color.g;
-        colors[k * 4 + 2] = color.b;
-        colors[k * 4 + 3] = alpha * fade;
-        sizes[k] = size;
-        k++;
+      const scale = R / FIELD.DISC;
+      const size = R < 60 ? 256 : 512;
+      const seed = AUR.fnv1a('field:' + record.key);
+      const tint = [record.color.r, record.color.g, record.color.b];
+      const pixels = FIELD.buildAtlas(spiral, seed, tint, size);
+      const body = {
+        exposure: EXPOSURE * (record.dim ? 0.35 : 1), cameraLocal: new BABYLON.Vector3(),
+        inverse: new BABYLON.Matrix(),
       };
-      for (let i = 0; i < stars; i++) {
-        // Half the stars crowd the core, half spread evenly over the disc; most trace an arm.
-        const u = rand();
-        const r = Math.min(R, rand() < 0.5 ? -R * 0.3 * Math.log(1 - u) : R * Math.sqrt(u));
-        const angle = rand() < SHARE.field ? rand() * Math.PI * 2
-          : GALAXY.armAngle(spiral, i % spiral.arms, r) + gaussian(rand) * (0.04 + 0.14 * (r / R));
-        const color = r < spiral.core ? pick(rand, CORE_COLORS)
-          : rand() < SHARE.nebula ? NEBULA_COLOR : pick(rand, ARM_COLORS);
-        // Mostly small with a bright few, never larger than the smallest sun, so glyphs stay legible.
-        put(Math.cos(angle) * r, gaussian(rand) * GALAXY.discThickness(spiral, r) * 0.8, Math.sin(angle) * r,
-          0.3 + (AUR.SUN_DIAMETER_MIN - 0.3) * rand() ** 4, color, 0.9 * (0.3 + 0.7 * rand()));
+      body.atlas = BABYLON.RawTexture.CreateRGBATexture(pixels, size, size, scene, true, false,
+        BABYLON.Texture.TRILINEAR_SAMPLINGMODE);
+      body.atlas.wrapU = body.atlas.wrapV = BABYLON.Texture.CLAMP_ADDRESSMODE;
+
+      body.volume = BABYLON.MeshBuilder.CreateBox('galaxy-region:' + record.key, FIELD.BOX, scene);
+      body.volume.metadata = { isGalaxyRegion: true, galaxyKey: record.key };
+      body.volume.material = shader('galaxy-volume', record.key, 'galaxyVolume',
+        ['position'], ['worldViewProjection'], body);
+
+      const count = Math.round(Math.max(STARS_MIN, Math.min(STARS_MAX, R * R * STARS_PER_AREA)));
+      const stars = FIELD.sampleStars(pixels, size, seed, count, record.dim ? 0.5 : 1);
+      // Sizes in world units, never larger than the smallest sun, so glyphs stay legible.
+      for (let i = 0; i < count; i++) stars.sizes[i] = Math.min(AUR.SUN_DIAMETER_MIN, stars.sizes[i] * scale);
+      body.stars = new BABYLON.Mesh('galaxy-stars:' + record.key, scene);
+      body.stars.setVerticesData(BABYLON.VertexBuffer.PositionKind, stars.positions);
+      body.stars.setVerticesData(BABYLON.VertexBuffer.ColorKind, stars.colors, false, 4);
+      body.stars.setVerticesData('size', stars.sizes, false, 1);
+      body.stars.isUnIndexed = true;
+      body.stars.material = shader('galaxy-stars', record.key, 'galaxyStars',
+        ['position', 'color', 'size'], ['worldViewProjection', 'worldView', 'pixelsPerUnit'], body);
+      body.stars.material.pointsCloud = true;
+
+      for (const mesh of [body.volume, body.stars]) {
+        mesh.parent = record.pivot;
+        mesh.scaling.setAll(scale);
+        mesh.isPickable = false;
+        mesh.alwaysSelectAsActiveMesh = true;
+        glow.addExcludedMesh(mesh);
       }
-      for (const [fraction, alpha, hex] of CORE_GLOWS) put(0, 0, 0, R * fraction, AUR.color3(hex), alpha);
-      for (let i = 0; i < dust; i++) {
-        const r = GALAXY.armRadius(spiral, (Math.floor(i / spiral.arms) + 0.5) / DUST_PER_ARM);
-        const angle = GALAXY.armAngle(spiral, i % spiral.arms, r) + gaussian(rand) * 0.08;
-        put(Math.cos(angle) * r, gaussian(rand) * 0.6, Math.sin(angle) * r, R * (0.1 + rand() * 0.1),
-          record.color, 0.12);
-      }
-      const mesh = new BABYLON.Mesh('galaxy-stars:' + record.key, scene);
-      mesh.setVerticesData(BABYLON.VertexBuffer.PositionKind, positions);
-      mesh.setVerticesData(BABYLON.VertexBuffer.ColorKind, colors, false, 4);
-      mesh.setVerticesData('size', sizes, false, 1);
-      mesh.isUnIndexed = true;
-      mesh.material = starMaterial;
-      mesh.isPickable = false;
-      mesh.parent = record.pivot;
-      glow.addExcludedMesh(mesh);
-      return mesh;
+      return body;
     }
 
     // The body is a function of the galaxy's radius (which the member count sets), so a pivot
     // that merely moves, or a project that joins without widening the galaxy, keeps its stars.
+    // Either way the camera-to-local transform follows the pivot.
     function buildGalaxyStars(record, spec) {
-      if (record.body && record.bodyRadius === spec.radius) return;
-      disposeGalaxyStars(record);
-      record.body = starCloud(record, spec.spiral);
-      record.bodyRadius = spec.radius;
+      if (!record.body || record.bodyRadius !== spec.radius) {
+        disposeGalaxyStars(record);
+        record.body = buildBody(record, spec.spiral);
+        record.bodyRadius = spec.radius;
+      }
+      record.body.volume.computeWorldMatrix(true).invertToRef(record.body.inverse);
     }
 
     function disposeGalaxyStars(record) {
-      if (record.body) record.body.dispose();
+      const body = record.body;
+      if (!body) return;
+      for (const mesh of [body.volume, body.stars]) { mesh.material.dispose(); mesh.dispose(); }
+      body.atlas.dispose();
       record.body = null;
+    }
+
+    // Each frame: the camera in every galaxy's local frame, and the pixel size of a unit.
+    function animateStars() {
+      camera.getViewMatrix();
+      const pixelsPerUnit = scene.getEngine().getRenderHeight() / (2 * Math.tan(camera.fov / 2));
+      for (const galaxy of galaxies.values()) {
+        const body = galaxy.body;
+        if (!body) continue;
+        BABYLON.Vector3.TransformCoordinatesToRef(camera.position, body.inverse, body.cameraLocal);
+        body.stars.material.setFloat('pixelsPerUnit', pixelsPerUnit);
+      }
     }
 
     return { buildGalaxyStars, disposeGalaxyStars, animateStars };

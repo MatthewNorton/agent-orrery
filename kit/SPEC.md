@@ -56,7 +56,7 @@ loaders), then:
 
 | Layer | Files |
 |---|---|
-| Shared libraries | `util.js` (creates `window.AUR`; `fnv1a`/`mulberry32` copied from `src/main/shared/hash.js` so seeds agree), `util-scene.js` (Babylon helpers), `procedural-worlds.js`, `ship-assets.js` + `ship-assets-hulls.js` + `ship-assets-api.js` (`AUR.ships`), `polish-math.js` and `galaxy-layout.js` (pure UMD), `search-core.js`, `components/project-vcs-status.js` |
+| Shared libraries | `util.js` (creates `window.AUR`; `fnv1a`/`mulberry32` copied from `src/main/shared/hash.js` so seeds agree), `util-scene.js` (Babylon helpers), `procedural-worlds.js`, `ship-assets.js` + `ship-assets-hulls.js` + `ship-assets-api.js` (`AUR.ships`), `polish-math.js`, `galaxy-layout.js` and `galaxy-field.js` (pure UMD; the field is a galaxy's emission/dust atlas and the stars drawn from it), `search-core.js`, `components/project-vcs-status.js` |
 | Views | `scene-common.js` (`AUR.sceneParts`), then each view's parts before the view: `scene-universe-{galaxies,glyphs,labels,ships,stars,stats}.js` → `scene-universe.js`, `scene-system-{belt,focus,ships}.js` → `scene-system.js`, then `scene-planet.js` |
 | App state | `app-state.js` — the only file that assigns `AUR.app` (`state`, `const`) |
 | App modules | `app-agent-focus.js`, `app-chrome.js`, `app-chrome-hud.js`, `app-chrome-queue.js`, `app-history-metrics.js`, `app-ideas.js`, `app-ideas-list.js`, `app-modules.js`, `app-playback.js`, `app-project-control.js`, `app-project-directory.js`, `app-project-search.js`, `app-project-settings.js`, `app-project-tasks.js`, `app-replay.js`, `app-store.js` |
@@ -299,15 +299,19 @@ Design tokens (put in `:root`):
   cluster's centre, with a positive gap; every galaxy is lifted and tilted on its own
   pivot, which everything of its rides: the glyphs (and so their ships, pulses and
   labels) and the body.
-- **Galaxy body**: one point cloud per galaxy, a child of the pivot, rebuilt only when
-  the galaxy's radius changes, outside the glow layer: stars on the same arms, a bright
-  core and dust in the galaxy's colour as larger faint points. A faint non-pickable halo
-  disc under the stars gives the galaxy a hue at far zoom, where the points go
-  sub-pixel; a faint outline carries the label anchor, the camera bounds and the colour
-  proof, and a `GALAXY: <LABEL> · N SYSTEMS` label sits on it. No star is larger than
-  the smallest sun (`AUR.SUN_DIAMETER_MIN`), so a glyph stays legible inside the
-  field. The body's alphas are design values; the backdrop luma budget above is a
-  ceiling they clear. Graveyard is muted and peripheral.
+- **Galaxy body**: a spiral galaxy, after the Sidereal observatory. `galaxy-field.js`
+  computes an emission/dust atlas over the disc (cloudy arms on the spiral the systems
+  ride, a warm core, star-forming knots, dust lanes inside the arms, the arms leaning
+  toward the galaxy's colour) and draws the resolved stars from it. The renderer gives
+  each galaxy a non-pickable volume box (the region mesh) that raymarches the atlas
+  with a luminous bulge and dust extinction, and one point cloud of stars dimmed by the
+  dust in front of them; both are children of the pivot in the field's local frame
+  scaled to the radius, rebuilt only when the radius changes, added to the scene (so
+  glyphs inside stay legible) and outside the glow layer. No star is larger than the
+  smallest sun (`AUR.SUN_DIAMETER_MIN`) or 12px. A faint outline carries the label
+  anchor, the camera bounds and the colour proof, and a `GALAXY: <LABEL> · N SYSTEMS`
+  label sits on it. Exposure is a design value; the backdrop luma budget above is a
+  ceiling it clears. Graveyard is muted and peripheral.
   Galaxy and project labels share the 6px screen-space
   declutter pass. Camera framing uses the world-space bounds of every outline, lift
   and tilt included. ArcRotateCamera keeps

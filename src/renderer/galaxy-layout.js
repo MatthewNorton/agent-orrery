@@ -16,7 +16,7 @@
   const CORE_LIFT = 3;
   const CORE_RADIUS = 10;
   const CORE_BULGE = 0.28;
-  const ARM_TWIST = 3;
+  const ARM_TWIST = 5.5;
   const ARM_STRETCH = 1.4;
   const MEMBER_MARGIN = 10;
   const MIN_RADIUS = 24;

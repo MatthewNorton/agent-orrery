@@ -132,7 +132,7 @@
             (value, item) => Math.max(value, item.distanceFromCenter), 0),
           color: actualColor,
           expectedColor: GALAXY.galaxyColor(galaxy.key).toLowerCase(),
-          regionPickable: galaxy.region.isPickable,
+          regionPickable: galaxy.body.volume.isPickable,
           labelVisible: Boolean(galaxy.label.isVisible),
         };
       }).sort((a, b) => a.key.localeCompare(b.key));

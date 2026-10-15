@@ -1,7 +1,7 @@
 // scene-universe-galaxies.js — galaxy regions on the universe map: each galaxy is a tilted, lifted
-// pivot carrying a faint halo, an outline, its star body (scene-universe-stars.js) and its project
-// glyphs; the project layout that places each glyph in its galaxy; and the camera framing that
-// keeps them all on screen.
+// pivot carrying its body (scene-universe-stars.js), an outline and its project glyphs; the
+// project layout that places each glyph in its galaxy; and the camera framing that keeps them
+// all on screen.
 'use strict';
 
 (function () {
@@ -9,7 +9,7 @@
   const GALAXY = window.AUR_GALAXY;
 
   AUR.sceneParts.universe.galaxies = function (view) {
-    const { scene, camera, canvas, gui, store, glyphs, galaxies, glow, softDisc } = view;
+    const { scene, camera, canvas, gui, store, glyphs, galaxies } = view;
 
     function galaxyLabelText(spec, memberCount) {
       if (spec.key === 'graveyard') {
@@ -24,19 +24,7 @@
       const dim = spec.key === 'graveyard';
       const pivot = new BABYLON.TransformNode('galaxy:' + spec.key, scene);
 
-      const region = BABYLON.MeshBuilder.CreateDisc('galaxy-region:' + spec.key, { radius: 1, tessellation: 64 }, scene);
-      region.parent = pivot;
-      region.rotation.x = Math.PI / 2;
-      region.position.y = -1.5;
-      region.isPickable = false;
-      region.metadata = { isGalaxyRegion: true, galaxyKey: spec.key };
-      const material = AUR.softMaterial(scene, 'galaxy-region-mat:' + spec.key,
-        color.scale(dim ? 0.2 : 0.4), dim ? 0.12 : 0.18, softDisc);
-      material.backFaceCulling = false;
-      region.material = material;
-      glow.addExcludedMesh(region);
-
-      const outline = AUR.orbitRing(scene, 1, colorHex, dim ? 0.06 : 0.1, 0);
+      const outline = AUR.orbitRing(scene, 1, colorHex, dim ? 0.03 : 0.05, 0);
       outline.name = 'galaxy-outline:' + spec.key;
       outline.parent = pivot;
       outline.isPickable = false;
@@ -51,7 +39,7 @@
       label.isVisible = false;
 
       const record = {
-        key: spec.key, colorHex, color, dim, pivot, region, material, outline, label,
+        key: spec.key, colorHex, color, dim, pivot, outline, label,
         labelOffsetY: -12, labelScreen: null,
       };
       updateGalaxyVisual(record, spec, memberCount);
@@ -67,9 +55,6 @@
       record.labelText = spec.label;
       record.pivot.position.set(spec.x, spec.y, spec.z);
       record.pivot.rotation.set(spec.tiltX, 0, spec.tiltZ);
-      // The disc fades out before the outline so the rim reads as a boundary, not a cut edge.
-      const disc = spec.radius * 1.08;
-      record.region.scaling.set(disc, disc, 1);
       record.outline.scaling.set(spec.radius, 1, spec.radius);
       record.label.text = galaxyLabelText(spec, memberCount);
       record.labelWidth = Math.min(260, Math.max(90, record.label.text.length * 7.8));
@@ -77,12 +62,11 @@
     }
 
     // Called once the galaxy's glyphs have moved to another pivot; disposing the pivot takes the
-    // disc and the outline with it.
+    // outline with it.
     function disposeGalaxyVisual(record) {
       view.disposeGalaxyStars(record);
       record.label.dispose();
       record.pivot.dispose();
-      record.material.dispose();
     }
 
     function rebuildGalaxyLayout() {
