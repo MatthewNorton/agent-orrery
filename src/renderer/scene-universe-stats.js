@@ -104,9 +104,10 @@
         const galaxy = galaxies.get(g.galaxyKey);
         g.root.computeWorldMatrix(true);
         const position = g.root.getAbsolutePosition();
-        const distance = galaxy
-          ? Math.hypot(position.x - galaxy.pivot.position.x, position.z - galaxy.pivot.position.z)
-          : Infinity;
+        // Containment is judged on the galaxy's own tilted disc, not on its ground shadow.
+        const local = galaxy ? BABYLON.Vector3.TransformCoordinates(
+          position, galaxy.pivot.computeWorldMatrix(true).clone().invert()) : null;
+        const distance = local ? Math.hypot(local.x, local.z) : Infinity;
         if (g.galaxyKey !== expectedKey) assignmentMismatchCount++;
         if (!galaxy || distance > galaxy.radius + 1e-6) memberOutsideCount++;
         assignments.push({

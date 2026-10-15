@@ -127,6 +127,33 @@
     return marker;
   };
 
+  // A soft radial disc, white at the centre and clear at the rim: the opacity of every glow.
+  AUR.softDiscTexture = function (scene) {
+    const size = 128;
+    const texture = new BABYLON.DynamicTexture('soft-disc', size, scene, false);
+    const context = texture.getContext();
+    const gradient = context.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+    gradient.addColorStop(0, 'rgba(255,255,255,1)');
+    gradient.addColorStop(0.45, 'rgba(255,255,255,0.45)');
+    gradient.addColorStop(1, 'rgba(255,255,255,0)');
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, size, size);
+    texture.hasAlpha = true;
+    texture.update();
+    return texture;
+  };
+
+  // Unlit colour through an opacity texture, drawn without writing depth: discs and coronas.
+  AUR.softMaterial = function (scene, name, color, alpha, opacityTexture) {
+    const material = new BABYLON.StandardMaterial(name, scene);
+    material.emissiveColor = color;
+    material.opacityTexture = opacityTexture;
+    material.disableLighting = true;
+    material.disableDepthWrite = true;
+    material.alpha = alpha;
+    return material;
+  };
+
   // Attach normalized, renderer-owned identity to the actual hull mesh. This
   // keeps provider evidence observable without exposing raw log-source text.
   AUR.markShipMesh = function markShipMesh(mesh, ship) {

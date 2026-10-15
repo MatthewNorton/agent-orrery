@@ -1,6 +1,6 @@
 // galaxy-layout.js — pure deterministic galaxy colors and cluster packing.
-// Galaxies gather around the largest one at hashed angles, heights and tilts; inside a galaxy the
-// recently active projects sit at the core and dormant ones drift to the rim.
+// Galaxies huddle around the largest one at hashed bearings, heights and tilts; inside a galaxy
+// the recently active projects sit at the core and dormant ones drift to the rim.
 // UMD keeps the same implementation available to the renderer and Node gates.
 'use strict';
 
@@ -11,13 +11,15 @@
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
   const MEMBER_STEP = 16;
-  const MEMBER_JITTER = 3;
-  const MEMBER_MARGIN = 10;
+  const MEMBER_RADIUS_JITTER = 3;
+  const MEMBER_ANGLE_JITTER = 0.3;
   const MEMBER_LIFT = 1.5;
+  const MEMBER_MARGIN = 10;
   const MIN_RADIUS = 24;
   const GALAXY_GAP = 20;
   const GALAXY_LIFT = 14;
   const GALAXY_TILT = 0.22;
+  const SLOTS = 24;
 
   function fnv1a(value) {
     const text = String(value == null ? '' : value);
@@ -29,8 +31,19 @@
     return hash >>> 0;
   }
 
-  // A hash as a number in [-1, 1).
+  // A hash as a number in [-1, 1), and as an angle.
   const signed = (value) => (fnv1a(value) / 4294967296) * 2 - 1;
+  const hashAngle = (value) => signed(value) * Math.PI;
+
+  // Three independent numbers in [-1, 1) from one integer seed, no strings involved.
+  function seedJitter(seed) {
+    let n = seed >>> 0;
+    n = Math.imul(n ^ (n >>> 16), 0x45d9f3b);
+    n = Math.imul(n ^ (n >>> 16), 0x45d9f3b);
+    n = (n ^ (n >>> 16)) >>> 0;
+    const slice = (shift) => (((n >>> shift) & 1023) / 1023) * 2 - 1;
+    return [slice(0), slice(10), slice(20)];
+  }
 
   function componentHex(value) {
     return Math.max(0, Math.min(255, Math.round(value))).toString(16).padStart(2, '0');
@@ -70,19 +83,22 @@
 
   // Core to rim by recency, on a jittered sunflower so the spacing stays even without the pattern.
   function memberLayout(group) {
-    const phase = signed(group.key) * Math.PI;
+    const phase = hashAngle(group.key);
     group.members.sort((a, b) => (b.lastActivity - a.lastActivity) || a.id.localeCompare(b.id));
     let farthest = 0;
     group.members.forEach((project, index) => {
-      const jitter = signed(group.key + ':' + project.id);
-      const radius = index === 0 ? 0 : MEMBER_STEP * Math.sqrt(index) + jitter * MEMBER_JITTER;
-      const angle = phase + index * GOLDEN_ANGLE + signed(project.id + ':angle') * 0.3;
+      const [radial, angular, lift] = seedJitter(project.seed);
+      const radius = index === 0 ? 0 : MEMBER_STEP * Math.sqrt(index) + radial * MEMBER_RADIUS_JITTER;
+      const angle = phase + index * GOLDEN_ANGLE + angular * MEMBER_ANGLE_JITTER;
       project.localX = Math.cos(angle) * radius;
-      project.localY = signed(project.id + ':lift') * MEMBER_LIFT;
+      project.localY = lift * MEMBER_LIFT;
       project.localZ = Math.sin(angle) * radius;
       farthest = Math.max(farthest, radius);
     });
     group.radius = Math.max(MIN_RADIUS, farthest + MEMBER_MARGIN);
+    group.y = signed('lift:' + group.key) * GALAXY_LIFT;
+    group.tiltX = signed('tilt-x:' + group.key) * GALAXY_TILT;
+    group.tiltZ = signed('tilt-z:' + group.key) * GALAXY_TILT;
   }
 
   function clearOf(placed, x, z, radius) {
@@ -94,23 +110,29 @@
   // already placed and takes the free slot nearest the cluster's centre, so the whole huddles
   // instead of lining up; the slot search starts at a hashed bearing, which is the only variety.
   function placeLiveGroups(groups) {
-    const ordered = groups.slice().sort((a, b) => (b.radius - a.radius) || a.key.localeCompare(b.key));
-    const placed = [];
-    ordered.forEach((group, index) => {
-      if (index === 0) {
-        group.x = 0;
-        group.z = 0;
-        placed.push(group);
-        return;
-      }
-      const centreX = placed.reduce((sum, item) => sum + item.x, 0) / placed.length;
-      const centreZ = placed.reduce((sum, item) => sum + item.z, 0) / placed.length;
-      const phase = signed('place:' + group.key) * Math.PI;
-      let selected = null;
-      for (const host of placed) {
+    const [anchor, ...rest] = groups.slice().sort(
+      (a, b) => (b.radius - a.radius) || a.key.localeCompare(b.key));
+    if (!anchor) return;
+    anchor.x = 0;
+    anchor.z = 0;
+    const placed = [anchor];
+    let sumX = 0;
+    let sumZ = 0;
+    for (const group of rest) {
+      const centreX = sumX / placed.length;
+      const centreZ = sumZ / placed.length;
+      const phase = hashAngle('place:' + group.key);
+      // A host's slots all lie at one distance from it, so hosts are tried nearest-first and
+      // the search stops once no slot on the rest could beat the best found.
+      const hosts = placed.map((host) => {
         const distance = host.radius + group.radius + GALAXY_GAP;
-        for (let step = 0; step < 24; step++) {
-          const angle = phase + step * (Math.PI / 12);
+        return { host, distance, bound: Math.hypot(host.x - centreX, host.z - centreZ) - distance };
+      }).sort((a, b) => a.bound - b.bound);
+      let selected = null;
+      for (const { host, distance, bound } of hosts) {
+        if (selected && bound >= selected.spread) break;
+        for (let step = 0; step < SLOTS; step++) {
+          const angle = phase + step * (2 * Math.PI / SLOTS);
           const x = host.x + Math.cos(angle) * distance;
           const z = host.z + Math.sin(angle) * distance;
           if (!clearOf(placed, x, z, group.radius)) continue;
@@ -119,22 +141,21 @@
         }
       }
       if (!selected) {
-        // Every touching slot is blocked only in pathological corpora; keep a deterministic fallback.
+        // No sampled bearing was free; extend the row instead.
         const extent = placed.reduce((value, other) => Math.max(value, other.x + other.radius), 0);
         selected = { x: extent + group.radius + GALAXY_GAP, z: 0 };
       }
       group.x = selected.x;
       group.z = selected.z;
       placed.push(group);
-    });
-
-    if (placed.length) {
-      const centerX = placed.reduce((sum, item) => sum + item.x, 0) / placed.length;
-      const centerZ = placed.reduce((sum, item) => sum + item.z, 0) / placed.length;
-      for (const item of placed) {
-        item.x -= centerX;
-        item.z -= centerZ;
-      }
+      sumX += group.x;
+      sumZ += group.z;
+    }
+    const centreX = sumX / placed.length;
+    const centreZ = sumZ / placed.length;
+    for (const item of placed) {
+      item.x -= centreX;
+      item.z -= centreZ;
     }
   }
 
@@ -149,18 +170,14 @@
       (value, item) => Math.max(value, Math.hypot(item.x, item.z)), 0);
     const maxLiveRadius = live.reduce((value, item) => Math.max(value, item.radius), 0);
     const distance = maxCenterDistance + maxLiveRadius + graveyard.radius + GALAXY_GAP;
-    const angle = signed('place:graveyard') * Math.PI;
+    const angle = hashAngle('place:graveyard');
     graveyard.x = Math.cos(angle) * distance;
     graveyard.z = Math.sin(angle) * distance;
   }
 
   function layoutGalaxyProjects(projects) {
     const groupsByKey = new Map();
-    const canonicalProjects = Array.isArray(projects)
-      ? projects.slice().sort((a, b) => String(a && a.id).localeCompare(String(b && b.id)))
-      : [];
-
-    for (const project of canonicalProjects) {
+    for (const project of Array.isArray(projects) ? projects : []) {
       if (!project || project.id == null) continue;
       const galaxy = projectGalaxy(project);
       let group = groupsByKey.get(galaxy.key);
@@ -168,17 +185,16 @@
         group = { key: galaxy.key, label: galaxy.label, members: [] };
         groupsByKey.set(galaxy.key, group);
       }
-      const lastActivity = Number.isFinite(project.lastActivity) ? project.lastActivity : 0;
-      group.members.push({ id: String(project.id), lastActivity });
+      const id = String(project.id);
+      group.members.push({
+        id,
+        seed: Number.isFinite(project.seed) ? project.seed : fnv1a(id),
+        lastActivity: Number.isFinite(project.lastActivity) ? project.lastActivity : 0,
+      });
     }
 
     const groups = [...groupsByKey.values()].sort((a, b) => a.key.localeCompare(b.key));
-    for (const group of groups) {
-      memberLayout(group);
-      group.y = signed('lift:' + group.key) * GALAXY_LIFT;
-      group.tiltX = signed('tilt-x:' + group.key) * GALAXY_TILT;
-      group.tiltZ = signed('tilt-z:' + group.key) * GALAXY_TILT;
-    }
+    for (const group of groups) memberLayout(group);
     const live = groups.filter((group) => group.key !== 'graveyard');
     const graveyard = groups.find((group) => group.key === 'graveyard') || null;
     placeLiveGroups(live);
@@ -190,6 +206,8 @@
         laidOutProjects.push({
           id: member.id,
           galaxyKey: group.key,
+          // The ground projection, read by the layout gate; the renderer places glyphs on the
+          // galaxy's tilted pivot from the local coordinates.
           x: group.x + member.localX,
           z: group.z + member.localZ,
           localX: member.localX,
@@ -210,5 +228,5 @@
     };
   }
 
-  return { layoutGalaxyProjects, galaxyColor };
+  return { layoutGalaxyProjects, galaxyColor, projectGalaxy };
 });

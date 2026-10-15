@@ -46,7 +46,8 @@
     const ships = new Map();  // shipId -> ship record
     const galaxies = new Map(); // galaxy key -> rendered region record
     const view = {
-      engine, scene, canvas, camera, gui, store, glyphs, ships, galaxies,
+      engine, scene, canvas, camera, gui, store, glyphs, ships, galaxies, glow,
+      softDisc: AUR.softDiscTexture(scene), coronaMaterials: new Map(),
       skyLevel: UNIVERSE_SKY_LEVEL, searchMatchIds: null, hoveredProjectId: null,
     };
     const parts = AUR.sceneParts.universe;
@@ -54,6 +55,16 @@
       parts.ships(view), parts.stats(view));
 
     // ---- glyphs ----
+    // Suns come in five colours, so five corona materials serve every glyph.
+    function coronaMaterial(hex) {
+      let material = view.coronaMaterials.get(hex);
+      if (!material) {
+        material = AUR.softMaterial(scene, 'corona:' + hex, AUR.color3(hex).scale(0.85), 1, view.softDisc);
+        view.coronaMaterials.set(hex, material);
+      }
+      return material;
+    }
+
     function buildGlyph(p) {
       const rand = AUR.mulberry32(p.seed >>> 0);
 
@@ -77,19 +88,14 @@
       sunMat.specularColor = new BABYLON.Color3(0, 0, 0);
       sun.material = sunMat;
 
-      // A soft corona behind the sun, in its colour, always facing the camera.
-      const corona = BABYLON.MeshBuilder.CreatePlane('corona_' + p.id, { size: dia * 3.0 }, scene);
+      // A soft corona behind the sun, in its colour, always facing the camera. The glow layer
+      // ignores opacity textures, so it stays out of the glow pass.
+      const corona = BABYLON.MeshBuilder.CreatePlane('corona_' + p.id, { size: dia * 2.4 }, scene);
       corona.parent = root;
       corona.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
       corona.isPickable = false;
-      const coronaMat = new BABYLON.StandardMaterial('coronam_' + p.id, scene);
-      coronaMat.emissiveColor = col.scale(0.85);
-      coronaMat.opacityTexture = view.softDisc;
-      coronaMat.diffuseColor = new BABYLON.Color3(0, 0, 0);
-      coronaMat.specularColor = new BABYLON.Color3(0, 0, 0);
-      coronaMat.disableLighting = true;
-      coronaMat.disableDepthWrite = true;
-      corona.material = coronaMat;
+      corona.material = coronaMaterial(AUR.sunColor(p.seed));
+      glow.addExcludedMesh(corona);
 
       // One reusable alert halo per glyph. It stays disabled until a main
       // ship in this project needs a question answered or permission granted.
@@ -155,7 +161,7 @@
       vcsLayer.appendChild(markerHost);
 
       const g = {
-        id: p.id, root, sun, sunMat, coronaMat, baseEmissive: col, rings, dots, label,
+        id: p.id, root, sun, sunMat, corona, baseEmissive: col, rings, dots, label,
         markerHost,
         galaxyKey: null,
         halo, haloMat, attention: null,

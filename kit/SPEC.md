@@ -270,10 +270,13 @@ Design tokens (put in `:root`):
 - Backdrop: `assets/skyboxes/skybox-001.png` (2048×1024 equirectangular) via
   `BABYLON.PhotoDome` (size ~1200), universe-only texture level `0.04`, plus a
   ~2500-point starfield (PointsCloudSystem or small billboards). Keep it dark —
-  the mockup is near-black.
+  the mockup is near-black. The galaxy gate measures it over the clear centre of
+  the frame: median luma ≤ 24 and p90 ≤ 48 (of 255).
 - Each project = a **mini solar-system glyph**:
   - Emissive sun sphere; diameter ~ `1.2 + log10(totalBytes+1) * 0.35`.
     Sun color from seed: pick from `#ffb454, #ff7a59, #dfe6ff, #ffd27d, #9db8ff`.
+  - Soft corona behind the sun in its colour: a billboard on the shared soft disc,
+    excluded from the glow layer.
   - 2–3 thin elliptical orbit rings (LinesMesh circles, alpha ~0.25, tilted
     slightly toward camera like the mockup).
   - 3–5 tiny planet dots on the rings (deterministic from seed).
@@ -288,13 +291,16 @@ Design tokens (put in `:root`):
 - **Deterministic galaxy layout** (persistent universe — same every launch):
   group projects by their additive `galaxy.key`; inside a galaxy the most recently
   active projects sit at the core and dormant ones drift to the rim, on a jittered
-  hash-rotated spiral. The largest galaxy anchors the cluster and the others gather
-  around it at hashed bearings with a positive gap; every galaxy is lifted (±14) and
-  tilted (±0.22 rad) on its own pivot, which its glyphs ride. Render a soft
-  non-pickable hashed-color disc, an outline, and a `GALAXY: <LABEL> · N SYSTEMS`
-  label for each group; each sun carries a soft corona in its colour; Graveyard is
-  muted and peripheral. Galaxy and project labels share the 6px screen-space
-  declutter pass. Camera framing uses all region extents. ArcRotateCamera keeps
+  hash-rotated spiral (the same layout for the same activity history; a project moves
+  inward when it is worked on). The largest galaxy anchors the cluster and each other
+  one touches a placed galaxy at the free slot nearest the cluster's centre, with a
+  positive gap; every galaxy is lifted and tilted on its own pivot, which its glyphs
+  (and so their ships, pulses and labels) ride. Render a soft non-pickable
+  hashed-color disc (excluded from the glow layer), an outline, and a
+  `GALAXY: <LABEL> · N SYSTEMS` label for each group; Graveyard is muted and
+  peripheral. Galaxy and project labels share the 6px screen-space
+  declutter pass. Camera framing uses the world-space bounds of every outline, lift
+  and tilt included. ArcRotateCamera keeps
   wheel zoom + drag rotation and a dynamically sufficient radius clamp.
 - States: system with ≥1 ship = "online" (brighter, sun pulse, label full
   opacity). Idle = normal dim. `exists: false` = derelict (very dim, ~40%

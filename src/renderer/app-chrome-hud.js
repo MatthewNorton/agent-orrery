@@ -88,13 +88,18 @@
     const count = document.getElementById('galaxies-count');
     const GALAXY = window.AUR_GALAXY;
     if (!list || !GALAXY) return;
-    const projects = [...S.store.projects.values()];
-    const layout = GALAXY.layoutGalaxyProjects(projects);
-    const keyOf = new Map(layout.projects.map((p) => [p.id, p.galaxyKey]));
-    const rows = new Map(layout.galaxies.map((g) => [g.key, { key: g.key, label: g.label, systems: 0, agents: 0, builds: 0 }]));
-    for (const p of projects) {
-      const row = rows.get(keyOf.get(String(p.id)));
-      if (row) { row.systems += 1; row.builds += p.totalBuilds || 0; }
+    const keyOf = new Map();
+    const rows = new Map();
+    for (const p of S.store.projects.values()) {
+      const galaxy = GALAXY.projectGalaxy(p);
+      keyOf.set(String(p.id), galaxy.key);
+      let row = rows.get(galaxy.key);
+      if (!row) {
+        row = { key: galaxy.key, label: galaxy.label, systems: 0, agents: 0, builds: 0 };
+        rows.set(galaxy.key, row);
+      }
+      row.systems += 1;
+      row.builds += p.totalBuilds || 0;
     }
     for (const ship of S.store.ships.values()) {
       const row = rows.get(keyOf.get(String(ship.project)));

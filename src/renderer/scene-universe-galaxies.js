@@ -8,21 +8,7 @@
   const GALAXY = window.AUR_GALAXY;
 
   AUR.sceneParts.universe.galaxies = function (view) {
-    const { scene, camera, canvas, gui, store, glyphs, galaxies } = view;
-
-    // One soft radial disc, white at the centre and clear at the rim, shared by every galaxy
-    // region and every sun halo.
-    const softDisc = new BABYLON.DynamicTexture('soft-disc', 256, scene, false);
-    const ctx2d = softDisc.getContext();
-    const gradient = ctx2d.createRadialGradient(128, 128, 0, 128, 128, 128);
-    gradient.addColorStop(0, 'rgba(255,255,255,1)');
-    gradient.addColorStop(0.45, 'rgba(255,255,255,0.45)');
-    gradient.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx2d.fillStyle = gradient;
-    ctx2d.fillRect(0, 0, 256, 256);
-    softDisc.update();
-    softDisc.hasAlpha = true;
-    view.softDisc = softDisc;
+    const { scene, camera, canvas, gui, store, glyphs, galaxies, glow, softDisc } = view;
 
     function galaxyLabelText(spec, memberCount) {
       if (spec.key === 'graveyard') {
@@ -45,16 +31,11 @@
       region.position.y = -1.5;
       region.isPickable = false;
       region.metadata = { isGalaxyRegion: true, galaxyKey: spec.key };
-      const material = new BABYLON.StandardMaterial('galaxy-region-mat:' + spec.key, scene);
-      material.emissiveColor = color.scale(dim ? 0.18 : 0.34);
-      material.opacityTexture = softDisc;
-      material.diffuseColor = new BABYLON.Color3(0, 0, 0);
-      material.specularColor = new BABYLON.Color3(0, 0, 0);
-      material.disableLighting = true;
-      material.alpha = dim ? 0.16 : 0.24;
+      const material = AUR.softMaterial(scene, 'galaxy-region-mat:' + spec.key,
+        color.scale(dim ? 0.22 : 0.45), dim ? 0.2 : 0.3, softDisc);
       material.backFaceCulling = false;
-      material.disableDepthWrite = true;
       region.material = material;
+      glow.addExcludedMesh(region);
 
       const outline = AUR.orbitRing(scene, 1, colorHex, dim ? 0.12 : 0.19, 0);
       outline.name = 'galaxy-outline:' + spec.key;
@@ -71,10 +52,7 @@
       label.isVisible = false;
 
       const record = {
-        key: spec.key, labelText: spec.label, colorHex,
-        x: spec.x, z: spec.z, radius: spec.radius, memberCount,
-        pivot, region, material, outline, label,
-        labelWidth: Math.min(260, Math.max(90, label.text.length * 7.8)),
+        key: spec.key, colorHex, pivot, region, material, outline, label,
         labelOffsetY: -12, labelScreen: null,
       };
       updateGalaxyVisual(record, spec, memberCount);
@@ -91,19 +69,19 @@
       record.pivot.position.set(spec.x, spec.y, spec.z);
       record.pivot.rotation.set(spec.tiltX, 0, spec.tiltZ);
       // The disc fades out before the outline so the rim reads as a boundary, not a cut edge.
-      record.region.scaling.set(spec.radius * 1.08, spec.radius * 1.08, 1);
+      const disc = spec.radius * 1.08;
+      record.region.scaling.set(disc, disc, 1);
       record.outline.scaling.set(spec.radius, 1, spec.radius);
       record.label.text = galaxyLabelText(spec, memberCount);
       record.labelWidth = Math.min(260, Math.max(90, record.label.text.length * 7.8));
     }
 
+    // Called once the galaxy's glyphs have moved to another pivot; disposing the pivot takes the
+    // disc and the outline with it.
     function disposeGalaxyVisual(record) {
-      if (!record) return;
-      if (record.label) record.label.dispose();
-      if (record.outline) record.outline.dispose();
-      if (record.region) record.region.dispose();
-      if (record.material) record.material.dispose();
-      if (record.pivot) record.pivot.dispose();
+      record.label.dispose();
+      record.pivot.dispose();
+      record.material.dispose();
     }
 
     function rebuildGalaxyLayout() {
@@ -115,11 +93,6 @@
         memberCounts.set(item.galaxyKey, (memberCounts.get(item.galaxyKey) || 0) + 1);
       }
 
-      for (const [key, record] of galaxies) {
-        if (galaxySpecs.has(key)) continue;
-        disposeGalaxyVisual(record);
-        galaxies.delete(key);
-      }
       for (const spec of layout.galaxies) {
         const count = memberCounts.get(spec.key) || 0;
         const record = galaxies.get(spec.key);
@@ -138,26 +111,39 @@
         g.galaxyKey = spec.galaxyKey;
         view.refreshProjectLabel(g, project);
       }
+
+      for (const [key, record] of galaxies) {
+        if (galaxySpecs.has(key)) continue;
+        disposeGalaxyVisual(record);
+        galaxies.delete(key);
+      }
       view.markLabelLayoutDirty();
       frameCamera();
     }
 
     const framed = { radius: NaN, x: NaN, z: NaN };
 
+    // The world-space box of every galaxy's outline, tilt and lift included.
+    function galaxyBounds() {
+      const min = new BABYLON.Vector3(Infinity, Infinity, Infinity);
+      const max = new BABYLON.Vector3(-Infinity, -Infinity, -Infinity);
+      for (const galaxy of galaxies.values()) {
+        galaxy.outline.computeWorldMatrix(true);
+        const box = galaxy.outline.getBoundingInfo().boundingBox;
+        min.minimizeInPlace(box.minimumWorld);
+        max.maximizeInPlace(box.maximumWorld);
+      }
+      return { min, max };
+    }
+
     function frameCamera() {
       if (galaxies.size === 0) return;
-      let minX = Infinity; let maxX = -Infinity;
-      let minZ = Infinity; let maxZ = -Infinity;
-      for (const galaxy of galaxies.values()) {
-        minX = Math.min(minX, galaxy.x - galaxy.radius);
-        maxX = Math.max(maxX, galaxy.x + galaxy.radius);
-        minZ = Math.min(minZ, galaxy.z - galaxy.radius);
-        maxZ = Math.max(maxZ, galaxy.z + galaxy.radius);
-      }
-      const cx = (minX + maxX) / 2;
-      const cz = (minZ + maxZ) / 2;
-      const extentX = (maxX - minX) / 2;
-      const extentZ = (maxZ - minZ) / 2;
+      const { min, max } = galaxyBounds();
+      const cx = (min.x + max.x) / 2;
+      const cz = (min.z + max.z) / 2;
+      const extentX = (max.x - min.x) / 2;
+      // Lift shows on screen much like depth does at this pitch, so it widens the depth extent.
+      const extentZ = (max.z - min.z) / 2 + Math.max(Math.abs(min.y), Math.abs(max.y));
       // Fit the world into the part of the canvas the chrome leaves clear. The near edge of the
       // tilted ground sits closest to the camera, so it decides the radius; the target then
       // shifts so the world's centre lands in the middle of the clear area, not of the canvas.
@@ -176,7 +162,7 @@
       const cosB = Math.max(0.2, Math.cos(camera.beta));
       const rx = extentZ * sinB + extentX * height / (bounds.width * tanFov);
       const rz = extentZ * sinB + extentZ * cosB * height / (bounds.height * tanFov);
-      const desiredRadius = Math.max(90, Math.max(rx, rz) * 1.06 + 16);
+      const desiredRadius = Math.max(90, Math.max(rx, rz) * 1.02 + 12);
       camera.upperRadiusLimit = Math.max(320, desiredRadius * 1.25);
       camera.radius = Math.min(desiredRadius, camera.upperRadiusLimit);
       const unit = 2 * camera.radius * tanFov / height;
