@@ -227,7 +227,7 @@
       return;
     }
     const old = S.activeView;
-    if (name !== 'universe') A.clearProjectSearch();
+    A.clearProjectSearch();
     if (S.agentFocus.shipId) A.exitAgentFocus(false);
     S.activeView = next;
     S.activeScene = next.scene;
@@ -237,7 +237,7 @@
     if (old && old.dispose) disposeSettled(old);
     A.renderChrome();
     if (name === 'system' && S.current.projectId) A.startTasksView(S.current.projectId);
-    if (name === 'universe') A.refreshProjectSearchFromStore();
+    A.refreshProjectSearchFromStore();
   }
 
   function disposeSettled(view) {
@@ -270,7 +270,6 @@
   };
 
   A.openSystem = async function openSystem(projectId) {
-    A.clearProjectSearch();
     const request = ++S.routeRequestGeneration;
     const requestedEpoch = S.streamEpoch;
     /** @type {SystemData} */

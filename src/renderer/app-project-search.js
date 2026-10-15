@@ -1,5 +1,5 @@
 // @ts-check
-// app-project-search.js — universe project search: topbar query, GitHub filter, match highlighting.
+// app-project-search.js — project search in every view: topbar query, GitHub filter, universe match highlighting.
 'use strict';
 
 (function () {
@@ -9,17 +9,16 @@
   if (!A) throw new Error('app-state.js must load before app-project-search.js');
   const S = A.state, C = A.const;
 
-  // ---------- universe project search ----------
+  // ---------- project search ----------
   A.wireProjectSearch = function wireProjectSearch() {
     S.projectSearch.els = {
-      root: document.getElementById('project-search'),
       input: document.getElementById('search-input'),
       results: document.getElementById('search-results'),
       filter: document.getElementById('project-vcs-filter'),
       filterCount: document.getElementById('project-vcs-filter-count'),
     };
     const els = S.projectSearch.els;
-    if (!els.root || !els.input || !els.results) return;
+    if (!els.input || !els.results) return;
 
     els.input.addEventListener('input', () => {
       cancelProjectSearchTimer();
@@ -91,16 +90,7 @@
       els.results.classList.add('hidden');
       AUR.clear(els.results);
     }
-    if (S.activeView && typeof S.activeView.setSearchMatches === 'function') {
-      A.syncUniverseProjectMatches();
-    }
-  };
-
-  A.renderProjectSearchVisibility = function renderProjectSearchVisibility() {
-    const els = S.projectSearch.els;
-    if (!els) return;
-    els.root.classList.toggle('hidden', S.current.view !== 'universe');
-    renderProjectVcsFilter();
+    A.syncProjectMatches();
   };
 
   function renderProjectVcsFilter() {
@@ -120,31 +110,29 @@
 
   A.refreshProjectSearchFromStore = function refreshProjectSearchFromStore() {
     const els = S.projectSearch.els;
-    A.renderProjectSearchVisibility();
-    if (!els || S.current.view !== 'universe') return;
-    if (els.input.value.trim() || S.projectSearch.filter !== VCS.FILTERS.ALL) updateProjectSearch();
-    else A.syncUniverseProjectMatches();
+    if (!els) return;
+    if (els.input.value.trim()) updateProjectSearch();
+    else { A.syncProjectMatches(); renderProjectVcsFilter(); }
   };
 
-  function matchingUniverseProjects(projects, query) {
+  function matchingProjects(projects, query) {
     return VCS.filterProjects(projects, { filter: S.projectSearch.filter, query });
   }
 
-  A.syncUniverseProjectMatches = function syncUniverseProjectMatches(projects, query) {
-    if (!S.activeView || typeof S.activeView.setSearchMatches !== 'function' ||
-        S.current.view !== 'universe') return;
+  A.syncProjectMatches = function syncProjectMatches(projects, query) {
+    if (!S.activeView || typeof S.activeView.setSearchMatches !== 'function') return;
     const source = projects || [...S.store.projects.values()];
     const needle = query == null && S.projectSearch.els
       ? S.projectSearch.els.input.value.trim() : String(query || '').trim();
     const active = Boolean(needle) || S.projectSearch.filter !== VCS.FILTERS.ALL;
     S.activeView.setSearchMatches(active
-      ? new Set(matchingUniverseProjects(source, needle).map((project) => project.id))
+      ? new Set(matchingProjects(source, needle).map((project) => project.id))
       : null);
   };
 
   function updateProjectSearch() {
     const els = S.projectSearch.els;
-    if (!els || S.current.view !== 'universe') return;
+    if (!els) return;
     const query = els.input.value.trim();
     const queryChanged = query !== S.projectSearch.query;
     const previous = queryChanged ? null : S.projectSearch.results[S.projectSearch.selected];
@@ -153,13 +141,13 @@
       S.projectSearch.results = [];
       S.projectSearch.selected = 0;
       renderProjectSearchResults();
-      A.syncUniverseProjectMatches();
+      A.syncProjectMatches();
       renderProjectVcsFilter();
       return;
     }
 
     const projects = [...S.store.projects.values()];
-    const matches = matchingUniverseProjects(projects, query);
+    const matches = matchingProjects(projects, query);
     const ranked = AUR.searchProjects(matches, query);
     const rankedIds = new Set(ranked.map((project) => project.id));
     const extras = matches.filter((project) => !rankedIds.has(project.id)).sort((a, b) =>
@@ -178,7 +166,7 @@
     S.projectSearch.selected = queryChanged ? 0 : previousIndex >= 0
       ? previousIndex : Math.min(S.projectSearch.selected, Math.max(0, S.projectSearch.results.length - 1));
     renderProjectSearchResults();
-    A.syncUniverseProjectMatches(projects, query);
+    A.syncProjectMatches(projects, query);
     renderProjectVcsFilter();
   }
 
@@ -198,7 +186,7 @@
   function renderProjectSearchResults() {
     const els = S.projectSearch.els;
     if (!els) return;
-    const open = S.current.view === 'universe' && Boolean(els.input.value.trim());
+    const open = Boolean(els.input.value.trim());
     els.results.classList.toggle('hidden', !open);
     els.input.setAttribute('aria-expanded', String(open));
     AUR.clear(els.results);

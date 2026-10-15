@@ -90,9 +90,7 @@
     S.projectDirectory.selected = 0;
     els.input.value = '';
     A.renderProjectDirectory();
-    if (S.activeView && typeof S.activeView.setSearchMatches === 'function') {
-      A.syncUniverseProjectMatches();
-    }
+    A.syncProjectMatches();
     if (restoreFocus) els.button.focus();
   };
 
@@ -130,9 +128,7 @@
     const queryChanged = query !== S.projectDirectory.query;
     const previous = queryChanged ? null : S.projectDirectory.results[S.projectDirectory.selected];
     const allProjects = projectsByActivity();
-    const projects = S.current.view === 'universe'
-      ? VCS.filterProjects(allProjects, { filter: S.projectSearch.filter })
-      : allProjects;
+    const projects = VCS.filterProjects(allProjects, { filter: S.projectSearch.filter });
     S.projectDirectory.query = query;
     if (query) {
       const matches = VCS.filterProjects(projects, { query });
@@ -180,7 +176,7 @@
       return;
     }
     const shown = S.projectDirectory.results.length;
-    const githubOnly = S.current.view === 'universe' && S.projectSearch.filter === VCS.FILTERS.GITHUB;
+    const githubOnly = S.projectSearch.filter === VCS.FILTERS.GITHUB;
     els.subtitle.textContent = S.projectDirectory.query || githubOnly
       ? `${shown} of ${total} projects${githubOnly ? ' · GitHub only' : ''}`
       : `${total} projects · active first`;

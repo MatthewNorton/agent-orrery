@@ -61,7 +61,6 @@
     A.renderTabbar();
     A.renderBackButton();
     A.renderGalaxies();
-    A.renderProjectSearchVisibility();
     A.renderProjectDirectory();
     A.renderProjectSettings();
     A.renderIdeas();
