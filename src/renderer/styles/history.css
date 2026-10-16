@@ -26,7 +26,7 @@
   transition: background var(--dur-fast) var(--ease);
 }
 .history-btn:hover:not(:disabled) { background: var(--plate); }
-.history-btn:focus-visible, .history-scrubber:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
+.history-btn:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
 .history-btn:disabled { border-color: var(--hair); color: var(--ink-3); cursor: default; }
 .history-speed { color: var(--ink-2); font-family: var(--font-mono); font-weight: 500; }
 .history-live { color: var(--ink-3); }
@@ -75,23 +75,12 @@
   font-family: var(--font-mono); font-size: 12px; white-space: nowrap;
 }
 .history-range-labels time { color: var(--ink-3); }
-.history-scrubber {
-  position: relative; z-index: 2;
-  width: 100%; height: 20px; margin: 0;
-  appearance: none; -webkit-appearance: none;
-  background: transparent; cursor: pointer;
-}
+.history-scrubber { position: relative; z-index: 2; }
 .history-scrubber::-webkit-slider-runnable-track {
   height: 2px;
   background: linear-gradient(to right,
     var(--ink) 0 var(--history-progress, 100%),
     var(--hair-2) var(--history-progress, 100%) 100%);
-}
-.history-scrubber::-webkit-slider-thumb {
-  width: 12px; height: 12px; margin-top: -5px;
-  border: 2px solid var(--paper-solid); border-radius: var(--radius-dot);
-  appearance: none; -webkit-appearance: none;
-  background: var(--ink);
 }
 .history-scrubber:disabled { opacity: 0.38; cursor: default; }
 

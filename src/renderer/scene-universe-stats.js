@@ -9,11 +9,13 @@
   const VCS = AUR.ProjectVcsStatus;
 
   AUR.sceneParts.universe.stats = function (view) {
-    const { engine, scene, canvas, gui, store, glyphs, galaxies } = view;
+    const { scene, canvas, gui, store, glyphs, galaxies } = view;
 
     function measuredLabelStats() {
-      const scaleX = canvas.clientWidth / engine.getRenderWidth();
-      const scaleY = canvas.clientHeight / engine.getRenderHeight();
+      // Label measures are in the GUI texture's pixels, which the graphics quality keeps at the display's.
+      const guiSize = gui.getSize();
+      const scaleX = canvas.clientWidth / guiSize.width;
+      const scaleY = canvas.clientHeight / guiSize.height;
       const bounds = AUR.chromeBounds(canvas);
       const measured = [];
       const combined = [];

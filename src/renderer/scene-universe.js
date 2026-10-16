@@ -22,7 +22,8 @@
     camera.upperRadiusLimit = 320;
     camera.lowerBetaLimit = 0.15;
     camera.upperBetaLimit = 1.35;
-    camera.panningSensibility = 0;
+    // Right-drag pans along the ground; scene-universe-galaxies.js sets its speed and bounds.
+    camera.mapPanning = true;
     camera.minZ = 0.1;
     camera.maxZ = 6000;
     AUR.configureComfortCamera(camera);
@@ -50,6 +51,7 @@
       fields: ctx.galaxyFields || new Map(),
       softDisc: AUR.softDiscTexture(scene), coronaMaterials: new Map(),
       skyLevel: UNIVERSE_SKY_LEVEL, searchMatchIds: null, hoveredProjectId: null,
+      quality: ctx.quality,
     };
     const parts = AUR.sceneParts.universe;
     Object.assign(view, parts.labels(view), parts.glyphs(view), parts.stars(view),
@@ -186,10 +188,13 @@
     for (const s of store.ships.values()) if (glyphs.has(s.project)) view.buildShip(s);
 
     // ---- interaction ----
+    // Left-click opens a system; a double-click on open space re-frames the whole universe.
     scene.onPointerObservable.add((pi) => {
       if (pi.type === BABYLON.PointerEventTypes.POINTERPICK) {
         const m = pi.pickInfo && pi.pickInfo.pickedMesh;
-        if (m && m.metadata && m.metadata.isSun) ctx.openSystem(m.metadata.projectId);
+        if (pi.event.button === 0 && m && m.metadata && m.metadata.isSun) ctx.openSystem(m.metadata.projectId);
+      } else if (pi.type === BABYLON.PointerEventTypes.POINTERDOUBLETAP) {
+        if (pi.event.button === 0 && view.hoveredProjectId == null) view.frameCamera();
       } else if (pi.type === BABYLON.PointerEventTypes.POINTERMOVE) {
         const pick = scene.pick(scene.pointerX, scene.pointerY, (mm) => mm.metadata && mm.metadata.isSun);
         const nextHovered = pick && pick.hit ? pick.pickedMesh.metadata.projectId : null;
@@ -206,7 +211,10 @@
       const dt = engine.getDeltaTime() / 1000;
       const now = performance.now();
       const t = now / 1000;
-      if (view.cameraLayoutChanged()) view.markLabelLayoutDirty();
+      if (view.cameraLayoutChanged()) {
+        view.markLabelLayoutDirty();
+        view.updatePanSpeed();
+      }
       view.animateGlyphs(dt, now, t);
       view.animateShips(dt, now, t);
       view.animateStars();
@@ -281,6 +289,7 @@
       scene,
       update,
       setSearchMatches: view.setSearchMatches,
+      setQuality: view.setStarsQuality,
       resize: view.reframeCamera,
       dispose() {
         view.cancelLabelLayout();

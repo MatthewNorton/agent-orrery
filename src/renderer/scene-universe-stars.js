@@ -2,8 +2,9 @@
 // through the galaxy's emission atlas, and resolved stars drawn from the same atlas, both in the
 // galaxy-field.js local frame scaled to the galaxy's radius and riding its pivot. The light is
 // added to the scene, so the solar-system glyphs inside stay legible. One volume and one point
-// cloud per galaxy, outside the glow pass, rebuilt only when the galaxy's radius changes; the
-// atlas pixels are kept across rebuilds and view switches.
+// cloud per galaxy, outside the glow pass, rebuilt only when the galaxy's radius changes (the
+// graphics quality swaps just its shaders and stars); the atlas pixels are kept across rebuilds
+// and view switches.
 'use strict';
 
 (function () {
@@ -13,7 +14,6 @@
   const STARS_MIN = 4000;
   const STARS_MAX = 120000;
   const STARS_PER_AREA = 12;
-  const STEPS = 48;
 
   // The shaders, written against the field's frame.
   function shaderSources(FIELD) {
@@ -36,7 +36,8 @@
         gl_Position = worldViewProjection * vec4(position, 1.0);
       }`;
     // The exit face of the box integrates emission and extinction along the viewing ray, so the
-    // camera may sit inside the volume. Dithering the first step hides the slab banding.
+    // camera may sit inside the volume. Dithering the first step hides the slab banding. STEPS is
+    // a define the graphics quality sets.
     const volumeFragment = `
       precision highp float;
       varying vec3 localPosition;
@@ -53,11 +54,11 @@
         float entry = max(max(lo.x, lo.y), max(lo.z, 0.0));
         float exit = min(min(hi.x, hi.y), hi.z);
         if (exit <= entry) discard;
-        float stepLength = (exit - entry) / ${STEPS}.0;
+        float stepLength = (exit - entry) / float(STEPS);
         float along = entry + stepLength * hash(gl_FragCoord.xy);
         vec3 radiance = vec3(0.0);
         float transmission = 1.0;
-        for (int i = 0; i < ${STEPS}; i++) {
+        for (int i = 0; i < STEPS; i++) {
           vec3 p = cameraLocal + ray * along;
           vec4 field = fieldAt(p);
           float height = diskScale(p);
@@ -85,13 +86,14 @@
       uniform float pixelsPerUnit;
       uniform float unitScale;
       uniform float sizeMax;
+      uniform float pointMax;
       ${frame}
       varying vec4 vColor;
       void main() {
         vec4 viewPosition = worldView * vec4(position, 1.0);
         gl_Position = worldViewProjection * vec4(position, 1.0);
         float world = min(size * unitScale, sizeMax);
-        gl_PointSize = clamp(world * pixelsPerUnit / max(1.0, abs(viewPosition.z)), 0.8, 12.0);
+        gl_PointSize = clamp(world * pixelsPerUnit / max(1.0, abs(viewPosition.z)), 0.8, pointMax);
         vec3 direction = normalize(cameraLocal - position);
         float dustHeight = diskScale(position) * 0.46;
         float here = exp(-abs(position.y) / dustHeight);
@@ -123,10 +125,10 @@
     const diskHeight = BABYLON.Vector2.FromArray(FIELD.DISK_HEIGHT);
     const toLocal = new BABYLON.Matrix();
 
-    function shader(shaderName, key, attributes, uniforms, body) {
+    function shader(shaderName, key, attributes, uniforms, body, defines = []) {
       const material = new BABYLON.ShaderMaterial(shaderName + ':' + key, scene, shaderName, {
         attributes, uniforms: [...uniforms, 'exposure', 'diskHeight', 'cameraLocal'],
-        samplers: ['atlas'], needAlphaBlending: true,
+        samplers: ['atlas'], needAlphaBlending: true, defines,
       });
       material.backFaceCulling = false;
       material.disableDepthWrite = true;
@@ -151,48 +153,77 @@
       return pixels;
     }
 
-    function buildBody(record, spiral) {
-      const R = spiral.radius;
-      const size = R < 60 ? 256 : 512;
-      const pixels = atlasPixels(record, spiral, size);
-      const body = { exposure: EXPOSURE * (record.dim ? 0.35 : 1), cameraLocal: new BABYLON.Vector3() };
-      body.atlas = BABYLON.RawTexture.CreateRGBATexture(pixels, size, size, scene, true, false,
-        BABYLON.Texture.TRILINEAR_SAMPLINGMODE);
-      body.atlas.wrapU = body.atlas.wrapV = BABYLON.Texture.CLAMP_ADDRESSMODE;
+    const atlasSize = (spiral) => spiral.radius < 60 ? 256 : 512;
 
+    function buildBody(record, spiral) {
+      const size = atlasSize(spiral);
+      const body = { spiral, exposure: EXPOSURE * (record.dim ? 0.35 : 1), cameraLocal: new BABYLON.Vector3() };
+      body.atlas = BABYLON.RawTexture.CreateRGBATexture(atlasPixels(record, spiral, size), size, size, scene,
+        true, false, BABYLON.Texture.TRILINEAR_SAMPLINGMODE);
+      body.atlas.wrapU = body.atlas.wrapV = BABYLON.Texture.CLAMP_ADDRESSMODE;
       body.volume = BABYLON.MeshBuilder.CreateBox('galaxy-region:' + record.key, FIELD.BOX, scene);
       body.volume.metadata = { isGalaxyRegion: true, galaxyKey: record.key };
-      body.volume.material = shader('galaxyVolume', record.key, ['position'], ['worldViewProjection'], body);
+      placeInGalaxy(record, body, body.volume);
+      dressBody(record, body);
+      return body;
+    }
 
-      const count = Math.round(Math.max(STARS_MIN, Math.min(STARS_MAX, R * R * STARS_PER_AREA)));
-      const stars = FIELD.sampleStars(pixels, size, AUR.fnv1a('stars:' + record.key), count);
+    function placeInGalaxy(record, body, mesh) {
+      mesh.parent = record.pivot;
+      mesh.scaling.setAll(body.spiral.radius / FIELD.DISC);
+      mesh.isPickable = false;
+      glow.addExcludedMesh(mesh);
+    }
+
+    // What the graphics quality decides: the volume's raymarch steps and the resolved stars.
+    function dressBody(record, body) {
+      const R = body.spiral.radius;
+      const size = atlasSize(body.spiral);
+      body.volume.material = shader('galaxyVolume', record.key, ['position'], ['worldViewProjection'], body,
+        ['#define STEPS ' + view.quality.steps]);
+
+      const count = Math.round(
+        Math.max(STARS_MIN, Math.min(STARS_MAX, R * R * STARS_PER_AREA)) * view.quality.stars);
+      const stars = FIELD.sampleStars(atlasPixels(record, body.spiral, size), size,
+        AUR.fnv1a('stars:' + record.key), count);
       body.stars = new BABYLON.Mesh('galaxy-stars:' + record.key, scene);
       body.stars.setVerticesData(BABYLON.VertexBuffer.PositionKind, stars.positions);
       body.stars.setVerticesData(BABYLON.VertexBuffer.ColorKind, stars.colors, false, 4);
       body.stars.setVerticesData('size', stars.sizes, false, 1);
       body.stars.isUnIndexed = true;
       body.stars.material = shader('galaxyStars', record.key, ['position', 'color', 'size'],
-        ['worldViewProjection', 'worldView', 'pixelsPerUnit', 'unitScale', 'sizeMax'], body);
+        ['worldViewProjection', 'worldView', 'pixelsPerUnit', 'unitScale', 'sizeMax', 'pointMax'], body);
       body.stars.material.pointsCloud = true;
       body.stars.material.setFloat('unitScale', R / FIELD.DISC);
       body.stars.material.setFloat('sizeMax', AUR.SUN_DIAMETER_MIN);
+      // 12 display pixels at most, whatever share of them the scene renders.
+      body.stars.material.setFloat('pointMax', 12 * view.quality.resolution);
+      placeInGalaxy(record, body, body.stars);
+    }
 
-      for (const mesh of [body.volume, body.stars]) {
-        mesh.parent = record.pivot;
-        mesh.scaling.setAll(R / FIELD.DISC);
-        mesh.isPickable = false;
-        glow.addExcludedMesh(mesh);
-      }
-      return body;
+    // The materials go, the atlas they share stays.
+    function undressBody(body) {
+      const starsMaterial = body.stars.material;
+      body.stars.dispose();
+      starsMaterial.dispose();
+      body.volume.material.dispose();
     }
 
     // The body is a function of the galaxy's radius (which the member count sets), so a pivot
     // that merely moves, or a project that joins without widening the galaxy, keeps its stars.
     function buildGalaxyStars(record, spec) {
-      if (record.body && record.bodyRadius === spec.radius) return;
+      if (record.body && record.body.spiral.radius === spec.spiral.radius) return;
       disposeGalaxyStars(record);
       record.body = buildBody(record, spec.spiral);
-      record.bodyRadius = spec.radius;
+    }
+
+    function setStarsQuality(quality) {
+      view.quality = quality;
+      for (const record of galaxies.values()) {
+        if (!record.body) continue;
+        undressBody(record.body);
+        dressBody(record, record.body);
+      }
     }
 
     function disposeGalaxyStars(record) {
@@ -214,6 +245,6 @@
       }
     }
 
-    return { buildGalaxyStars, disposeGalaxyStars, animateStars };
+    return { buildGalaxyStars, disposeGalaxyStars, setStarsQuality, animateStars };
   };
 })();

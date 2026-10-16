@@ -59,14 +59,14 @@ loaders), then:
 | Shared libraries | `util.js` (creates `window.AUR`; `fnv1a`/`mulberry32` copied from `src/main/shared/hash.js` so seeds agree), `util-scene.js` (Babylon helpers), `procedural-worlds.js`, `ship-assets.js` + `ship-assets-hulls.js` + `ship-assets-api.js` (`AUR.ships`), `polish-math.js`, `galaxy-layout.js` and `galaxy-field.js` (pure UMD; the field is a galaxy's emission/dust atlas and the stars drawn from it), `search-core.js`, `components/project-vcs-status.js` |
 | Views | `scene-common.js` (`AUR.sceneParts`), then each view's parts before the view: `scene-universe-{galaxies,glyphs,labels,ships,stars,stats}.js` → `scene-universe.js`, `scene-system-{belt,focus,ships}.js` → `scene-system.js`, then `scene-planet.js` |
 | App state | `app-state.js` — the only file that assigns `AUR.app` (`state`, `const`) |
-| App modules | `app-agent-focus.js`, `app-chrome.js`, `app-chrome-hud.js`, `app-chrome-queue.js`, `app-history-metrics.js`, `app-ideas.js`, `app-ideas-list.js`, `app-modules.js`, `app-playback.js`, `app-project-control.js`, `app-project-directory.js`, `app-project-search.js`, `app-project-settings.js`, `app-project-tasks.js`, `app-replay.js`, `app-store.js` |
+| App modules | `app-agent-focus.js`, `app-chrome.js`, `app-chrome-hud.js`, `app-chrome-queue.js`, `app-history-metrics.js`, `app-ideas.js`, `app-ideas-list.js`, `app-modules.js`, `app-playback.js`, `app-project-control.js`, `app-project-directory.js`, `app-project-search.js`, `app-project-settings.js`, `app-project-tasks.js`, `app-render-quality.js`, `app-replay.js`, `app-store.js` |
 | Boot | `app.js` — boot, event routing, view switching, debug hooks |
 
 View contract: each `scene-*.js` registers
 `AUR.views.<name> = (engine, data, ctx) => ({ scene, update(eventBatch), dispose() })`
-where `ctx` provides `openSystem(projectId)`, `openPlanet(projectId, name)` and the
-shared `store`. Views may expose extras the app layer probes for
-(`setSearchMatches`, `focusShip`, `planetData`).
+where `ctx` provides `openSystem(projectId)`, `openPlanet(projectId, name)`, the
+shared `store` and the graphics `quality` tier. Views may expose extras the app layer
+probes for (`setSearchMatches`, `setQuality`, `focusShip`, `planetData`).
 
 ## 3. The `window.AU` bridge (matches `src/preload.js`)
 
@@ -209,7 +209,9 @@ Design tokens (put in `:root`):
   matches appear in a keyboard-accessible dropdown and Enter/click opens the
   existing guarded system route. It is present in every view; a view switch clears the
   query, and the GitHub filter also narrows the PROJECTS directory.
-  A persistent gear opens `SETTINGS · PROJECT PATHS`: missing project folders
+  A persistent gear opens `SETTINGS · GRAPHICS · PROJECT PATHS`. Graphics quality is a
+  stepped slider over `AUR.app.const.RENDER_QUALITIES` (Low · Balanced · High), kept per
+  viewer in localStorage; High is the default and the look every gate grades (§9). Missing project folders
   can be recovered with a bounded scan beneath a user-chosen parent or a
   native `Locate…` picker. Scan matches require explicit confirmation, remaps
   keep the original project ID/history, and path changes are LIVE-only.
@@ -308,7 +310,7 @@ Design tokens (put in `:root`):
   non-pickable volume box (the region mesh) that raymarches the atlas with a luminous
   bulge and dust extinction, and one point cloud of stars dimmed by the dust column in
   front of them; both are children of the pivot in the field's local frame scaled to the
-  radius, rebuilt only when the radius changes (the atlas pixels persist across view
+  radius, rebuilt only when the radius or the graphics quality changes (the atlas pixels persist across view
   switches in `AUR.app.state.galaxyFields`), added to the scene (so glyphs inside stay
   legible) and outside the glow layer. No star is larger than the smallest sun
   (`AUR.SUN_DIAMETER_MIN`) or 12px. The pivot carries the label anchor, the camera
@@ -318,7 +320,11 @@ Design tokens (put in `:root`):
   Galaxy and project labels share the 6px screen-space
   declutter pass. Camera framing uses the world-space bounds of every outline, lift
   and tilt included. ArcRotateCamera keeps
-  wheel zoom + drag rotation and a dynamically sufficient radius clamp.
+  wheel zoom + drag rotation and a dynamically sufficient radius clamp. Right-drag pans
+  along the ground (`mapPanning`), the ground following the pointer at any zoom, and the
+  target stays within the galaxies' footprint; only a left-click opens a system, and a
+  double-click on open space re-fits every galaxy. A layout change re-fits only while
+  the viewer has not moved the camera.
 - States: system with ≥1 ship = "online" (brighter, sun pulse, label full
   opacity). Idle = normal dim. `exists: false` = derelict (very dim, ~40%
   opacity, no pulse).
@@ -457,6 +463,13 @@ fixed Windows Terminal arguments, and writes two screenshots plus a bounded
   thin instances only, one GlowLayer per scene max, no per-frame allocations in
   observables (reuse Vector3s), dispose scenes fully on view switch
   (`scene.dispose()` and drop references).
+- Graphics tiers trade frame rate for detail: each sets the share of the display's
+  pixels the engine renders (`setHardwareScalingLevel`), the galaxy volume's raymarch
+  steps (a `STEPS` define) and the share of resolved stars. GUI labels keep their size and
+  layout at every tier (`AUR.guiLayer` sets `renderScale`) and soften with the scene below
+  High; star points stay capped at 12 display pixels. Test-mode runs keep their
+  storage in an in-memory partition, so they render the default tier and default panels
+  whatever the viewer saved.
 - Textures are 1–5MB PNGs; load per scene, never re-fetch in a loop.
 - The event stream can burst (a batch per second per active session). `update()`
   must be O(batch) for ordinary ship/activity events and never rebuild the
