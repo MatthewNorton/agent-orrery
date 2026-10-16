@@ -94,6 +94,7 @@ body:has(#rail-left.is-collapsed) .view-title { left: calc(var(--sidebar-compact
   pointer-events: none;
 }
 body:has(#sidebar.is-collapsed) .view-hint { right: calc(var(--sidebar-compact-w) + 2 * var(--space-3)); }
+body:not([data-view="universe"]) .view-hint-universe { display: none; }
 
 /* needs you: one row per agent waiting on you, oldest first */
 .needs-row {

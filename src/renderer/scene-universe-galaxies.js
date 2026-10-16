@@ -1,7 +1,7 @@
 // scene-universe-galaxies.js — galaxy regions on the universe map: each galaxy is a tilted, lifted
 // pivot carrying its body (scene-universe-stars.js), an outline and its project glyphs; the
 // project layout that places each glyph in its galaxy; and the camera framing that keeps them
-// all on screen.
+// all on screen, with the pan bounds and speed.
 'use strict';
 
 (function () {
@@ -100,20 +100,24 @@
         galaxies.delete(key);
       }
       view.markLabelLayoutDirty();
-      frameCamera();
+      if (galaxies.size === 0) return;
+      const box = galaxyBounds();
+      reframeCamera(box);
+      limitPanning(box);
     }
 
     const framed = { radius: NaN, x: NaN, z: NaN };
+    const CORNERS = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
 
     // The world-space box of every galaxy's disc, tilt and lift included.
     function galaxyBounds() {
       const min = new BABYLON.Vector3(Infinity, Infinity, Infinity);
       const max = new BABYLON.Vector3(-Infinity, -Infinity, -Infinity);
+      const corner = new BABYLON.Vector3();
       for (const galaxy of galaxies.values()) {
         const world = galaxy.pivot.computeWorldMatrix(true);
-        for (const [x, z] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
-          const corner = BABYLON.Vector3.TransformCoordinates(
-            new BABYLON.Vector3(x * galaxy.radius, 0, z * galaxy.radius), world);
+        for (const [x, z] of CORNERS) {
+          BABYLON.Vector3.TransformCoordinatesFromFloatsToRef(x * galaxy.radius, 0, z * galaxy.radius, world, corner);
           min.minimizeInPlace(corner);
           max.maximizeInPlace(corner);
         }
@@ -121,9 +125,9 @@
       return { min, max };
     }
 
-    function frameCamera() {
+    function frameCamera(box = galaxyBounds()) {
       if (galaxies.size === 0) return;
-      const { min, max } = galaxyBounds();
+      const { min, max } = box;
       const cx = (min.x + max.x) / 2;
       const cz = (min.z + max.z) / 2;
       const extentX = (max.x - min.x) / 2;
@@ -140,6 +144,7 @@
         camera.upperRadiusLimit = Math.max(320, desiredRadius * 1.25);
         camera.setTarget(new BABYLON.Vector3(cx, 0, cz));
         camera.radius = Math.min(desiredRadius, camera.upperRadiusLimit);
+        limitPanning(box);
         return;
       }
       const tanFov = Math.tan(camera.fov / 2);
@@ -161,13 +166,32 @@
       framed.radius = camera.radius;
       framed.x = camera.target.x;
       framed.z = camera.target.z;
+      limitPanning(box);
     }
 
-    // Re-fit after the chrome or the window changes size, unless the viewer has moved the camera.
-    function reframeCamera() {
-      const untouched = Math.abs(camera.radius - framed.radius) < 0.5 &&
-        Math.abs(camera.target.x - framed.x) < 0.5 && Math.abs(camera.target.z - framed.z) < 0.5;
-      if (untouched) frameCamera();
+    // Re-fit after the layout, the chrome or the window changes, unless the viewer moved the camera.
+    function reframeCamera(box) {
+      const untouched = Number.isNaN(framed.radius) || (Math.abs(camera.radius - framed.radius) < 0.5 &&
+        Math.abs(camera.target.x - framed.x) < 0.5 && Math.abs(camera.target.z - framed.z) < 0.5);
+      if (untouched) frameCamera(box);
+    }
+
+    // Panning stays over the galaxies: the target roams their footprint, and always reaches where
+    // it already is (framing shifts it to clear the chrome), since Babylon refuses any pan step
+    // that would end outside the limit.
+    function limitPanning({ min, max }) {
+      const cx = (min.x + max.x) / 2;
+      const cz = (min.z + max.z) / 2;
+      camera.panningOriginTarget.set(cx, 0, cz);
+      camera.panningDistanceLimit = Math.max((max.x - min.x) / 2, (max.z - min.z) / 2,
+        Math.hypot(camera.target.x - cx, camera.target.z - cz));
+    }
+
+    // A drag moves the ground about as far as the pointer at any zoom: Babylon divides the
+    // pointer's travel by the sensibility, then lets the pan coast out over panningInertia.
+    function updatePanSpeed() {
+      const unit = 2 * camera.radius * Math.tan(camera.fov / 2) / Math.max(1, canvas.clientHeight);
+      camera.panningSensibility = 1 / (unit * (1 - camera.panningInertia));
     }
 
     // The first galaxy up close: the kit's proof shot of a body.
@@ -180,6 +204,6 @@
       return true;
     }
 
-    return { rebuildGalaxyLayout, reframeCamera, frameGalaxy };
+    return { rebuildGalaxyLayout, frameCamera, reframeCamera, frameGalaxy, updatePanSpeed };
   };
 })();

@@ -213,9 +213,20 @@
     };
   };
 
-  // Fullscreen GUI layer for a scene (exactly one per scene).
+  // Fullscreen GUI layer for a scene (exactly one per scene). Its labels keep their size and
+  // layout when the graphics setting renders the scene with fewer pixels; they share the scene's
+  // buffer, so they soften with it.
   AUR.guiLayer = function (scene) {
-    return BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI('ui', true, scene);
+    const gui = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI('ui', true, scene);
+    const engine = scene.getEngine();
+    const matchDisplay = () => {
+      gui.renderScale = Math.round(1000 * engine.getHardwareScalingLevel() * window.devicePixelRatio) / 1000;
+    };
+    matchDisplay();
+    // Ahead of the GUI's own resize handler, so the texture is sized once.
+    const resized = engine.onResizeObservable.add(matchDisplay, undefined, true);
+    gui.onDisposeObservable.addOnce(() => engine.onResizeObservable.remove(resized));
+    return gui;
   };
 
   // Map labels use the chrome's faces (shipped under fonts/, declared in styles/tokens.css); the GUI

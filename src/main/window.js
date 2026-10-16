@@ -28,6 +28,9 @@ function createWindow(ctx, electron = require('electron')) {
       // Visual runners can execute from an occluded desktop session. Keep
       // their render loop alive so debug-ready can observe a completed frame.
       backgroundThrottling: !ctx.flags.testMode,
+      // Test runs keep their storage in memory, so the viewer's saved preferences (graphics,
+      // folded panels, focus) never shape what a gate sees.
+      partition: ctx.flags.testMode ? 'orrery-test' : undefined,
     },
   });
   hardenWebContents(win.webContents, RENDERER_ENTRY_URL);
