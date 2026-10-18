@@ -10,7 +10,7 @@ const {
   buildPullRequestQuery,
   parseGraphqlResponse,
   normalizeRepository,
-} = require('../src/main/github-metadata-provider');
+} = require('../src/main/vcs-status/github-metadata-provider');
 
 function fakeChild() {
   const child = new EventEmitter();

@@ -61,7 +61,7 @@ Plain JavaScript throughout — no `.ts` files (types are JSDoc, checked by `npm
 ### Layout
 
 - `src/main/` — Electron main process: transcript tailing (`tracker.js`), replay/history (`replay-source.js`), IPC, git/GitHub status, and the IDEAS queue.
-- `src/renderer/` — three Babylon.js views (`scene-universe.js`, `scene-system.js`, `scene-planet.js`) orchestrated by `app.js`, one engine for the app lifetime with a scene per view.
+- `src/renderer/` — three Babylon.js views (`scene/universe/view.js`, `scene/system/view.js`, `scene/planet.js`) orchestrated by `app/boot.js`, one engine for the app lifetime with a scene per view.
 - `kit/` — the contract-driven development workflow this repo is built with: `kit/SPEC.md` is the live renderer contract, `kit/RUBRIC.md` the visual acceptance reference, and completed kits under `kit/done/` keep their grading gates passing.
 - `docs/` — design direction, roadmap, playback, multi-provider support, agent control, and Windows launch notes.
 

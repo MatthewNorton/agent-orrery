@@ -12,7 +12,7 @@ const {
   parseRemoteConfig,
   githubIdentity,
   selectGithubRemote,
-} = require('../src/main/project-vcs-status');
+} = require('../src/main/vcs-status/collector');
 
 function fakeFs(realPath = path.resolve('C:\\workspace\\project'), isDirectory = true) {
   return {

@@ -40,21 +40,23 @@ const lines = (rel) => {
   return s.length === 0 || s.endsWith('\n') ? n : n + 1;
 };
 
-const rendererFiles = fs.readdirSync(RENDERER).filter((f) => f.endsWith('.js')).sort();
-const modulesOnDisk = rendererFiles.filter((f) => /^app-[a-z0-9-]+\.js$/.test(f));
+const rendererFiles = fs.readdirSync(RENDERER, { recursive: true })
+  .map((f) => f.split(path.sep).join('/')).filter((f) => f.endsWith('.js')).sort();
+// 2026-10-18: the app modules live in app/; boot.js is the entry, not a module.
+const modulesOnDisk = rendererFiles.filter((f) => f.startsWith('app/') && f !== 'app/boot.js');
 
-// ---- T1: renderer file sizes (task 0 for modules and frozen files; task B for app.js) ----
+// ---- T1: renderer file sizes (task 0 for modules and frozen files; task B for app/boot.js) ----
 if (!reached('0')) skip('T1', '0');
 else {
   const before = failures;
   for (const f of rendererFiles) {
     // Owner's rule (2026-10-13): every renderer file stays at 400 lines or fewer.
-    const cap = f === 'app.js' && !reached('B') ? Infinity : 400;
+    const cap = f === 'app/boot.js' && !reached('B') ? Infinity : 400;
     const n = lines('src/renderer/' + f);
     if (n > cap) fail('T1', `${f} is ${n} lines (cap ${cap})`);
   }
-  if (modulesOnDisk.length === 0) fail('T1', 'no app-*.js modules exist yet');
-  if (failures === before) ok('T1', `all ${rendererFiles.length} renderer files within caps${reached('B') ? '' : ' (app.js cap deferred to task B)'}`);
+  if (modulesOnDisk.length === 0) fail('T1', 'no app/ modules exist yet');
+  if (failures === before) ok('T1', `all ${rendererFiles.length} renderer files within caps${reached('B') ? '' : ' (app/boot.js cap deferred to task B)'}`);
 }
 
 // ---- T2: index.html load order and no ES modules (task 0) ----
@@ -63,20 +65,20 @@ else {
   const before = failures;
   const html = read('src/renderer/index.html');
   const tags = [...html.matchAll(/<script\s+src="([^"]+)"[^>]*>/g)].map((m) => m[1]);
-  const appTags = tags.filter((t) => /^app(-[a-z0-9-]+)?\.js$/.test(t));
+  const appTags = tags.filter((t) => t.startsWith('app/'));
   if (/type="module"/.test(html)) fail('T2', 'index.html uses type="module"');
-  if (appTags[0] !== 'app-state.js') fail('T2', `first app script must be app-state.js, found ${appTags[0] ?? 'none'}`);
-  if (appTags[appTags.length - 1] !== 'app.js') fail('T2', 'app.js must be the last app script');
+  if (appTags[0] !== 'app/state.js') fail('T2', `first app script must be app/state.js, found ${appTags[0] ?? 'none'}`);
+  if (appTags[appTags.length - 1] !== 'app/boot.js') fail('T2', 'app/boot.js must be the last app script');
   for (const m of modulesOnDisk) if (!appTags.includes(m)) fail('T2', `${m} exists but is not loaded by index.html`);
-  for (const t of appTags) if (t !== 'app.js' && !modulesOnDisk.includes(t)) fail('T2', `index.html loads ${t} which does not exist`);
-  const scenePlanetIdx = tags.indexOf('scene-planet.js');
-  if (tags.includes('app-state.js') && (scenePlanetIdx < 0 || tags.indexOf('app-state.js') < scenePlanetIdx)) {
-    fail('T2', 'app-state.js must load after scene-planet.js');
+  for (const t of appTags) if (t !== 'app/boot.js' && !modulesOnDisk.includes(t)) fail('T2', `index.html loads ${t} which does not exist`);
+  const scenePlanetIdx = tags.indexOf('scene/planet.js');
+  if (tags.includes('app/state.js') && (scenePlanetIdx < 0 || tags.indexOf('app/state.js') < scenePlanetIdx)) {
+    fail('T2', 'app/state.js must load after scene/planet.js');
   }
   for (const f of rendererFiles) {
     if (/^\s*(import\s.+from\s|export\s)/m.test(read('src/renderer/' + f))) fail('T2', `${f} uses ES module syntax`);
   }
-  if (failures === before) ok('T2', `index.html loads ${modulesOnDisk.length} module(s) between app-state.js and app.js`);
+  if (failures === before) ok('T2', `index.html loads ${modulesOnDisk.length} module(s) between app/state.js and app/boot.js`);
 }
 
 // ---- T3: single AUR.app owner; modules guard against missing namespace (task 0) ----
@@ -88,16 +90,16 @@ else {
     const src = read('src/renderer/' + f);
     const count = (src.match(/\bAUR\.app\s*=[^=]/g) || []).length;
     if (count) assignments.push(`${f}:${count}`);
-    if (/^app-[a-z0-9-]+\.js$/.test(f) && f !== 'app-state.js') {
+    if (modulesOnDisk.includes(f) && f !== 'app/state.js') {
       if (!/AUR\.app/.test(src)) fail('T3', `${f} does not use the AUR.app namespace`);
-      if (!/throw new Error\(['"`]app-state\.js must load before/.test(src)) fail('T3', `${f} lacks the app-state.js load guard`);
+      if (!/throw new Error\(['"`]app\/state\.js must load before/.test(src)) fail('T3', `${f} lacks the app/state.js load guard`);
       if (!/^'use strict';/m.test(src)) fail('T3', `${f} is not in strict mode`);
     }
   }
-  if (assignments.length !== 1 || !assignments[0].startsWith('app-state.js:1')) {
-    fail('T3', `AUR.app must be assigned exactly once, in app-state.js; found [${assignments.join(', ') || 'none'}]`);
+  if (assignments.length !== 1 || !assignments[0].startsWith('app/state.js:1')) {
+    fail('T3', `AUR.app must be assigned exactly once, in app/state.js; found [${assignments.join(', ') || 'none'}]`);
   }
-  if (failures === before) ok('T3', 'AUR.app owned by app-state.js; every module guards its load order');
+  if (failures === before) ok('T3', 'AUR.app owned by app/state.js; every module guards its load order');
 }
 
 // ---- T4: shared path classifier (task C) ----
@@ -128,7 +130,7 @@ else {
 if (!reached('D')) skip('T5', 'D');
 else {
   const before = failures;
-  const appLayer = rendererFiles.filter((f) => /^app(-[a-z0-9-]+)?\.js$/.test(f)).map((f) => read('src/renderer/' + f)).join('\n');
+  const appLayer = rendererFiles.filter((f) => f.startsWith('app/')).map((f) => read('src/renderer/' + f)).join('\n');
   const disposeMatch = appLayer.match(/function disposeSettled\([\s\S]*?\r?\n  \}\r?\n/);
   if (!disposeMatch) fail('T5', 'disposeSettled not found in the app layer');
   else {

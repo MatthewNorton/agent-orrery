@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const {
   createProjectVcsStatusService,
   normalizedProject,
-} = require('../src/main/project-vcs-status-service');
+} = require('../src/main/vcs-status/service');
 
 function project(id, projectPath = `C:\\workspace\\${id}`, exists = true) {
   return { id, path: projectPath, exists };

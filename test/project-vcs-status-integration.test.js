@@ -6,9 +6,9 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
-const { createLocalGitStatusCollector } = require('../src/main/project-vcs-status');
-const { createGitHubMetadataProvider } = require('../src/main/github-metadata-provider');
-const { createProjectVcsStatusService } = require('../src/main/project-vcs-status-service');
+const { createLocalGitStatusCollector } = require('../src/main/vcs-status/collector');
+const { createGitHubMetadataProvider } = require('../src/main/vcs-status/github-metadata-provider');
+const { createProjectVcsStatusService } = require('../src/main/vcs-status/service');
 
 function gitAvailable() {
   const result = spawnSync('git', ['--version'], {

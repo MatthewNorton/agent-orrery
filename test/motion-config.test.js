@@ -31,9 +31,9 @@ test('planet scenes consume the dedicated planet motion settings', () => {
     'utf8'
   );
 
-  const universe = readRenderer('scene-universe.js');
-  const system = readRenderer('scene-system.js');
-  const planet = readRenderer('scene-planet.js');
+  const universe = readRenderer('scene/universe/view.js');
+  const system = readRenderer('scene/system/view.js');
+  const planet = readRenderer('scene/planet.js');
 
   assert.match(universe, /AUR\.MOTION\.universePlanetOrbitMin/);
   assert.match(system, /AUR\.MOTION\.systemPlanetOrbitMin/);

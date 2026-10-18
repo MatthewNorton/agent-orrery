@@ -8,11 +8,11 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const RENDERER = path.join(__dirname, '..', 'src', 'renderer');
-// A view's source is its scene-<view>*.js files.
-const viewSource = (view) => fs.readdirSync(RENDERER)
-  .filter((file) => file.startsWith(`scene-${view}`) && file.endsWith('.js')).sort()
-  .map((file) => fs.readFileSync(path.join(RENDERER, file), 'utf8')).join('\n');
+const SCENE = path.join(__dirname, '..', 'src', 'renderer', 'scene');
+// A view's source is scene/<view>.js or the files in scene/<view>/.
+const viewSource = (view) => fs.readdirSync(SCENE, { recursive: true })
+  .filter((file) => file.startsWith(view) && file.endsWith('.js')).sort()
+  .map((file) => fs.readFileSync(path.join(SCENE, file), 'utf8')).join('\n');
 function headingCode(view, pattern) {
   const match = viewSource(view).match(pattern);
   assert.ok(match, `${view} view: heading code not found`);

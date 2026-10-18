@@ -230,7 +230,7 @@
   };
 
   // Map labels use the chrome's faces (shipped under fonts/, declared in styles/tokens.css); the GUI
-  // measures text on a canvas, so app.js awaits loadLabelFonts() before the first scene draws.
+  // measures text on a canvas, so app/boot.js awaits loadLabelFonts() before the first scene draws.
   AUR.LABEL_FONTS = {
     sans: '"Archivo", system-ui, "Segoe UI", sans-serif',
     mono: '"IBM Plex Mono", Consolas, monospace',

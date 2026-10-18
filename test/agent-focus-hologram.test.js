@@ -15,10 +15,10 @@ const styles = () => fs.readdirSync(path.join(__dirname, '..', 'src', 'renderer'
   .filter((f) => f.endsWith('.css')).sort()
   .map((f) => renderer(path.join('styles', f))).join('\n');
 
-// 2026-09-27 kit 13: app.js split into app-*.js modules; grep the whole app layer.
-const appLayer = () => fs.readdirSync(path.join(__dirname, '..', 'src', 'renderer'))
-  .filter((f) => /^app.*\.js$/.test(f)).sort()
-  .map((f) => renderer(f)).join('\n');
+// The app layer is every module under app/; grep it whole.
+const appLayer = () => fs.readdirSync(path.join(__dirname, '..', 'src', 'renderer', 'app'), { recursive: true })
+  .filter((f) => f.endsWith('.js')).sort()
+  .map((f) => renderer(path.join('app', f))).join('\n');
 
 test('first-person environments render a live orbital hologram', () => {
   const html = renderer('index.html');
@@ -37,7 +37,7 @@ test('first-person environments render a live orbital hologram', () => {
 });
 
 test('focused ships expose a normalized position for the navigation map', () => {
-  const system = renderer('scene-system.js');
+  const system = renderer('scene/system/view.js');
 
   assert.match(system, /radiusRatio: AUR\.clamp\(Math\.hypot\(x, z\) \/ mapRadius, 0, 1\)/);
 });
@@ -65,7 +65,7 @@ test('POV foreground covers the viewport without distorting its native aspect ra
 test('first-person mode offers persistent ship-relative camera headings', () => {
   const html = renderer('index.html');
   const app = appLayer();
-  const system = renderer('scene-system.js');
+  const system = renderer('scene/system/view.js');
 
   for (const vantage of ['forward', 'starboard', 'aft', 'port']) {
     assert.match(html, new RegExp(`data-vantage="${vantage}"`));

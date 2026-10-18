@@ -80,7 +80,7 @@ const mainSrc = (function readMainLayer(dir) {
 })(path.join(ROOT, 'src', 'main'));
 const preloadSrc = fs.readFileSync(path.join(ROOT, 'src', 'preload.js'), 'utf8');
 const rendererDir = path.join(ROOT, 'src', 'renderer');
-const rendererSrc = fs.readdirSync(rendererDir).filter((f) => f.endsWith('.js') || f.endsWith('.html'))
+const rendererSrc = fs.readdirSync(rendererDir, { recursive: true }).filter((f) => f.endsWith('.js') || f.endsWith('.html'))
   .map((f) => fs.readFileSync(path.join(rendererDir, f), 'utf8')).join('\n');
 if (!mainSrc.includes('au:tasks-get') || !mainSrc.includes('au:task-add')) fail('T3: tasks IPC handlers missing in main.js');
 if (!preloadSrc.includes('tasksGet') || !preloadSrc.includes('taskAdd')) fail('T3: tasksGet/taskAdd missing in preload.js');

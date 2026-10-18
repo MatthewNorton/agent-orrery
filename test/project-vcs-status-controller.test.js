@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { createProjectVcsStatusController } = require('../src/main/project-vcs-status-controller');
+const { createProjectVcsStatusController } = require('../src/main/vcs-status/controller');
 
 function trackerWithProjects() {
   return {
