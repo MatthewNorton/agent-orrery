@@ -1,5 +1,5 @@
 // First-person focus support: fades the other ships
-// while one is followed and restores them after, and reports the focus stats.
+// while one is followed and restores them after.
 // The focus camera itself lives in scene/system/view.js.
 'use strict';
 
@@ -7,15 +7,11 @@
   const AUR = window.AUR;
 
   AUR.sceneParts.system.focus = function (view) {
-    const { scene, ships, reducedMotion } = view;
+    const { ships } = view;
 
     function recordVisualNodes(rec) {
-      const nodes = [];
-      if (rec.mesh && typeof rec.mesh.visibility === 'number') nodes.push(rec.mesh);
-      if (rec.mesh && typeof rec.mesh.getChildMeshes === 'function') {
-        for (const child of rec.mesh.getChildMeshes(false)) nodes.push(child);
-      }
-      if (rec.trail && !nodes.includes(rec.trail)) nodes.push(rec.trail);
+      const nodes = [rec.mesh, ...rec.mesh.getChildMeshes(false)];
+      if (!nodes.includes(rec.trail)) nodes.push(rec.trail);
       return nodes;
     }
 
@@ -47,14 +43,10 @@
     function restoreShipFocusVisuals() {
       const { shipFocus } = view;
       if (!shipFocus) return;
-      for (const saved of shipFocus.saved.values()) {
-        for (const [node, visibility] of saved.nodes) {
-          const disposed = typeof node.isDisposed === 'function'
-            ? node.isDisposed() : node.isDisposed === true;
-          if (!disposed) node.visibility = visibility;
-        }
-      }
       for (const [id, saved] of shipFocus.saved) {
+        for (const [node, visibility] of saved.nodes) {
+          if (!AUR.isNodeDisposed(node)) node.visibility = visibility;
+        }
         const rec = ships.get(id);
         if (!rec) continue;
         if (rec.label && saved.labelAlpha != null) rec.label.alpha = saved.labelAlpha;
@@ -62,33 +54,6 @@
       }
     }
 
-    function shipFocusStats() {
-      const { shipFocus } = view;
-      const state = view.shipFocusState();
-      const focused = shipFocus && ships.get(shipFocus.shipId);
-      const speed = focused ? Math.abs(focused.speed) : null;
-      return {
-        active: Boolean(shipFocus),
-        shipId: shipFocus ? shipFocus.shipId : null,
-        vantage: shipFocus ? shipFocus.vantage : null,
-        activeCamera: scene.activeCamera ? scene.activeCamera.name : null,
-        dimmedShipCount: shipFocus ? Math.max(0, ships.size - 1) : 0,
-        target: state ? state.target : null,
-        motion: {
-          focusedPatrolSpeed: speed,
-          estimatedOrbitSeconds: speed ? (Math.PI * 2) / speed : null,
-          focusFollowRate: reducedMotion
-            ? AUR.MOTION.reducedFocusFollowRate
-            : AUR.MOTION.focusFollowRate,
-          cameraPosition: scene.activeCamera ? {
-            x: scene.activeCamera.position.x,
-            y: scene.activeCamera.position.y,
-            z: scene.activeCamera.position.z,
-          } : null,
-        },
-      };
-    }
-
-    return { applyShipFocusVisual, restoreShipFocusVisuals, shipFocusStats };
+    return { applyShipFocusVisual, restoreShipFocusVisuals };
   };
 })();

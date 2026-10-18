@@ -18,11 +18,6 @@
     hullFiles, ensureContainer, fitsBudget, resolveAsset, lookOf, createShipEntry, swapHull,
   } = assets;
 
-  function isNodeDisposed(node) {
-    if (!node) return true;
-    return typeof node.isDisposed === 'function' ? node.isDisposed() : node.isDisposed === true;
-  }
-
   function instantiate(scene, ship) {
     const state = stateFor(scene);
     const manifest = settledManifest();
@@ -49,7 +44,7 @@
       const hull = selectHull(manifest, ship);
       if (!hull) return null;
       return resolveAsset(scene, state, hull, 0).then((asset) => {
-        if (!asset || isNodeDisposed(fallback) || isSceneDisposed(scene, state)) return null;
+        if (!asset || AUR.isNodeDisposed(fallback) || isSceneDisposed(scene, state)) return null;
         const entry = createShipEntry(scene, state, hull, asset, ship);
         if (!entry) return null;
         const assetRoot = entry.root;
@@ -98,7 +93,7 @@
     entry.wanted = look; // also cancels a pending swap when the rank falls back
     if (look === entry.look) return Promise.resolve(null);
     return resolveAsset(scene, state, hull, entry.triangles).then((asset) => {
-      if (!asset || entry.wanted !== look || isNodeDisposed(entry.root) ||
+      if (!asset || entry.wanted !== look || AUR.isNodeDisposed(entry.root) ||
           isSceneDisposed(scene, state) || isFaded(entry)) return null;
       return swapHull(scene, state, entry, hull, asset, ship) ? entry.root : null;
     }).catch(() => null);

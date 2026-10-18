@@ -80,41 +80,50 @@
       const candidates = [];
       let finiteProjections = 0;
 
-      for (const g of glyphs.values()) {
-        g.sun.computeWorldMatrix(true);
-        const worldCenter = g.sun.getBoundingInfo().boundingSphere.centerWorld;
+      // Where an item's label anchor lands on screen and the rect its label takes there; null,
+      // with the label hidden, when the projection is not finite.
+      function screenLabel(item, worldCenter) {
         const projected = BABYLON.Vector3.Project(
           worldCenter, BABYLON.Matrix.IdentityReadOnly,
           scene.getTransformMatrix(), viewport);
-        const centerX = projected.x * width / renderWidth;
-        const projectedY = projected.y * height / renderHeight;
-        if (!Number.isFinite(centerX) || !Number.isFinite(projectedY) || !Number.isFinite(projected.z)) {
-          g.label.isVisible = false;
-          g.label.alpha = 0;
-          g.labelScreen = null;
+        const x = projected.x * width / renderWidth;
+        const y = projected.y * height / renderHeight;
+        if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(projected.z)) {
+          item.label.isVisible = false;
+          item.label.alpha = 0;
+          item.labelScreen = null;
+          return null;
+        }
+        const rect = {
+          x: x - item.labelWidth / 2,
+          y: y + item.labelOffsetY - 11,
+          width: item.labelWidth,
+          height: 22,
+        };
+        return { x, y, rect, inDepth: projected.z >= 0 && projected.z <= 1 };
+      }
+
+      for (const g of glyphs.values()) {
+        g.sun.computeWorldMatrix(true);
+        const screen = screenLabel(g, g.sun.getBoundingInfo().boundingSphere.centerWorld);
+        if (!screen) {
           if (g.markerHost) g.markerHost.classList.add('hidden');
           continue;
         }
         finiteProjections++;
-        const centerY = projectedY + g.labelOffsetY;
-        const rect = {
-          x: centerX - g.labelWidth / 2,
-          y: centerY - 11,
-          width: g.labelWidth,
-          height: 22,
-        };
+        const { x, y, rect, inDepth } = screen;
         const searchMatched = searchMatchIds !== null && searchMatchIds.has(g.id);
         const priority = searchMatched ? 0 : g.id === hoveredProjectId ? 0
           : g.attention ? 1
             : g.online ? 3 : 4;
         const eligible = priority < 4 || g.recencyRank < recentLimit;
-        const onScreen = projected.z >= 0 && projected.z <= 1 && labelPointIsClear(rect);
+        const onScreen = inDepth && labelPointIsClear(rect);
         g.labelScreen = {
-          id: g.id, x: centerX, y: projectedY,
+          id: g.id, x, y,
           rect, eligible, visible: false,
-          markerVisible: projected.z >= 0 && projected.z <= 1 &&
-            centerX >= bounds.x && centerX <= bounds.x + bounds.width &&
-            projectedY >= bounds.y && projectedY <= bounds.y + bounds.height,
+          markerVisible: inDepth &&
+            x >= bounds.x && x <= bounds.x + bounds.width &&
+            y >= bounds.y && y <= bounds.y + bounds.height,
         };
         if (!eligible || !onScreen) continue;
         candidates.push({
@@ -136,31 +145,15 @@
       let finiteGalaxyProjections = 0;
       for (const galaxy of galaxies.values()) {
         galaxy.pivot.computeWorldMatrix(true);
-        const worldCenter = galaxy.pivot.getAbsolutePosition();
-        const projected = BABYLON.Vector3.Project(
-          worldCenter, BABYLON.Matrix.IdentityReadOnly,
-          scene.getTransformMatrix(), viewport);
-        const centerX = projected.x * width / renderWidth;
-        const projectedY = projected.y * height / renderHeight;
-        if (!Number.isFinite(centerX) || !Number.isFinite(projectedY) || !Number.isFinite(projected.z)) {
-          galaxy.label.isVisible = false;
-          galaxy.label.alpha = 0;
-          galaxy.labelScreen = null;
-          continue;
-        }
+        const screen = screenLabel(galaxy, galaxy.pivot.getAbsolutePosition());
+        if (!screen) continue;
         finiteGalaxyProjections++;
-        const centerY = projectedY + galaxy.labelOffsetY;
-        const rect = {
-          x: centerX - galaxy.labelWidth / 2,
-          y: centerY - 11,
-          width: galaxy.labelWidth,
-          height: 22,
-        };
-        const onScreen = projected.z >= 0 && projected.z <= 1 && labelPointIsClear(rect);
+        const { x, y, rect, inDepth } = screen;
+        const onScreen = inDepth && labelPointIsClear(rect);
         const id = 'galaxy:' + galaxy.key;
         const eligible = galaxyCandidateKeys.has(galaxy.key);
         galaxy.labelScreen = {
-          id, key: galaxy.key, x: centerX, y: projectedY,
+          id, key: galaxy.key, x, y,
           rect, eligible, visible: false,
         };
         if (!eligible || !onScreen) continue;
@@ -172,11 +165,14 @@
 
       const selected = POLISH.selectLabelLayout(candidates, bounds, 6);
       const selectedById = new Map(selected.map((item) => [item.id, item]));
+      const place = (item, placed) => {
+        item.label.isVisible = Boolean(placed);
+        item.label.alpha = placed ? placed.alpha : 0;
+        if (item.labelScreen) item.labelScreen.visible = Boolean(placed);
+      };
       for (const g of glyphs.values()) {
         const placed = selectedById.get(g.id);
-        g.label.isVisible = Boolean(placed);
-        g.label.alpha = placed ? placed.alpha : 0;
-        if (g.labelScreen) g.labelScreen.visible = Boolean(placed);
+        place(g, placed);
         if (g.markerHost) {
           const empty = Boolean(g.markerHost.querySelector('.project-vcs-markers-empty'));
           const visible = !empty && g.labelScreen && g.labelScreen.markerVisible;
@@ -189,19 +185,8 @@
           }
         }
       }
-      for (const galaxy of galaxies.values()) {
-        const placed = selectedById.get('galaxy:' + galaxy.key);
-        galaxy.label.isVisible = Boolean(placed);
-        galaxy.label.alpha = placed ? placed.alpha : 0;
-        if (galaxy.labelScreen) galaxy.labelScreen.visible = Boolean(placed);
-      }
+      for (const galaxy of galaxies.values()) place(galaxy, selectedById.get('galaxy:' + galaxy.key));
 
-      let overlaps = 0;
-      for (let i = 0; i < selected.length; i++) {
-        for (let j = i + 1; j < selected.length; j++) {
-          if (POLISH.rectsOverlap(selected[i].rect, selected[j].rect, 6)) overlaps++;
-        }
-      }
       const selectedProjects = selected.filter((item) => item.kind === 'project');
       const selectedGalaxies = selected.filter((item) => item.kind === 'galaxy');
       lastLabelMetrics = {
@@ -209,7 +194,7 @@
         totalLabels: glyphs.size,
         visibleLabels: selectedProjects.length,
         hiddenLabels: glyphs.size - selectedProjects.length,
-        overlaps,
+        overlaps: POLISH.countOverlaps(selected, 6),
         hoveredProjectId,
         cameraRadius: camera.radius,
         skyLevel,

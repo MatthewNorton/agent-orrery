@@ -12,26 +12,16 @@
 
     function buildShip(s) {
       const g = glyphs.get(s.project);
-      const tint = AUR.shipTint(s.id, s.provider);
-      const signal = AUR.isSignalEntity(s);
-      const scale = signal ? 0.64 : 1.0;
-      let mesh = signal
-        ? AUR.signalMarker(scene, 'usig_' + s.id, tint)
-        : AUR.ships.instantiate(scene, s);
-      const usedFallback = !signal && !mesh;
-      if (usedFallback) mesh = AUR.dartMesh(scene, 'ushp_' + s.id, tint, scale);
-      else mesh.scaling.setAll(scale);
-      const provider = AUR.markShipMesh(mesh, s);
+      const { mesh, tint, providerKey } = AUR.shipMesh(scene, s, 'u', 0.64, 1.0);
       const rand = AUR.mulberry32(AUR.fnv1a(s.id));
       const rec = {
-        id: s.id, mesh, kind: s.kind, tint, providerKey: provider.key,
+        id: s.id, project: s.project, mesh, kind: s.kind, tint, providerKey,
         r: 5 + rand() * 2.5, a: rand() * Math.PI * 2,
         speed: (AUR.MOTION.universeShipOrbitMin +
           rand() * AUR.MOTION.universeShipOrbitRange) * (rand() > 0.5 ? 1 : -1),
         bob: rand() * Math.PI * 2, born: performance.now(),
       };
       mesh.parent = g.root;
-      if (usedFallback) AUR.ships.upgrade(scene, s, mesh, scale);
       ships.set(s.id, rec);
       return rec;
     }

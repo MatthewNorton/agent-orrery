@@ -11,6 +11,8 @@
   AUR.sceneParts.universe.glyphs = function (view) {
     const { store, glyphs } = view;
 
+    const projectLabelWidth = (text) => AUR.clamp(text.length * 7.6, 60, 260);
+
     function shipCount(projectId) {
       let n = 0;
       for (const s of store.ships.values()) if (s.project === projectId) n++;
@@ -85,7 +87,7 @@
       const text = String(project.name);
       if (g.label.text !== text) {
         g.label.text = text;
-        g.labelWidth = Math.min(260, Math.max(60, text.length * 7.6));
+        g.labelWidth = projectLabelWidth(text);
       }
       if (g.markerHost) VCS.renderMarkers(g.markerHost, project);
     }
@@ -132,7 +134,7 @@
     }
 
     return {
-      applyGlyphState, applyGlyphSearchState, setSearchMatches, refreshProjectLabel,
+      projectLabelWidth, applyGlyphState, applyGlyphSearchState, setSearchMatches, refreshProjectLabel,
       refreshRecencyRanks, animateGlyphs,
     };
   };

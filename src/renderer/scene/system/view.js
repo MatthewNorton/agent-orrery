@@ -28,17 +28,10 @@
     const orbitR = (i) => 11 + i * 6;
     const outer = orbitR(Math.max(0, planetList.length - 1));
 
-    const camera = new BABYLON.ArcRotateCamera(
-      'scam', -Math.PI / 2, 0.92, outer * 2.3 + 14, BABYLON.Vector3.Zero(), scene);
-    camera.attachControl(canvas, true);
-    camera.lowerRadiusLimit = 18;
-    camera.upperRadiusLimit = outer * 3.4 + 40;
-    camera.lowerBetaLimit = 0.15;
-    camera.upperBetaLimit = 1.45;
-    camera.panningSensibility = 0;
-    camera.minZ = 0.1;
-    camera.maxZ = 6000;
-    AUR.configureComfortCamera(camera);
+    const camera = AUR.viewCamera(scene, 'scam', 0.92, outer * 2.3 + 14, {
+      lowerRadiusLimit: 18, upperRadiusLimit: outer * 3.4 + 40,
+      lowerBetaLimit: 0.15, upperBetaLimit: 1.45, panningSensibility: 0,
+    });
 
     const sunLight = new BABYLON.PointLight('sunl', BABYLON.Vector3.Zero(), scene);
     sunLight.intensity = 1.5;
@@ -68,11 +61,7 @@
     sun.material = sunMat;
     // corona shell
     const corona = BABYLON.MeshBuilder.CreateSphere('corona', { diameter: sunDia * 1.5, segments: 20 }, scene);
-    const coronaMat = new BABYLON.StandardMaterial('coronam', scene);
-    coronaMat.emissiveColor = sunCol.clone().scaleInPlace(0.5);
-    coronaMat.diffuseColor = new BABYLON.Color3(0, 0, 0);
-    coronaMat.specularColor = new BABYLON.Color3(0, 0, 0);
-    coronaMat.alpha = 0.18;
+    const coronaMat = AUR.unlitMaterial(scene, 'coronam', sunCol.clone().scaleInPlace(0.5), 0.18);
     coronaMat.backFaceCulling = false;
     corona.material = coronaMat;
     corona.isPickable = false;
@@ -83,20 +72,16 @@
     const ships = new Map();
     const view = {
       scene, gui, sys, projectId, orbitR, outer, planets, ships,
-      reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
-      shipFocus: null, buildPlanet, clearShipFocus, shipFocusState,
+      shipFocus: null, buildPlanet, clearShipFocus,
     };
     const parts = AUR.sceneParts.system;
     Object.assign(view, parts.ships(view), parts.focus(view));
-    const { reducedMotion } = view;
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     scene.metadata = {
       view: 'system',
       providerStats() {
         return AUR.sceneProviderStats(scene);
-      },
-      focusStats() {
-        return view.shipFocusStats();
       },
       polishStats() {
         return {
@@ -117,7 +102,7 @@
       const rand = AUR.mulberry32(AUR.fnv1a(projectId + ':' + pd.name));
       const r = orbitR(i);
       const ring = AUR.orbitRing(scene, r, '#9fb0e0', 0.16, 0);
-      const dia = AUR.clamp(1.1 + Math.sqrt((pd.files || 0) + (pd.builds || 0) * 5) * 0.18, 1.1, 4.5);
+      const dia = AUR.clamp(1.1 + Math.sqrt(AUR.planetWeight(pd)) * 0.18, 1.1, 4.5);
       const mesh = BABYLON.MeshBuilder.CreateSphere('pl_' + pd.name, { diameter: dia, segments: 24 }, scene);
       const mat = new BABYLON.StandardMaterial('plm_' + pd.name, scene);
       const world = AUR.applyPlanetSurface(scene, mat, projectId, pd.name, {
@@ -132,9 +117,9 @@
       const a0 = rand() * Math.PI * 2;
       mesh.position.set(Math.cos(a0) * r, 0, Math.sin(a0) * r);
 
-      const label = AUR.label(gui, pd.name, { fontSize: 12.5, weight: '600', color: '#eeece6' });
-      label.linkWithMesh(mesh);
-      label.linkOffsetY = -(18 + dia * 5);
+      const label = AUR.label(gui, pd.name, {
+        fontSize: 12.5, weight: '600', mesh, offsetY: -(18 + dia * 5),
+      });
       const persistent = topNames.indexOf(pd.name) >= 0;
       label.alpha = persistent ? 0.95 : 0;
 
@@ -309,7 +294,7 @@
         }
         p.mesh.scaling.setAll(sc);
       }
-      if (belt) belt.rotation.y += dt * 0.03;
+      belt.rotation.y += dt * 0.03;
 
       view.animateShips(dt, now, t);
       if (view.shipFocus) updateShipFocusCamera(false, dt);
@@ -325,12 +310,7 @@
       shipFocusState,
       dispose() {
         clearShipFocus();
-        scene.onBeforeRenderObservable.clear();
-        scene.onPointerObservable.clear();
-        canvas.style.cursor = 'default';
-        gui.dispose();
-        AUR.ships.dispose(scene);
-        scene.dispose();
+        AUR.disposeView(scene, gui);
       },
     };
   };
