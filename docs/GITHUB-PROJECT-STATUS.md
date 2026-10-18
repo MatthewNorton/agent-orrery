@@ -66,7 +66,7 @@ The presentation API is intentionally small:
 Run `npm run status:lab` to inspect both component modes without changing the
 main application.
 
-The local collector lives in `src/main/project-vcs-status.js`. Its
+The local collector lives in `src/main/vcs-status/collector.js`. Its
 `createLocalGitStatusCollector().read(projectPath)` method executes two bounded,
 non-shell Git commands and returns the same `git` and `github` fields consumed
 by the renderer component. It resolves the project to a real directory, disables
@@ -74,12 +74,12 @@ optional locks and filesystem-monitor hooks, limits runtime and output, treats a
 repository with no remotes as a valid local-only project, and returns explicit
 failure codes instead of guessing clean state.
 
-`src/main/project-vcs-status-service.js` coordinates the collector across a
+`src/main/vcs-status/service.js` coordinates the collector across a
 project snapshot. It deduplicates IDs, caps the number of accepted projects,
 limits concurrent Git processes, caches short-lived results, coalesces duplicate
 reads, and prevents a slow result for an old project path from overwriting a
 newer one. It is still independent of the tracker and renderer lifecycle; that
-wiring is owned by `src/main/project-vcs-status-controller.js`.
+wiring is owned by `src/main/vcs-status/controller.js`.
 
 The controller refreshes all current live projects at startup and on window
 focus, debounces project/build events into targeted forced refreshes, enriches
@@ -87,7 +87,7 @@ live snapshots and solar-system data without mutating tracker records, and keeps
 replay snapshots historical. The preload exposes sanitized change events but no
 renderer-triggered refresh, Git commands, raw stderr, or credentials.
 
-`src/main/github-metadata-provider.js` is the remote-only adapter. It validates
+`src/main/vcs-status/github-metadata-provider.js` is the remote-only adapter. It validates
 and deduplicates repository identities, batches count-only GraphQL projections,
 and invokes a fixed `gh api graphql` query without a shell or interactive prompts.
 The adapter bounds query count, runtime, and combined output; serializes CLI

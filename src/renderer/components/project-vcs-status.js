@@ -1,5 +1,5 @@
 // @ts-check
-// project-vcs-status.js — presentation-only Git/GitHub project status.
+// Presentation-only Git/GitHub project status.
 //
 // The component intentionally does not inspect repositories or call GitHub.
 // The Electron main process owns those concerns and passes a sanitized snapshot

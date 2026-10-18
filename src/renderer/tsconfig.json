@@ -12,8 +12,7 @@
     "skipLibCheck": true
   },
   "include": [
-    "*.js",
-    "components/*.js",
+    "**/*.js",
     "../types/*.d.ts",
     "../../node_modules/babylonjs/babylon.d.ts",
     "../../node_modules/babylonjs-gui/babylon.gui.d.ts"

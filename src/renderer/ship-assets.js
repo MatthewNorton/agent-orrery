@@ -1,5 +1,5 @@
 // @ts-check
-// ship-assets.js — manifest-backed original hull loading with procedural fallback: the manifest,
+// Manifest-backed original hull loading with procedural fallback: the manifest,
 // per-scene state, hull choice and container loading. ship-assets-hulls.js builds hulls from these
 // and ship-assets-api.js publishes AUR.ships.
 'use strict';

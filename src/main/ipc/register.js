@@ -2,7 +2,7 @@
 'use strict';
 
 const { isLocalProjectPath } = require('../provider-adapters');
-const { githubIdentity } = require('../project-vcs-status');
+const { githubIdentity } = require('../vcs-status/collector');
 const guards = require('./guards');
 
 /** @import { OpenExternalResult } from '../../types/contract' */

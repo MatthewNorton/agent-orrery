@@ -67,7 +67,7 @@ a to-do, assign it to a live project, and start Codex on the exact tagged
 clustered galaxy universe map → solar system → planet, matching the three
 mockup PNGs in the repo root.
 
-Frozen for executors: the **Frozen files** bullet in `CLAUDE.md` is the one authoritative list.
+Frozen for executors: the **Frozen files** bullet in `AGENTS.md` is the one authoritative list.
 
 ## Runner loop (kit-runner, applies to any kit here)
 

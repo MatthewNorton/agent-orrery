@@ -1,5 +1,5 @@
 // @ts-check
-// ship-assets-api.js — AUR.ships: instantiate a ship's hull, upgrade a fallback dart to one,
+// AUR.ships: instantiate a ship's hull, upgrade a fallback dart to one,
 // refresh it in place on promotion, and dispose a scene's hull state.
 'use strict';
 

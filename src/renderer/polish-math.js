@@ -1,4 +1,4 @@
-// polish-math.js — pure, dependency-free layout and color helpers shared by
+// Pure, dependency-free layout and color helpers shared by
 // the renderer and the item-02 Node grader.
 'use strict';
 
