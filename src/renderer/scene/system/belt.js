@@ -10,7 +10,6 @@
     const n = (sys.planets || []).length;
     const beltR = n >= 2 ? (orbitR(Math.floor(n / 2) - 1) + orbitR(Math.floor(n / 2))) / 2 : outer + 4;
     const count = AUR.clamp(Math.max((sys.beltDensity || 0) * 4, 70), 0, 300);
-    if (count <= 0) return null;
     const rand = AUR.mulberry32(AUR.fnv1a(projectId + ':belt'));
     const belt = new BABYLON.TransformNode('asteroid-belt', scene);
     const variants = [1, 2, 3];

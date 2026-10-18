@@ -30,11 +30,9 @@
       outline.isPickable = false;
 
       const label = AUR.label(gui, galaxyLabelText(spec, memberCount), {
-        fontSize: 12, weight: '700', color: colorHex, outline: 4,
+        fontSize: 12, weight: '700', color: colorHex, outline: 4, mesh: pivot, offsetY: -12,
       });
       label.name = 'galaxy-label:' + spec.key;
-      label.linkWithMesh(pivot);
-      label.linkOffsetY = -12;
       label.isVisible = false;
 
       const record = {
@@ -54,7 +52,7 @@
       record.pivot.rotation.set(spec.tiltX, 0, spec.tiltZ);
       record.outline.scaling.set(spec.radius, 1, spec.radius);
       record.label.text = galaxyLabelText(spec, memberCount);
-      record.labelWidth = Math.min(260, Math.max(90, record.label.text.length * 7.8));
+      record.labelWidth = AUR.clamp(record.label.text.length * 7.8, 90, 260);
       view.buildGalaxyStars(record, spec);
     }
 

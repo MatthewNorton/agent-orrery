@@ -11,24 +11,16 @@
     const projectId = data.projectId;
     const name = data.name;
     const project = pd.project;
-    const canvas = engine.getRenderingCanvas();
 
     const scene = new BABYLON.Scene(engine);
     scene.clearColor = AUR.color4('#04050a', 1);
     scene.ambientColor = new BABYLON.Color3(0.06, 0.07, 0.1);
 
     const PDIA = 12;
-    const camera = new BABYLON.ArcRotateCamera(
-      'pcam', -Math.PI / 2, 1.24, PDIA * 1.9, BABYLON.Vector3.Zero(), scene);
-    camera.attachControl(canvas, true);
-    camera.lowerRadiusLimit = PDIA * 1.15;
-    camera.upperRadiusLimit = PDIA * 4;
-    camera.lowerBetaLimit = 0.2;
-    camera.upperBetaLimit = 1.55;
-    camera.panningSensibility = 0;
-    camera.minZ = 0.05;
-    camera.maxZ = 6000;
-    AUR.configureComfortCamera(camera);
+    AUR.viewCamera(scene, 'pcam', 1.24, PDIA * 1.9, {
+      lowerRadiusLimit: PDIA * 1.15, upperRadiusLimit: PDIA * 4,
+      lowerBetaLimit: 0.2, upperBetaLimit: 1.55, panningSensibility: 0, minZ: 0.05,
+    });
 
     const key = new BABYLON.DirectionalLight('key', new BABYLON.Vector3(0.55, -0.35, 0.75), scene);
     key.intensity = 1.6;
@@ -44,7 +36,6 @@
     const atmosphere = AUR.atmosphereProfile(projectId, name);
     scene.metadata = {
       view: 'planet',
-      atmosphere,
       providerStats() {
         return AUR.sceneProviderStats(scene);
       },
@@ -69,11 +60,8 @@
     const atmo = BABYLON.MeshBuilder.CreateSphere('atmo', {
       diameter: PDIA * atmosphere.scale, segments: 64,
     }, scene);
-    const amat = new BABYLON.StandardMaterial('amat', scene);
+    const amat = AUR.unlitMaterial(scene, 'amat', new BABYLON.Color3(0, 0, 0), atmosphere.alpha * 0.55);
     const atmosphereColor = AUR.color3(atmosphere.color);
-    amat.emissiveColor = new BABYLON.Color3(0, 0, 0);
-    amat.diffuseColor = new BABYLON.Color3(0, 0, 0);
-    amat.specularColor = new BABYLON.Color3(0, 0, 0);
     amat.backFaceCulling = false;
     amat.disableLighting = true;
     const emissiveFresnel = new BABYLON.FresnelParameters();
@@ -82,7 +70,6 @@
     emissiveFresnel.leftColor = atmosphereColor.scale(0.58);
     emissiveFresnel.rightColor = BABYLON.Color3.Black();
     amat.emissiveFresnelParameters = emissiveFresnel;
-    amat.alpha = atmosphere.alpha * 0.55;
     atmo.material = amat;
     atmo.isPickable = false;
 
@@ -111,28 +98,16 @@
     // ---- ships ----
     const ships = new Map();
     function buildShip(s) {
-      const tint = AUR.shipTint(s.id, s.provider);
-      const signal = AUR.isSignalEntity(s);
-      const scale = signal ? 0.72 : 1.1;
-      let mesh = signal
-        ? AUR.signalMarker(scene, 'psig_' + s.id, tint)
-        : AUR.ships.instantiate(scene, s);
-      const usedFallback = !signal && !mesh;
-      if (usedFallback) mesh = AUR.dartMesh(scene, 'pshp_' + s.id, tint, scale);
-      else mesh.scaling.setAll(scale);
-      const provider = AUR.markShipMesh(mesh, s);
+      const { mesh, tint, providerKey } = AUR.shipMesh(scene, s, 'p', 0.72, 1.1);
       const rand = AUR.mulberry32(AUR.fnv1a(s.id));
-      const label = AUR.label(gui, s.name, { fontSize: 12, mono: true, color: '#eeece6' });
-      label.linkWithMesh(mesh);
-      label.linkOffsetY = -20;
+      const label = AUR.label(gui, s.name, { fontSize: 12, mono: true, mesh, offsetY: -20 });
       const rec = {
-        id: s.id, mesh, label, tint, providerKey: provider.key,
+        id: s.id, mesh, label, tint, providerKey,
         r: PDIA * (0.82 + rand() * 0.5), a: rand() * 6.28,
         speed: (AUR.MOTION.planetShipOrbitMin +
           rand() * AUR.MOTION.planetShipOrbitRange) * (rand() > 0.5 ? 1 : -1),
         tilt: (rand() - 0.5) * 0.7, yoff: (rand() - 0.5) * PDIA * 0.5,
       };
-      if (usedFallback) AUR.ships.upgrade(scene, s, mesh, scale);
       ships.set(s.id, rec);
       return rec;
     }
@@ -174,7 +149,7 @@
         if (ev.type === 'ship-spawned' && ev.ship.project === projectId) {
           if (!ships.has(ev.ship.id)) buildShip(ev.ship);
         } else if (ev.type === 'ship-departed') {
-          if (ships.has(ev.shipId)) removeShip(ev.shipId);
+          removeShip(ev.shipId);
         }
       }
     }
@@ -184,12 +159,7 @@
       planetData: pd,
       update,
       dispose() {
-        scene.onBeforeRenderObservable.clear();
-        scene.onPointerObservable.clear();
-        canvas.style.cursor = 'default';
-        gui.dispose();
-        AUR.ships.dispose(scene);
-        scene.dispose();
+        AUR.disposeView(scene, gui);
       },
     };
   };

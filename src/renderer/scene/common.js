@@ -23,6 +23,41 @@
     return { x: left, y: top, width: Math.max(1, right - left), height: Math.max(1, bottom - top) };
   };
 
+  // Every view's orbit camera; limits holds its radius and beta limits plus any other settings.
+  AUR.viewCamera = function (scene, name, beta, radius, limits) {
+    const camera = new BABYLON.ArcRotateCamera(name, -Math.PI / 2, beta, radius, BABYLON.Vector3.Zero(), scene);
+    camera.attachControl(scene.getEngine().getRenderingCanvas(), true);
+    Object.assign(camera, { minZ: 0.1, maxZ: 6000, ...limits });
+    return AUR.configureComfortCamera(camera);
+  };
+
+  // A ship's mesh: a transmission glyph for signals and drones, else its hull, or a dart until
+  // the hull loads (upgrade is that load's promise, null otherwise). Names start with prefix.
+  AUR.shipMesh = function (scene, ship, prefix, signalScale, hullScale) {
+    const tint = AUR.shipTint(ship.id, ship.provider);
+    const signal = AUR.isSignalEntity(ship);
+    const scale = signal ? signalScale : hullScale;
+    let mesh = signal
+      ? AUR.signalMarker(scene, prefix + 'sig_' + ship.id, tint)
+      : AUR.ships.instantiate(scene, ship);
+    const usedFallback = !signal && !mesh;
+    if (usedFallback) mesh = AUR.dartMesh(scene, prefix + 'shp_' + ship.id, tint, scale);
+    else mesh.scaling.setAll(scale);
+    const provider = AUR.markShipMesh(mesh, ship);
+    const upgrade = usedFallback ? AUR.ships.upgrade(scene, ship, mesh, scale) : null;
+    return { mesh, tint, providerKey: provider.key, upgrade };
+  };
+
+  // The teardown every view ends with, after its own.
+  AUR.disposeView = function (scene, gui) {
+    scene.onBeforeRenderObservable.clear();
+    scene.onPointerObservable.clear();
+    scene.getEngine().getRenderingCanvas().style.cursor = 'default';
+    gui.dispose();
+    AUR.ships.dispose(scene);
+    scene.dispose();
+  };
+
   // Hull materials are shared per scene and released by AUR.ships.dispose.
   AUR.disposeMeshAndMaterial = function (mesh) {
     if (!mesh) return;

@@ -1,12 +1,11 @@
 // The universe map's measured metrics for the
-// harness and gates: rendered label rects, galaxy grouping, search and VCS.
+// harness and gates: rendered label rects and galaxy grouping.
 'use strict';
 
 (function () {
   const AUR = window.AUR;
   const POLISH = window.AUR_POLISH;
   const GALAXY = window.AUR_GALAXY;
-  const VCS = AUR.ProjectVcsStatus;
 
   AUR.sceneParts.universe.stats = function (view) {
     const { scene, canvas, gui, store, glyphs, galaxies } = view;
@@ -17,62 +16,43 @@
       const scaleX = canvas.clientWidth / guiSize.width;
       const scaleY = canvas.clientHeight / guiSize.height;
       const bounds = AUR.chromeBounds(canvas);
-      const measured = [];
-      const combined = [];
-      let chromeOcclusions = 0;
-      let combinedChromeOcclusions = 0;
-      for (const g of glyphs.values()) {
-        if (!g.label.isVisible) continue;
-        const value = g.label._currentMeasure;
-        if (!value) continue;
+      // A shown label's rendered rect in canvas pixels, or null when it is hidden or not measured yet.
+      const measuredRect = (label) => {
+        const value = label.isVisible && label._currentMeasure;
+        if (!value) return null;
         const rect = {
           x: value.left * scaleX,
           y: value.top * scaleY,
           width: value.width * scaleX,
           height: value.height * scaleY,
         };
-        if (![rect.x, rect.y, rect.width, rect.height].every(Number.isFinite)) continue;
+        return [rect.x, rect.y, rect.width, rect.height].every(Number.isFinite) ? rect : null;
+      };
+      const occluded = (rect) => !POLISH.insideBounds(rect, bounds) || !view.labelPointIsClear(rect);
+      const measured = [];
+      const combined = [];
+      let chromeOcclusions = 0;
+      let combinedChromeOcclusions = 0;
+      for (const g of glyphs.values()) {
+        const rect = measuredRect(g.label);
+        if (!rect) continue;
         measured.push({ id: g.id, rect });
         combined.push({ id: g.id, kind: 'project', rect });
-        const inside = rect.x >= bounds.x && rect.y >= bounds.y &&
-          rect.x + rect.width <= bounds.x + bounds.width &&
-          rect.y + rect.height <= bounds.y + bounds.height;
-        if (!inside || !view.labelPointIsClear(rect)) {
+        if (occluded(rect)) {
           chromeOcclusions++;
           combinedChromeOcclusions++;
         }
       }
       let measuredGalaxyLabelCount = 0;
       for (const galaxy of galaxies.values()) {
-        if (!galaxy.label.isVisible) continue;
-        const value = galaxy.label._currentMeasure;
-        if (!value) continue;
-        const rect = {
-          x: value.left * scaleX,
-          y: value.top * scaleY,
-          width: value.width * scaleX,
-          height: value.height * scaleY,
-        };
-        if (![rect.x, rect.y, rect.width, rect.height].every(Number.isFinite)) continue;
+        const rect = measuredRect(galaxy.label);
+        if (!rect) continue;
         measuredGalaxyLabelCount++;
         combined.push({ id: 'galaxy:' + galaxy.key, kind: 'galaxy', rect });
-        const inside = rect.x >= bounds.x && rect.y >= bounds.y &&
-          rect.x + rect.width <= bounds.x + bounds.width &&
-          rect.y + rect.height <= bounds.y + bounds.height;
-        if (!inside || !view.labelPointIsClear(rect)) combinedChromeOcclusions++;
+        if (occluded(rect)) combinedChromeOcclusions++;
       }
-      let overlaps = 0;
-      for (let i = 0; i < measured.length; i++) {
-        for (let j = i + 1; j < measured.length; j++) {
-          if (POLISH.rectsOverlap(measured[i].rect, measured[j].rect, 6)) overlaps++;
-        }
-      }
-      let combinedOverlaps = 0;
-      for (let i = 0; i < combined.length; i++) {
-        for (let j = i + 1; j < combined.length; j++) {
-          if (POLISH.rectsOverlap(combined[i].rect, combined[j].rect, 6)) combinedOverlaps++;
-        }
-      }
+      const overlaps = POLISH.countOverlaps(measured, 6);
+      const combinedOverlaps = POLISH.countOverlaps(combined, 6);
       return {
         pickableSunCount: scene.meshes.filter(
           (mesh) => mesh.isPickable && mesh.metadata && mesh.metadata.isSun
@@ -100,9 +80,7 @@
       let memberOutsideCount = 0;
 
       for (const g of glyphs.values()) {
-        const project = store.projects.get(g.id);
-        const expectedKey = project && project.galaxy && project.galaxy.key
-          ? project.galaxy.key : (project && project.exists === false ? 'graveyard' : 'unassigned');
+        const expectedKey = GALAXY.projectGalaxy(store.projects.get(g.id)).key;
         const galaxy = galaxies.get(g.galaxyKey);
         g.root.computeWorldMatrix(true);
         const position = g.root.getAbsolutePosition();
@@ -153,12 +131,8 @@
         galaxyCount: galaxies.size,
         galaxyKeys: clusters.map((item) => item.key),
         graveyardProjectCount: assignments.filter((item) => item.galaxyKey === 'graveyard').length,
-        pickableSunCount: scene.meshes.filter(
-          (mesh) => mesh.isPickable && mesh.metadata && mesh.metadata.isSun
-        ).length,
-        projectLabelControlCount: gui.rootContainer.children.filter(
-          (control) => String(control.name || '').startsWith('project-label:')
-        ).length,
+        pickableSunCount: measured.pickableSunCount,
+        projectLabelControlCount: measured.labelControlCount,
         regionMeshCount: regionMeshes.length,
         pickableRegionCount: regionMeshes.filter((mesh) => mesh.isPickable).length,
         galaxyLabelControlCount: gui.rootContainer.children.filter(
@@ -176,31 +150,6 @@
       };
     }
 
-    function searchStats() {
-      const { searchMatchIds } = view;
-      return {
-        active: searchMatchIds !== null,
-        matchIds: searchMatchIds === null ? [] : [...searchMatchIds],
-        glyphs: [...glyphs.values()].map((g) => ({
-          id: g.id, factor: g.searchFactor, labelFactor: g.searchLabelFactor,
-        })),
-      };
-    }
-
-    function vcsStats() {
-      const statuses = [...glyphs.values()].map((g) => ({
-        id: g.id,
-        ...VCS.normalize(store.projects.get(g.id)),
-        markerVisible: g.markerHost ? !g.markerHost.classList.contains('hidden') : false,
-      }));
-      return {
-        githubCount: statuses.filter((status) => status.hasGitHub).length,
-        dirtyCount: statuses.filter((status) => status.dirty).length,
-        visibleMarkerCount: statuses.filter((status) => status.markerVisible).length,
-        statuses,
-      };
-    }
-
     function polishStats() {
       view.ensureLabelLayout();
       const measured = measuredLabelStats();
@@ -211,6 +160,6 @@
       };
     }
 
-    return { galaxyStats, searchStats, vcsStats, polishStats };
+    return { galaxyStats, polishStats };
   };
 })();

@@ -68,6 +68,8 @@
 
   AUR.statusColor = (status) => AUR.STATUS_DOT[status] || AUR.STATUS_DOT.Working;
   AUR.attentionMeta = (state) => AUR.ATTENTION[state] || null;
+  // The agent is blocked on the user: a question to answer or a permission to grant.
+  AUR.needsYou = (state) => state === 'question' || state === 'permission';
   AUR.attentionColor = (state) => {
     const meta = AUR.attentionMeta(state);
     return meta ? meta.color : null;
@@ -104,6 +106,8 @@
     ship && (ship.kind === 'drone' || AUR.providerKey(ship.provider) === 'generic')
   );
   AUR.sunColor = (seed) => AUR.SUN_COLORS[seed % AUR.SUN_COLORS.length];
+  // What a planet's size grows with: its files, and five per build.
+  AUR.planetWeight = (pd) => (pd.files || 0) + (pd.builds || 0) * 5;
 
   AUR.clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
   AUR.MOTION = Object.freeze({

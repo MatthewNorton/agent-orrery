@@ -126,6 +126,7 @@ test('shared hulls receive fixed provider palettes while signals and drones load
     shipTint(_id, provider) { return colors[providerKey(provider)]; },
     shipColor(ship) { return ship && ship.local === true ? '#ff3344' : colors[providerKey(ship && ship.provider)]; },
     color3(hex) { return new Color(hex); },
+    isNodeDisposed(node) { return !node || node.isDisposed(); },
     markShipMesh(mesh, ship) {
       mesh.metadata = {
         ...(mesh.metadata || {}), isShip: true, shipId: ship.id,
@@ -313,6 +314,7 @@ function loadShipAssets(manifest, trianglesByFile) {
     shipTint(_id, provider) { return colors[providerKey(provider)]; },
     shipColor(ship) { return ship && ship.local === true ? '#ff3344' : colors[providerKey(ship && ship.provider)]; },
     color3(hex) { return new Color(hex); },
+    isNodeDisposed(node) { return !node || node.isDisposed(); },
     markShipMesh(mesh, ship) {
       mesh.metadata = { ...(mesh.metadata || {}), isShip: true, shipId: ship.id };
       return { key: providerKey(ship.provider), label: '' };

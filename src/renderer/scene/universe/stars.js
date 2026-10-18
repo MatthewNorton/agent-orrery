@@ -182,8 +182,7 @@
       body.volume.material = shader('galaxyVolume', record.key, ['position'], ['worldViewProjection'], body,
         ['#define STEPS ' + view.quality.steps]);
 
-      const count = Math.round(
-        Math.max(STARS_MIN, Math.min(STARS_MAX, R * R * STARS_PER_AREA)) * view.quality.stars);
+      const count = Math.round(AUR.clamp(R * R * STARS_PER_AREA, STARS_MIN, STARS_MAX) * view.quality.stars);
       const stars = FIELD.sampleStars(atlasPixels(record, body.spiral, size), size,
         AUR.fnv1a('stars:' + record.key), count);
       body.stars = new BABYLON.Mesh('galaxy-stars:' + record.key, scene);

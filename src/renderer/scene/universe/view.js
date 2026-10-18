@@ -5,6 +5,7 @@
 
 (function () {
   const AUR = window.AUR;
+  const GALAXY = window.AUR_GALAXY;
   const VCS = AUR.ProjectVcsStatus;
   const UNIVERSE_SKY_LEVEL = 0.04;
 
@@ -15,18 +16,11 @@
     scene.clearColor = AUR.color4('#04050a', 1);
     scene.ambientColor = new BABYLON.Color3(0, 0, 0);
 
-    const camera = new BABYLON.ArcRotateCamera(
-      'ucam', -Math.PI / 2, 0.82, 175, BABYLON.Vector3.Zero(), scene);
-    camera.attachControl(canvas, true);
-    camera.lowerRadiusLimit = 60;
-    camera.upperRadiusLimit = 320;
-    camera.lowerBetaLimit = 0.15;
-    camera.upperBetaLimit = 1.35;
-    // Right-drag pans along the ground; scene/universe/galaxies.js sets its speed and bounds.
-    camera.mapPanning = true;
-    camera.minZ = 0.1;
-    camera.maxZ = 6000;
-    AUR.configureComfortCamera(camera);
+    const camera = AUR.viewCamera(scene, 'ucam', 0.82, 175, {
+      lowerRadiusLimit: 60, upperRadiusLimit: 320, lowerBetaLimit: 0.15, upperBetaLimit: 1.35,
+      // Right-drag pans along the ground; scene/universe/galaxies.js sets its speed and bounds.
+      mapPanning: true,
+    });
 
     const glow = new BABYLON.GlowLayer('uglow', scene, { blurKernelSize: 48 });
     glow.intensity = 0.9;
@@ -72,23 +66,19 @@
       const rand = AUR.mulberry32(p.seed >>> 0);
 
       const root = new BABYLON.TransformNode('g_' + p.id, scene);
-      root.position.set(0, 0, 0);
 
       const dia = AUR.SUN_DIAMETER_MIN + Math.log10((p.totalBytes || 0) + 1) * 0.35;
       const sunR = dia / 2;
       const sun = BABYLON.MeshBuilder.CreateSphere('sun_' + p.id, { diameter: dia, segments: 16 }, scene);
       sun.parent = root;
       sun.metadata = { projectId: p.id, isSun: true, projectExists: p.exists !== false };
-      const sunMat = new BABYLON.StandardMaterial('sunm_' + p.id, scene);
       const col = AUR.color3(AUR.sunColor(p.seed));
       // Give the material its OWN emissive Color3. The per-frame pulse does
       // `emissiveColor.copyFrom(baseEmissive).scaleInPlace(k)`; if the material's
       // color and baseEmissive were the same object, copyFrom would be a no-op
       // self-copy and scaleInPlace would shrink the shared base every frame,
       // decaying the sun to black (~0.68/frame idle). Keep `col` pristine.
-      sunMat.emissiveColor = col.clone();
-      sunMat.diffuseColor = new BABYLON.Color3(0, 0, 0);
-      sunMat.specularColor = new BABYLON.Color3(0, 0, 0);
+      const sunMat = AUR.unlitMaterial(scene, 'sunm_' + p.id, col.clone());
       sun.material = sunMat;
 
       // A soft corona behind the sun, in its colour, always facing the camera. The glow layer
@@ -107,11 +97,7 @@
       }, scene);
       halo.parent = root;
       halo.isPickable = false;
-      const haloMat = new BABYLON.StandardMaterial('alertm_' + p.id, scene);
-      haloMat.emissiveColor = new BABYLON.Color3(0, 0, 0);
-      haloMat.diffuseColor = new BABYLON.Color3(0, 0, 0);
-      haloMat.specularColor = new BABYLON.Color3(0, 0, 0);
-      haloMat.alpha = 0;
+      const haloMat = AUR.unlitMaterial(scene, 'alertm_' + p.id, new BABYLON.Color3(0, 0, 0), 0);
       halo.material = haloMat;
       halo.setEnabled(false);
 
@@ -150,11 +136,11 @@
         });
       }
 
-      const label = AUR.label(gui, String(p.name), { fontSize: 13, weight: '600', color: '#eeece6' });
-      label.name = 'project-label:' + p.id;
-      label.linkWithMesh(sun);
       const labelOffsetY = -(24 + sunR * 6);
-      label.linkOffsetY = labelOffsetY;
+      const label = AUR.label(gui, String(p.name), {
+        fontSize: 13, weight: '600', mesh: sun, offsetY: labelOffsetY,
+      });
+      label.name = 'project-label:' + p.id;
       label.isVisible = false;
 
       const markerHost = document.createElement('span');
@@ -169,7 +155,7 @@
         galaxyKey: null,
         halo, haloMat, attention: null,
         lastActivity: p.lastActivity || 0, recencyRank: Number.MAX_SAFE_INTEGER,
-        labelBaseAlpha: 0.85, labelWidth: Math.min(260, Math.max(60, label.text.length * 7.6)),
+        labelBaseAlpha: 0.85, labelWidth: view.projectLabelWidth(label.text),
         labelOffsetY, labelScreen: null,
         sunR, pulseUntil: 0, phase: rand() * Math.PI * 2, appear: 0,
         derelict: false, searchFactor: 1, searchLabelFactor: 1,
@@ -234,10 +220,7 @@
         } else if (ev.type === 'project-updated') {
           const g = glyphs.get(ev.project.id);
           if (g) {
-            const nextGalaxyKey = ev.project.galaxy && ev.project.galaxy.key
-              ? ev.project.galaxy.key
-              : (ev.project.exists === false ? 'graveyard' : 'unassigned');
-            if (g.galaxyKey !== nextGalaxyKey) structuralLayout = true;
+            if (g.galaxyKey !== GALAXY.projectGalaxy(ev.project).key) structuralLayout = true;
             view.refreshProjectLabel(g, ev.project);
             view.applyGlyphState(g);
             recencyDirty = true;
@@ -251,7 +234,7 @@
           if (g) view.applyGlyphState(g);
         } else if (ev.type === 'ship-departed') {
           const r = ships.get(ev.shipId);
-          const proj = r && r.mesh && r.mesh.parent ? r.mesh.parent.name.slice(2) : null;
+          const proj = r ? r.project : null;
           view.removeShip(ev.shipId);
           if (proj && glyphs.has(proj)) view.applyGlyphState(glyphs.get(proj));
         } else if (ev.type === 'build' || ev.type === 'activity') {
@@ -278,8 +261,6 @@
       providerStats() {
         return AUR.sceneProviderStats(scene);
       },
-      searchStats: view.searchStats,
-      vcsStats: view.vcsStats,
       polishStats: view.polishStats,
     };
 
@@ -293,13 +274,8 @@
       resize: view.reframeCamera,
       dispose() {
         view.cancelLabelLayout();
-        scene.onBeforeRenderObservable.clear();
-        scene.onPointerObservable.clear();
-        canvas.style.cursor = 'default';
         vcsLayer.remove();
-        gui.dispose();
-        AUR.ships.dispose(scene);
-        scene.dispose();
+        AUR.disposeView(scene, gui);
       },
     };
   };

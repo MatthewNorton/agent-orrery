@@ -14,7 +14,7 @@
     let refetching = false;
 
     function attentionSuffix(attention) {
-      if (attention === 'question' || attention === 'permission') return '· needs you';
+      if (AUR.needsYou(attention)) return '· needs you';
       if (attention === 'done') return '· done';
       return '';
     }
@@ -31,37 +31,19 @@
     }
 
     function buildShip(s) {
-      const tint = AUR.shipTint(s.id, s.provider);
-      const signal = AUR.isSignalEntity(s);
-      const scale = signal ? 0.72 : 1.1;
-      let mesh = signal
-        ? AUR.signalMarker(scene, 'ssig_' + s.id, tint)
-        : AUR.ships.instantiate(scene, s);
-      const usedFallback = !signal && !mesh;
-      if (usedFallback) mesh = AUR.dartMesh(scene, 'sshp_' + s.id, tint, scale);
-      else mesh.scaling.setAll(scale);
-      const provider = AUR.markShipMesh(mesh, s);
+      const { mesh, tint, providerKey, upgrade } = AUR.shipMesh(scene, s, 's', 0.72, 1.1);
       const rand = AUR.mulberry32(AUR.fnv1a(s.id));
       const r = outer + 3 + rand() * 4;
       const a0 = rand() * Math.PI * 2;
       mesh.position.set(Math.cos(a0) * r, (rand() - 0.5) * 2, Math.sin(a0) * r);
       const trail = new BABYLON.TrailMesh('t_' + s.id, mesh, scene, 0.08, 18, true);
-      const tmat = new BABYLON.StandardMaterial('tm_' + s.id, scene);
-      tmat.emissiveColor = AUR.color3(tint);
-      tmat.diffuseColor = new BABYLON.Color3(0, 0, 0);
-      tmat.specularColor = new BABYLON.Color3(0, 0, 0);
-      tmat.alpha = 0.24;
-      trail.material = tmat;
-      const label = AUR.label(gui, s.name, { fontSize: 12, mono: true, color: '#eeece6' });
-      label.linkWithMesh(mesh);
-      label.linkOffsetY = -22;
+      trail.material = AUR.unlitMaterial(scene, 'tm_' + s.id, AUR.color3(tint), 0.24);
+      const label = AUR.label(gui, s.name, { fontSize: 12, mono: true, mesh, offsetY: -22 });
       const suffix = AUR.label(gui, attentionSuffix(s.attention), {
-        fontSize: 12, mono: true, color: AUR.attentionColor(s.attention),
+        fontSize: 12, mono: true, color: AUR.attentionColor(s.attention), mesh, offsetY: -22,
       });
-      suffix.linkWithMesh(mesh);
-      suffix.linkOffsetY = -22;
       const rec = {
-        id: s.id, mesh, trail, label, suffix, tint, providerKey: provider.key,
+        id: s.id, mesh, trail, label, suffix, tint, providerKey,
         r, a: a0, speed: (AUR.MOTION.systemShipOrbitMin +
           rand() * AUR.MOTION.systemShipOrbitRange) * (rand() > 0.5 ? 1 : -1),
         bob: rand() * 6.28, mode: 'patrol', fly: null, born: performance.now(),
@@ -69,8 +51,8 @@
       applyShipAttention(rec, s);
       ships.set(s.id, rec);
       if (view.shipFocus) view.applyShipFocusVisual(rec, 0.16);
-      if (usedFallback) {
-        AUR.ships.upgrade(scene, s, mesh, scale).then(() => {
+      if (upgrade) {
+        upgrade.then(() => {
           if (view.shipFocus && ships.has(s.id)) {
             view.applyShipFocusVisual(rec, view.shipFocus.shipId === rec.id ? 0 : 0.16);
           }
@@ -84,10 +66,10 @@
       if (view.shipFocus && view.shipFocus.shipId === id) view.clearShipFocus();
       else if (view.shipFocus) view.shipFocus.saved.delete(id);
       if (r.fly && r.fly.beam) disposeMeshAndMaterial(r.fly.beam);
-      if (r.trail) disposeMeshAndMaterial(r.trail);
-      if (r.label) r.label.dispose();
-      if (r.suffix) r.suffix.dispose();
-      if (r.mesh) disposeMeshAndMaterial(r.mesh);
+      disposeMeshAndMaterial(r.trail);
+      r.label.dispose();
+      r.suffix.dispose();
+      disposeMeshAndMaterial(r.mesh);
       ships.delete(id);
     }
 
@@ -96,12 +78,7 @@
         path: [shipRec.mesh.position.clone(), planetRec.mesh.position.clone()],
         radius: 0.06, tessellation: 6, updatable: false,
       }, scene);
-      const bm = new BABYLON.StandardMaterial('beamm', scene);
-      bm.emissiveColor = AUR.color3(shipRec.tint);
-      bm.diffuseColor = new BABYLON.Color3(0, 0, 0);
-      bm.specularColor = new BABYLON.Color3(0, 0, 0);
-      bm.alpha = 0.7;
-      beam.material = bm;
+      beam.material = AUR.unlitMaterial(scene, 'beamm', AUR.color3(shipRec.tint), 0.7);
       beam.isPickable = false;
       return beam;
     }
@@ -154,7 +131,7 @@
           const sh = ships.get(ev.ship.id);
           if (sh) applyShipAttention(sh, ev.ship);
         } else if (ev.type === 'ship-departed') {
-          if (ships.has(ev.shipId)) removeShip(ev.shipId);
+          removeShip(ev.shipId);
         } else if (ev.type === 'build' && ev.project === projectId) {
           const pr = planets.get(ev.bucket);
           const sh = ships.get(ev.shipId);

@@ -17,6 +17,17 @@
     );
   }
 
+  // Pairs of items whose rects overlap within the padding.
+  function countOverlaps(items, padding) {
+    let overlaps = 0;
+    for (let i = 0; i < items.length; i++) {
+      for (let j = i + 1; j < items.length; j++) {
+        if (rectsOverlap(items[i].rect, items[j].rect, padding)) overlaps++;
+      }
+    }
+    return overlaps;
+  }
+
   function insideBounds(rect, bounds) {
     return (
       rect.x >= bounds.x &&
@@ -52,5 +63,5 @@
     return factor;
   }
 
-  return { rectsOverlap, selectLabelLayout, applySunPulse };
+  return { rectsOverlap, countOverlaps, insideBounds, selectLabelLayout, applySunPulse };
 });

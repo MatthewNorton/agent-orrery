@@ -474,7 +474,7 @@ contract), `AUR`, `AUR_POLISH` and `AUR_GALAXY` (all `any` for now).
 | `scene/universe/stats.js` | 218 | Measured metrics for the harness and gates |
 | `scene/system/view.js` | 337 | Solar system + first-person focus camera (`focusShip`) |
 | `scene/system/belt.js` | 46 | Asteroid belt (thin instances) |
-| `scene/system/focus.js` | 94 | Fades the other ships while one is followed; focus stats |
+| `scene/system/focus.js` | 59 | Fades the other ships while one is followed |
 | `scene/system/ships.js` | 193 | Ships: build / remove, patrols, fly-to-planet builds, `refetchPlanets`, the view's `update` |
 | `scene/planet/view.js` | 196 | Planet close-up |
 | `app/state.js` | 180 | Shared state and constants (including the chrome dirty bits, `AUR.app.const.CHROME`) |
@@ -669,7 +669,7 @@ not reproduced.
     fleet — not loaded at runtime.
 21. *(resolved)* `edge-validation.mjs` was folded into `test/tracker.test.js`.
 22. Unused by the app: `providerToolStatus` (only `grade-providers.mjs` calls it),
-    `AUR.attentionLabel`, `scene/system/view.js` `focusStats`.
+    `AUR.attentionLabel`. *(resolved)* The unread `focusStats`, `searchStats` and `vcsStats` scene hooks are gone.
 
 ### Stale documentation
 23. Older docs quote line numbers in the pre-split `main.js` (§5.3 maps them).

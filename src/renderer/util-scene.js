@@ -113,11 +113,7 @@
 
     const marker = BABYLON.MeshBuilder.CreatePlane(name, { size: 1.15 }, scene);
     marker.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
-    const material = new BABYLON.StandardMaterial(name + '_material', scene);
-    const color = BABYLON.Color3.FromHexString(hex);
-    material.emissiveColor = color;
-    material.diffuseColor = new BABYLON.Color3(0, 0, 0);
-    material.specularColor = new BABYLON.Color3(0, 0, 0);
+    const material = AUR.unlitMaterial(scene, name + '_material', BABYLON.Color3.FromHexString(hex));
     material.emissiveTexture = texture;
     material.opacityTexture = texture;
     material.disableLighting = true;
@@ -143,6 +139,16 @@
     return texture;
   };
 
+  // Emissive colour only: no diffuse or specular response to the scene's lights.
+  AUR.unlitMaterial = function (scene, name, emissive, alpha) {
+    const material = new BABYLON.StandardMaterial(name, scene);
+    material.emissiveColor = emissive;
+    material.diffuseColor = new BABYLON.Color3(0, 0, 0);
+    material.specularColor = new BABYLON.Color3(0, 0, 0);
+    if (alpha != null) material.alpha = alpha;
+    return material;
+  };
+
   // Unlit colour through an opacity texture, drawn without writing depth: discs and coronas.
   AUR.softMaterial = function (scene, name, color, alpha, opacityTexture) {
     const material = new BABYLON.StandardMaterial(name, scene);
@@ -152,6 +158,12 @@
     material.disableDepthWrite = true;
     material.alpha = alpha;
     return material;
+  };
+
+  // A missing node counts as disposed.
+  AUR.isNodeDisposed = function (node) {
+    if (!node) return true;
+    return typeof node.isDisposed === 'function' ? node.isDisposed() : node.isDisposed === true;
   };
 
   // Attach normalized, renderer-owned identity to the actual hull mesh. This
@@ -242,7 +254,7 @@
     return Promise.race([Promise.all(wanted.map((f) => document.fonts.load(f))).catch(() => null), timeout]);
   };
 
-  // A text label added to a GUI layer; call .linkWithMesh(mesh) after.
+  // A text label added to a GUI layer, following opts.mesh (offset opts.offsetY pixels) when given.
   AUR.label = function (gui, text, opts) {
     opts = opts || {};
     const tb = new BABYLON.GUI.TextBlock();
@@ -255,6 +267,8 @@
     tb.outlineColor = 'rgba(4,6,11,0.8)';
     tb.resizeToFit = true;
     gui.addControl(tb);
+    if (opts.mesh) tb.linkWithMesh(opts.mesh);
+    if (opts.offsetY != null) tb.linkOffsetY = opts.offsetY;
     return tb;
   };
 })();
