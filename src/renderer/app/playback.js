@@ -1,10 +1,10 @@
 // @ts-check
-// app/playback.js — the live/history bar: transport buttons, scrubber preview, project markers.
+// The live/history bar: transport buttons, scrubber preview, project markers.
 'use strict';
 
 (function () {
   const AUR = window.AUR;
-  const A = AUR.app;               // created by app/state.js; throw if missing
+  const A = AUR.app;
   if (!A) throw new Error('app/state.js must load before app/playback.js');
   const S = A.state, C = A.const;
 

@@ -1,5 +1,5 @@
 // @ts-check
-// app/project/tasks.js — per-project GOALS.md task panel.
+// Per-project GOALS.md task panel.
 'use strict';
 
 /** @import { TaskMutationResult, TasksChangedPush, TasksSnapshot } from '../../../types/contract' */
@@ -7,7 +7,7 @@
 (function () {
   const AUR = window.AUR;
   const AU = window.AU;
-  const A = AUR.app;               // created by app/state.js; throw if missing
+  const A = AUR.app;
   if (!A) throw new Error('app/state.js must load before app/project/tasks.js');
   const S = A.state, C = A.const;
 

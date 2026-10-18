@@ -1,12 +1,12 @@
 // @ts-check
-// app/chrome-queue.js — overlay chrome refresh: which panels an event dirties, coalesced into one frame.
+// Overlay chrome refresh: which panels an event dirties, coalesced into one frame.
 'use strict';
 
 /** @import { AUEvent } from '../../types/contract' */
 
 (function () {
   const AUR = window.AUR;
-  const A = AUR.app;               // created by app/state.js; throw if missing
+  const A = AUR.app;
   if (!A) throw new Error('app/state.js must load before app/chrome-queue.js');
   const C = A.const;
   const CHROME = C.CHROME;

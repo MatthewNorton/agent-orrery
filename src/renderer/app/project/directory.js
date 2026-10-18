@@ -1,11 +1,11 @@
 // @ts-check
-// app/project/directory.js — the searchable ALL PROJECTS directory dialog.
+// The searchable ALL PROJECTS directory dialog.
 'use strict';
 
 (function () {
   const AUR = window.AUR;
   const VCS = AUR.ProjectVcsStatus;
-  const A = AUR.app;               // created by app/state.js; throw if missing
+  const A = AUR.app;
   if (!A) throw new Error('app/state.js must load before app/project/directory.js');
   const S = A.state, C = A.const;
 

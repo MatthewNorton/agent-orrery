@@ -2,23 +2,10 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
+const { readRenderer: renderer, rendererSource } = require('./support/renderer-source');
 
-const renderer = (name) => fs.readFileSync(
-  path.join(__dirname, '..', 'src', 'renderer', name),
-  'utf8'
-);
-
-// 2026-10-14: style.css was split into styles/*.css; grep them all.
-const styles = () => fs.readdirSync(path.join(__dirname, '..', 'src', 'renderer', 'styles'))
-  .filter((f) => f.endsWith('.css')).sort()
-  .map((f) => renderer(path.join('styles', f))).join('\n');
-
-// The app layer is every module under app/; grep it whole.
-const appLayer = () => fs.readdirSync(path.join(__dirname, '..', 'src', 'renderer', 'app'), { recursive: true })
-  .filter((f) => f.endsWith('.js')).sort()
-  .map((f) => renderer(path.join('app', f))).join('\n');
+const styles = () => rendererSource('styles', (f) => f.endsWith('.css'));
+const appLayer = () => rendererSource('app');
 
 test('first-person environments render a live orbital hologram', () => {
   const html = renderer('index.html');

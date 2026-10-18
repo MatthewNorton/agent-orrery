@@ -57,12 +57,12 @@ loaders), then:
 | Layer | Files |
 |---|---|
 | Shared libraries | `util.js` (creates `window.AUR`; `fnv1a`/`mulberry32` copied from `src/main/shared/hash.js` so seeds agree), `util-scene.js` (Babylon helpers), `procedural-worlds.js`, `ship-assets.js` + `ship-assets-hulls.js` + `ship-assets-api.js` (`AUR.ships`), `polish-math.js`, `galaxy-layout.js` and `galaxy-field.js` (pure UMD; the field is a galaxy's emission/dust atlas and the stars drawn from it), `search-core.js`, `components/project-vcs-status.js` |
-| Views | `scene/common.js` (`AUR.sceneParts`), then each view's parts before the view: `scene/universe/{galaxies,glyphs,labels,ships,stars,stats}.js` → `scene/universe/view.js`, `scene/system/{belt,focus,ships}.js` → `scene/system/view.js`, then `scene/planet.js` |
+| Views | `scene/common.js` (`AUR.sceneParts`), then for each view in `scene/<view>/` (universe, system, planet) its parts before its `view.js` |
 | App state | `app/state.js` — the only file that assigns `AUR.app` (`state`, `const`) |
-| App modules | `app/agent-focus.js`, `app/chrome.js`, `app/chrome-hud.js`, `app/chrome-queue.js`, `app/history-metrics.js`, `app/ideas.js`, `app/ideas-list.js`, `app/modules.js`, `app/playback.js`, `app/project/control.js`, `app/project/directory.js`, `app/project/search.js`, `app/project/settings.js`, `app/project/tasks.js`, `app/render-quality.js`, `app/replay.js`, `app/store.js` |
+| App modules | every other file in `app/` and `app/project/`, in `index.html` order |
 | Boot | `app/boot.js` — boot, event routing, view switching, debug hooks |
 
-View contract: each `scene-*.js` registers
+View contract: each `scene/<view>/view.js` registers
 `AUR.views.<name> = (engine, data, ctx) => ({ scene, update(eventBatch), dispose() })`
 where `ctx` provides `openSystem(projectId)`, `openPlanet(projectId, name)`, the
 shared `store` and the graphics `quality` tier. Views may expose extras the app layer

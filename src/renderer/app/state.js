@@ -1,5 +1,5 @@
 // @ts-check
-// app/state.js — shared app-layer state (AUR.app.state) and constants (AUR.app.const).
+// Shared app-layer state (AUR.app.state) and constants (AUR.app.const).
 'use strict';
 
 (function () {

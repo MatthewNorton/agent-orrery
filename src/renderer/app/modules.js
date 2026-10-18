@@ -1,5 +1,5 @@
 // @ts-check
-// app/modules.js — folding chrome: any `[data-module]` (a module on either rail, or a rail itself)
+// Folding chrome: any `[data-module]` (a module on either rail, or a rail itself)
 // folds to its header from the `.mod-x` chevron in that header. One delegated click listener
 // serves them all, the top bar's panels button folds or opens both rails at once, and the set
 // of folded keys persists between runs.
@@ -7,7 +7,7 @@
 
 (function () {
   const AUR = window.AUR;
-  const A = AUR.app;               // created by app/state.js; throw if missing
+  const A = AUR.app;
   if (!A) throw new Error('app/state.js must load before app/modules.js');
   const S = A.state, C = A.const;
 

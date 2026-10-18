@@ -1,4 +1,4 @@
-// scene/system/focus.js — first-person focus support: fades the other ships
+// First-person focus support: fades the other ships
 // while one is followed and restores them after, and reports the focus stats.
 // The focus camera itself lives in scene/system/view.js.
 'use strict';

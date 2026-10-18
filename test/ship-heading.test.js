@@ -5,14 +5,9 @@
 // directions; about half the ships circle clockwise, and they used to fly tail first.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
+const { rendererSource } = require('./support/renderer-source');
 
-const SCENE = path.join(__dirname, '..', 'src', 'renderer', 'scene');
-// A view's source is scene/<view>.js or the files in scene/<view>/.
-const viewSource = (view) => fs.readdirSync(SCENE, { recursive: true })
-  .filter((file) => file.startsWith(view) && file.endsWith('.js')).sort()
-  .map((file) => fs.readFileSync(path.join(SCENE, file), 'utf8')).join('\n');
+const viewSource = (view) => rendererSource(`scene/${view}`);
 function headingCode(view, pattern) {
   const match = viewSource(view).match(pattern);
   assert.ok(match, `${view} view: heading code not found`);

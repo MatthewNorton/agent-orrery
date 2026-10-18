@@ -330,7 +330,7 @@ const NODES = {
     issues: ['One 178-line closure'] },
   vcsgit: { label: 'vcs-status/collector.js', lines: 284, note: 'collector', layer: 'main', path: 'src/main/vcs-status/collector.js',
     job: 'Runs git status and the remote lookup, parses porcelain v2.',
-    issues: ['Tested by test/project-vcs-status-collector.test.js; test/project-vcs-status.test.js tests the renderer component instead'] },
+    issues: ['Tested by test/vcs-status-collector.test.js; test/project-vcs-status.test.js tests the renderer component instead'] },
   ghmeta: { label: 'vcs-status/github-metadata-provider.js', lines: 301, note: 'factory', layer: 'main', path: 'src/main/vcs-status/github-metadata-provider.js',
     job: 'Open-PR counts through gh api graphql; maps AGENT_UNIVERSE_GITHUB_TOKEN to GH_TOKEN and scrubs other tokens.' },
   shared: { label: 'shared/*.js', lines: 219, note: '5 small modules', layer: 'main', path: 'src/main/shared/',
@@ -430,7 +430,7 @@ const NODES = {
   vsys: { label: 'scene/system/*.js', lines: 337, note: 'solar system · + 3 parts', layer: 'view', path: 'src/renderer/scene/system/view.js',
     job: 'Planets, asteroid belt (thin instances), ships that fly to the planet they edit, first-person focus camera. Parts on AUR.sceneParts.system: belt, ships, focus in scene/system/.',
     issues: ['By reading: refetchPlanets (scene/system/ships.js) can build meshes into an already-disposed scene', 'Calls window.AU directly'] },
-  vplan: { label: 'scene/planet.js', lines: 196, note: 'planet close-up', layer: 'view', path: 'src/renderer/scene/planet.js',
+  vplan: { label: 'scene/planet/view.js', lines: 196, note: 'planet close-up', layer: 'view', path: 'src/renderer/scene/planet/view.js',
     job: 'Planet close-up with atmosphere, moons and the project’s ships.' },
   util: { label: 'util.js', lines: 213, note: 'creates window.AUR · + util-scene 209', layer: 'view', path: 'src/renderer/util.js',
     job: 'Creates window.AUR: hashes, colours, provider metadata, motion tuning, asset paths, DOM helpers. util-scene.js holds the Babylon helpers: skybox, starfield, rings, markers, GUI labels.',
@@ -1121,7 +1121,7 @@ const SIZES_REN = [
   ['app/project/settings.js', 340, 0, 'app'], ['procedural-worlds.js', 329, 0, 'view'], ['ship-assets.js', 254, 0, 'view'],
   ['ship-assets-hulls.js', 252, 0, 'view'], ['ship-assets-api.js', 123, 0, 'view'],
   ['app/project/tasks.js', 286, 0, 'app'], ['components/project-vcs-status.js', 268, 0, 'view'], ['app/project/control.js', 244, 0, 'app'],
-  ['scene/planet.js', 196, 0, 'view'], ['galaxy-layout.js', 178, 0, 'view'], ['app/state.js', 180, 0, 'app'],
+  ['scene/planet/view.js', 196, 0, 'view'], ['galaxy-layout.js', 178, 0, 'view'], ['app/state.js', 180, 0, 'app'],
   ['polish-math.js', 56, 0, 'view'], ['search-core.js', 34, 0, 'view'],
 ];
 function chart(el, rows, layerDefault, withCap) {

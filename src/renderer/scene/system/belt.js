@@ -1,4 +1,4 @@
-// scene/system/belt.js — the solar system's asteroid belt: three deformed rock
+// The solar system's asteroid belt: three deformed rock
 // forms drawn as thin instances between the middle orbits.
 'use strict';
 

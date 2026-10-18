@@ -42,8 +42,9 @@ const lines = (rel) => {
 
 const rendererFiles = fs.readdirSync(RENDERER, { recursive: true })
   .map((f) => f.split(path.sep).join('/')).filter((f) => f.endsWith('.js')).sort();
-// 2026-10-18: the app modules live in app/; boot.js is the entry, not a module.
-const modulesOnDisk = rendererFiles.filter((f) => f.startsWith('app/') && f !== 'app/boot.js');
+// 2026-10-18: the app layer lives in app/; boot.js is its entry, not a module.
+const appFiles = rendererFiles.filter((f) => f.startsWith('app/'));
+const modulesOnDisk = appFiles.filter((f) => f !== 'app/boot.js');
 
 // ---- T1: renderer file sizes (task 0 for modules and frozen files; task B for app/boot.js) ----
 if (!reached('0')) skip('T1', '0');
@@ -69,11 +70,11 @@ else {
   if (/type="module"/.test(html)) fail('T2', 'index.html uses type="module"');
   if (appTags[0] !== 'app/state.js') fail('T2', `first app script must be app/state.js, found ${appTags[0] ?? 'none'}`);
   if (appTags[appTags.length - 1] !== 'app/boot.js') fail('T2', 'app/boot.js must be the last app script');
-  for (const m of modulesOnDisk) if (!appTags.includes(m)) fail('T2', `${m} exists but is not loaded by index.html`);
-  for (const t of appTags) if (t !== 'app/boot.js' && !modulesOnDisk.includes(t)) fail('T2', `index.html loads ${t} which does not exist`);
-  const scenePlanetIdx = tags.indexOf('scene/planet.js');
-  if (tags.includes('app/state.js') && (scenePlanetIdx < 0 || tags.indexOf('app/state.js') < scenePlanetIdx)) {
-    fail('T2', 'app/state.js must load after scene/planet.js');
+  for (const m of appFiles) if (!appTags.includes(m)) fail('T2', `${m} exists but is not loaded by index.html`);
+  for (const t of appTags) if (!appFiles.includes(t)) fail('T2', `index.html loads ${t} which does not exist`);
+  const lastSceneIdx = tags.findLastIndex((t) => t.startsWith('scene/'));
+  if (tags.includes('app/state.js') && (lastSceneIdx < 0 || tags.indexOf('app/state.js') < lastSceneIdx)) {
+    fail('T2', 'app/state.js must load after every scene/ script');
   }
   for (const f of rendererFiles) {
     if (/^\s*(import\s.+from\s|export\s)/m.test(read('src/renderer/' + f))) fail('T2', `${f} uses ES module syntax`);
@@ -130,7 +131,7 @@ else {
 if (!reached('D')) skip('T5', 'D');
 else {
   const before = failures;
-  const appLayer = rendererFiles.filter((f) => f.startsWith('app/')).map((f) => read('src/renderer/' + f)).join('\n');
+  const appLayer = appFiles.map((f) => read('src/renderer/' + f)).join('\n');
   const disposeMatch = appLayer.match(/function disposeSettled\([\s\S]*?\r?\n  \}\r?\n/);
   if (!disposeMatch) fail('T5', 'disposeSettled not found in the app layer');
   else {

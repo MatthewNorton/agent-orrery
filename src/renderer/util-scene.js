@@ -1,4 +1,4 @@
-// util-scene.js — shared Babylon helpers on AUR: colors, skybox, starfield, orbit rings,
+// Shared Babylon helpers on AUR: colors, skybox, starfield, orbit rings,
 // ship and signal markers, provider stats, GUI labels. Loads right after util.js.
 'use strict';
 

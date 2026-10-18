@@ -1,5 +1,5 @@
 // @ts-check
-// app/project/control.js — project card (folder/terminal actions) and planet card.
+// Project card (folder/terminal actions) and planet card.
 'use strict';
 
 /** @import { OpenTerminalResult } from '../../../types/contract' */
@@ -8,7 +8,7 @@
   const AUR = window.AUR;
   const AU = window.AU;
   const VCS = AUR.ProjectVcsStatus;
-  const A = AUR.app;               // created by app/state.js; throw if missing
+  const A = AUR.app;
   if (!A) throw new Error('app/state.js must load before app/project/control.js');
   const S = A.state, C = A.const;
 

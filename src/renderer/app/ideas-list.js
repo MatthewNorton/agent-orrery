@@ -1,10 +1,10 @@
 // @ts-check
-// app/ideas-list.js — renders the IDEAS list: phase labels, assign/retry/view controls, focus restore.
+// Renders the IDEAS list: phase labels, assign/retry/view controls, focus restore.
 'use strict';
 
 (function () {
   const AUR = window.AUR;
-  const A = AUR.app;               // created by app/state.js; throw if missing
+  const A = AUR.app;
   if (!A) throw new Error('app/state.js must load before app/ideas-list.js');
   const S = A.state;
 

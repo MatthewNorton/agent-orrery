@@ -1,4 +1,4 @@
-// scene/common.js — helpers shared by the views, and the AUR.sceneParts
+// Helpers shared by the views, and the AUR.sceneParts
 // registry the split-off scene/<view>/*.js parts add their builders to.
 'use strict';
 

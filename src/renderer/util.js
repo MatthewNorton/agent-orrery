@@ -1,4 +1,4 @@
-// util.js — window.AUR bootstrap: deterministic hashes (bit-exact copies of
+// Window.AUR bootstrap: deterministic hashes (bit-exact copies of
 // src/main/tracker.js so seeds agree), palettes, helpers. Classic script, no
 // modules. Everything hangs off the single global AUR.
 'use strict';

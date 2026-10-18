@@ -1,12 +1,12 @@
 // @ts-check
-// app/store.js — renderer store: snapshot seeding, event reducer, attention alerts, hull promotions.
+// Renderer store: snapshot seeding, event reducer, attention alerts, hull promotions.
 'use strict';
 
 /** @import { AUEvent, Snapshot } from '../../types/contract' */
 
 (function () {
   const AUR = window.AUR;
-  const A = AUR.app;               // created by app/state.js; throw if missing
+  const A = AUR.app;
   if (!A) throw new Error('app/state.js must load before app/store.js');
   const S = A.state, C = A.const;
 

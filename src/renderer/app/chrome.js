@@ -1,10 +1,10 @@
 // @ts-check
-// app/chrome.js — compact command rail, agents/feed/summary renderers, tab bar.
+// Compact command rail, agents/feed/summary renderers, tab bar.
 'use strict';
 
 (function () {
   const AUR = window.AUR;
-  const A = AUR.app;               // created by app/state.js; throw if missing
+  const A = AUR.app;
   if (!A) throw new Error('app/state.js must load before app/chrome.js');
   const S = A.state, C = A.const;
 

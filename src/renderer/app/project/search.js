@@ -1,11 +1,11 @@
 // @ts-check
-// app/project/search.js — project search in every view: topbar query, GitHub filter, universe match highlighting.
+// Project search in every view: topbar query, GitHub filter, universe match highlighting.
 'use strict';
 
 (function () {
   const AUR = window.AUR;
   const VCS = AUR.ProjectVcsStatus;
-  const A = AUR.app;               // created by app/state.js; throw if missing
+  const A = AUR.app;
   if (!A) throw new Error('app/state.js must load before app/project/search.js');
   const S = A.state, C = A.const;
 

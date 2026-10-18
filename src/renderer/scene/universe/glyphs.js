@@ -1,4 +1,4 @@
-// scene/universe/glyphs.js — a project glyph's live state on the universe map:
+// A project glyph's live state on the universe map:
 // online/derelict dimming, search focus, the attention halo, recency rank,
 // label text and VCS markers, and the per-frame sun pulse and dot orbits.
 // The glyph itself is built in scene/universe/view.js.

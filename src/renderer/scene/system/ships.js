@@ -1,4 +1,4 @@
-// scene/system/ships.js — ships in a solar system: build and remove, patrol
+// Ships in a solar system: build and remove, patrol
 // orbits, fly-to-planet builds with a beam, attention suffixes, and the view's
 // live update handler.
 'use strict';

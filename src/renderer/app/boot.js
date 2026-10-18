@@ -1,5 +1,5 @@
 // @ts-check
-// app/boot.js — boot, event routing, view switching, debug hooks.
+// Boot, event routing, view switching, debug hooks.
 'use strict';
 
 /**
@@ -10,7 +10,7 @@
 (function () {
   const AUR = window.AUR;
   const AU = window.AU;
-  const A = AUR.app;               // created by app/state.js; throw if missing
+  const A = AUR.app;
   if (!A) throw new Error('app/state.js must load before app/boot.js');
   const S = A.state, C = A.const;
 

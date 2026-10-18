@@ -2,7 +2,7 @@
 'use strict';
 // HUD chrome: the view's name over the universe, the live clock, and the needs-you alarm and module.
 (function () {
-  const A = AUR.app;               // created by app/state.js; throw if missing
+  const A = AUR.app;
   if (!A) throw new Error('app/state.js must load before app/chrome-hud.js');
   const S = A.state;
 

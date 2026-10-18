@@ -1,30 +1,30 @@
 'use strict';
 
-// Owner's rule (2026-10-18, AGENTS.md): a folder stays flat until more than three files in it share
-// the first word of their names; then they move into a folder named for that word.
+// AGENTS.md "Folders over prefixes", checked for the source files under src/.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const SRC = path.join(__dirname, '..', 'src');
-const MAX_SHARED_PREFIX = 3;
+const ROOT = path.join(__dirname, '..');
+const entries = fs.readdirSync(path.join(ROOT, 'src'), { recursive: true, withFileTypes: true });
+const folderOf = (entry) => path.relative(ROOT, entry.parentPath).split(path.sep).join('/');
+// One stem per module: a component's .js and .css count once.
+const stems = new Map(entries.filter((e) => e.isFile() && /\.(js|css|html|ts)$/.test(e.name)).map((e) => {
+  const stem = { folder: folderOf(e), name: e.name.slice(0, e.name.indexOf('.')) };
+  return [`${stem.folder}/${stem.name}`, stem];
+}));
 
-function crowdedPrefixes(dir) {
-  const entries = fs.readdirSync(dir, { withFileTypes: true });
-  const groups = new Map();
-  for (const entry of entries.filter((e) => e.isFile())) {
-    const word = entry.name.split(/[-.]/)[0];
-    groups.set(word, [...(groups.get(word) ?? []), entry.name]);
-  }
-  const where = path.relative(SRC, dir).split(path.sep).join('/') || '.';
-  return [
-    ...[...groups].filter(([, files]) => files.length > MAX_SHARED_PREFIX)
-      .map(([word, files]) => `src/${where}: ${files.join(', ')} belong in ${word}/`),
-    ...entries.filter((e) => e.isDirectory()).flatMap((e) => crowdedPrefixes(path.join(dir, e.name))),
-  ];
-}
+test('no src/ folder holds more than three source files that share a name prefix', () => {
+  const groups = Map.groupBy(stems.entries(), ([, { folder, name }]) => `${folder}/${name.split('-')[0]}`);
+  const crowded = [...groups.values()].filter((group) => group.length > 3)
+    .map((group) => group.map(([where]) => where).join(', '));
+  assert.deepEqual(crowded, [], 'move each group into a folder named for what it shares');
+});
 
-test('no folder under src/ holds more than three files that share a name prefix', () => {
-  assert.deepEqual(crowdedPrefixes(SRC), []);
+test('a source file named for a sibling folder lives in that folder', () => {
+  const folders = entries.filter((e) => e.isDirectory()).map((e) => `${folderOf(e)}/${e.name}`);
+  const strays = [...stems.keys()]
+    .filter((where) => folders.some((folder) => where === folder || where.startsWith(`${folder}-`)));
+  assert.deepEqual(strays, []);
 });

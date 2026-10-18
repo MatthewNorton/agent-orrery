@@ -1,4 +1,4 @@
-// scene/planet.js — planet close-up: one large textured planet, atmosphere
+// Planet close-up: one large textured planet, atmosphere
 // rim, moons, this project's ships orbiting with name labels.
 'use strict';
 

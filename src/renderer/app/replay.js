@@ -1,5 +1,5 @@
 // @ts-check
-// app/replay.js — stream epochs, playback state, and replay commands (live/history switching).
+// Stream epochs, playback state, and replay commands (live/history switching).
 'use strict';
 
 /**
@@ -9,7 +9,7 @@
 (function () {
   const AUR = window.AUR;
   const AU = window.AU;
-  const A = AUR.app;               // created by app/state.js; throw if missing
+  const A = AUR.app;
   if (!A) throw new Error('app/state.js must load before app/replay.js');
   const S = A.state, C = A.const;
 

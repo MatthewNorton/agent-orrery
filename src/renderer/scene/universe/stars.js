@@ -1,4 +1,4 @@
-// scene/universe/stars.js — the body of a galaxy: a volume of starlight and dust raymarched
+// The body of a galaxy: a volume of starlight and dust raymarched
 // through the galaxy's emission atlas, and resolved stars drawn from the same atlas, both in the
 // galaxy-field.js local frame scaled to the galaxy's radius and riding its pivot. The light is
 // added to the scene, so the solar-system glyphs inside stay legible. One volume and one point

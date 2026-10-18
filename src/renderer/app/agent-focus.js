@@ -1,11 +1,11 @@
 // @ts-check
-// app/agent-focus.js — first-person agent focus: POV overlay, hologram, navigation map.
+// First-person agent focus: POV overlay, hologram, navigation map.
 'use strict';
 
 (function () {
   const AUR = window.AUR;
   const AU = window.AU;
-  const A = AUR.app;               // created by app/state.js; throw if missing
+  const A = AUR.app;
   if (!A) throw new Error('app/state.js must load before app/agent-focus.js');
   const S = A.state, C = A.const;
 

@@ -1,4 +1,4 @@
-// scene/universe/ships.js — ships on the universe map: each one orbits its
+// Ships on the universe map: each one orbits its
 // project's glyph, warps in on spawn and is disposed when it departs.
 'use strict';
 

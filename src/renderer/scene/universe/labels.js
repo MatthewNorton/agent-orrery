@@ -1,4 +1,4 @@
-// scene/universe/labels.js — dirty-driven label layout for the universe map:
+// Dirty-driven label layout for the universe map:
 // projects each project and galaxy label, keeps the ones that fit the free
 // canvas without overlap, and places the VCS markers beside them.
 'use strict';

@@ -1,5 +1,5 @@
 // @ts-check
-// app/ideas.js — root task ideas (global IDEAS queue): loading and create/assign/retry/remove.
+// Root task ideas (global IDEAS queue): loading and create/assign/retry/remove.
 'use strict';
 
 /** @import { RootTaskResult, RootTasksSnapshot } from '../../types/contract' */
@@ -7,7 +7,7 @@
 (function () {
   const AUR = window.AUR;
   const AU = window.AU;
-  const A = AUR.app;               // created by app/state.js; throw if missing
+  const A = AUR.app;
   if (!A) throw new Error('app/state.js must load before app/ideas.js');
   const S = A.state, C = A.const;
 

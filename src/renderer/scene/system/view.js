@@ -1,4 +1,4 @@
-// scene/system/view.js — one project's solar system: central sun, orbit rings,
+// One project's solar system: central sun, orbit rings,
 // textured planets and the first-person focus camera. The asteroid belt, the
 // ships and the focus fade are the belt, ships and focus parts in this folder.
 'use strict';

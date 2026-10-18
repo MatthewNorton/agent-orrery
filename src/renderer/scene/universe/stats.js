@@ -1,4 +1,4 @@
-// scene/universe/stats.js — the universe map's measured metrics for the
+// The universe map's measured metrics for the
 // harness and gates: rendered label rects, galaxy grouping, search and VCS.
 'use strict';
 

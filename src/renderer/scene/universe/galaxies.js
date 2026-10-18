@@ -1,4 +1,4 @@
-// scene/universe/galaxies.js — galaxy regions on the universe map: each galaxy is a tilted, lifted
+// Galaxy regions on the universe map: each galaxy is a tilted, lifted
 // pivot carrying its body (scene/universe/stars.js), an outline and its project glyphs; the
 // project layout that places each glyph in its galaxy; and the camera framing that keeps them
 // all on screen, with the pan bounds and speed.

@@ -1,4 +1,4 @@
-// scene/universe/view.js — the universe map: project solar-system glyphs on a
+// The universe map: project solar-system glyphs on a
 // starfield, live ships, event pulses, click-through to a system. Glyph state,
 // galaxies, ships, label layout and stats are the parts in this folder.
 'use strict';

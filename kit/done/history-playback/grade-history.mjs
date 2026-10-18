@@ -82,26 +82,24 @@ const mainSource = (function readMainLayer(dir) {
     .join('\n');
 })(path.join(root, 'src', 'main'));
 const preloadSource = read('src/preload.js');
-// 2026-09-27 kit 13: app.js split into modules, under app/ since 2026-10-18; grep the whole app layer.
-const appSource = fs.readdirSync(path.join(root, 'src', 'renderer', 'app'), { recursive: true })
-  .filter((f) => f.endsWith('.js')).sort()
-  .map((f) => read(path.join('src', 'renderer', 'app', f))).join('\n');
 const htmlSource = read('src/renderer/index.html');
 // 2026-10-14: style.css was split into styles/*.css; grep them all.
 const styleSource = fs.readdirSync(path.join(root, 'src', 'renderer', 'styles'))
   .filter((f) => f.endsWith('.css')).sort()
   .map((f) => read(`src/renderer/styles/${f}`)).join('\n');
-// 2026-10-18: renderer files live in folders. A view's source is scene/<view>.js or scene/<view>/ plus
+// 2026-10-18: renderer files live in folders. A view's source is scene/<view>/ plus
 // the shared scene helpers and ship-assets*.js; util source is util.js plus util-*.js.
 const rendererJs = fs.readdirSync(path.join(root, 'src', 'renderer'), { recursive: true })
   .map((f) => f.split(path.sep).join('/')).filter((f) => f.endsWith('.js')).sort();
 const VIEWS = ['universe', 'system', 'planet'];
-const viewSource = (view) => rendererJs.filter((f) => f.startsWith(`scene/${view}`) || f.startsWith('ship-assets') ||
-  (f.startsWith('scene/') && !VIEWS.some((other) => f.startsWith(`scene/${other}`))))
+const viewSource = (view) => rendererJs.filter((f) => f.startsWith(`scene/${view}/`) || f.startsWith('ship-assets') ||
+  (f.startsWith('scene/') && !VIEWS.some((other) => f.startsWith(`scene/${other}/`))))
   .map((f) => read(`src/renderer/${f}`)).join('\n');
 const utilLayer = () => rendererJs.filter((f) => /^util(-[a-z0-9-]+)?\.js$/.test(f))
   .map((f) => read(`src/renderer/${f}`)).join('\n');
 const utilSource = utilLayer();
+// 2026-09-27 kit 13: app.js split into modules, under app/ since 2026-10-18; grep the whole app layer.
+const appSource = rendererJs.filter((f) => f.startsWith('app/')).map((f) => read(`src/renderer/${f}`)).join('\n');
 const docsSource = read('docs/HISTORY-PLAYBACK.md');
 
 if (!/history-test/.test(mainSource) || !/au:replay/.test(mainSource) ||
