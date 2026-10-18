@@ -17,7 +17,7 @@ Gold samples (visual ground truth, in repo root):
 - `2.solar-system-view.png` — one project: sun, orbits, planets, asteroid belt, ships
 - `1.planet-view.png` — one planet close-up with status panels
 
-Frozen files: the **Frozen files** bullet in `CLAUDE.md` is the one authoritative list. The main-process layout is described in
+Frozen files: the **Frozen files** bullet in `AGENTS.md` is the one authoritative list. The main-process layout is described in
 `.docs/architecture.md`.
 
 ## 1. Hard constraints
@@ -57,12 +57,12 @@ loaders), then:
 | Layer | Files |
 |---|---|
 | Shared libraries | `util.js` (creates `window.AUR`; `fnv1a`/`mulberry32` copied from `src/main/shared/hash.js` so seeds agree), `util-scene.js` (Babylon helpers), `procedural-worlds.js`, `ship-assets.js` + `ship-assets-hulls.js` + `ship-assets-api.js` (`AUR.ships`), `polish-math.js`, `galaxy-layout.js` and `galaxy-field.js` (pure UMD; the field is a galaxy's emission/dust atlas and the stars drawn from it), `search-core.js`, `components/project-vcs-status.js` |
-| Views | `scene-common.js` (`AUR.sceneParts`), then each view's parts before the view: `scene-universe-{galaxies,glyphs,labels,ships,stars,stats}.js` → `scene-universe.js`, `scene-system-{belt,focus,ships}.js` → `scene-system.js`, then `scene-planet.js` |
-| App state | `app-state.js` — the only file that assigns `AUR.app` (`state`, `const`) |
-| App modules | `app-agent-focus.js`, `app-chrome.js`, `app-chrome-hud.js`, `app-chrome-queue.js`, `app-history-metrics.js`, `app-ideas.js`, `app-ideas-list.js`, `app-modules.js`, `app-playback.js`, `app-project-control.js`, `app-project-directory.js`, `app-project-search.js`, `app-project-settings.js`, `app-project-tasks.js`, `app-render-quality.js`, `app-replay.js`, `app-store.js` |
-| Boot | `app.js` — boot, event routing, view switching, debug hooks |
+| Views | `scene/common.js` (`AUR.sceneParts`), then for each view in `scene/<view>/` (universe, system, planet) its parts before its `view.js` |
+| App state | `app/state.js` — the only file that assigns `AUR.app` (`state`, `const`) |
+| App modules | every other file in `app/` and `app/project/`, in `index.html` order |
+| Boot | `app/boot.js` — boot, event routing, view switching, debug hooks |
 
-View contract: each `scene-*.js` registers
+View contract: each `scene/<view>/view.js` registers
 `AUR.views.<name> = (engine, data, ctx) => ({ scene, update(eventBatch), dispose() })`
 where `ctx` provides `openSystem(projectId)`, `openPlanet(projectId, name)`, the
 shared `store` and the graphics `quality` tier. Views may expose extras the app layer
@@ -181,8 +181,8 @@ within its source stream. The renderer reconciles `(streamEpoch, seq)` with the
 snapshot boundary so live/replay transitions and events racing an invoke are
 neither mixed, lost, nor applied twice.
 
-The renderer-side store lives in `AUR.app.state.store` (`app-state.js`):
-`projects` Map, `ships` Map, feed array (cap 60). `app.js` applies every batch to
+The renderer-side store lives in `AUR.app.state.store` (`app/state.js`):
+`projects` Map, `ships` Map, feed array (cap 60). `app/boot.js` applies every batch to
 the store first, then hands the batch to the active view's `update()`, then
 re-renders the affected overlay DOM. The renderer also synthesizes one event of
 its own, `{ type: 'project-vcs-status' }`, when a git status push arrives.
@@ -234,7 +234,7 @@ Design tokens (put in `:root`):
   galaxies, event feed, ideas) folds to its header from the chevron at the right of the header,
   and each rail folds from the chevron at its top: the left rail to a strip, the right rail to
   its compact section buttons. The top bar's panels button folds or opens both rails at once.
-  One mechanism (`app-modules.js`, `[data-module]` + `.is-collapsed`); the set of folded
+  One mechanism (`app/modules.js`, `[data-module]` + `.is-collapsed`); the set of folded
   keys persists in localStorage.
 - **Back control** (system + planet views, top-left under the project card or
   above it): `← Universe` / `← Orion System` style button.
@@ -264,7 +264,7 @@ Design tokens (put in `:root`):
   `file` (clones, so focus mode can fade ships one by one) in system and planet
   views; a near view steps down to far, then to the dart, at 100k hull
   triangles per scene. `AUR.ships.refresh(scene, ship)` swaps the hull inside
-  the asset root the scene already holds; `app.js` calls it after `ship-updated`
+  the asset root the scene already holds; `app/boot.js` calls it after `ship-updated`
   and `build` events, and it waits while focus mode has the ship faded.
 
 ## 5. Universe view (`3.universe-map-view.png`)
@@ -435,7 +435,7 @@ Data: `AU.getPlanet(projectId, name)`.
   e.g. `scene.executeWhenReady` then one `onAfterRenderObservable` tick), call
   `AU.debugReady()`. Main then waits ~1.8s (animations settle) and captures.
 
-Also: `app.js` must catch and `console.error` any async boot failure — renderer
+Also: `app/boot.js` must catch and `console.error` any async boot failure — renderer
 console is forwarded to stdout in shots mode and scanned by the grader.
 
 Item-02 adds a second test-only main-process mode:

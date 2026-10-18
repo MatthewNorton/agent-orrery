@@ -66,7 +66,7 @@ this: dim/fade systems untouched for N days ("derelict drift"), sort/label by
   dense clusters. Fade labels below a zoom threshold or declutter by
   priority (online > recent > dormant).
 - ~~**Filter/search box**~~ — shipped 2026-07-22 as project search (kit 11).
-- **`Color3` aliasing in `scene-system.js`**: same bug class that blacked out
+- **`Color3` aliasing in `scene/system/view.js`**: same bug class that blacked out
   the universe suns (shared object mutated by `scaleInPlace` per frame) exists
   there, currently masked because the scale factor stays ≈1. Fix is one
   `.clone()`.

@@ -93,12 +93,13 @@ const mainFiles = fs.readdirSync(path.join(root, 'src', 'main'), { recursive: tr
 const mainSource = mainFiles.map((f) => f.text).join('\n');
 const inputSource = mainFiles.filter((f) => f.rel.startsWith('harness/') && f.rel !== 'harness/modes/shots.js')
   .map((f) => f.text).join('\n');
-// 2026-10-13: renderer files may be split. A view's source is its scene-<view>*.js files plus the
-// shared scene helpers and ship-assets*.js; util source is util.js plus util-*.js.
-const rendererJs = fs.readdirSync(path.join(root, 'src', 'renderer')).filter((f) => f.endsWith('.js')).sort();
+// 2026-10-18: renderer files live in folders. A view's source is scene/<view>/ plus
+// the shared scene helpers and ship-assets*.js; util source is util.js plus util-*.js.
+const rendererJs = fs.readdirSync(path.join(root, 'src', 'renderer'), { recursive: true })
+  .map((f) => f.split(path.sep).join('/')).filter((f) => f.endsWith('.js')).sort();
 const VIEWS = ['universe', 'system', 'planet'];
-const viewSource = (view) => rendererJs.filter((f) => f.startsWith(`scene-${view}`) || f.startsWith('ship-assets') ||
-  (f.startsWith('scene-') && !VIEWS.some((other) => f.startsWith(`scene-${other}`))))
+const viewSource = (view) => rendererJs.filter((f) => f.startsWith(`scene/${view}/`) || f.startsWith('ship-assets') ||
+  (f.startsWith('scene/') && !VIEWS.some((other) => f.startsWith(`scene/${other}/`))))
   .map((f) => read(`src/renderer/${f}`)).join('\n');
 const utilLayer = () => rendererJs.filter((f) => /^util(-[a-z0-9-]+)?\.js$/.test(f))
   .map((f) => read(`src/renderer/${f}`)).join('\n');

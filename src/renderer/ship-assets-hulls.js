@@ -1,5 +1,5 @@
 // @ts-check
-// ship-assets-hulls.js — builds a ship's hull from a loaded model: provider livery materials,
+// Builds a ship's hull from a loaded model: provider livery materials,
 // instances of a per-provider template on the universe map or clones in the system and planet
 // views, and in-place swaps on promotion.
 'use strict';

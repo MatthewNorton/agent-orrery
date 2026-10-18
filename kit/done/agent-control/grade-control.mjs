@@ -84,10 +84,10 @@ const mainSource = (function readMainLayer(dir) {
     .join('\n');
 })(path.join(root, 'src', 'main'));
 const preloadSource = read('src/preload.js');
-// 2026-09-27 kit 13: app.js split into app-*.js modules; grep the whole app layer.
-const appSource = fs.readdirSync(path.join(root, 'src', 'renderer'))
-  .filter((f) => /^app.*\.js$/.test(f)).sort()
-  .map((f) => read(`src/renderer/${f}`)).join('\n');
+// 2026-09-27 kit 13: app.js split into modules, under app/ since 2026-10-18; grep the whole app layer.
+const appSource = fs.readdirSync(path.join(root, 'src', 'renderer', 'app'), { recursive: true })
+  .filter((f) => f.endsWith('.js')).sort()
+  .map((f) => read(path.join('src', 'renderer', 'app', f))).join('\n');
 // 2026-10-14: style.css was split into styles/*.css; grep them all.
 const styleSource = fs.readdirSync(path.join(root, 'src', 'renderer', 'styles'))
   .filter((f) => f.endsWith('.css')).sort()

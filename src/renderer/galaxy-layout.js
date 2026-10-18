@@ -1,4 +1,4 @@
-// galaxy-layout.js — pure deterministic galaxy colors and cluster packing.
+// Pure deterministic galaxy colors and cluster packing.
 // Galaxies huddle around the largest one at hashed bearings, heights and tilts; inside a galaxy
 // the recently active projects sit at the core and dormant ones drift to the rim.
 // UMD keeps the same implementation available to the renderer and Node gates.

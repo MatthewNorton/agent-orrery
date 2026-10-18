@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
+const { rendererSource } = require('./support/renderer-source');
 
 const root = path.join(__dirname, '..');
 
@@ -64,10 +65,7 @@ test('runtime planet generation is deterministic and spans distinct world classe
 });
 
 test('solar systems build three deformed asteroid forms with nonuniform instances', () => {
-  // The system view's source is its scene-system*.js files.
-  const source = fs.readdirSync(path.join(root, 'src/renderer'))
-    .filter((file) => /^scene-system.*\.js$/.test(file)).sort()
-    .map((file) => fs.readFileSync(path.join(root, 'src/renderer', file), 'utf8')).join('\n');
+  const source = rendererSource('scene/system');
   const manifest = JSON.parse(fs.readFileSync(path.join(root, 'assets/manifest.json'), 'utf8'));
   const asteroids = manifest.assets.filter((entry) => entry.type === 'asteroid');
 

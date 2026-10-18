@@ -63,11 +63,11 @@ console.log('P2 PASS  all fixtures');
 // ---- P3 wiring ----
 const html = fs.readFileSync(path.join(ROOT, 'src', 'renderer', 'index.html'), 'utf8');
 const iCore = html.indexOf('search-core.js');
-const iApp = html.indexOf('app.js');
+const iApp = html.indexOf('app/boot.js');
 if (iCore === -1) fail('P3: search-core.js script tag missing from index.html');
-if (!(iCore < iApp)) fail('P3: search-core.js must load before app.js');
+if (!(iCore < iApp)) fail('P3: search-core.js must load before app/boot.js');
 const rendererDir = path.join(ROOT, 'src', 'renderer');
-const rendererSrc = fs.readdirSync(rendererDir).filter((f) => f.endsWith('.js') || f.endsWith('.html'))
+const rendererSrc = fs.readdirSync(rendererDir, { recursive: true }).filter((f) => f.endsWith('.js') || f.endsWith('.html'))
   .map((f) => fs.readFileSync(path.join(rendererDir, f), 'utf8')).join('\n');
 if (!/[Ss]earch/.test(rendererSrc) || !/searchProjects/.test(rendererSrc)) fail('P3: search UI not wired in renderer');
 console.log('P3 PASS  script order + UI wiring present');

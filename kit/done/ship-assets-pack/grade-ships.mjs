@@ -43,7 +43,7 @@ try {
   const iLoaders = html.indexOf('babylonjs.loaders.min.js');
   const iUtil = html.indexOf('util.js');
   const iShipAssets = html.indexOf('ship-assets.js');
-  const iSceneU = html.indexOf('scene-universe.js');
+  const iSceneU = html.indexOf('scene/universe/view.js');
   if (iLoaders === -1) bad('S2', 'loaders script tag missing from index.html');
   else if (!(iLoaders < iUtil)) bad('S2', 'loaders tag must come before util.js');
   else ok('S2a', 'loaders tag ordered before util.js');
