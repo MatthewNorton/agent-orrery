@@ -173,162 +173,69 @@ None of these block release. Each is a kit-sized job.
       (found 2026-09-27 while landing PR #32). Fix: hash with line endings
       normalized to LF inside the gate scripts, then re-pin once. ~30 min.
 
-## Phase 6 — Visual quality: the last leg before public · ~10–12 agent days · one PR per item
+## Phase 6 — Visual quality before public · ~6–8 h · three PRs
 
-Added 2026-10-18. The owner chose to land this phase before flipping the repo
-public. It comes from two investigations run that day on the owner's machine
-(AMD Radeon 890M integrated GPU, 4K display at 125%, Babylon 9.30, Electron 44):
+Added 2026-10-18 and rescoped the same day. Two investigations that day
+(measurements, the planet design and the parked items are in
+`kit/todo/15-visual-quality.md`) found that every view holds a vsync-locked
+60 fps at every quality tier on the owner's machine, even at 40 projects and
+an emulated 4K viewport, so what precedes the flip is narrow: repair the
+gates, remove dead per-frame cost, and let viewers set quality. The
+procedural-planet pipeline, the sun, the idle frame cap, glyph consolidation
+and the Ultra tier are parked on the todo list; the owner decides whether any
+of them precede the flip.
 
-- **Performance.** Driven over the DevTools protocol on the synthetic profile
-  padded to 40 projects, every view holds a vsync-locked 60 fps at every
-  quality tier, even with an emulated 3840×2160 viewport. GPU frame time peaks
-  at 6.4 ms (universe, 4K, High). Low vs High barely moves the GPU at window
-  size, so the tier knobs are not the lever. What costs is per-object work
-  (684 draw calls, 466 meshes, 396 materials at 40 projects) and idle power:
-  sitting still on the universe view the app burns ~62% of one core and ~19%
-  of the GPU at 557 MB.
-- **Realism.** Planets are 33 authored tileable PNGs (`assets/planets`, frozen)
-  tiled 2× over each sphere by `AUR.applyPlanetSurface`, which reads as a
-  repeating cell pattern in close-up. The sun clips to white under the glow
-  layer. There is no terminator drama, cloud layer or limb haze. The reference
-  is the owner's sandbox-animations-v2 PR #31 (`experiments/sidereal-v2`):
-  CPU-generated 2048×1024 equirectangular maps (albedo+height, emission+water
-  mask, clouds) from seeded 3D noise sampled on the unit sphere, generated in
-  a worker, cached, lit by a hand-written shader.
+Effort is session time as defined above. Every item: one PR, a `/simplify`
+pass before it is reported ready, `node kit/grade.mjs` and every done-kit gate
+green on a committed tree, `npm test` and `npm run typecheck` green.
 
-Standing rules for every item: one PR per item, `/simplify` pass before it is
-reported ready, `node kit/grade.mjs` and every done-kit gate green,
-`npm test` and `npm run typecheck` green, files ≤ 300 lines (400 with a
-written reason), no new dependencies, frozen files untouched.
-
-### Decisions the owner confirms before 6.6 starts
-
-- [ ] **D1 Authored PNGs stop being the default planet surface.** Assets stay
-      frozen on disk; nothing is deleted. SPEC §6/§7/§10, DESIGN-DIRECTION
-      lines 78–79 and `test/planet-assets.test.js` change with 6.7.
-      Recommended: yes.
-- [ ] **D2 Look.** Keep the five world classes (rocky, gas, ice, volcanic,
-      oceanic) keyed by today's seeds so existing planets keep their identity,
-      with the oceanic class carrying clouds, ocean glint and night-side
-      lights so the mockup's habitable look appears where it is drawn.
-      Alternative: every project planet Earth-like. Recommended: keep classes.
-- [ ] **D3 First-open latency.** A placeholder surface appears at once and the
-      detail map lands within about a second on High (longer on Ultra).
-      Recommended: accept; generation is split across workers if it drags.
-
-### Quality tiers after this phase
-
-The Graphics slider in Settings keeps one stop per tier and gains Ultra. Each
-tier is a frozen object in `src/renderer/app-state.js`; views apply it through
-`setQuality`. The first run picks a default from the renderer string, logical
-cores and screen size (Balanced for an integrated GPU at 4K, High for a
-discrete GPU, Low for a software renderer) and stores it under the existing key
-so the slider shows it.
-
-| Knob | Low | Balanced | High | Ultra |
-|---|---|---|---|---|
-| Render scale | 0.6 | 0.8 | 1.0 | 1.0 |
-| Galaxy raymarch steps | 20 | 32 | 48 | 64 |
-| Star share | 0.4 | 0.7 | 1.0 | 1.0 |
-| Glow layer texture ratio | 0.25 | 0.5 | 0.5 | 1.0 |
-| Panel backdrop blur | off | off | on | on |
-| Planet-view map | 1024×512 | 2048×1024 | 2048×1024 | 4096×2048 (active planet only) |
-| System planet map | 256×128 | 512×256 | 512×256 | 1024×512 |
-| Cloud layer | off | on | on + shadows | on + shadows |
-| Sphere segments | 32 | 48 | 64 | 96 |
-| Sun granulation map | 256×128 | 512×256 | 512×256 | 1024×512 |
-
-One toggle sits outside the tiers: **Reduce frame rate when idle**, default
-on, because it is a preference about power, not looks.
-
-### Items
-
+- [ ] **6.0 Gate repair, gate runner, CI.** On 2026-10-18 four of the
+      thirteen gates were red on `main` and nobody had noticed, because CI
+      runs only typecheck and unit tests. Polish P4 greps all of `src/main`
+      for `.click()` and the screenshot harness has folded panels that way
+      since 2026-10-14 (`harness/modes/shots.js`): narrow the check to the
+      polish harness or use the driver's `screenshotClick`. Agent-control C5:
+      in the 1200×720 harness window the click on Open Terminal never puts
+      the button into its pending state and one control reports as clipped;
+      cause still open. The two `--full` gates are red only because they
+      re-run those two. Then add `kit/run-gates.mjs`, which runs all thirteen
+      and prints one line each, and a CI job for the static gates (structure,
+      main-split, search, tasks, ships, attention fixtures). One policy line
+      in `kit/README.md`: no file-hash pins, ever; frozen means review.
+      Note for every gate run: the packaging gate fails W0 on any dirty
+      working tree by design, so run gates after committing. ~3 h.
 - [ ] **6.1 Engine and compositor fixes, no setting.** Drop
       `preserveDrawingBuffer: true` and `stencil: true` from the engine
       options in `src/renderer/app.js` (nothing reads the canvas back; shots
       use `capturePage`). Reuse a scratch vector in the planet view's per-ship
-      `lookAt` (`scene-planet.js`). Hide non-top-3 system labels with
-      `isVisible` instead of alpha 0 (`scene-system.js`). Cache sampled stars
-      per galaxy next to the cached atlas pixels (`scene-universe-stars.js`,
-      key `key:arms:size:count`). ~2 h. Gate: shots unchanged.
-- [ ] **6.2 Tiers carry the knobs; Ultra; auto default.** Add the table's
-      fields to `RENDER_QUALITIES`; glow layer `mainTextureRatio` per tier with
-      the blur kernel scaled to keep the same screen radius; panel blur as a
-      class on `<body>`; `setQuality` in the system and planet views; the
-      first-run pick; a fourth slider stop. ~4 h. Gate: grade at High (test
-      partition) and polish P2 backdrop luma unchanged.
-- [ ] **6.3 Idle frame cap toggle.** Full rate during pointer or wheel input,
-      a 1 s grace and camera coasting; ~30 fps idle; ~15 fps unfocused. Each
-      view keeps its own delta time from `performance.now()`, because
-      `engine.getDeltaTime()` keeps ticking on skipped frames and would slow
-      every orbit. Off in test mode. Stored under
-      `agent-universe.idle-frame-cap.v1`. ~2–3 h.
-- [ ] **6.4 Universe glyph consolidation** (scaling headroom; may follow
-      public). Share the five dot materials (search dimming moves from
-      `material.alpha` to `visibility`), merge each glyph's rings into one
-      line system, dots as thin instances; clip the galaxy raymarch to the
-      lit r ≤ 24 cylinder and cull front faces instead of discarding them.
-      Expected ~40% fewer universe draws, identical image. ~half a day. Gate:
-      galaxy-grouping gate and an A/B of `shot-galaxy-close`.
-- [ ] **6.5 Sun.** Generated granulation `emissiveTexture` (3D cells, sized by
-      tier, slow U drift), limb darkening via `emissiveFresnelParameters`, a
-      soft billboard corona on its own material, glow lowered so the core no
-      longer clips white. Keep the literal
-      `sunMat.emissiveColor = sunCol.clone()` for grade-polish P3. ~1 day.
-- [ ] **6.6 World generator and tests.** New `src/renderer/worlds/` folder
-      (added to the renderer tsconfig), UMD files with `// @ts-check`:
-      `world-noise.js` (seeded 3D Perlin, fbm, domain warp, Worley F2−F1,
-      vortex, banded craters; its mulberry32 copy added to
-      `test/shared-hash.test.js`), `world-classes.js` (one sampler per class
-      per D2, airless variant from `atmosphereProfile`), `world-maps.js`
-      (`generateWorldMaps(profile, {width, height, layers})` → surface
-      albedo+height, material emission+specular/water, optional clouds; input
-      validation). `test/world-maps.test.js`: determinism, distinct classes,
-      seam and pole continuity, buffer sizes, bad-input rejection, emission
-      rules, small-size checksum. No visual change. ~1–1.5 days.
-- [ ] **6.7 Worker, cache and the planet view.** `world-worker.js` as a
-      classic worker (`importScripts`; CSP already allows `worker-src 'self'
-      blob:`), `world-textures.js` published as `AUR.worldTextures`: one job
-      at a time with priorities, a view epoch that drops stale jobs, a
-      disposed-scene guard, a per-job timeout, synchronous low-res fallback.
-      CPU-buffer LRU with a byte budget on `AUR.app.state.worldMaps`, passed
-      through `makeCtx` like `galaxyFields`. `RawTexture` upload per scene
-      (wrapU WRAP, wrapV CLAMP). The planet view draws a 128×64 placeholder
-      synchronously, then holds `scene.addPendingData` until the detail map
-      lands or 6 s pass, inside the polish gate's 10 s wait. Normal map from
-      height with the 1/sin(lat) correction, specular map, cloud sphere at
-      ×1.006, moons on the airless class. `scene.metadata.surfaceStats`.
-      SPEC §7/§10 and `test/planet-assets.test.js` updated per D1. ~2–3 days.
-      Gate: every gate, no M4 console noise, a latitude/longitude marker map
-      shows no seam at u = 0 and no pole pinch, return visits are cache hits.
-- [ ] **6.8 System planets and distance LOD.** 64×32 placeholder, tier map
-      sizes, top three planets first, hover prefetches the planet-view map,
-      cached planet-view maps reused, segments from the tier, gas drift via
-      `uOffset`. ~1–1.5 days. Gate: a system-to-planet round trip regenerates
-      nothing.
-- [ ] **6.9 Lighting shaders.** `worlds/world-shaders.js` and a new
-      `scene-planet-surface.js` part (`AUR.sceneParts.planet` added in
-      `scene-common.js`): relief from height taps, terminator, night-side
-      emission, ocean glint from the water mask, cloud shadows, limb haze from
-      `atmosphereProfile`. Sun direction from the key light in the planet view
-      and from each planet's position in the system view. Verify GlowLayer
-      with ShaderMaterial meshes and tonemap consistency with ships and GUI.
-      ~2 days. Gate: polish P2 unchanged; visual check against
-      `1.planet-view.png`.
-- [ ] **6.10 Docs and media.** README screenshots re-shot with
-      `node scripts/demo-shots.mjs`; SPEC, RUBRIC, DESIGN-DIRECTION and the
-      kit status board updated; any art want (cloud atlas) logged in
-      `kit/ASSET-REQUESTS.md`. ~1 h.
+      `lookAt`. Hide non-top-3 system labels with `isVisible` instead of
+      alpha 0. Cache sampled stars per galaxy next to the cached atlas pixels.
+      ~1 h. Gate: shots unchanged.
+- [ ] **6.2 Quality settings.** The three tiers in `RENDER_QUALITIES` carry
+      glow-layer texture ratio, panel backdrop blur and sphere segments as
+      well as render scale, raymarch steps and star share; glow layers are
+      rebuilt on a tier change with the blur kernel scaled to keep the same
+      screen radius; panel blur is a class on `<body>`; `setQuality` in the
+      system and planet views rebuilds the scene. A "Recommend for this
+      machine" button in Settings reads the renderer string, cores and screen
+      and moves the slider, instead of a silent first-run pick, so test runs
+      stay at High. ~2–3 h. Gate: polish P2 backdrop luma unchanged at High.
+
+| Knob | Low | Balanced | High |
+|---|---|---|---|
+| Render scale | 0.6 | 0.8 | 1.0 |
+| Galaxy raymarch steps | 20 | 32 | 48 |
+| Star share | 0.4 | 0.7 | 1.0 |
+| Glow layer texture ratio | 0.25 | 0.5 | 0.5 |
+| Panel backdrop blur | off | off | on |
+| Sphere segments | 32 | 48 | 64 |
 
 ### Release tail
 
-- [ ] **6.11 Merge PR #49** (universe cluster, carries #50) then **PR #51**
+- [ ] **6.3 Merge PR #49** (universe cluster, carries #50) then **PR #51**
       (README screenshots), on the owner's word.
 - [ ] **4.8** flip public and the four post-flip settings (above).
 - [ ] **5.4** mapped drives stays optional and may follow public.
-
-Order: 6.1 → 6.2 → 6.3 → 6.5 → 6.6 → 6.7 → 6.8 → 6.9 → 6.10, with 6.4
-whenever a gap opens. Items 6.1–6.3 and 6.5–6.10 block the flip; 6.4 does not.
 
 ## Totals
 
@@ -339,10 +246,11 @@ whenever a gap opens. Items 6.1–6.3 and 6.5–6.10 block the flip; 6.4 does no
 | 3 Leak cleanup | 30 min | yes |
 | 4 Fresh repo | ~1 h | is the snapshot |
 | 5 Structural | 8–10 h | no |
-| 6 Visual quality | 10–12 days | last leg before the flip (added 2026-10-18) |
+| 6 Visual quality | 6–8 h | three PRs before the flip; the rest is parked (added 2026-10-18) |
 
 Critical path to a public repo: **about 4–5 hours of agent time across three
 PRs and one manual GitHub session.**
 
-2026-10-18: the owner chose to land Phase 6 first. The critical path is now items
-6.1–6.3 and 6.5–6.10, then 6.11 and 4.8.
+2026-10-18: Phase 6 precedes the flip, rescoped to gate repair, engine fixes and quality
+settings (6–8 h, three PRs). The planet pipeline and the other visual work are parked in
+`kit/todo/15-visual-quality.md`.

@@ -6,6 +6,7 @@
 |---|---|---|
 | 09 | `09-ship-assets-gen.md` — locally generated hulls (ComfyUI image-to-3D) | stub — Kit 08's manifest contract has landed; ready to distill |
 | 12 | `12-standalone-installer.md` — packaged exe/installer independent of the checkout | declined 2026-10-13 — the users are developers, `npm run setup` is the install path; don't distill unless matt asks |
+| 15 | `15-visual-quality.md` — procedural worlds, lighting shaders, sun, idle frame cap, glyph consolidation, Ultra tier | stub — parked 2026-10-18; ~12–15 session hours in three PRs; decisions D1–D3 need the owner |
 
 Feed a ready kit to an executor via `kit/EXECUTOR-HANDOFF.md` with its
 CONTRACT.md path.

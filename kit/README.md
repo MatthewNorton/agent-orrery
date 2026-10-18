@@ -30,6 +30,7 @@ kit/
   todo/                pending work, in intended order (see todo/README.md)
     09-ship-assets-gen.md stub — ready to distill from the landed manifest
     12-standalone-installer.md declined — developers install with npm run setup
+    15-visual-quality.md   stub — parked 2026-10-18; procedural worlds, lighting, sun, idle cap, glyphs, Ultra
 ```
 
 ## Status
@@ -51,6 +52,7 @@ kit/
 | 12 Standalone installer | **DECLINED** 2026-10-13 — the users are developers; `npm run setup` is the install path. Notes kept in `todo/12-standalone-installer.md` | none |
 | 13 Structural cleanup | **DONE** — PASS 2026-09-28; `app.js` split into `AUR.app` modules, shared `src/main/path-safety.js`; §2.6 (observable-driven dispose) withdrawn, poll documented; archived in `done/structural-cleanup/` (Phase 5 of `docs/PUBLIC-RELEASE-TASKS.md`) | `node kit/done/structural-cleanup/grade-structure.mjs` (sweep: `node kit/run-gates.mjs`) |
 | 14 Main-process split | **DONE** — PASS 2026-10-01; `main.js` (2217 lines) is a 47-line bootstrap over `app-context.js`, `window.js`, `replay-control.js`, `ipc/*`, `harness/*`; zero module-level `let` in `src/main`; `main.js` unfrozen; project-tasks gate widened to the `src/main` layer (owner-authorized); archived in `done/main-split/` | `node kit/done/main-split/grade-main-split.mjs` (sweep: `node kit/run-gates.mjs`) |
+| 15 Visual quality | **STUB** — parked 2026-10-18 by the owner; the lean three-PR plan (procedural worlds, lighting shaders, sun, idle frame cap, glyph consolidation, Ultra tier) with measurements and open decisions is in `todo/15-visual-quality.md`; the gate repair, engine fixes and quality settings that precede the public flip are `docs/PUBLIC-RELEASE-TASKS.md` Phase 6 | none yet |
 
 ## How the app works (context for any executor)
 
