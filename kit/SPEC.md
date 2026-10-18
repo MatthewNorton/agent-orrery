@@ -17,7 +17,7 @@ Gold samples (visual ground truth, in repo root):
 - `2.solar-system-view.png` — one project: sun, orbits, planets, asteroid belt, ships
 - `1.planet-view.png` — one planet close-up with status panels
 
-Frozen files: the **Frozen files** bullet in `CLAUDE.md` is the one authoritative list. The main-process layout is described in
+Frozen files: the **Frozen files** bullet in `AGENTS.md` is the one authoritative list. The main-process layout is described in
 `.docs/architecture.md`.
 
 ## 1. Hard constraints
