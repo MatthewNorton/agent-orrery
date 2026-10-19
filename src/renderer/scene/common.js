@@ -58,12 +58,13 @@
     scene.dispose();
   };
 
-  // Hull materials are shared per scene and released by AUR.ships.dispose.
+  // Hull materials are shared per scene and released by AUR.ships.dispose. Any other material is
+  // the mesh's own, textures included (a signal marker draws its glyph into one).
   AUR.disposeMeshAndMaterial = function (mesh) {
     if (!mesh) return;
     const material = mesh.material;
     const sharedAssetMaterial = Boolean(mesh.metadata && mesh.metadata.assetHullId);
     mesh.dispose();
-    if (material && !sharedAssetMaterial) material.dispose();
+    if (material && !sharedAssetMaterial) material.dispose(false, true);
   };
 })();

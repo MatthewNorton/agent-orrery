@@ -117,7 +117,8 @@
           : g.attention ? 1
             : g.online ? 3 : 4;
         const eligible = priority < 4 || g.recencyRank < recentLimit;
-        const onScreen = inDepth && labelPointIsClear(rect);
+        // Five hit tests each, so only for a label that could be shown.
+        const onScreen = eligible && inDepth && labelPointIsClear(rect);
         g.labelScreen = {
           id: g.id, x, y,
           rect, eligible, visible: false,
@@ -149,9 +150,9 @@
         if (!screen) continue;
         finiteGalaxyProjections++;
         const { x, y, rect, inDepth } = screen;
-        const onScreen = inDepth && labelPointIsClear(rect);
         const id = 'galaxy:' + galaxy.key;
         const eligible = galaxyCandidateKeys.has(galaxy.key);
+        const onScreen = eligible && inDepth && labelPointIsClear(rect);
         galaxy.labelScreen = {
           id, key: galaxy.key, x, y,
           rect, eligible, visible: false,
@@ -174,8 +175,7 @@
         const placed = selectedById.get(g.id);
         place(g, placed);
         if (g.markerHost) {
-          const empty = Boolean(g.markerHost.querySelector('.project-vcs-markers-empty'));
-          const visible = !empty && g.labelScreen && g.labelScreen.markerVisible;
+          const visible = !g.markersEmpty && g.labelScreen && g.labelScreen.markerVisible;
           g.markerHost.classList.toggle('hidden', !visible);
           if (visible) {
             const x = placed ? placed.rect.x + placed.rect.width : g.labelScreen.x;

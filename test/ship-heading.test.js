@@ -35,12 +35,12 @@ test('system view: a patrolling ship faces along its orbit either way round', ()
 });
 
 test('planet view: an orbiting ship faces along its orbit either way round', () => {
-  const look = new Function('r', 'BABYLON',
-    headingCode('planet', /r\.mesh\.lookAt\(new BABYLON\.Vector3\([\s\S]*?\)\);/));
-  const BABYLON = { Vector3: function Vector3(x, y, z) { Object.assign(this, { x, y, z }); } };
+  const look = new Function('r', 'heading',
+    headingCode('planet', /const ahead = [^;]+;\s*r\.mesh\.lookAt\(heading\.set\([^;]+\);/));
+  const heading = { set(x, y, z) { return { x, y, z }; } };
   for (const orbit of ORBITS) {
     let target = null;
-    look({ ...orbit, r: R, yoff: 0, mesh: { lookAt: (v) => { target = v; } } }, BABYLON);
+    look({ ...orbit, r: R, yoff: 0, mesh: { lookAt: (v) => { target = v; } } }, heading);
     const forward = [target.x - Math.cos(orbit.a) * R, target.z - Math.sin(orbit.a) * R];
     assert.ok(along(orbit, forward) > 0.99, `a=${orbit.a.toFixed(1)} speed=${orbit.speed}`);
   }

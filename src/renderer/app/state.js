@@ -64,7 +64,7 @@
 
     notificationByShip: new Map(),
     liveProjectEvents: new Map(),
-    galaxyFields: new Map(), // galaxy key + spiral shape -> emission atlas pixels (galaxy-field.js)
+    galaxyFields: new Map(), // galaxy key + spiral shape -> emission atlas pixels and star samples (galaxy-field.js)
     renderQuality: C.RENDER_QUALITIES[C.RENDER_QUALITIES.length - 1], // the viewer's graphics tier
     lastNotificationAt: -Infinity,
 
