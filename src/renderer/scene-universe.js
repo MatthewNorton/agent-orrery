@@ -22,7 +22,8 @@
     camera.upperRadiusLimit = 320;
     camera.lowerBetaLimit = 0.15;
     camera.upperBetaLimit = 1.35;
-    camera.panningSensibility = 0;
+    // Right-drag pans along the ground; scene-universe-galaxies.js sets its speed and bounds.
+    camera.mapPanning = true;
     camera.minZ = 0.1;
     camera.maxZ = 6000;
     AUR.configureComfortCamera(camera);
@@ -46,21 +47,34 @@
     const ships = new Map();  // shipId -> ship record
     const galaxies = new Map(); // galaxy key -> rendered region record
     const view = {
-      engine, scene, canvas, camera, gui, store, glyphs, ships, galaxies,
+      engine, scene, canvas, camera, gui, store, glyphs, ships, galaxies, glow,
+      fields: ctx.galaxyFields || new Map(),
+      softDisc: AUR.softDiscTexture(scene), coronaMaterials: new Map(),
       skyLevel: UNIVERSE_SKY_LEVEL, searchMatchIds: null, hoveredProjectId: null,
+      quality: ctx.quality,
     };
     const parts = AUR.sceneParts.universe;
-    Object.assign(view, parts.labels(view), parts.glyphs(view), parts.galaxies(view),
-      parts.ships(view), parts.stats(view));
+    Object.assign(view, parts.labels(view), parts.glyphs(view), parts.stars(view),
+      parts.galaxies(view), parts.ships(view), parts.stats(view));
 
     // ---- glyphs ----
+    // Suns come in five colours, so five corona materials serve every glyph.
+    function coronaMaterial(hex) {
+      let material = view.coronaMaterials.get(hex);
+      if (!material) {
+        material = AUR.softMaterial(scene, 'corona:' + hex, AUR.color3(hex).scale(0.85), 1, view.softDisc);
+        view.coronaMaterials.set(hex, material);
+      }
+      return material;
+    }
+
     function buildGlyph(p) {
       const rand = AUR.mulberry32(p.seed >>> 0);
 
       const root = new BABYLON.TransformNode('g_' + p.id, scene);
       root.position.set(0, 0, 0);
 
-      const dia = 1.2 + Math.log10((p.totalBytes || 0) + 1) * 0.35;
+      const dia = AUR.SUN_DIAMETER_MIN + Math.log10((p.totalBytes || 0) + 1) * 0.35;
       const sunR = dia / 2;
       const sun = BABYLON.MeshBuilder.CreateSphere('sun_' + p.id, { diameter: dia, segments: 16 }, scene);
       sun.parent = root;
@@ -76,6 +90,15 @@
       sunMat.diffuseColor = new BABYLON.Color3(0, 0, 0);
       sunMat.specularColor = new BABYLON.Color3(0, 0, 0);
       sun.material = sunMat;
+
+      // A soft corona behind the sun, in its colour, always facing the camera. The glow layer
+      // ignores opacity textures, so it stays out of the glow pass.
+      const corona = BABYLON.MeshBuilder.CreatePlane('corona_' + p.id, { size: dia * 2.4 }, scene);
+      corona.parent = root;
+      corona.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
+      corona.isPickable = false;
+      corona.material = coronaMaterial(AUR.sunColor(p.seed));
+      glow.addExcludedMesh(corona);
 
       // One reusable alert halo per glyph. It stays disabled until a main
       // ship in this project needs a question answered or permission granted.
@@ -141,7 +164,7 @@
       vcsLayer.appendChild(markerHost);
 
       const g = {
-        id: p.id, root, sun, sunMat, baseEmissive: col, rings, dots, label,
+        id: p.id, root, sun, sunMat, corona, baseEmissive: col, rings, dots, label,
         markerHost,
         galaxyKey: null,
         halo, haloMat, attention: null,
@@ -165,10 +188,13 @@
     for (const s of store.ships.values()) if (glyphs.has(s.project)) view.buildShip(s);
 
     // ---- interaction ----
+    // Left-click opens a system; a double-click on open space re-frames the whole universe.
     scene.onPointerObservable.add((pi) => {
       if (pi.type === BABYLON.PointerEventTypes.POINTERPICK) {
         const m = pi.pickInfo && pi.pickInfo.pickedMesh;
-        if (m && m.metadata && m.metadata.isSun) ctx.openSystem(m.metadata.projectId);
+        if (pi.event.button === 0 && m && m.metadata && m.metadata.isSun) ctx.openSystem(m.metadata.projectId);
+      } else if (pi.type === BABYLON.PointerEventTypes.POINTERDOUBLETAP) {
+        if (pi.event.button === 0 && view.hoveredProjectId == null) view.frameCamera();
       } else if (pi.type === BABYLON.PointerEventTypes.POINTERMOVE) {
         const pick = scene.pick(scene.pointerX, scene.pointerY, (mm) => mm.metadata && mm.metadata.isSun);
         const nextHovered = pick && pick.hit ? pick.pickedMesh.metadata.projectId : null;
@@ -185,9 +211,13 @@
       const dt = engine.getDeltaTime() / 1000;
       const now = performance.now();
       const t = now / 1000;
-      if (view.cameraLayoutChanged()) view.markLabelLayoutDirty();
+      if (view.cameraLayoutChanged()) {
+        view.markLabelLayoutDirty();
+        view.updatePanSpeed();
+      }
       view.animateGlyphs(dt, now, t);
       view.animateShips(dt, now, t);
+      view.animateStars();
     });
 
     // ---- live updates ----
@@ -244,6 +274,7 @@
     scene.metadata = {
       view: 'universe',
       galaxyStats: view.galaxyStats,
+      frameGalaxy: view.frameGalaxy,
       providerStats() {
         return AUR.sceneProviderStats(scene);
       },
@@ -258,6 +289,7 @@
       scene,
       update,
       setSearchMatches: view.setSearchMatches,
+      setQuality: view.setStarsQuality,
       resize: view.reframeCamera,
       dispose() {
         view.cancelLabelLayout();

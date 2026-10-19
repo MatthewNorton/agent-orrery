@@ -20,6 +20,7 @@
     S.engine = new BABYLON.Engine(S.canvas, true, {
       preserveDrawingBuffer: true, stencil: true, antialias: true,
     }, true);
+    A.wireRenderQuality();
     S.engine.runRenderLoop(() => {
       if (S.activeScene && !S.activeScene.isDisposed) {
         try { S.activeScene.render(); } catch (e) { /* swallow transient swap frames */ }
@@ -33,6 +34,7 @@
       }
     });
     const onChromeResize = () => {
+      A.applyRenderScale();
       S.engine.resize();
       if (S.activeView && S.activeView.resize) S.activeView.resize();
     };
@@ -208,7 +210,10 @@
 
   // ---------- view switching ----------
   function makeCtx() {
-    return { store: S.store, openSystem: A.openSystem, openPlanet: A.openPlanet };
+    return {
+      store: S.store, galaxyFields: S.galaxyFields, quality: S.renderQuality,
+      openSystem: A.openSystem, openPlanet: A.openPlanet,
+    };
   }
 
   function setView(name, data) {

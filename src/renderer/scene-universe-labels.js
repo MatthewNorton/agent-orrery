@@ -135,8 +135,8 @@
         .map((galaxy) => galaxy.key));
       let finiteGalaxyProjections = 0;
       for (const galaxy of galaxies.values()) {
-        galaxy.outline.computeWorldMatrix(true);
-        const worldCenter = galaxy.outline.getBoundingInfo().boundingSphere.centerWorld;
+        galaxy.pivot.computeWorldMatrix(true);
+        const worldCenter = galaxy.pivot.getAbsolutePosition();
         const projected = BABYLON.Vector3.Project(
           worldCenter, BABYLON.Matrix.IdentityReadOnly,
           scene.getTransformMatrix(), viewport);

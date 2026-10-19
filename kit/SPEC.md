@@ -56,17 +56,17 @@ loaders), then:
 
 | Layer | Files |
 |---|---|
-| Shared libraries | `util.js` (creates `window.AUR`; `fnv1a`/`mulberry32` copied from `src/main/shared/hash.js` so seeds agree), `util-scene.js` (Babylon helpers), `procedural-worlds.js`, `ship-assets.js` + `ship-assets-hulls.js` + `ship-assets-api.js` (`AUR.ships`), `polish-math.js` and `galaxy-layout.js` (pure UMD), `search-core.js`, `components/project-vcs-status.js` |
-| Views | `scene-common.js` (`AUR.sceneParts`), then each view's parts before the view: `scene-universe-{galaxies,glyphs,labels,ships,stats}.js` → `scene-universe.js`, `scene-system-{belt,focus,ships}.js` → `scene-system.js`, then `scene-planet.js` |
+| Shared libraries | `util.js` (creates `window.AUR`; `fnv1a`/`mulberry32` copied from `src/main/shared/hash.js` so seeds agree), `util-scene.js` (Babylon helpers), `procedural-worlds.js`, `ship-assets.js` + `ship-assets-hulls.js` + `ship-assets-api.js` (`AUR.ships`), `polish-math.js`, `galaxy-layout.js` and `galaxy-field.js` (pure UMD; the field is a galaxy's emission/dust atlas and the stars drawn from it), `search-core.js`, `components/project-vcs-status.js` |
+| Views | `scene-common.js` (`AUR.sceneParts`), then each view's parts before the view: `scene-universe-{galaxies,glyphs,labels,ships,stars,stats}.js` → `scene-universe.js`, `scene-system-{belt,focus,ships}.js` → `scene-system.js`, then `scene-planet.js` |
 | App state | `app-state.js` — the only file that assigns `AUR.app` (`state`, `const`) |
-| App modules | `app-agent-focus.js`, `app-chrome.js`, `app-chrome-hud.js`, `app-chrome-queue.js`, `app-history-metrics.js`, `app-ideas.js`, `app-ideas-list.js`, `app-modules.js`, `app-playback.js`, `app-project-control.js`, `app-project-directory.js`, `app-project-search.js`, `app-project-settings.js`, `app-project-tasks.js`, `app-replay.js`, `app-store.js` |
+| App modules | `app-agent-focus.js`, `app-chrome.js`, `app-chrome-hud.js`, `app-chrome-queue.js`, `app-history-metrics.js`, `app-ideas.js`, `app-ideas-list.js`, `app-modules.js`, `app-playback.js`, `app-project-control.js`, `app-project-directory.js`, `app-project-search.js`, `app-project-settings.js`, `app-project-tasks.js`, `app-render-quality.js`, `app-replay.js`, `app-store.js` |
 | Boot | `app.js` — boot, event routing, view switching, debug hooks |
 
 View contract: each `scene-*.js` registers
 `AUR.views.<name> = (engine, data, ctx) => ({ scene, update(eventBatch), dispose() })`
-where `ctx` provides `openSystem(projectId)`, `openPlanet(projectId, name)` and the
-shared `store`. Views may expose extras the app layer probes for
-(`setSearchMatches`, `focusShip`, `planetData`).
+where `ctx` provides `openSystem(projectId)`, `openPlanet(projectId, name)`, the
+shared `store` and the graphics `quality` tier. Views may expose extras the app layer
+probes for (`setSearchMatches`, `setQuality`, `focusShip`, `planetData`).
 
 ## 3. The `window.AU` bridge (matches `src/preload.js`)
 
@@ -209,7 +209,9 @@ Design tokens (put in `:root`):
   matches appear in a keyboard-accessible dropdown and Enter/click opens the
   existing guarded system route. It is present in every view; a view switch clears the
   query, and the GitHub filter also narrows the PROJECTS directory.
-  A persistent gear opens `SETTINGS · PROJECT PATHS`: missing project folders
+  A persistent gear opens `SETTINGS · GRAPHICS · PROJECT PATHS`. Graphics quality is a
+  stepped slider over `AUR.app.const.RENDER_QUALITIES` (Low · Balanced · High), kept per
+  viewer in localStorage; High is the default and the look every gate grades (§9). Missing project folders
   can be recovered with a bounded scan beneath a user-chosen parent or a
   native `Locate…` picker. Scan matches require explicit confirmation, remaps
   keep the original project ID/history, and path changes are LIVE-only.
@@ -270,10 +272,13 @@ Design tokens (put in `:root`):
 - Backdrop: `assets/skyboxes/skybox-001.png` (2048×1024 equirectangular) via
   `BABYLON.PhotoDome` (size ~1200), universe-only texture level `0.04`, plus a
   ~2500-point starfield (PointsCloudSystem or small billboards). Keep it dark —
-  the mockup is near-black.
+  the mockup is near-black. The galaxy gate measures it over the clear centre of
+  the frame: median luma ≤ 24 and p90 ≤ 48 (of 255).
 - Each project = a **mini solar-system glyph**:
   - Emissive sun sphere; diameter ~ `1.2 + log10(totalBytes+1) * 0.35`.
     Sun color from seed: pick from `#ffb454, #ff7a59, #dfe6ff, #ffd27d, #9db8ff`.
+  - Soft corona behind the sun in its colour: a billboard on the shared soft disc,
+    excluded from the glow layer.
   - 2–3 thin elliptical orbit rings (LinesMesh circles, alpha ~0.25, tilted
     slightly toward camera like the mockup).
   - 3–5 tiny planet dots on the rings (deterministic from seed).
@@ -286,13 +291,40 @@ Design tokens (put in `:root`):
   the camera zooms in, and reruns only when camera/viewport, hover, project,
   galaxy, or ship state becomes dirty.
 - **Deterministic galaxy layout** (persistent universe — same every launch):
-  group projects by their additive `galaxy.key`, place members on a
-  hash-rotated spiral inside a galaxy disc, and collision-pack the discs with
-  a positive gap. Render a very faint non-pickable hashed-color region,
-  outline, and `GALAXY: <LABEL> · N SYSTEMS` label for each group; Graveyard is
-  muted and peripheral. Galaxy and project labels share the 6px screen-space
-  declutter pass. Camera framing uses all region extents. ArcRotateCamera keeps
-  wheel zoom + drag rotation and a dynamically sufficient radius clamp.
+  group projects by their additive `galaxy.key`. A galaxy is a spiral: two to four
+  arms (by member count) twisting out from a core, and its systems sit on those arms
+  by recency, the most recently active nearest the core, each on the next arm outward,
+  with a per-project nudge off the arm and a lift that follows the disc's thickness
+  (a bulge at the core, thin at the rim). The same layout for the same activity
+  history; a project moves inward when it is worked on. The largest galaxy anchors the
+  cluster and each other one touches a placed galaxy at the free slot nearest the
+  cluster's centre, with a positive gap; every galaxy is lifted and tilted on its own
+  pivot, which everything of its rides: the glyphs (and so their ships, pulses and
+  labels) and the body.
+- **Galaxy body**: a spiral galaxy, after the Sidereal observatory. `galaxy-field.js`
+  computes an emission/dust atlas over the disc (cloudy logarithmic arms from the
+  galaxy's spiral phase, a warm core, star-forming knots, dust lanes inside the arms,
+  the arms leaning toward the galaxy's colour) and draws the resolved stars from it; the
+  systems sit on their own, looser placement spiral, so the light winds as a galaxy's
+  does while neighbouring systems stay a step apart. The renderer gives each galaxy a
+  non-pickable volume box (the region mesh) that raymarches the atlas with a luminous
+  bulge and dust extinction, and one point cloud of stars dimmed by the dust column in
+  front of them; both are children of the pivot in the field's local frame scaled to the
+  radius, rebuilt only when the radius or the graphics quality changes (the atlas pixels persist across view
+  switches in `AUR.app.state.galaxyFields`), added to the scene (so glyphs inside stay
+  legible) and outside the glow layer. No star is larger than the smallest sun
+  (`AUR.SUN_DIAMETER_MIN`) or 12px. The pivot carries the label anchor, the camera
+  bounds and the colour proof; a faint outline and a `GALAXY: <LABEL> · N SYSTEMS`
+  label sit on it. Exposure is a design value; the backdrop luma budget above is a
+  ceiling it clears. Graveyard is muted and peripheral.
+  Galaxy and project labels share the 6px screen-space
+  declutter pass. Camera framing uses the world-space bounds of every outline, lift
+  and tilt included. ArcRotateCamera keeps
+  wheel zoom + drag rotation and a dynamically sufficient radius clamp. Right-drag pans
+  along the ground (`mapPanning`), the ground following the pointer at any zoom, and the
+  target stays within the galaxies' footprint; only a left-click opens a system, and a
+  double-click on open space re-fits every galaxy. A layout change re-fits only while
+  the viewer has not moved the camera.
 - States: system with ≥1 ship = "online" (brighter, sun pulse, label full
   opacity). Idle = normal dim. `exists: false` = derelict (very dim, ~40%
   opacity, no pulse).
@@ -431,6 +463,13 @@ fixed Windows Terminal arguments, and writes two screenshots plus a bounded
   thin instances only, one GlowLayer per scene max, no per-frame allocations in
   observables (reuse Vector3s), dispose scenes fully on view switch
   (`scene.dispose()` and drop references).
+- Graphics tiers trade frame rate for detail: each sets the share of the display's
+  pixels the engine renders (`setHardwareScalingLevel`), the galaxy volume's raymarch
+  steps (a `STEPS` define) and the share of resolved stars. GUI labels keep their size and
+  layout at every tier (`AUR.guiLayer` sets `renderScale`) and soften with the scene below
+  High; star points stay capped at 12 display pixels. Test-mode runs keep their
+  storage in an in-memory partition, so they render the default tier and default panels
+  whatever the viewer saved.
 - Textures are 1–5MB PNGs; load per scene, never re-fetch in a loop.
 - The event stream can burst (a batch per second per active session). `update()`
   must be O(batch) for ordinary ship/activity events and never rebuild the

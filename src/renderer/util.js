@@ -63,6 +63,8 @@
     attention: '#ff5d5d', done: '#34d399',
   };
   AUR.SUN_COLORS = ['#ffb454', '#ff7a59', '#dfe6ff', '#ffd27d', '#9db8ff'];
+  // The smallest sun on the universe map; galaxy stars never exceed it.
+  AUR.SUN_DIAMETER_MIN = 1.2;
 
   AUR.statusColor = (status) => AUR.STATUS_DOT[status] || AUR.STATUS_DOT.Working;
   AUR.attentionMeta = (state) => AUR.ATTENTION[state] || null;

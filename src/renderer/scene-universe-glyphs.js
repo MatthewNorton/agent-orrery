@@ -66,6 +66,7 @@
       g.searchLabelFactor = active ? (matched ? 1 : 0.2) : 1;
       const ringAlpha = g.derelict ? 0.1 : 0.22;
       for (const ring of g.rings) ring.alpha = ringAlpha * g.searchFactor;
+      g.corona.visibility = 0.5 * g.mul * Math.min(1, g.searchFactor);
       for (const dot of g.dots) {
         if (dot.mesh && dot.mesh.material) dot.mesh.material.alpha = active && !matched ? 0.18 : 1;
       }

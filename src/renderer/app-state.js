@@ -18,6 +18,13 @@
     MODULES_STORAGE_KEY: 'agent-universe.modules.v1',
     AGENT_FOCUS_ENVIRONMENT_STORAGE_KEY: 'agent-universe.focus-environment.v1',
     AGENT_FOCUS_VANTAGE_STORAGE_KEY: 'agent-universe.focus-vantage.v1',
+    RENDER_QUALITY_STORAGE_KEY: 'agent-universe.render-quality.v1',
+    // Graphics tiers, cheapest first; the last is the default (app-render-quality.js).
+    RENDER_QUALITIES: Object.freeze([
+      Object.freeze({ key: 'low', label: 'Low', resolution: 0.6, steps: 20, stars: 0.4 }),
+      Object.freeze({ key: 'balanced', label: 'Balanced', resolution: 0.8, steps: 32, stars: 0.7 }),
+      Object.freeze({ key: 'high', label: 'High', resolution: 1, steps: 48, stars: 1 }),
+    ]),
     AGENT_FOCUS_ENVIRONMENTS: Object.freeze({
       cockpit: { label: 'COCKPIT LINK', asset: 'assets/cockpit-frame.png' },
       quarters: { label: 'LIVING QUARTERS', asset: 'assets/environment-quarters.png' },
@@ -57,6 +64,8 @@
 
     notificationByShip: new Map(),
     liveProjectEvents: new Map(),
+    galaxyFields: new Map(), // galaxy key + spiral shape -> emission atlas pixels (galaxy-field.js)
+    renderQuality: C.RENDER_QUALITIES[C.RENDER_QUALITIES.length - 1], // the viewer's graphics tier
     lastNotificationAt: -Infinity,
 
     // ---------- runtime ----------

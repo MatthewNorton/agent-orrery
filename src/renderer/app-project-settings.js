@@ -261,8 +261,8 @@
     els.count.textContent = missingCount > 99 ? '99+' : String(missingCount);
     els.count.classList.toggle('hidden', missingCount === 0);
     els.button.setAttribute('aria-label', missingCount === 0
-      ? 'Project path settings'
-      : `Project path settings, ${missingCount} missing`);
+      ? 'Settings'
+      : `Settings, ${missingCount} projects missing`);
     if (!S.projectSettings.open || !els.dialog || !els.dialog.open) return;
 
     const live = S.playback.mode === 'live' && !S.replayTransitionPending;
