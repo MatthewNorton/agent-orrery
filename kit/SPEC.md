@@ -274,7 +274,7 @@ Design tokens (put in `:root`):
 ## 5. Universe view (`3.universe-map-view.png`)
 
 - Backdrop: `assets/skyboxes/skybox-001.png` (2048×1024 equirectangular) via
-  `BABYLON.PhotoDome` (size ~1200), universe-only texture level `0.028`, plus a
+  `BABYLON.PhotoDome` (size 1600), universe-only texture level `0.028`, plus a
   ~2500-point starfield (PointsCloudSystem or small billboards). Keep it dark —
   the mockup is near-black. The galaxy gate measures it over the clear centre of
   the frame: median luma ≤ 24 and p90 ≤ 48 (of 255).

@@ -8,7 +8,7 @@
   const POLISH = window.AUR_POLISH;
 
   AUR.sceneParts.universe.labels = function (view) {
-    const { scene, canvas, camera, glyphs, galaxies, skyLevel } = view;
+    const { scene, canvas, camera, glyphs, galaxies } = view;
     let labelLayoutDirty = true;
     let labelLayoutTimer = null;
     let lastLabelMetrics = null;
@@ -198,7 +198,6 @@
         overlaps: POLISH.countOverlaps(selected, 6),
         hoveredProjectId,
         cameraRadius: camera.radius,
-        skyLevel,
         finiteProjections,
         labels: [...glyphs.values()].map((g) => g.labelScreen),
         visibleGalaxyLabels: selectedGalaxies.length,
