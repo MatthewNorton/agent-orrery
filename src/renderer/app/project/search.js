@@ -9,6 +9,88 @@
   if (!A) throw new Error('app/state.js must load before app/project/search.js');
   const S = A.state, C = A.const;
 
+  // ---------- listbox: the search results and the ALL PROJECTS directory ----------
+  // `state` is S.projectSearch or S.projectDirectory: { timer, results, selected }.
+  A.cancelListboxTimer = function cancelListboxTimer(state) {
+    if (state.timer != null) clearTimeout(state.timer);
+    state.timer = null;
+  };
+
+  A.debounceListbox = function debounceListbox(state, update) {
+    A.cancelListboxTimer(state);
+    state.timer = setTimeout(() => {
+      state.timer = null;
+      update();
+    }, C.SEARCH_DEBOUNCE_MS);
+  };
+
+  /** Escape runs `escape`; arrows move the selection and Enter activates it, once a pending query has run. */
+  A.wireListboxKeys = function wireListboxKeys(input, state, { escape, update, activate, render }) {
+    input.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        escape();
+        return;
+      }
+      if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp' && event.key !== 'Enter') return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (state.timer != null) {
+        A.cancelListboxTimer(state);
+        update();
+      }
+      if (event.key === 'Enter') {
+        activate(state.selected);
+        return;
+      }
+      if (state.results.length === 0) return;
+      const delta = event.key === 'ArrowDown' ? 1 : -1;
+      state.selected = (state.selected + delta + state.results.length) % state.results.length;
+      render();
+    });
+  };
+
+  /** After a re-query: the first row for a new query, else the same entry, else the nearest row. */
+  A.keepSelection = function keepSelection(state, previous, queryChanged, keyOf) {
+    const previousIndex = previous
+      ? state.results.findIndex((entry) => keyOf(entry) === keyOf(previous))
+      : -1;
+    state.selected = queryChanged ? 0 : previousIndex >= 0
+      ? previousIndex : Math.min(state.selected, Math.max(0, state.results.length - 1));
+  };
+
+  /** `ranked` first, then the rest of `matches`, sorted by `compareRest` when given. */
+  A.rankedFirst = function rankedFirst(matches, ranked, compareRest) {
+    const rankedIds = new Set(ranked.map((project) => project.id));
+    const rest = matches.filter((project) => !rankedIds.has(project.id));
+    return [...ranked, ...(compareRest ? rest.sort(compareRest) : rest)];
+  };
+
+  /** One option button per result, completed by `fill`; the selected one is the active descendant. */
+  A.renderListbox = function renderListbox(list, input, state, opts) {
+    AUR.clear(list);
+    if (state.results.length === 0) {
+      list.appendChild(AUR.el('div', opts.emptyClass, opts.emptyText));
+      input.removeAttribute('aria-activedescendant');
+      return;
+    }
+    let selectedRow = null;
+    state.results.forEach((entry, index) => {
+      const selected = index === state.selected;
+      const row = AUR.button(opts.rowClass(entry) + (selected ? ' selected' : ''));
+      row.id = opts.idPrefix + index;
+      row.setAttribute('role', 'option');
+      row.setAttribute('aria-selected', String(selected));
+      opts.fill(row, entry);
+      row.addEventListener('click', () => opts.activate(index));
+      list.appendChild(row);
+      if (selected) selectedRow = row;
+    });
+    input.setAttribute('aria-activedescendant', opts.idPrefix + state.selected);
+    if (selectedRow) selectedRow.scrollIntoView({ block: 'nearest' });
+  };
+
   // ---------- project search ----------
   A.wireProjectSearch = function wireProjectSearch() {
     S.projectSearch.els = {
@@ -21,15 +103,12 @@
     if (!els.input || !els.results) return;
 
     els.input.addEventListener('input', () => {
-      cancelProjectSearchTimer();
-      if (!els.input.value.trim()) {
-        updateProjectSearch();
+      if (els.input.value.trim()) {
+        A.debounceListbox(S.projectSearch, updateProjectSearch);
         return;
       }
-      S.projectSearch.timer = setTimeout(() => {
-        S.projectSearch.timer = null;
-        updateProjectSearch();
-      }, C.SEARCH_DEBOUNCE_MS);
+      A.cancelListboxTimer(S.projectSearch);
+      updateProjectSearch();
     });
 
     els.input.addEventListener('focus', () => A.closeProjectDirectory(false));
@@ -43,42 +122,16 @@
       });
     }
 
-    els.input.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        event.stopPropagation();
-        A.clearProjectSearch();
-        return;
-      }
-      if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp' && event.key !== 'Enter') return;
-      event.preventDefault();
-      event.stopPropagation();
-      flushProjectSearch();
-      if (event.key === 'Enter') {
-        activateProjectSearchResult(S.projectSearch.selected);
-        return;
-      }
-      if (S.projectSearch.results.length === 0) return;
-      const delta = event.key === 'ArrowDown' ? 1 : -1;
-      S.projectSearch.selected = (S.projectSearch.selected + delta + S.projectSearch.results.length) %
-        S.projectSearch.results.length;
-      renderProjectSearchResults();
+    A.wireListboxKeys(els.input, S.projectSearch, {
+      escape: A.clearProjectSearch,
+      update: updateProjectSearch,
+      activate: activateProjectSearchResult,
+      render: renderProjectSearchResults,
     });
   };
 
-  function cancelProjectSearchTimer() {
-    if (S.projectSearch.timer != null) clearTimeout(S.projectSearch.timer);
-    S.projectSearch.timer = null;
-  }
-
-  function flushProjectSearch() {
-    if (S.projectSearch.timer == null) return;
-    cancelProjectSearchTimer();
-    updateProjectSearch();
-  }
-
   A.clearProjectSearch = function clearProjectSearch() {
-    cancelProjectSearchTimer();
+    A.cancelListboxTimer(S.projectSearch);
     S.projectSearch.query = '';
     S.projectSearch.results = [];
     S.projectSearch.selected = 0;
@@ -120,7 +173,7 @@
   }
 
   A.syncProjectMatches = function syncProjectMatches(projects, query) {
-    if (!S.activeView || typeof S.activeView.setSearchMatches !== 'function') return;
+    if (!S.activeView) return;
     const source = projects || [...S.store.projects.values()];
     const needle = query == null && S.projectSearch.els
       ? S.projectSearch.els.input.value.trim() : String(query || '').trim();
@@ -148,32 +201,22 @@
 
     const projects = [...S.store.projects.values()];
     const matches = matchingProjects(projects, query);
-    const ranked = AUR.searchProjects(matches, query);
-    const rankedIds = new Set(ranked.map((project) => project.id));
-    const extras = matches.filter((project) => !rankedIds.has(project.id)).sort((a, b) =>
-      String(a.name || a.id).localeCompare(String(b.name || b.id))
-    );
-    const projectEntries = [...ranked, ...extras].slice(0, 6)
+    const projectEntries = A.rankedFirst(matches, AUR.searchProjects(matches, query), A.byProjectName)
+      .slice(0, 6)
       .map((project) => ({ kind: 'project', key: 'p:' + project.id, project }));
     const agentEntries = AUR.searchAgents([...S.store.ships.values()], query, 4)
       .map((ship) => ({ kind: 'agent', key: 'a:' + ship.id, ship }));
     const planetEntries = AUR.searchPlanets(projects, query, 4)
       .map((hit) => ({ kind: 'planet', key: 'f:' + hit.project.id + '/' + hit.planet, project: hit.project, planet: hit.planet }));
     S.projectSearch.results = [...projectEntries, ...agentEntries, ...planetEntries].slice(0, 10);
-    const previousIndex = previous
-      ? S.projectSearch.results.findIndex((entry) => entry.key === previous.key)
-      : -1;
-    S.projectSearch.selected = queryChanged ? 0 : previousIndex >= 0
-      ? previousIndex : Math.min(S.projectSearch.selected, Math.max(0, S.projectSearch.results.length - 1));
+    A.keepSelection(S.projectSearch, previous, queryChanged, (entry) => entry.key);
     renderProjectSearchResults();
     A.syncProjectMatches(projects, query);
     renderProjectVcsFilter();
   }
 
   A.projectSearchSubtitle = function projectSearchSubtitle(project) {
-    const galaxy = typeof project.galaxy === 'string'
-      ? project.galaxy
-      : project.galaxy && (project.galaxy.label || project.galaxy.key);
+    const galaxy = A.projectGalaxyLabel(project);
     const detail = [];
     if (galaxy) detail.push(String(galaxy));
     const vcs = VCS.normalize(project);
@@ -189,47 +232,36 @@
     const open = Boolean(els.input.value.trim());
     els.results.classList.toggle('hidden', !open);
     els.input.setAttribute('aria-expanded', String(open));
-    AUR.clear(els.results);
     if (!open) {
+      AUR.clear(els.results);
       els.input.removeAttribute('aria-activedescendant');
       return;
     }
-    if (S.projectSearch.results.length === 0) {
-      els.results.appendChild(AUR.el('div', 'search-empty', 'Nothing found'));
-      els.input.removeAttribute('aria-activedescendant');
-      return;
-    }
-
-    S.projectSearch.results.forEach((entry, index) => {
-      const selected = index === S.projectSearch.selected;
-      const row = AUR.el('button', 'search-result' + (selected ? ' selected' : ''));
-      row.type = 'button';
-      row.id = 'search-result-' + index;
-      row.setAttribute('role', 'option');
-      row.setAttribute('aria-selected', String(selected));
-      const live = entry.kind === 'project' && A.shipsInProject(entry.project.id).length > 0;
-      const dot = AUR.el('span', 'search-result-dot' + (live ? ' live' : ''));
-      if (entry.kind === 'agent') dot.style.background = AUR.providerMeta(entry.ship.provider).color;
-      const copy = AUR.el('span', 'search-result-copy');
-      let name, meta, kind;
-      if (entry.kind === 'agent') {
-        name = entry.ship.name; meta = entry.ship.status + ' · ' + A.projectName(entry.ship.project); kind = 'Agent';
-      } else if (entry.kind === 'planet') {
-        name = entry.planet; meta = entry.project.name || entry.project.id; kind = 'Folder';
-      } else {
-        name = entry.project.name || entry.project.id; meta = A.projectSearchSubtitle(entry.project); kind = 'Project';
-      }
-      copy.appendChild(AUR.el('span', 'search-result-name', name));
-      copy.appendChild(AUR.el('span', 'search-result-meta', meta));
-      row.appendChild(dot);
-      row.appendChild(copy);
-      row.appendChild(AUR.el('span', 'search-result-kind', kind));
-      row.addEventListener('click', () => activateProjectSearchResult(index));
-      els.results.appendChild(row);
+    A.renderListbox(els.results, els.input, S.projectSearch, {
+      idPrefix: 'search-result-',
+      rowClass: () => 'search-result',
+      emptyClass: 'search-empty',
+      emptyText: 'Nothing found',
+      fill: fillSearchRow,
+      activate: activateProjectSearchResult,
     });
-    els.input.setAttribute('aria-activedescendant', 'search-result-' + S.projectSearch.selected);
-    const selectedRow = els.results.querySelector('.search-result.selected');
-    if (selectedRow) selectedRow.scrollIntoView({ block: 'nearest' });
+  }
+
+  function fillSearchRow(row, entry) {
+    const live = entry.kind === 'project' && A.shipsInProject(entry.project.id).length > 0;
+    const dot = AUR.el('span', 'search-result-dot' + (live ? ' live' : ''));
+    if (entry.kind === 'agent') dot.style.background = AUR.providerMeta(entry.ship.provider).color;
+    const copy = AUR.el('span', 'search-result-copy');
+    let name, meta, kind;
+    if (entry.kind === 'agent') {
+      name = entry.ship.name; meta = entry.ship.status + ' · ' + A.projectName(entry.ship.project); kind = 'Agent';
+    } else if (entry.kind === 'planet') {
+      name = entry.planet; meta = A.projectLabel(entry.project); kind = 'Folder';
+    } else {
+      name = A.projectLabel(entry.project); meta = A.projectSearchSubtitle(entry.project); kind = 'Project';
+    }
+    copy.append(AUR.el('span', 'search-result-name', name), AUR.el('span', 'search-result-meta', meta));
+    row.append(dot, copy, AUR.el('span', 'search-result-kind', kind));
   }
 
   function activateProjectSearchResult(index) {

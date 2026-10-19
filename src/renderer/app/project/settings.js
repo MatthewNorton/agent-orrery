@@ -3,7 +3,7 @@
 'use strict';
 
 /**
- * @import { ProjectPathRecoveryResult, ProjectPathsScanResult } from '../../../types/contract'
+ * @import { Failure, ProjectPathFailureCode } from '../../../types/contract'
  */
 
 (function () {
@@ -11,7 +11,7 @@
   const AU = window.AU;
   const A = AUR.app;
   if (!A) throw new Error('app/state.js must load before app/project/settings.js');
-  const S = A.state, C = A.const;
+  const S = A.state;
 
   // ---------- project path settings ----------
   A.wireProjectSettings = function wireProjectSettings() {
@@ -46,7 +46,7 @@
   function missingPathProjects() {
     return [...S.store.projects.values()]
       .filter((project) => project && project.exists === false)
-      .sort((a, b) => String(a.name || a.id).localeCompare(String(b.name || b.id)));
+      .sort(A.byProjectName);
   }
 
   A.openProjectSettings = function openProjectSettings() {
@@ -54,15 +54,7 @@
     if (!els || !els.dialog || S.projectSettings.open) return;
     A.clearProjectSearch();
     A.closeProjectDirectory(false);
-    S.projectSettings.owner++;
-    S.projectSettings.request++;
-    S.projectSettings.open = true;
-    S.projectSettings.busy = false;
-    S.projectSettings.scanPerformed = false;
-    S.projectSettings.scanRoot = '';
-    S.projectSettings.matches.clear();
-    S.projectSettings.status = '';
-    S.projectSettings.error = false;
+    resetSettingsSession(true);
     els.button.setAttribute('aria-expanded', 'true');
     els.dialog.showModal();
     A.renderProjectSettings();
@@ -78,17 +70,21 @@
     els.dialog.close();
   }
 
-  function finishProjectSettingsClose() {
-    const els = S.projectSettings.els;
+  // Opening or closing ends any request in flight and forgets the last scan.
+  function resetSettingsSession(open) {
     S.projectSettings.owner++;
     S.projectSettings.request++;
-    S.projectSettings.open = false;
+    S.projectSettings.open = open;
     S.projectSettings.busy = false;
     S.projectSettings.scanPerformed = false;
     S.projectSettings.scanRoot = '';
     S.projectSettings.matches.clear();
-    S.projectSettings.status = '';
-    S.projectSettings.error = false;
+    setProjectSettingsStatus('');
+  }
+
+  function finishProjectSettingsClose() {
+    const els = S.projectSettings.els;
+    resetSettingsSession(false);
     if (els && els.button) {
       els.button.setAttribute('aria-expanded', 'false');
       els.button.focus();
@@ -96,15 +92,18 @@
     A.renderProjectSettings();
   }
 
+  const PATH_ERRORS = new Map([
+    ['REPLAY', 'Return to LIVE before changing project paths.'],
+    ['BUSY', 'Another folder picker or scan is already open.'],
+    ['IN_USE', 'That folder is already assigned to another project.'],
+    ['EXPIRED', 'That scan result expired. Scan the folder again.'],
+    ['NOT_FOUND', 'The selected folder is no longer available.'],
+    ['NOT_MISSING', 'This project path has already been recovered.'],
+    ['INVALID', 'That folder cannot be used for this project.'],
+  ]);
+
   function projectPathErrorText(code) {
-    if (code === 'REPLAY') return 'Return to LIVE before changing project paths.';
-    if (code === 'BUSY') return 'Another folder picker or scan is already open.';
-    if (code === 'IN_USE') return 'That folder is already assigned to another project.';
-    if (code === 'EXPIRED') return 'That scan result expired. Scan the folder again.';
-    if (code === 'NOT_FOUND') return 'The selected folder is no longer available.';
-    if (code === 'NOT_MISSING') return 'This project path has already been recovered.';
-    if (code === 'INVALID') return 'That folder cannot be used for this project.';
-    return 'The project path could not be updated.';
+    return PATH_ERRORS.get(code) || 'The project path could not be updated.';
   }
 
   function setProjectSettingsStatus(message, error = false) {
@@ -140,25 +139,39 @@
     });
   }
 
-  async function scanForProjectPaths() {
-    if (S.projectSettings.busy || S.playback.mode !== 'live') return;
+  /**
+   * One folder picker or scan with the dialog busy. Null when refused (busy, not LIVE) or
+   * superseded; a missing or thrown result becomes FAILED.
+   * @template T
+   * @param {string} statusText
+   * @param {() => Promise<T>} call
+   * @returns {Promise<T | Failure<ProjectPathFailureCode> | null>}
+   */
+  async function runSettingsRequest(statusText, call) {
+    if (S.projectSettings.busy || S.playback.mode !== 'live') return null;
     const owner = S.projectSettings.owner;
     const request = ++S.projectSettings.request;
     S.projectSettings.busy = true;
-    setProjectSettingsStatus('Choose a parent folder to scan.');
+    setProjectSettingsStatus(statusText);
     A.renderProjectSettings();
     S.projectSettings.els.close.focus();
-    /** @type {ProjectPathsScanResult} */
-    let result;
+    /** @type {T | null} */
+    let result = null;
     try {
-      result = await AU.projectPathsScan();
+      result = await call();
     } catch {
-      result = { ok: false, code: 'FAILED' };
+      result = null;
     }
-    if (!settingsRequestIsCurrent(owner, request)) return;
+    if (!settingsRequestIsCurrent(owner, request)) return null;
     S.projectSettings.busy = false;
-    if (!result || result.ok !== true) {
-      setProjectSettingsStatus(projectPathErrorText(result && result.code), true);
+    return result || { ok: false, code: 'FAILED' };
+  }
+
+  async function scanForProjectPaths() {
+    const result = await runSettingsRequest('Choose a parent folder to scan.', () => AU.projectPathsScan());
+    if (!result) return;
+    if (result.ok !== true) {
+      setProjectSettingsStatus(projectPathErrorText(result.code), true);
       A.renderProjectSettings();
       focusProjectSettingsControl('scan');
       return;
@@ -193,24 +206,10 @@
   }
 
   async function locateProjectPath(projectId) {
-    if (S.projectSettings.busy || S.playback.mode !== 'live') return;
-    const owner = S.projectSettings.owner;
-    const request = ++S.projectSettings.request;
-    S.projectSettings.busy = true;
-    setProjectSettingsStatus('Choose the project folder.');
-    A.renderProjectSettings();
-    S.projectSettings.els.close.focus();
-    /** @type {ProjectPathRecoveryResult} */
-    let result;
-    try {
-      result = await AU.projectPathLocate(projectId);
-    } catch {
-      result = { ok: false, code: 'FAILED' };
-    }
-    if (!settingsRequestIsCurrent(owner, request)) return;
-    S.projectSettings.busy = false;
-    if (!result || result.ok !== true) {
-      setProjectSettingsStatus(projectPathErrorText(result && result.code), true);
+    const result = await runSettingsRequest('Choose the project folder.', () => AU.projectPathLocate(projectId));
+    if (!result) return;
+    if (result.ok !== true) {
+      setProjectSettingsStatus(projectPathErrorText(result.code), true);
     } else if (result.canceled) {
       setProjectSettingsStatus('No folder selected. No paths were changed.');
     } else {
@@ -218,39 +217,23 @@
       setProjectSettingsStatus(`Recovered ${result.project && result.project.name || 'project'}.`);
     }
     A.renderProjectSettings();
-    focusProjectSettingsControl(
-      !result || result.ok !== true || result.canceled ? 'locate' : 'scan', projectId
-    );
+    focusProjectSettingsControl(result.ok !== true || result.canceled ? 'locate' : 'scan', projectId);
   }
 
   async function applyProjectPathCandidate(projectId, token) {
-    if (S.projectSettings.busy || S.playback.mode !== 'live') return;
-    const owner = S.projectSettings.owner;
-    const request = ++S.projectSettings.request;
-    S.projectSettings.busy = true;
-    setProjectSettingsStatus('Applying the selected project folder…');
-    A.renderProjectSettings();
-    S.projectSettings.els.close.focus();
-    /** @type {ProjectPathRecoveryResult} */
-    let result;
-    try {
-      result = await AU.projectPathApply(projectId, token);
-    } catch {
-      result = { ok: false, code: 'FAILED' };
-    }
-    if (!settingsRequestIsCurrent(owner, request)) return;
-    S.projectSettings.busy = false;
-    if (!result || result.ok !== true) {
-      setProjectSettingsStatus(projectPathErrorText(result && result.code), true);
-      if (result && result.code === 'EXPIRED') S.projectSettings.matches.delete(projectId);
+    const result = await runSettingsRequest(
+      'Applying the selected project folder…', () => AU.projectPathApply(projectId, token)
+    );
+    if (!result) return;
+    if (result.ok !== true) {
+      setProjectSettingsStatus(projectPathErrorText(result.code), true);
+      if (result.code === 'EXPIRED') S.projectSettings.matches.delete(projectId);
     } else {
       S.projectSettings.matches.delete(projectId);
       setProjectSettingsStatus(`Recovered ${result.project && result.project.name || 'project'}.`);
     }
     A.renderProjectSettings();
-    focusProjectSettingsControl(
-      !result || result.ok !== true ? 'candidate' : 'scan', projectId, token
-    );
+    focusProjectSettingsControl(result.ok !== true ? 'candidate' : 'scan', projectId, token);
   }
 
   A.renderProjectSettings = function renderProjectSettings() {
@@ -286,22 +269,18 @@
       const row = AUR.el('section', 'settings-project-row');
       const head = AUR.el('div', 'settings-project-head');
       const copy = AUR.el('div', 'settings-project-copy');
-      const projectName = project.name || project.id;
+      const projectName = A.projectLabel(project);
       const name = AUR.el('div', 'settings-project-name', projectName);
       name.id = `settings-project-name-${projectIndex}`;
       row.setAttribute('aria-labelledby', name.id);
-      copy.appendChild(name);
-      copy.appendChild(AUR.el(
+      copy.append(name, AUR.el(
         'div', 'settings-project-path', project.path || 'No recorded folder path'
       ));
-      const locate = AUR.el('button', 'settings-locate', 'Locate…');
-      locate.type = 'button';
+      const locate = AUR.button('settings-locate', 'Locate…', () => locateProjectPath(project.id));
       locate.disabled = S.projectSettings.busy || !live;
       locate.dataset.projectId = project.id;
       locate.setAttribute('aria-label', `Locate folder for ${projectName}`);
-      locate.addEventListener('click', () => locateProjectPath(project.id));
-      head.appendChild(copy);
-      head.appendChild(locate);
+      head.append(copy, locate);
       row.appendChild(head);
 
       const candidates = S.projectSettings.matches.get(project.id) || [];
@@ -318,13 +297,14 @@
         for (const candidate of candidates) {
           const candidateRow = AUR.el('div', 'settings-candidate');
           candidateRow.appendChild(AUR.el('div', 'settings-candidate-path', candidate.path));
-          const use = AUR.el('button', 'settings-candidate-use', 'Use this folder');
-          use.type = 'button';
+          const use = AUR.button(
+            'settings-candidate-use', 'Use this folder',
+            () => applyProjectPathCandidate(project.id, candidate.token)
+          );
           use.disabled = S.projectSettings.busy || !live;
           use.dataset.projectId = project.id;
           use.dataset.token = candidate.token;
           use.setAttribute('aria-label', `Use ${candidate.path} for ${projectName}`);
-          use.addEventListener('click', () => applyProjectPathCandidate(project.id, candidate.token));
           candidateRow.appendChild(use);
           list.appendChild(candidateRow);
         }

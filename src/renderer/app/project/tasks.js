@@ -9,7 +9,7 @@
   const AU = window.AU;
   const A = AUR.app;
   if (!A) throw new Error('app/state.js must load before app/project/tasks.js');
-  const S = A.state, C = A.const;
+  const S = A.state;
 
   // ---------- project tasks ----------
   /** @param {TasksChangedPush} update */
@@ -211,8 +211,9 @@
       S.taskPanel.items.forEach((item, index) => {
         const row = AUR.el('div', 'task-row' + (item.done ? ' done' : ''));
         row.dataset.taskIndex = String(index);
-        const toggle = AUR.el('button', 'task-toggle');
-        toggle.type = 'button';
+        const toggle = AUR.button('task-toggle', null, () => {
+          setTaskDone(item, !item.done);
+        });
         toggle.disabled = S.taskPanel.saving;
         toggle.setAttribute('role', 'checkbox');
         toggle.setAttribute('aria-checked', String(item.done));
@@ -227,18 +228,13 @@
           body.appendChild(AUR.el('span', `task-status ${item.agentStatus}`, label));
         }
         toggle.appendChild(body);
-        toggle.addEventListener('click', () => {
-          setTaskDone(item, !item.done);
-        });
         row.appendChild(toggle);
         if (!item.id) {
-          const remove = AUR.el('button', 'task-remove', '×');
-          remove.type = 'button';
+          const remove = AUR.button('task-remove', '×', () => removeTask(item, index));
           remove.disabled = S.taskPanel.saving;
           remove.setAttribute('aria-label', 'Remove task');
           remove.setAttribute('aria-describedby', taskText.id);
           remove.title = 'Remove task';
-          remove.addEventListener('click', () => removeTask(item, index));
           row.appendChild(remove);
         }
         els.list.appendChild(row);
