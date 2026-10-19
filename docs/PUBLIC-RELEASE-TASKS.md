@@ -173,6 +173,72 @@ None of these block release. Each is a kit-sized job.
       (found 2026-09-27 while landing PR #32). Fix: hash with line endings
       normalized to LF inside the gate scripts, then re-pin once. ~30 min.
 
+## Phase 6 — Visual quality before public · ~6–8 h · three PRs
+
+Added 2026-10-18 and rescoped the same day. Two investigations that day
+(measurements, the planet design and the parked items are in
+`kit/todo/15-visual-quality.md`) found that every view holds a vsync-locked
+60 fps at every quality tier on the owner's machine, even at 40 projects and
+an emulated 4K viewport, so what precedes the flip is narrow: repair the
+gates, remove dead per-frame cost, and let viewers set quality. The
+procedural-planet pipeline, the sun, the idle frame cap, glyph consolidation
+and the Ultra tier are parked on the todo list; the owner decides whether any
+of them precede the flip.
+
+Effort is session time as defined above. Every item: one PR, a `/simplify`
+pass before it is reported ready, `node kit/grade.mjs` and every done-kit gate
+green on a committed tree, `npm test` and `npm run typecheck` green.
+
+- [x] **6.0 Gate repair, gate runner, CI.** Done 2026-10-18, PR #54. Four of
+      the thirteen gates were red on `main` and nobody had noticed, because CI
+      ran only typecheck and unit tests. Polish P4 grepped all of `src/main`
+      for `.click()` while the screenshot harness has folded panels that way
+      since 2026-10-14; the check now covers the input harness only, with
+      `harness/modes/shots.js` excluded by name. Agent-control C5: the test
+      window shared the viewer's `localStorage`, so the folded-panel set the
+      screenshot mode persists hid the project card in every later control
+      run (button 0×0, card hidden). The harness now prints those rectangles
+      in its timeout; #50 (carried by #49) already stops the leak with an
+      in-memory partition for test runs, so C5 goes green on `main` when #49
+      merges. The two `--full` gates were red only because they re-run those
+      two. `kit/run-gates.mjs` runs all thirteen gates one line each
+      (`--static` for the Electron-free set, which CI now runs on ubuntu), and
+      `kit/README.md` states the policy: no file-hash pins, ever; frozen means
+      review. The packaging gate fails W0 on any dirty tree by design, so run
+      the sweep after committing.
+- [ ] **6.1 Engine and compositor fixes, no setting.** Drop
+      `preserveDrawingBuffer: true` and `stencil: true` from the engine
+      options in `src/renderer/app.js` (nothing reads the canvas back; shots
+      use `capturePage`). Reuse a scratch vector in the planet view's per-ship
+      `lookAt`. Hide non-top-3 system labels with `isVisible` instead of
+      alpha 0. Cache sampled stars per galaxy next to the cached atlas pixels.
+      ~1 h. Gate: shots unchanged.
+- [ ] **6.2 Quality settings.** The three tiers in `RENDER_QUALITIES` carry
+      glow-layer texture ratio, panel backdrop blur and sphere segments as
+      well as render scale, raymarch steps and star share; glow layers are
+      rebuilt on a tier change with the blur kernel scaled to keep the same
+      screen radius; panel blur is a class on `<body>`; `setQuality` in the
+      system and planet views rebuilds the scene. A "Recommend for this
+      machine" button in Settings reads the renderer string, cores and screen
+      and moves the slider, instead of a silent first-run pick, so test runs
+      stay at High. ~2–3 h. Gate: polish P2 backdrop luma unchanged at High.
+
+| Knob | Low | Balanced | High |
+|---|---|---|---|
+| Render scale | 0.6 | 0.8 | 1.0 |
+| Galaxy raymarch steps | 20 | 32 | 48 |
+| Star share | 0.4 | 0.7 | 1.0 |
+| Glow layer texture ratio | 0.25 | 0.5 | 0.5 |
+| Panel backdrop blur | off | off | on |
+| Sphere segments | 32 | 48 | 64 |
+
+### Release tail
+
+- [ ] **6.3 Merge PR #49** (universe cluster, carries #50) then **PR #51**
+      (README screenshots), on the owner's word.
+- [ ] **4.8** flip public and the four post-flip settings (above).
+- [ ] **5.4** mapped drives stays optional and may follow public.
+
 ## Totals
 
 | Phase | Agent time | Blocks snapshot |
@@ -182,6 +248,11 @@ None of these block release. Each is a kit-sized job.
 | 3 Leak cleanup | 30 min | yes |
 | 4 Fresh repo | ~1 h | is the snapshot |
 | 5 Structural | 8–10 h | no |
+| 6 Visual quality | 6–8 h | three PRs before the flip; the rest is parked (added 2026-10-18) |
 
 Critical path to a public repo: **about 4–5 hours of agent time across three
 PRs and one manual GitHub session.**
+
+2026-10-18: Phase 6 precedes the flip, rescoped to gate repair, engine fixes and quality
+settings (6–8 h, three PRs). The planet pipeline and the other visual work are parked in
+`kit/todo/15-visual-quality.md`.
