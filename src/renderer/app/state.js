@@ -64,14 +64,14 @@
 
     notificationByShip: new Map(),
     liveProjectEvents: new Map(),
-    galaxyFields: new Map(), // galaxy key + spiral shape -> emission atlas pixels and star samples (galaxy-field.js)
+    galaxyFields: new Map(), // per galaxy key: its emission atlas and star samples (scene/universe/stars.js)
     renderQuality: C.RENDER_QUALITIES[C.RENDER_QUALITIES.length - 1], // the viewer's graphics tier
     lastNotificationAt: -Infinity,
 
     // ---------- runtime ----------
     engine: null,
     canvas: null,
-    activeView: null,   // { scene, update, dispose }
+    activeView: null,   // what the view factory returned (kit/SPEC.md view contract)
     activeScene: null,
     current: { view: 'universe', projectId: null, planetName: null },
     routeRequestGeneration: 0,

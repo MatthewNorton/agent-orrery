@@ -85,10 +85,8 @@
       if (!g || !project) return;
       g.sun.metadata.projectExists = project.exists !== false;
       const text = String(project.name);
-      if (g.label.text !== text) {
-        g.label.text = text;
-        g.labelWidth = projectLabelWidth(text);
-      }
+      if (g.label.text !== text) g.label.text = text;
+      g.labelWidth = projectLabelWidth(text);
       if (g.markerHost) {
         g.markersEmpty = VCS.renderMarkers(g.markerHost, project).classList.contains('project-vcs-markers-empty');
       }
@@ -136,8 +134,8 @@
     }
 
     return {
-      projectLabelWidth, applyGlyphState, applyGlyphSearchState, setSearchMatches, refreshProjectLabel,
-      refreshRecencyRanks, animateGlyphs,
+      applyGlyphState, applyGlyphSearchState, setSearchMatches, refreshProjectLabel, refreshRecencyRanks,
+      animateGlyphs,
     };
   };
 })();

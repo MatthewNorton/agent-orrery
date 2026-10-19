@@ -23,11 +23,11 @@
     return { x: left, y: top, width: Math.max(1, right - left), height: Math.max(1, bottom - top) };
   };
 
-  // Every view's orbit camera; limits holds its radius and beta limits plus any other settings.
-  AUR.viewCamera = function (scene, name, beta, radius, limits) {
+  // Every view's orbit camera; settings are properties set on it, such as its radius and beta limits.
+  AUR.viewCamera = function (scene, name, beta, radius, settings) {
     const camera = new BABYLON.ArcRotateCamera(name, -Math.PI / 2, beta, radius, BABYLON.Vector3.Zero(), scene);
     camera.attachControl(scene.getEngine().getRenderingCanvas(), true);
-    Object.assign(camera, { minZ: 0.1, maxZ: 6000, ...limits });
+    Object.assign(camera, { minZ: 0.1, maxZ: 6000, ...settings });
     return AUR.configureComfortCamera(camera);
   };
 

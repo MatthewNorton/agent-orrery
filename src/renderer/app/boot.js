@@ -202,8 +202,8 @@
   // ---------- view switching ----------
   // The extras a view may leave out (kit/SPEC.md view contract), as no-ops.
   const VIEW_DEFAULTS = {
-    resize() {}, setQuality() {}, setSearchMatches() {},
-    setShipFocusVantage: () => false, focusShip: () => false, shipFocusState: () => null,
+    resize() {}, setQuality() {}, setSearchMatches() {}, setShipFocusVantage() {},
+    focusShip: () => false, shipFocusState: () => null,
   };
 
   function makeCtx() {
@@ -239,7 +239,7 @@
     S.current.view = name;
     document.body.dataset.view = name;
     A.stopTasksView();
-    if (old && old.dispose) disposeSettled(old);
+    if (old) disposeSettled(old);
     A.renderChrome();
     if (name === 'system' && S.current.projectId) A.startTasksView(S.current.projectId);
     A.refreshProjectSearchFromStore();

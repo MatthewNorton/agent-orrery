@@ -146,13 +146,12 @@
     const request = ++S.taskPanel.request;
     renderTasksPanel();
     /** @type {TaskMutationResult} */
-    let result = null;
-    try { result = await operation(); } catch (error) { /* refresh below */ }
+    const result = await AUR.settle(operation);
     if (!taskOwnerIsActive(owner, projectId) || request !== S.taskPanel.request) return;
     S.taskPanel.saving = false;
     const refreshAfterSave = S.taskPanel.refreshAfterSave;
     S.taskPanel.refreshAfterSave = false;
-    if (result && result.ok === true && Array.isArray(result.items)) {
+    if (result.ok === true && Array.isArray(result.items)) {
       S.taskPanel.items = taskItemsFrom(result);
       if (clearInput && S.taskPanel.els) S.taskPanel.els.input.value = '';
       S.taskPanel.status = options.successText || '';

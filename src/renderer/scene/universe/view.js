@@ -6,7 +6,6 @@
 (function () {
   const AUR = window.AUR;
   const GALAXY = window.AUR_GALAXY;
-  const VCS = AUR.ProjectVcsStatus;
   const UNIVERSE_SKY_LEVEL = 0.04;
 
   AUR.views.universe = function (engine, data, ctx) {
@@ -71,7 +70,7 @@
       const sunR = dia / 2;
       const sun = BABYLON.MeshBuilder.CreateSphere('sun_' + p.id, { diameter: dia, segments: 16 }, scene);
       sun.parent = root;
-      sun.metadata = { projectId: p.id, isSun: true, projectExists: p.exists !== false };
+      sun.metadata = { projectId: p.id, isSun: true };
       const col = AUR.color3(AUR.sunColor(p.seed));
       // Give the material its OWN emissive Color3. The per-frame pulse does
       // `emissiveColor.copyFrom(baseEmissive).scaleInPlace(k)`; if the material's
@@ -137,7 +136,7 @@
       }
 
       const labelOffsetY = -(24 + sunR * 6);
-      const label = AUR.label(gui, String(p.name), {
+      const label = AUR.label(gui, '', {
         fontSize: 13, weight: '600', mesh: sun, offsetY: labelOffsetY,
       });
       label.name = 'project-label:' + p.id;
@@ -146,20 +145,19 @@
       const markerHost = document.createElement('span');
       markerHost.className = 'universe-project-vcs-marker hidden';
       markerHost.dataset.projectId = p.id;
-      const markers = VCS.renderMarkers(markerHost, p);
       vcsLayer.appendChild(markerHost);
 
       const g = {
-        id: p.id, root, sun, sunMat, corona, baseEmissive: col, rings, dots, label,
-        markerHost, markersEmpty: markers.classList.contains('project-vcs-markers-empty'),
+        id: p.id, root, sun, sunMat, corona, baseEmissive: col, rings, dots, label, markerHost,
         galaxyKey: null,
         halo, haloMat, attention: null,
         lastActivity: p.lastActivity || 0, recencyRank: Number.MAX_SAFE_INTEGER,
-        labelBaseAlpha: 0.85, labelWidth: view.projectLabelWidth(label.text),
-        labelOffsetY, labelScreen: null,
+        labelBaseAlpha: 0.85, labelOffsetY, labelScreen: null,
         sunR, pulseUntil: 0, phase: rand() * Math.PI * 2, appear: 0,
         derelict: false, searchFactor: 1, searchLabelFactor: 1,
       };
+      // The label text and width, the VCS markers and the sun's projectExists flag.
+      view.refreshProjectLabel(g, p);
       view.applyGlyphState(g);
       glyphs.set(p.id, g);
       return g;

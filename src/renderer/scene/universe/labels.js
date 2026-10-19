@@ -16,6 +16,7 @@
       alpha: NaN, beta: NaN, radius: NaN,
       tx: NaN, ty: NaN, tz: NaN, width: 0, height: 0,
     };
+    const projected = new BABYLON.Vector3();
 
     function markLabelLayoutDirty() {
       labelLayoutDirty = true;
@@ -83,9 +84,9 @@
       // Where an item's label anchor lands on screen and the rect its label takes there; null,
       // with the label hidden, when the projection is not finite.
       function screenLabel(item, worldCenter) {
-        const projected = BABYLON.Vector3.Project(
+        BABYLON.Vector3.ProjectToRef(
           worldCenter, BABYLON.Matrix.IdentityReadOnly,
-          scene.getTransformMatrix(), viewport);
+          scene.getTransformMatrix(), viewport, projected);
         const x = projected.x * width / renderWidth;
         const y = projected.y * height / renderHeight;
         if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(projected.z)) {
@@ -117,16 +118,15 @@
           : g.attention ? 1
             : g.online ? 3 : 4;
         const eligible = priority < 4 || g.recencyRank < recentLimit;
-        // Five hit tests each, so only for a label that could be shown.
-        const onScreen = eligible && inDepth && labelPointIsClear(rect);
+        // Five hit tests each, so only for a label the layout could place.
+        const onScreen = eligible && inDepth && POLISH.insideBounds(rect, bounds) &&
+          labelPointIsClear(rect);
         g.labelScreen = {
           id: g.id, x, y,
           rect, eligible, visible: false,
-          markerVisible: inDepth &&
-            x >= bounds.x && x <= bounds.x + bounds.width &&
-            y >= bounds.y && y <= bounds.y + bounds.height,
+          markerVisible: inDepth && POLISH.insideBounds({ x, y, width: 0, height: 0 }, bounds),
         };
-        if (!eligible || !onScreen) continue;
+        if (!onScreen) continue;
         candidates.push({
           id: g.id, kind: 'project', rect, priority,
           lastActivity: g.lastActivity,
@@ -152,12 +152,13 @@
         const { x, y, rect, inDepth } = screen;
         const id = 'galaxy:' + galaxy.key;
         const eligible = galaxyCandidateKeys.has(galaxy.key);
-        const onScreen = eligible && inDepth && labelPointIsClear(rect);
+        const onScreen = eligible && inDepth && POLISH.insideBounds(rect, bounds) &&
+          labelPointIsClear(rect);
         galaxy.labelScreen = {
           id, key: galaxy.key, x, y,
           rect, eligible, visible: false,
         };
-        if (!eligible || !onScreen) continue;
+        if (!onScreen) continue;
         candidates.push({
           id, kind: 'galaxy', rect, priority: 2,
           lastActivity: Number.MAX_SAFE_INTEGER, alpha: 0.96,

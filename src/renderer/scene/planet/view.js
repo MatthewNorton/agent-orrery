@@ -114,7 +114,7 @@
     function removeShip(id) {
       const r = ships.get(id);
       if (!r) return;
-      if (r.label) r.label.dispose();
+      r.label.dispose();
       AUR.disposeMeshAndMaterial(r.mesh);
       ships.delete(id);
     }

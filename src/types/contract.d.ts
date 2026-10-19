@@ -90,6 +90,7 @@ export interface PlanetData {
   procedural?: boolean;
 }
 
+/** Bounded by main (replay-control.js): unknown times are null; in LIVE, playing is false and cursorTs is maxTs once known. */
 export interface PlaybackStatus {
   mode: StreamMode;
   available: boolean;

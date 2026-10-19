@@ -249,7 +249,7 @@
         orbit.style.setProperty('--orbit-width', (22 + extent * 72) + '%');
         orbit.style.setProperty('--orbit-height', (18 + extent * 60) + '%');
         orbit.style.setProperty('--planet-color', colors[seed % colors.length]);
-        const score = Number(planet.files || 0) + Number(planet.builds || 0) * 5;
+        const score = AUR.planetWeight(planet);
         orbit.style.setProperty('--planet-size', AUR.clamp(4 + Math.log10(score + 1), 4, 8) + 'px');
         const body = document.createElement('b');
         const label = document.createElement('span');
@@ -267,8 +267,7 @@
     }
   }
 
-  // `state` is the view's shipFocusState().
-  function renderAgentFocusNavigationMap(state) {
+  function renderAgentFocusNavigationMap(flight) {
     const els = S.agentFocus.els;
     if (!els || !els.hologramSystem) return;
     const time = reducedMotion.matches ? 0 : performance.now() / 1000;
@@ -280,17 +279,17 @@
       body.style.top = (50 + Math.sin(angle) * 50) + '%';
     }
 
-    if (!els.hologramShip || !state || !state.map) {
+    if (!els.hologramShip || !flight || !flight.map) {
       if (els.hologramShip) els.hologramShip.classList.add('hidden');
       return;
     }
     els.hologramShip.classList.remove('hidden');
     els.hologramShip.style.left =
-      (50 + Math.cos(state.map.angle) * state.map.radiusRatio * 47) + '%';
+      (50 + Math.cos(flight.map.angle) * flight.map.radiusRatio * 47) + '%';
     els.hologramShip.style.top =
-      (50 + Math.sin(state.map.angle) * state.map.radiusRatio * 39) + '%';
+      (50 + Math.sin(flight.map.angle) * flight.map.radiusRatio * 39) + '%';
     if (els.hologramShipLabel) {
-      const ship = S.store.ships.get(state.shipId);
+      const ship = S.store.ships.get(flight.shipId);
       els.hologramShipLabel.textContent = String(ship && ship.name || 'SHIP').toUpperCase();
     }
   }

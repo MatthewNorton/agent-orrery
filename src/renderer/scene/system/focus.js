@@ -1,5 +1,5 @@
-// First-person focus support: fades the other ships
-// while one is followed and restores them after.
+// First-person focus support: fades the other ships and hides every ship's
+// labels while one is followed, and restores them after.
 // The focus camera itself lives in scene/system/view.js.
 'use strict';
 
@@ -15,42 +15,37 @@
       return nodes;
     }
 
-    function focusedVisualRecord(rec) {
-      const { shipFocus } = view;
-      let saved = shipFocus && shipFocus.saved.get(rec.id);
-      if (saved) return saved;
-      saved = {
-        nodes: new Map(),
-        labelAlpha: rec.label ? rec.label.alpha : null,
-        suffixAlpha: rec.suffix ? rec.suffix.alpha : null,
-      };
-      if (shipFocus) shipFocus.saved.set(rec.id, saved);
-      return saved;
+    // Each node's visibility before the fade, saved once per ship.
+    function savedVisibilities(rec) {
+      const { saved } = view.shipFocus;
+      if (!saved.has(rec.id)) saved.set(rec.id, new Map());
+      return saved.get(rec.id);
     }
 
     function applyShipFocusVisual(rec, visibility) {
-      const { shipFocus } = view;
-      if (!shipFocus) return;
-      const saved = focusedVisualRecord(rec);
+      if (!view.shipFocus) return;
+      const saved = savedVisibilities(rec);
       for (const node of recordVisualNodes(rec)) {
-        if (!saved.nodes.has(node)) saved.nodes.set(node, node.visibility);
+        if (!saved.has(node)) saved.set(node, node.visibility);
         node.visibility = visibility;
       }
-      if (rec.label) rec.label.alpha = 0;
-      if (rec.suffix) rec.suffix.alpha = 0;
+      // Hidden, not transparent: Babylon GUI still projects and draws a linked label at alpha 0.
+      if (rec.label) rec.label.isVisible = false;
+      if (rec.suffix) rec.suffix.isVisible = false;
     }
 
     function restoreShipFocusVisuals() {
       const { shipFocus } = view;
       if (!shipFocus) return;
       for (const [id, saved] of shipFocus.saved) {
-        for (const [node, visibility] of saved.nodes) {
+        for (const [node, visibility] of saved) {
           if (!AUR.isNodeDisposed(node)) node.visibility = visibility;
         }
         const rec = ships.get(id);
         if (!rec) continue;
-        if (rec.label && saved.labelAlpha != null) rec.label.alpha = saved.labelAlpha;
-        if (rec.suffix && saved.suffixAlpha != null) rec.suffix.alpha = saved.suffixAlpha;
+        if (rec.label) rec.label.isVisible = true;
+        // The attention text can change during focus (scene/system/ships.js).
+        if (rec.suffix) rec.suffix.isVisible = rec.suffix.text !== '';
       }
     }
 

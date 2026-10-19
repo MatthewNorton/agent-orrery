@@ -95,6 +95,7 @@
       for (const [key, record] of galaxies) {
         if (galaxySpecs.has(key)) continue;
         disposeGalaxyVisual(record);
+        view.forgetGalaxyFields(key);
         galaxies.delete(key);
       }
       view.markLabelLayoutDirty();

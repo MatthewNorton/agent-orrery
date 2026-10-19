@@ -50,7 +50,7 @@
       minTs: known('minTs'),
       maxTs,
       cursorTs: mode === 'live' && Number.isFinite(maxTs) ? maxTs : known('cursorTs'),
-      playing: mode === 'replay' && value.playing,
+      playing: value.playing,
       speed: value.speed,
       truncated: value.truncated,
     };
@@ -80,10 +80,9 @@
   function adoptReplayResult(result, forceReset) {
     if (!result || typeof result !== 'object') return;
     const snap = result.snapshot && typeof result.snapshot === 'object' ? result.snapshot : null;
-    const nextPlayback = result.playback || (snap && snap.playback);
     // Set replay mode before any historical ship update can consider desktop
     // notifications. Historical attention stays visible but never pages.
-    A.applyPlayback(nextPlayback, false);
+    A.applyPlayback(result.playback, false);
 
     const nextEpoch = result.streamEpoch != null
       ? result.streamEpoch : A.epochOf(snap);
@@ -106,7 +105,8 @@
       drainDeferredEpochEvents();
       return;
     }
-    A.renderChromeNow(CHROME.HISTORY | CHROME.FEED | CHROME.PROJECT);
+    // issueReplay re-renders the history bar and the project card as it settles.
+    A.renderChromeNow(CHROME.FEED);
   }
 
   A.rebuildRoute = function rebuildRoute(route) {

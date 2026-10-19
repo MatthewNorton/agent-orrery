@@ -50,7 +50,7 @@
   }
 
   const CONTROL_NOTES = new Map([
-    ['replay', 'Return to LIVE to open a terminal.'],
+    ['replay', TERMINAL_FAILURES.get('REPLAY')],
     ['transition', 'History view is changing.'],
     ['pending', 'Requesting terminal launch\u2026'],
     ['success', 'Terminal launch requested'],
@@ -71,25 +71,18 @@
   };
 
   A.requestProjectTerminal = async function requestProjectTerminal(projectId) {
-    const state = ensureProjectControl(projectId);
-    if (state.phase === 'pending' || S.playback.mode !== 'live' ||
-        S.replayTransitionPending || S.replayBusy) return;
+    if (A.projectControlPresentation(projectId).disabled) return;
 
     const requestId = ++S.terminalRequestSerial;
     S.projectControl = { projectId, requestId, phase: 'pending', code: null };
     A.renderChromeNow(C.CHROME.PROJECT | C.CHROME.FOCUS);
 
     /** @type {OpenTerminalResult} */
-    let result;
-    try {
-      result = await AU.openTerminal(projectId);
-    } catch (error) {
-      result = { ok: false, code: 'FAILED' };
-    }
+    const result = await AUR.settle(() => AU.openTerminal(projectId));
     if (S.projectControl.projectId !== projectId || S.projectControl.requestId !== requestId) return;
 
-    const ok = Boolean(result && result.ok === true);
-    const code = !ok && result && typeof result.code === 'string' ? result.code : 'FAILED';
+    const ok = result.ok === true;
+    const code = !ok && typeof result.code === 'string' ? result.code : 'FAILED';
     S.projectControl = {
       projectId,
       requestId,

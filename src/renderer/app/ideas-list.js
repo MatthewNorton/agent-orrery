@@ -60,10 +60,6 @@
     return 'Goal remains in GOALS.md';
   }
 
-  function ideaMutationsDisabled() {
-    return S.ideaPanel.busy || S.playback.mode !== 'live' || S.replayTransitionPending;
-  }
-
   function ideaFocusedControl(list) {
     const active = document.activeElement;
     if (!active || !list.contains(active)) {
@@ -132,7 +128,7 @@
     }
   }
 
-  function ideaButton(cls, text, action, describedBy, onClick) {
+  function ideaButton(cls, text, action, onClick, describedBy) {
     const button = AUR.button(cls, text, onClick);
     button.dataset.ideaAction = action;
     if (describedBy) button.setAttribute('aria-describedby', describedBy);
@@ -153,12 +149,11 @@
         ? 'Remove this idea? Its unfinished GOALS.md entry is removed from the project too.'
         : 'Remove this unassigned idea?';
       // removeIdea refuses on its own; this check only spares the confirm dialog.
-      const remove = ideaButton('idea-remove', '×', 'remove', null, () => {
-        if (ideaMutationsDisabled() || !A.confirmRemoval(prompt, item.text)) return;
+      const remove = ideaButton('idea-remove', '×', 'remove', () => {
+        if (A.ideaMutationsDisabled() || !A.confirmRemoval(prompt, item.text)) return;
         A.removeIdea(item);
-      });
+      }, taskText.id);
       remove.setAttribute('aria-label', 'Remove idea');
-      remove.setAttribute('aria-describedby', taskText.id);
       remove.title = 'Remove idea';
       heading.appendChild(remove);
     }
@@ -194,22 +189,22 @@
       }
       const selected = S.ideaPanel.selections.get(item.id) || '';
       if (projects.some((project) => project.id === selected)) select.value = selected;
-      const assign = ideaButton('idea-action', 'Assign & start', 'assign', describedBy,
-        () => A.assignIdea(item.id, select.value));
+      const assign = ideaButton('idea-action', 'Assign & start', 'assign',
+        () => A.assignIdea(item.id, select.value), describedBy);
       select.addEventListener('change', () => {
         S.ideaPanel.selections.set(item.id, select.value);
         assign.disabled = !select.value;
       });
       controls.append(select, assign);
     } else if (RETRYABLE_PHASES.has(item.phase)) {
-      const retry = ideaButton('idea-action', 'Retry start', 'retry', describedBy,
-        () => A.retryIdea(item.id));
+      const retry = ideaButton('idea-action', 'Retry start', 'retry',
+        () => A.retryIdea(item.id), describedBy);
       retry.dataset.unavailable = String(!assignedAvailable);
       controls.append(AUR.el('span', 'idea-project', retryIdeaCopy(item.phase)), retry);
     } else if (item.projectId &&
         (item.phase === 'ready-for-review' || item.phase === 'completion-failed')) {
-      const view = ideaButton('idea-action', 'View project', 'view', describedBy,
-        () => A.jumpToProject(item.projectId));
+      const view = ideaButton('idea-action', 'View project', 'view',
+        () => A.jumpToProject(item.projectId), describedBy);
       view.disabled = !assignedAvailable;
       controls.append(AUR.el('span', 'idea-project', 'Project task'), view);
     } else {
@@ -220,7 +215,7 @@
 
   function showMoreButton(remaining) {
     return ideaButton('idea-action idea-show-more', `Show ${Math.min(100, remaining)} more`,
-      'show-more', null, () => {
+      'show-more', () => {
         const firstNewItem = S.ideaPanel.items[S.ideaPanel.visibleLimit];
         S.ideaPanel.visibleLimit += 100;
         S.ideaPanel.focusAfterRender = firstNewItem
@@ -235,7 +230,7 @@
     if (!els || !els.panel) return;
     const projects = liveIdeaProjects();
     const replay = S.playback.mode !== 'live' || S.replayTransitionPending;
-    const disabled = ideaMutationsDisabled();
+    const disabled = A.ideaMutationsDisabled();
     const count = S.ideaPanel.items.length;
     A.setRailCount('ideas', count, count === 0);
     els.panel.setAttribute('aria-busy', String(S.ideaPanel.busy));

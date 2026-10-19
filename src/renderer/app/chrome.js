@@ -1,5 +1,5 @@
 // @ts-check
-// Compact command rail, agents/feed/summary renderers, tab bar.
+// Compact command rail, project-name helpers, agents/feed/summary renderers, tab bar.
 'use strict';
 
 (function () {
@@ -12,22 +12,21 @@
   const RAIL_SECTIONS = ['ideas', 'agents', 'feed', 'galaxies'];
 
   A.wireCommandRail = function wireCommandRail() {
-    /** @type {Record<string, HTMLElement | null>} */
+    /** @type {Record<string, { panel: HTMLElement | null, count: HTMLElement | null }>} */
     const els = {};
     for (const key of RAIL_SECTIONS) {
-      els[key + 'Panel'] = document.getElementById(`${key}-panel`);
-      els[key + 'Compact'] = document.getElementById(`compact-${key}-button`);
-      els[key + 'CompactCount'] = document.getElementById(`compact-${key}-count`);
-    }
-    S.commandRail.els = els;
-    for (const key of RAIL_SECTIONS) {
+      els[key] = {
+        panel: document.getElementById(`${key}-panel`),
+        count: document.getElementById(`compact-${key}-count`),
+      };
       // A compact-rail button opens the rail on that section, unfolded.
-      const button = els[key + 'Compact'];
+      const button = document.getElementById(`compact-${key}-button`);
       if (button) button.addEventListener('click', () => {
         A.setModuleCollapsed('rail-right', false);
         A.setModuleCollapsed(key, false);
       });
     }
+    S.commandRail.els = els;
   };
 
   /**
@@ -35,12 +34,10 @@
    * @param {string} key @param {number} n @param {boolean} [empty]
    */
   A.setRailCount = function setRailCount(key, n, empty) {
-    const els = S.commandRail.els;
-    if (!els) return;
-    const panel = els[key + 'Panel'];
-    const count = els[key + 'CompactCount'];
-    if (panel && typeof empty === 'boolean') panel.classList.toggle('is-empty', empty);
-    if (count) count.textContent = String(n);
+    const section = S.commandRail.els && S.commandRail.els[key];
+    if (!section) return;
+    if (section.panel && typeof empty === 'boolean') section.panel.classList.toggle('is-empty', empty);
+    if (section.count) section.count.textContent = String(n);
   };
 
   // ---------- agents / feed / summary renderers ----------
@@ -61,7 +58,6 @@
     return p ? p.name : id;
   };
 
-  /** What a list calls a project: its name, or its id when it has none. */
   A.projectLabel = function projectLabel(project) {
     return project.name || project.id;
   };
@@ -71,11 +67,16 @@
     return String(A.projectLabel(a)).localeCompare(String(A.projectLabel(b)));
   };
 
+  A.projectGalaxyLabel = function projectGalaxyLabel(project) {
+    if (typeof project.galaxy === 'string') return project.galaxy;
+    if (project.galaxy) return project.galaxy.label || project.galaxy.key || '';
+    return '';
+  };
+
   A.activePlanetData = function activePlanetData() {
     return S.activeView && S.activeView.planetData ? S.activeView.planetData : null;
   };
 
-  /** How many projects have a ship in flight. */
   A.onlineProjectCount = function onlineProjectCount() {
     const online = new Set();
     for (const s of S.store.ships.values()) online.add(s.project);

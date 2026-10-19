@@ -102,9 +102,7 @@
     });
 
   function isSceneDisposed(scene, state) {
-    if (!scene || !state || state.disposed) return true;
-    if (typeof scene.isDisposed === 'function') return scene.isDisposed();
-    return scene.isDisposed === true;
+    return !state || state.disposed || AUR.isNodeDisposed(scene);
   }
 
   /** @returns {SceneState} */

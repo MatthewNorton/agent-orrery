@@ -94,25 +94,29 @@
     });
   };
 
+  /** Edits wait for the one in flight and for LIVE. */
+  A.ideaMutationsDisabled = function ideaMutationsDisabled() {
+    return S.ideaPanel.busy || S.playback.mode !== 'live' || S.replayTransitionPending;
+  };
+
   /** @param {() => Promise<RootTaskResult>} operation */
   async function mutateIdea(operation, successText, clearInput = false, onSuccess = null) {
-    if (S.ideaPanel.busy || S.playback.mode !== 'live' || S.replayTransitionPending) return;
+    if (A.ideaMutationsDisabled()) return;
     S.ideaPanel.busy = true;
     S.ideaPanel.refreshAfterBusy = false;
     S.ideaPanel.status = '';
     S.ideaPanel.error = false;
     A.renderIdeas();
     /** @type {RootTaskResult} */
-    let result = null;
-    try { result = await operation(); } catch (error) { /* bounded failure below */ }
+    const result = await AUR.settle(operation);
     S.ideaPanel.busy = false;
-    if (result && result.ok === true) {
+    if (result.ok === true) {
       S.ideaPanel.status = successText;
       S.ideaPanel.error = false;
       if (clearInput && S.ideaPanel.els) S.ideaPanel.els.input.value = '';
       if (typeof onSuccess === 'function') onSuccess(result);
     } else {
-      S.ideaPanel.status = ideaFailureText(result && result.code);
+      S.ideaPanel.status = ideaFailureText(result.code);
       S.ideaPanel.error = true;
     }
     const refreshAgain = S.ideaPanel.refreshAfterBusy;
