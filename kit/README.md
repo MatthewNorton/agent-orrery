@@ -11,7 +11,7 @@ kit/
   SPEC.md              LIVE  renderer contract — update it when the app evolves
   RUBRIC.md            LIVE  visual/functional acceptance reference
   grade.mjs            LIVE  mechanical regression gate — run after ANY renderer change (synthetic profile; --real for yours)
-  run-gates.mjs        LIVE  every gate one line each (--static for the Electron-free set CI runs); logs in .shots/gates/
+  run-gates.mjs        LIVE  every gate one line each and npm test once (--static: the quick file-check set CI runs); logs in .shots/gates/
   ASSET-REQUESTS.md    LIVE  intake for missing-asset wants (never source ad hoc)
   EXECUTOR-HANDOFF.md  LIVE  copy-paste prompt for handing a kit to ANY agent (Codex etc.)
   done/                one gate per finished kit; contracts and reports are in git history
@@ -49,8 +49,8 @@ kit/
 | 10 Project tasks | **DONE** — PASS 2026-07-22; archived in `done/project-tasks/` | `node kit/done/project-tasks/grade-tasks.mjs` |
 | 11 Project search | **DONE** — PASS 2026-07-22; archived in `done/project-search/` | `node kit/done/project-search/grade-search.mjs` |
 | 12 Standalone installer | **DECLINED** 2026-10-13 — the users are developers; `npm run setup` is the install path. Notes kept in `todo/12-standalone-installer.md` | none |
-| 13 Structural cleanup | **DONE** — PASS 2026-09-28; `app.js` split into `AUR.app` modules, shared `src/main/path-safety.js`; §2.6 (observable-driven dispose) withdrawn, poll documented; archived in `done/structural-cleanup/` (Phase 5 of `docs/PUBLIC-RELEASE-TASKS.md`) | `node kit/done/structural-cleanup/grade-structure.mjs --full` |
-| 14 Main-process split | **DONE** — PASS 2026-10-01; `main.js` (2217 lines) is a 47-line bootstrap over `app-context.js`, `window.js`, `replay-control.js`, `ipc/*`, `harness/*`; zero module-level `let` in `src/main`; `main.js` unfrozen; project-tasks gate widened to the `src/main` layer (owner-authorized); archived in `done/main-split/` | `node kit/done/main-split/grade-main-split.mjs --full` |
+| 13 Structural cleanup | **DONE** — PASS 2026-09-28; `app.js` split into `AUR.app` modules, shared `src/main/path-safety.js`; §2.6 (observable-driven dispose) withdrawn, poll documented; archived in `done/structural-cleanup/` (Phase 5 of `docs/PUBLIC-RELEASE-TASKS.md`) | `node kit/done/structural-cleanup/grade-structure.mjs` (sweep: `node kit/run-gates.mjs`) |
+| 14 Main-process split | **DONE** — PASS 2026-10-01; `main.js` (2217 lines) is a 47-line bootstrap over `app-context.js`, `window.js`, `replay-control.js`, `ipc/*`, `harness/*`; zero module-level `let` in `src/main`; `main.js` unfrozen; project-tasks gate widened to the `src/main` layer (owner-authorized); archived in `done/main-split/` | `node kit/done/main-split/grade-main-split.mjs` (sweep: `node kit/run-gates.mjs`) |
 
 ## How the app works (context for any executor)
 
@@ -88,8 +88,8 @@ last pins were retired on 2026-10-13, PR #29). A frozen file is protected by rev
    or a failed 5th iteration → stop and escalate to the user with artifacts.
 5. On pass: move the kit's gate into `done/<kit-name>/`, paste
    `kit/EXECUTOR-REPORT.md` (executor summary + runner verification) into the PR
-   description and delete it with the contract, then update this status board
-   and `todo/README.md`.
+   description and delete it with the contract, then update this status board,
+   `todo/README.md` and the gate table in `run-gates.mjs`.
 
 Asset rule: executors never generate/download art — procedural fallback in
 code + an entry in `ASSET-REQUESTS.md`.

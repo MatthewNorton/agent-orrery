@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Kit 13 gate — structural cleanup (docs/PUBLIC-RELEASE-TASKS.md Phase 5).
-// Fails cleanly until the kit is built. `--full` additionally runs every archived
-// gate and the renderer gate three times. Exit 0 only when everything passes.
+// Fails cleanly until the kit is built. `--full` also runs the whole gate sweep
+// (kit/run-gates.mjs); `--no-unit-tests` leaves npm test to that sweep. Exit 0 only when everything passes.
 //
 // Usage: node kit/done/structural-cleanup/grade-structure.mjs [--stage A|0|B|C|D|all] [--full]
 // (run from kit/todo/grade-structure.mjs while the kit was executing)
@@ -141,41 +141,23 @@ else {
   if (failures === before) ok('T5', 'disposeSettled is a documented, bounded isReady() poll');
 }
 
-// ---- T7: unit tests (always) ----
-{
+// ---- T7: unit tests (the sweep passes --no-unit-tests because it runs npm test once itself) ----
+if (process.argv.includes('--no-unit-tests')) ok('T7', 'npm test left to the sweep (--no-unit-tests)');
+else {
   const r = spawnSync('npm test', { cwd: ROOT, encoding: 'utf8', shell: true });
   const summary = (r.stdout.match(/ℹ (pass|fail) \d+/g) || []).join(', ');
   if (r.status !== 0) fail('T7', `npm test failed (${summary || 'no summary'})`);
   else ok('T7', `npm test green (${summary})`);
 }
 
-// ---- --full: every archived gate + renderer gate x3 (always, any stage) ----
+// ---- --full: the whole gate sweep, one line per gate (kit/run-gates.mjs) ----
 if (FULL) {
-  const doneDir = path.join(ROOT, 'kit', 'done');
-  const gates = fs.readdirSync(doneDir).flatMap((d) =>
-    fs.readdirSync(path.join(doneDir, d)).filter((f) => /^grade-.*\.mjs$/.test(f)).map((f) => path.join('kit', 'done', d, f)));
-  for (const g of gates) {
-    if (g.endsWith('grade-structure.mjs')) continue; // never recurse into ourselves
-    if (g.includes('packaging')) {
-      // The packaging gate's W0 check fails on any `git status` change, so it can only run
-      // on a clean tree; every task re-runs this gate immediately after its commit.
-      const st = spawnSync('git', ['status', '--porcelain'], { cwd: ROOT, encoding: 'utf8' });
-      if ((st.stdout || '').trim()) {
-        console.log(`FULL SKIP  ${g} needs a clean tree; re-run this gate right after committing`);
-        continue;
-      }
-    }
-    const r = spawnSync(process.execPath, [path.join(ROOT, g)], { cwd: ROOT, encoding: 'utf8', timeout: 900_000 });
-    if (r.status !== 0) fail('FULL', `${g} failed:\n${(r.stdout + r.stderr).split(/\r?\n/).filter((l) => /FAIL|Error/.test(l)).slice(0, 3).join('\n')}`);
-    else ok('FULL', `${g} green`);
-  }
-  for (let i = 1; i <= 3; i++) {
-    const r = spawnSync(process.execPath, [path.join(ROOT, 'kit', 'grade.mjs')], { cwd: ROOT, encoding: 'utf8', timeout: 900_000 });
-    if (r.status !== 0) fail('FULL', `kit/grade.mjs run ${i} failed`);
-    else ok('FULL', `kit/grade.mjs run ${i} green`);
-  }
+  const r = spawnSync(process.execPath, [path.join(ROOT, 'kit', 'run-gates.mjs')], { cwd: ROOT, encoding: 'utf8', timeout: 1_800_000 });
+  process.stdout.write(r.stdout || '');
+  if (r.status !== 0) fail('FULL', 'the gate sweep is red (see above)');
+  else ok('FULL', 'every gate green');
 }
 
 console.log(`\n============= KIT 13 STRUCTURE GRADE (stage ${STAGE}${FULL ? ', full' : ''}) =============`);
 if (failures) { console.log(`FAIL  ${failures} check(s) red`); process.exit(1); }
-console.log(`PASS  every check expected at stage ${STAGE} is green${FULL ? ', including every archived gate and 3x renderer gate' : ' (add --full before committing)'}`);
+console.log(`PASS  every check expected at stage ${STAGE} is green${FULL ? ', including the whole gate sweep' : ' (add --full before committing)'}`);

@@ -45,4 +45,4 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci --ignore-scripts
-      - run: node kit/run-gates.mjs --static  # the kit gates that never launch Electron
+      - run: node kit/run-gates.mjs --static --no-unit-tests  # the quick file-check gates; the test job runs npm test

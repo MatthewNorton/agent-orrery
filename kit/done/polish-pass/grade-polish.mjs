@@ -84,17 +84,15 @@ function validateClickProof(result, proof, label, afterIndex) {
   return proof.end;
 }
 
-// Kit 14 (2026-10-01): main.js is split across src/main; grep the whole layer.
-function readLayer(dir, skip = () => false) {
-  return fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))
-    .flatMap((e) => e.isDirectory() ? [readLayer(path.join(dir, e.name), skip)]
-      : e.name.endsWith('.js') && !skip(e.name) ? [fs.readFileSync(path.join(dir, e.name), 'utf8')] : [])
-    .join('\n');
-}
-const mainSource = readLayer(path.join(root, 'src', 'main'));
-// 2026-10-18: the input proof is the harness. Its screenshot mode (modes/shots.js) arranges
-// panels for `npm run shots` and claims no input, so it alone may fold them with element.click().
-const inputSource = readLayer(path.join(root, 'src', 'main', 'harness'), (name) => name === 'shots.js');
+// Kit 14 (2026-10-01): main.js is split across src/main; grep the whole layer. The screenshot mode
+// (harness/modes/shots.js) arranges panels for `npm run shots` and claims no input, so it alone
+// may use element.click(); every other harness file is the input proof.
+const mainFiles = fs.readdirSync(path.join(root, 'src', 'main'), { recursive: true })
+  .filter((f) => f.endsWith('.js')).sort()
+  .map((f) => ({ rel: f.split(path.sep).join('/'), text: fs.readFileSync(path.join(root, 'src', 'main', f), 'utf8') }));
+const mainSource = mainFiles.map((f) => f.text).join('\n');
+const inputSource = mainFiles.filter((f) => f.rel.startsWith('harness/') && f.rel !== 'harness/modes/shots.js')
+  .map((f) => f.text).join('\n');
 // 2026-10-13: renderer files may be split. A view's source is its scene-<view>*.js files plus the
 // shared scene helpers and ship-assets*.js; util source is util.js plus util-*.js.
 const rendererJs = fs.readdirSync(path.join(root, 'src', 'renderer')).filter((f) => f.endsWith('.js')).sort();
