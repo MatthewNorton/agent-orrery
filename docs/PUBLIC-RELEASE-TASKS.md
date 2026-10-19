@@ -189,21 +189,23 @@ Effort is session time as defined above. Every item: one PR, a `/simplify`
 pass before it is reported ready, `node kit/grade.mjs` and every done-kit gate
 green on a committed tree, `npm test` and `npm run typecheck` green.
 
-- [ ] **6.0 Gate repair, gate runner, CI.** On 2026-10-18 four of the
-      thirteen gates were red on `main` and nobody had noticed, because CI
-      runs only typecheck and unit tests. Polish P4 greps all of `src/main`
-      for `.click()` and the screenshot harness has folded panels that way
-      since 2026-10-14 (`harness/modes/shots.js`): narrow the check to the
-      polish harness or use the driver's `screenshotClick`. Agent-control C5:
-      in the 1200×720 harness window the click on Open Terminal never puts
-      the button into its pending state and one control reports as clipped;
-      cause still open. The two `--full` gates are red only because they
-      re-run those two. Then add `kit/run-gates.mjs`, which runs all thirteen
-      and prints one line each, and a CI job for the static gates (structure,
-      main-split, search, tasks, ships, attention fixtures). One policy line
-      in `kit/README.md`: no file-hash pins, ever; frozen means review.
-      Note for every gate run: the packaging gate fails W0 on any dirty
-      working tree by design, so run gates after committing. ~3 h.
+- [x] **6.0 Gate repair, gate runner, CI.** Done 2026-10-18, PR #54. Four of
+      the thirteen gates were red on `main` and nobody had noticed, because CI
+      ran only typecheck and unit tests. Polish P4 grepped all of `src/main`
+      for `.click()` while the screenshot harness has folded panels that way
+      since 2026-10-14; the check now covers the input harness only, with
+      `harness/modes/shots.js` excluded by name. Agent-control C5: the test
+      window shared the viewer's `localStorage`, so the folded-panel set the
+      screenshot mode persists hid the project card in every later control
+      run (button 0×0, card hidden). The harness now prints those rectangles
+      in its timeout; #50 (carried by #49) already stops the leak with an
+      in-memory partition for test runs, so C5 goes green on `main` when #49
+      merges. The two `--full` gates were red only because they re-run those
+      two. `kit/run-gates.mjs` runs all thirteen gates one line each
+      (`--static` for the Electron-free set, which CI now runs on ubuntu), and
+      `kit/README.md` states the policy: no file-hash pins, ever; frozen means
+      review. The packaging gate fails W0 on any dirty tree by design, so run
+      the sweep after committing.
 - [ ] **6.1 Engine and compositor fixes, no setting.** Drop
       `preserveDrawingBuffer: true` and `stencil: true` from the engine
       options in `src/renderer/app.js` (nothing reads the canvas back; shots
