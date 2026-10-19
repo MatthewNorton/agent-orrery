@@ -57,11 +57,12 @@ PR #50 (quality slider and panning, 260 lines) took an afternoon.
    and camera coasting; ~30 fps idle; ~15 fps unfocused; each view keeps its
    own delta time from `performance.now()` because `engine.getDeltaTime()`
    keeps ticking on skipped frames; off in test mode.
-2. **Procedural worlds** (~5–7 h). `src/renderer/worlds/` (UMD, `// @ts-check`,
-   added to the renderer tsconfig and to grade-structure's file list):
-   `world-noise.js`, `world-classes.js` (rocky, gas, ice, volcanic, oceanic
-   keyed by today's `AUR.worldProfile` seeds), `world-maps.js`,
-   `world-worker.js` (classic worker, `importScripts`), `world-textures.js`
+2. **Procedural worlds** (~5–7 h). `src/renderer/worlds/` (UMD, `// @ts-check`;
+   the renderer tsconfig and grade-structure already walk folders; per the
+   AGENTS.md folder rule the files drop the `world-` prefix):
+   `noise.js`, `classes.js` (rocky, gas, ice, volcanic, oceanic
+   keyed by today's `AUR.worldProfile` seeds), `maps.js`,
+   `worker.js` (classic worker, `importScripts`), `textures.js`
    as `AUR.worldTextures` (one job at a time with priorities, a view epoch,
    a disposed-scene guard, a timeout, synchronous low-res fallback; CPU
    LRU with a byte budget on `AUR.app.state.worldMaps` through `makeCtx`
@@ -74,9 +75,9 @@ PR #50 (quality slider and panning, 260 lines) took an afternoon.
    and pole continuity, sizes, bad-input rejection, emission rules.
    SPEC §6/§7/§10, DESIGN-DIRECTION lines 78–79 and
    `test/planet-assets.test.js` change here (decision D1).
-3. **Lighting shaders + docs** (~4 h). `worlds/world-shaders.js` and a
-   `scene-planet-surface.js` part (`AUR.sceneParts.planet` in
-   `scene-common.js`): relief, terminator, night emission, ocean glint,
+3. **Lighting shaders + docs** (~4 h). `worlds/shaders.js` and a
+   `scene/planet/surface.js` part (add `planet` to `AUR.sceneParts` in
+   `scene/common.js`): relief, terminator, night emission, ocean glint,
    cloud shadows, limb haze from `atmosphereProfile`; verify GlowLayer with
    ShaderMaterial meshes and tonemap consistency. README screenshots re-shot
    with `node scripts/demo-shots.mjs`; SPEC, RUBRIC, DESIGN-DIRECTION and the
