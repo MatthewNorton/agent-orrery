@@ -116,7 +116,9 @@ function createMetrics(ctx, driver) {
       };
       const intersects = (a, b) => Boolean(a && b && a.left < b.right && a.right > b.left &&
         a.top < b.bottom && a.bottom > b.top);
-      const targetRects = [bounds(button), bounds(status)].filter(Boolean);
+      const buttonRect = bounds(button);
+      const statusRect = bounds(status);
+      const targetRects = [buttonRect, statusRect].filter(Boolean);
       const blockerIds = ['back-btn', 'sidebar', 'summary-card', 'planet-card', 'tabbar', 'history-bar'];
       const overlapIds = [];
       for (const id of blockerIds) {
@@ -142,6 +144,9 @@ function createMetrics(ctx, driver) {
         overlapIds,
         overlapCount: overlapIds.length,
         clippedCount,
+        // For waitForControl's timeout dump: where the controls and their card were, if anywhere.
+        rects: { button: buttonRect, status: statusRect, card: bounds(card) },
+        viewport: { innerWidth, innerHeight },
         noProviderOrPromptControls: !forbiddenText && forbiddenInputs === 0,
       };
     })()`);

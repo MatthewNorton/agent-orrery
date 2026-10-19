@@ -84,13 +84,15 @@ function validateClickProof(result, proof, label, afterIndex) {
   return proof.end;
 }
 
-// Kit 14 (2026-10-01): main.js is split across src/main; grep the whole layer.
-const mainSource = (function readMainLayer(dir) {
-  return fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))
-    .flatMap((e) => e.isDirectory() ? [readMainLayer(path.join(dir, e.name))]
-      : e.name.endsWith('.js') ? [fs.readFileSync(path.join(dir, e.name), 'utf8')] : [])
-    .join('\n');
-})(path.join(root, 'src', 'main'));
+// Kit 14 (2026-10-01): main.js is split across src/main; grep the whole layer. The screenshot mode
+// (harness/modes/shots.js) arranges panels for `npm run shots` and claims no input, so it alone
+// may use element.click(); every other harness file is the input proof.
+const mainFiles = fs.readdirSync(path.join(root, 'src', 'main'), { recursive: true })
+  .filter((f) => f.endsWith('.js')).sort()
+  .map((f) => ({ rel: f.split(path.sep).join('/'), text: fs.readFileSync(path.join(root, 'src', 'main', f), 'utf8') }));
+const mainSource = mainFiles.map((f) => f.text).join('\n');
+const inputSource = mainFiles.filter((f) => f.rel.startsWith('harness/') && f.rel !== 'harness/modes/shots.js')
+  .map((f) => f.text).join('\n');
 // 2026-10-13: renderer files may be split. A view's source is its scene-<view>*.js files plus the
 // shared scene helpers and ship-assets*.js; util source is util.js plus util-*.js.
 const rendererJs = fs.readdirSync(path.join(root, 'src', 'renderer')).filter((f) => f.endsWith('.js')).sort();
@@ -116,7 +118,7 @@ if (!/sunMat\.emissiveColor\s*=\s*sunCol\.clone\(\)/.test(systemSource)) {
 if (!/--polish-test/.test(mainSource) || !/sendTestInput/.test(mainSource) || !/sendInputEvent/.test(mainSource)) {
   fail('P4', 'real Electron pointer harness is missing');
 }
-if (/\.click\(\)/.test(mainSource)) fail('P4', 'harness contains direct element.click() input');
+if (/\.click\(\)/.test(inputSource)) fail('P4', 'input harness contains direct element.click() input');
 
 // Fail before launching Electron when the implementation has not started.
 if (failures.length === 0) {
