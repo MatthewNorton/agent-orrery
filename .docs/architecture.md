@@ -443,10 +443,10 @@ flowchart TB
 Exceptions to "everything on `AUR`": `polish-math.js` publishes `window.AUR_POLISH`,
 `galaxy-layout.js` publishes `window.AUR_GALAXY`, and `search-core.js` also leaks a bare
 global `searchProjects`. These three plus the VCS component are UMD so Node can load them.
-The split views follow one pattern: `scene/common.js` creates `AUR.sceneParts` (and
-`AUR.disposeMeshAndMaterial`), each part in `scene/<view>/` registers its builders on
-`AUR.sceneParts.<view>` and loads before its view, and the view builds one explicit `view`
-object and merges its parts into it.
+The split views follow one pattern: `scene/common.js` creates `AUR.sceneParts` (and the
+helpers every view shares: `viewCamera`, `shipMesh`, `disposeView`, `disposeMeshAndMaterial`),
+each part in `scene/<view>/` registers its builders on `AUR.sceneParts.<view>` and loads
+before its view, and the view builds one explicit `view` object and merges its parts into it.
 
 For the type check, `src/types/renderer-globals.d.ts` declares the globals `AU` (typed by the
 contract), `AUR`, `AUR_POLISH` and `AUR_GALAXY` (all `any` for now).
@@ -455,45 +455,45 @@ contract), `AUR`, `AUR_POLISH` and `AUR_GALAXY` (all `any` for now).
 
 | File | Lines | Job |
 |---|---|---|
-| `util.js` | 213 | Creates `AUR`; hashes, colours, provider metadata, motion tuning, asset paths, DOM helpers |
-| `util-scene.js` | 209 | Babylon helpers on `AUR`: skybox (PhotoDome), starfield, orbit rings, ship and signal markers, GUI labels |
+| `util.js` | 246 | Creates `AUR`; hashes, colours, provider metadata, motion tuning, asset paths, DOM helpers |
+| `util-scene.js` | 274 | Babylon helpers on `AUR`: skybox (PhotoDome), starfield, orbit rings, ship and signal markers, GUI labels |
 | `procedural-worlds.js` | 329 | Planet and asteroid surfaces (authored textures + generated normal maps) |
 | `ship-assets.js` | 254 | Manifest, per-scene state, hull choice by rank (`builds` against the manifest ladder), container loading; procedural dart fallback |
 | `ship-assets-hulls.js` | 252 | Builds a hull from a loaded model: provider livery, far-file instances on the universe map, near-file clones in system / planet views, within a 100k-triangle budget |
-| `ship-assets-api.js` | 123 | `AUR.ships`: instantiate, upgrade a fallback dart, `refresh` in place on promotion, dispose a scene's hull state |
-| `galaxy-layout.js` | 178 | Pure: galaxy grouping, spiral placement, Graveyard |
-| `polish-math.js` | 56 | Pure: label overlap, sun pulse |
-| `search-core.js` | 34 | Pure: project ranking |
+| `ship-assets-api.js` | 118 | `AUR.ships`: instantiate, upgrade a fallback dart, `refresh` in place on promotion, dispose a scene's hull state |
+| `galaxy-layout.js` | 284 | Pure: galaxy grouping, spiral placement, Graveyard |
+| `polish-math.js` | 67 | Pure: label overlap, sun pulse |
+| `search-core.js` | 87 | Pure: project ranking |
 | `components/project-vcs-status.js` | 268 | Pure presentation for git / GitHub markers and details |
-| `scene/common.js` | 18 | Creates `AUR.sceneParts` and `AUR.disposeMeshAndMaterial` |
-| `scene/universe/view.js` | 274 | Galaxy map: builds the `view` object and merges its parts |
-| `scene/universe/galaxies.js` | 145 | Galaxy discs, outlines, labels, glyph placement, camera framing |
-| `scene/universe/glyphs.js` | 138 | A project glyph's live state: dimming, search focus, attention halo, VCS markers, sun pulse |
-| `scene/universe/labels.js` | 238 | Dirty-driven label layout (`updateLabelLayout`) |
-| `scene/universe/ships.js` | 64 | Ships orbiting their project's glyph |
-| `scene/universe/stats.js` | 218 | Measured metrics for the harness and gates |
-| `scene/system/view.js` | 337 | Solar system + first-person focus camera (`focusShip`) |
-| `scene/system/belt.js` | 46 | Asteroid belt (thin instances) |
+| `scene/common.js` | 70 | Creates `AUR.sceneParts`; the shared camera, ship mesh, teardown and mesh disposal |
+| `scene/universe/view.js` | 282 | Galaxy map: builds the `view` object and merges its parts |
+| `scene/universe/galaxies.js` | 207 | Galaxy discs, outlines, labels, glyph placement, camera framing |
+| `scene/universe/glyphs.js` | 143 | A project glyph's live state: dimming, search focus, attention halo, VCS markers, sun pulse |
+| `scene/universe/labels.js` | 223 | Dirty-driven label layout (`updateLabelLayout`) |
+| `scene/universe/ships.js` | 54 | Ships orbiting their project's glyph |
+| `scene/universe/stats.js` | 165 | Measured metrics for the harness and gates |
+| `scene/system/view.js` | 319 | Solar system + first-person focus camera (`focusShip`) |
+| `scene/system/belt.js` | 45 | Asteroid belt (thin instances) |
 | `scene/system/focus.js` | 59 | Fades the other ships while one is followed |
-| `scene/system/ships.js` | 193 | Ships: build / remove, patrols, fly-to-planet builds, `refetchPlanets`, the view's `update` |
-| `scene/planet/view.js` | 196 | Planet close-up |
-| `app/state.js` | 180 | Shared state and constants (including the chrome dirty bits, `AUR.app.const.CHROME`) |
-| `app/store.js` | 113 | `seedStore`, `applyEvent`, `maybeNotifyAttention`, `refreshShipHulls`, `workedShipIds` |
-| `app/chrome-queue.js` | 71 | `chromeMaskFor`, `scheduleChrome`, `renderChrome`: one panel redraw per frame |
-| `app/playback.js` | 244 | History bar |
-| `app/replay.js` | 193 | Stream epochs, playback state, `issueReplay` |
-| `app/history-metrics.js` | 97 | `AUR.historyTestMetrics` for the history harness |
-| `app/project/search.js` | 237 | Search box, GitHub filter |
-| `app/project/directory.js` | 257 | ALL PROJECTS dialog |
-| `app/boot.js` | 369 | Boot, routing, view switching, debug hooks |
-| `app/ideas.js` | 144 | IDEAS panel |
-| `app/ideas-list.js` | 274 | IDEAS list rendering |
-| `app/chrome.js` | 369 | Command rail, RECENT strip, agent list, feed, summary, tabs |
-| `app/agent-focus.js` | 327 | Cockpit overlay, hologram mini-map |
-| `app/project/settings.js` | 340 | Moved-project dialog |
-| `app/project/tasks.js` | 286 | TASKS panel |
-| `app/project/control.js` | 244 | Project card, Open Terminal button, planet card |
-| `index.html` | 374 | All panels exist in the HTML up front; modules show / hide them |
+| `scene/system/ships.js` | 170 | Ships: build / remove, patrols, fly-to-planet builds, `refetchPlanets`, the view's `update` |
+| `scene/planet/view.js` | 167 | Planet close-up |
+| `app/state.js` | 184 | Shared state and constants (including the chrome dirty bits, `AUR.app.const.CHROME`) |
+| `app/store.js` | 121 | `seedStore`, `applyEvent`, `maybeNotifyAttention`, `refreshShipHulls`, `workedShipIds` |
+| `app/chrome-queue.js` | 78 | `chromeMaskFor`, `scheduleChrome`, `renderChrome`, `renderChromeNow`: one panel redraw per frame, or now |
+| `app/playback.js` | 232 | History bar |
+| `app/replay.js` | 164 | Stream epochs, playback state, `issueReplay` |
+| `app/history-metrics.js` | 96 | `AUR.historyTestMetrics` for the history harness |
+| `app/project/search.js` | 275 | Search box, GitHub filter; the listbox helpers the ALL PROJECTS dialog shares |
+| `app/project/directory.js` | 197 | ALL PROJECTS dialog |
+| `app/boot.js` | 384 | Boot, routing, view switching, debug hooks |
+| `app/ideas.js` | 148 | IDEAS panel |
+| `app/ideas-list.js` | 268 | IDEAS list rendering |
+| `app/chrome.js` | 278 | Command rail, RECENT strip, agent list, feed, summary, tabs |
+| `app/agent-focus.js` | 307 | Cockpit overlay, hologram mini-map |
+| `app/project/settings.js` | 320 | Moved-project dialog |
+| `app/project/tasks.js` | 268 | TASKS panel |
+| `app/project/control.js` | 217 | Project card, Open Terminal button, planet card |
+| `index.html` | 428 | All panels exist in the HTML up front; modules show / hide them |
 | `style.css` | 2,110 | All styles; ~470 lines are the cockpit |
 
 ### 6.3 Shared state and routing
@@ -510,7 +510,9 @@ contract), `AUR`, `AUR_POLISH` and `AUR_GALAXY` (all `any` for now).
 - **View switch** (`setView`): build the new scene first, swap, then dispose the old one —
   after polling up to 4 s for Babylon's BRDF texture, because disposing too early throws.
 - **Views** are `AUR.views.<name>(engine, data, ctx) → {scene, update, dispose, …}`. The app
-  layer also probes for view-specific extras (`setSearchMatches`, `focusShip`, `planetData`).
+  layer fills in no-op defaults for the optional methods (`VIEW_DEFAULTS` in `app/boot.js`:
+  `resize`, `setQuality`, `setSearchMatches`, `setShipFocusVantage`, `focusShip`,
+  `shipFocusState`) and reads the optional `planetData` field through `A.activePlanetData()`.
 
 ### 6.4 Who owns which part of the screen
 
