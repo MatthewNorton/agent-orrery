@@ -89,7 +89,9 @@
         g.label.text = text;
         g.labelWidth = projectLabelWidth(text);
       }
-      if (g.markerHost) VCS.renderMarkers(g.markerHost, project);
+      if (g.markerHost) {
+        g.markersEmpty = VCS.renderMarkers(g.markerHost, project).classList.contains('project-vcs-markers-empty');
+      }
     }
 
     function refreshRecencyRanks() {

@@ -146,12 +146,12 @@
       const markerHost = document.createElement('span');
       markerHost.className = 'universe-project-vcs-marker hidden';
       markerHost.dataset.projectId = p.id;
-      VCS.renderMarkers(markerHost, p);
+      const markers = VCS.renderMarkers(markerHost, p);
       vcsLayer.appendChild(markerHost);
 
       const g = {
         id: p.id, root, sun, sunMat, corona, baseEmissive: col, rings, dots, label,
-        markerHost,
+        markerHost, markersEmpty: markers.classList.contains('project-vcs-markers-empty'),
         galaxyKey: null,
         halo, haloMat, attention: null,
         lastActivity: p.lastActivity || 0, recencyRank: Number.MAX_SAFE_INTEGER,

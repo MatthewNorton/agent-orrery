@@ -113,8 +113,8 @@
   }
 
   A.refreshProjectDirectoryFromStore = function refreshProjectDirectoryFromStore() {
-    A.renderProjectDirectory();
     if (S.projectDirectory.open) updateProjectDirectory();
+    else A.renderProjectDirectory();
   };
 
   A.renderProjectDirectory = function renderProjectDirectory() {

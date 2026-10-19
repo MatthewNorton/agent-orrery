@@ -183,8 +183,14 @@
         ['#define STEPS ' + view.quality.steps]);
 
       const count = Math.round(AUR.clamp(R * R * STARS_PER_AREA, STARS_MIN, STARS_MAX) * view.quality.stars);
-      const stars = FIELD.sampleStars(atlasPixels(record, body.spiral, size), size,
-        AUR.fnv1a('stars:' + record.key), count);
+      // The samples follow from the atlas, the key and the count, so they are kept beside the atlas.
+      const starsKey = 'stars:' + record.key + ':' + body.spiral.arms + ':' + size + ':' + count;
+      let stars = fields.get(starsKey);
+      if (!stars) {
+        stars = FIELD.sampleStars(atlasPixels(record, body.spiral, size), size,
+          AUR.fnv1a('stars:' + record.key), count);
+        fields.set(starsKey, stars);
+      }
       body.stars = new BABYLON.Mesh('galaxy-stars:' + record.key, scene);
       body.stars.setVerticesData(BABYLON.VertexBuffer.PositionKind, stars.positions);
       body.stars.setVerticesData(BABYLON.VertexBuffer.ColorKind, stars.colors, false, 4);

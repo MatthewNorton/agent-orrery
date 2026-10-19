@@ -115,13 +115,14 @@
       const r = ships.get(id);
       if (!r) return;
       if (r.label) r.label.dispose();
-      if (r.mesh) r.mesh.dispose();
+      AUR.disposeMeshAndMaterial(r.mesh);
       ships.delete(id);
     }
     for (const s of store.ships.values()) if (s.project === projectId) buildShip(s);
 
     // ---- animation ----
     const tmp = new BABYLON.Vector3();
+    const heading = new BABYLON.Vector3();
     scene.onBeforeRenderObservable.add(() => {
       const dt = engine.getDeltaTime() / 1000;
       planet.rotation.y += dt * AUR.MOTION.planetDetailAxialRotation;
@@ -139,8 +140,8 @@
         r.a += r.speed * dt;
         tmp.set(Math.cos(r.a) * r.r, r.yoff + Math.sin(r.a) * r.r * r.tilt, Math.sin(r.a) * r.r);
         r.mesh.position.copyFrom(tmp);
-        r.mesh.lookAt(new BABYLON.Vector3(
-          Math.cos(r.a + Math.sign(r.speed) * 0.025) * r.r, r.yoff, Math.sin(r.a + Math.sign(r.speed) * 0.025) * r.r));
+        const ahead = r.a + Math.sign(r.speed) * 0.025;
+        r.mesh.lookAt(heading.set(Math.cos(ahead) * r.r, r.yoff, Math.sin(ahead) * r.r));
       }
     });
 

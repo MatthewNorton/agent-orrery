@@ -121,7 +121,9 @@
         fontSize: 12.5, weight: '600', mesh, offsetY: -(18 + dia * 5),
       });
       const persistent = topNames.indexOf(pd.name) >= 0;
-      label.alpha = persistent ? 0.95 : 0;
+      // Hidden, not transparent: Babylon GUI still projects and draws a linked label at alpha 0.
+      label.alpha = 0.95;
+      label.isVisible = persistent;
 
       const rec = {
         name: pd.name, mesh, mat, ring, world, r, a: a0,
@@ -262,8 +264,8 @@
         const hit = pick && pick.hit ? pick.pickedMesh.metadata.planetName : null;
         canvas.style.cursor = hit ? 'pointer' : 'default';
         if (hit !== hovered) {
-          if (hovered && planets.has(hovered) && !planets.get(hovered).persistent) planets.get(hovered).label.alpha = 0;
-          if (hit && planets.has(hit)) planets.get(hit).label.alpha = 0.98;
+          if (hovered && planets.has(hovered) && !planets.get(hovered).persistent) planets.get(hovered).label.isVisible = false;
+          if (hit && planets.has(hit)) Object.assign(planets.get(hit).label, { isVisible: true, alpha: 0.98 });
           hovered = hit;
         }
       }
