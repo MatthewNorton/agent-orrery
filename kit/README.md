@@ -11,6 +11,7 @@ kit/
   SPEC.md              LIVE  renderer contract — update it when the app evolves
   RUBRIC.md            LIVE  visual/functional acceptance reference
   grade.mjs            LIVE  mechanical regression gate — run after ANY renderer change (synthetic profile; --real for yours)
+  run-gates.mjs        LIVE  every gate one line each (--static for the Electron-free set CI runs); logs in .shots/gates/
   ASSET-REQUESTS.md    LIVE  intake for missing-asset wants (never source ad hoc)
   EXECUTOR-HANDOFF.md  LIVE  copy-paste prompt for handing a kit to ANY agent (Codex etc.)
   done/                one gate per finished kit; contracts and reports are in git history
@@ -68,6 +69,9 @@ clustered galaxy universe map → solar system → planet, matching the three
 mockup PNGs in the repo root.
 
 Frozen for executors: the **Frozen files** bullet in `CLAUDE.md` is the one authoritative list.
+
+Gates check behaviour and shape, never file hashes: no gate pins a SHA of any file, ever (the
+last pins were retired on 2026-10-13, PR #29). A frozen file is protected by review, not by a hash.
 
 ## Runner loop (kit-runner, applies to any kit here)
 

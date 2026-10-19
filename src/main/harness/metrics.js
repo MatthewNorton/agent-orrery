@@ -142,6 +142,8 @@ function createMetrics(ctx, driver) {
         overlapIds,
         overlapCount: overlapIds.length,
         clippedCount,
+        rects: { button: bounds(button), status: bounds(status), card: bounds(card) },
+        viewport: { innerWidth, innerHeight },
         noProviderOrPromptControls: !forbiddenText && forbiddenInputs === 0,
       };
     })()`);
