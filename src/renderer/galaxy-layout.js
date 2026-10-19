@@ -1,6 +1,6 @@
 // Pure deterministic galaxy colors and cluster packing.
 // Galaxies huddle around the largest one at hashed bearings, heights and tilts; inside a galaxy
-// the recently active projects sit at the core and dormant ones drift to the rim.
+// the recently active projects lean toward the core and dormant ones toward the rim.
 // UMD keeps the same implementation available to the renderer and Node gates.
 'use strict';
 
@@ -10,7 +10,8 @@
   if (root) root.AUR_GALAXY = api;
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   const MEMBER_STEP = 16;
-  const MEMBER_SPACING = [18, 14];
+  const MEMBER_ROOMY = 18;
+  const MEMBER_SPACING = 14;
   const MEMBER_SCATTER = 0.35;
   const MEMBER_TRIES = 24;
   const MEMBER_LIFT = 3;
@@ -85,14 +86,9 @@
     return { key, label };
   }
 
-  // Angle of a point on an arm at a given radius.
-  function armAngle(spiral, arm, radius) {
-    return spiral.phase + arm * Math.PI * 2 / spiral.arms + (radius / spiral.radius) * ARM_TWIST;
-  }
-
-  // The radii of a galaxy's systems along one arm, each a MEMBER_STEP chord from the last.
+  // The radii of MEMBER_STEP chords out along one arm, which size the disc.
   function armRadii(spiral) {
-    const point = (r) => { const a = armAngle(spiral, 0, r); return [Math.cos(a) * r, Math.sin(a) * r]; };
+    const point = (r) => { const a = spiral.phase + (r / spiral.radius) * ARM_TWIST; return [Math.cos(a) * r, Math.sin(a) * r]; };
     const radii = [CORE_RADIUS + MEMBER_STEP * 0.35];
     while (radii.length < spiral.perArm) {
       const prev = radii[radii.length - 1];
@@ -146,7 +142,6 @@
     const inner = spiral.radii[0];
     const outer = count === 1 ? inner : spiral.radius - MEMBER_MARGIN;
     group.members.sort((a, b) => (b.lastActivity - a.lastActivity) || a.id.localeCompare(b.id));
-    const placed = [];
     group.members.forEach((project, index) => {
       let best = null;
       for (let attempt = 0; attempt < MEMBER_TRIES; attempt++) {
@@ -155,15 +150,16 @@
         const radius = inner + (outer - inner) * Math.sqrt(share);
         const x = Math.cos(angular * Math.PI) * radius;
         const z = Math.sin(angular * Math.PI) * radius;
-        const clearance = placed.reduce((value, other) =>
-          Math.min(value, Math.hypot(x - other.localX, z - other.localZ)), Infinity);
+        let clearance = Infinity;
+        for (const other of group.members.slice(0, index)) {
+          clearance = Math.min(clearance, Math.hypot(x - other.localX, z - other.localZ));
+        }
         if (!best || clearance > best.clearance) best = { x, z, radius, lift, clearance };
-        if (clearance >= MEMBER_SPACING[attempt < MEMBER_TRIES / 2 ? 0 : 1]) break;
+        if (clearance >= (attempt < MEMBER_TRIES / 2 ? MEMBER_ROOMY : MEMBER_SPACING)) break;
       }
       project.localX = best.x;
       project.localY = best.lift * discThickness(spiral, best.radius);
       project.localZ = best.z;
-      placed.push(project);
     });
     group.spiral = spiral;
     group.radius = spiral.radius;
@@ -299,5 +295,5 @@
     };
   }
 
-  return { layoutGalaxyProjects, galaxyColor, projectGalaxy, armAngle };
+  return { layoutGalaxyProjects, galaxyColor, projectGalaxy };
 });
