@@ -82,7 +82,7 @@
   gap: 6px;
   overflow: hidden;
   color: color-mix(in srgb, var(--focus-accent) 54%, #8da2ad);
-  font-size: clamp(3px, 0.3vw, 5px);
+  font-size: clamp(5px, 0.34vw, 7px);
   font-weight: 760;
   letter-spacing: 0.12em;
   white-space: nowrap;
@@ -163,10 +163,10 @@
   position: absolute;
   left: calc(100% + 2px);
   top: -2px;
-  max-width: 52px;
+  max-width: 70px;
   overflow: hidden;
   color: color-mix(in srgb, var(--planet-color) 54%, #d6efff);
-  font-size: clamp(3px, 0.26vw, 5px);
+  font-size: clamp(5px, 0.32vw, 7px);
   font-style: normal;
   font-weight: 680;
   letter-spacing: 0.04em;
@@ -196,10 +196,10 @@
   position: absolute;
   left: 9px;
   top: -1px;
-  max-width: 62px;
+  max-width: 80px;
   overflow: hidden;
   color: #baf8ff;
-  font-size: clamp(3px, 0.28vw, 5px);
+  font-size: clamp(5px, 0.34vw, 7px);
   font-style: normal;
   font-weight: 780;
   letter-spacing: 0.05em;
