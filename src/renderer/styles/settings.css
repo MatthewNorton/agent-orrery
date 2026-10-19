@@ -1,4 +1,4 @@
-/* settings.css — The settings dialog: recovering moved projects.
+/* settings.css — The settings dialog: graphics quality and recovering moved projects.
    Values come from tokens.css only. */
 .settings-dialog {
   width: min(680px, calc(100vw - 40px));
@@ -65,15 +65,13 @@
   white-space: nowrap;
 }
 .settings-summary.clear { color: var(--green); border-color: var(--green); }
-.settings-actions {
+.settings-actions, .settings-quality {
   margin-top: var(--space-4);
   padding: var(--space-3);
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
   border: 1px solid var(--hair);
   border-radius: var(--radius-0);
 }
+.settings-actions { display: flex; align-items: center; gap: var(--space-3); }
 .settings-actions span { color: var(--ink-3); font-size: 12px; line-height: 1.4; }
 .settings-primary, .settings-locate, .settings-candidate-use {
   flex: 0 0 auto;
@@ -140,3 +138,8 @@
   user-select: text;
 }
 .settings-no-match { margin-top: 8px; color: var(--ink-3); font-size: 12px; }
+
+/* Graphics quality: a stepped slider over the tiers, the chosen one named at the right. */
+.settings-quality-value { color: var(--ink-2); border-color: var(--hair-2); }
+.settings-quality-scale { margin-top: 6px; display: flex; justify-content: space-between; color: var(--ink-3); font-size: 12px; }
+.settings-section { margin-top: var(--space-5); padding-top: var(--space-4); border-top: 1px solid var(--hair); }

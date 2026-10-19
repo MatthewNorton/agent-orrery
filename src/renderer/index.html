@@ -66,7 +66,7 @@
       <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="2.5" width="13" height="11"></rect><path d="M5 2.5v11M11 2.5v11"></path></svg>
     </button>
     <button class="settings-button" id="settings-button" type="button"
-      aria-label="Project path settings" aria-haspopup="dialog"
+      aria-label="Settings" aria-haspopup="dialog"
       aria-controls="settings-dialog" aria-expanded="false" title="Settings">
       <span class="settings-glyph" aria-hidden="true">⚙</span>
       <span class="settings-count hidden" id="settings-count" aria-hidden="true">0</span>
@@ -79,13 +79,24 @@
       <header class="settings-head">
         <div>
           <h2 id="settings-title">SETTINGS</h2>
-          <p>PROJECT PATHS</p>
+          <p>GRAPHICS · PROJECT PATHS</p>
         </div>
         <button class="settings-close" id="settings-close" type="button"
           aria-label="Close settings">×</button>
       </header>
       <div class="settings-body">
         <div class="settings-summary-row">
+          <div>
+            <h3><label for="render-quality">Graphics quality</label></h3>
+            <p>Lower renders fewer pixels and lighter galaxies, for a smoother frame rate.</p>
+          </div>
+          <span class="settings-summary settings-quality-value" id="render-quality-value"></span>
+        </div>
+        <div class="settings-quality">
+          <input class="range" id="render-quality" type="range" min="0" step="1" />
+          <div class="settings-quality-scale" id="render-quality-scale" aria-hidden="true"></div>
+        </div>
+        <div class="settings-summary-row settings-section">
           <div>
             <h3>Recover moved projects</h3>
             <p>Reconnect derelicts to folders that still exist on this computer.</p>
@@ -159,7 +170,7 @@
     <div class="title-box" id="view-sub"></div>
     <div class="legend" aria-label="Legend"><span><i class="claude"></i>Claude</span><span><i class="codex"></i>Codex</span><span><i class="local"></i>Local model</span><span><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M1 4V1h3M8 1h3v3M11 8v3H8M4 11H1V8"></path></svg>Needs you</span></div>
   </div>
-  <span class="view-hint" id="view-hint" aria-hidden="true">Drag to orbit · scroll to zoom</span>
+  <span class="view-hint" id="view-hint" aria-hidden="true">Drag to orbit · scroll to zoom<span class="view-hint-universe"> · right-drag to pan · double-click to fit</span></span>
 
   <!-- Right command rail -->
   <aside class="sidebar command-rail" id="sidebar" data-module="rail-right" aria-label="Command rail">
@@ -353,7 +364,7 @@
       <div class="history-track">
         <svg class="history-histogram" id="history-histogram" viewBox="0 0 480 20" preserveAspectRatio="none" aria-hidden="true"></svg>
         <div class="history-markers" id="history-markers" aria-hidden="true"></div>
-        <input class="history-scrubber" id="history-scrubber" type="range"
+        <input class="range history-scrubber" id="history-scrubber" type="range"
           min="0" max="10000" step="1" value="10000" aria-label="History time" disabled />
       </div>
       <div class="history-range-labels" aria-hidden="true">
@@ -378,6 +389,7 @@
   <script src="ship-assets-api.js"></script>
   <script src="polish-math.js"></script>
   <script src="galaxy-layout.js"></script>
+  <script src="galaxy-field.js"></script>
   <script src="search-core.js"></script>
   <script src="components/project-vcs-status.js"></script>
   <script src="scene-common.js"></script>
@@ -385,6 +397,7 @@
   <script src="scene-universe-glyphs.js"></script>
   <script src="scene-universe-labels.js"></script>
   <script src="scene-universe-ships.js"></script>
+  <script src="scene-universe-stars.js"></script>
   <script src="scene-universe-stats.js"></script>
   <script src="scene-universe.js"></script>
   <script src="scene-system-belt.js"></script>
@@ -406,6 +419,7 @@
   <script src="app-project-directory.js"></script>
   <script src="app-project-search.js"></script>
   <script src="app-project-settings.js"></script>
+  <script src="app-render-quality.js"></script>
   <script src="app-project-tasks.js"></script>
   <script src="app-replay.js"></script>
   <script src="app-store.js"></script>

@@ -127,6 +127,33 @@
     return marker;
   };
 
+  // A soft radial disc, white at the centre and clear at the rim: the opacity of every glow.
+  AUR.softDiscTexture = function (scene) {
+    const size = 128;
+    const texture = new BABYLON.DynamicTexture('soft-disc', size, scene, false);
+    const context = texture.getContext();
+    const gradient = context.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+    gradient.addColorStop(0, 'rgba(255,255,255,1)');
+    gradient.addColorStop(0.45, 'rgba(255,255,255,0.45)');
+    gradient.addColorStop(1, 'rgba(255,255,255,0)');
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, size, size);
+    texture.hasAlpha = true;
+    texture.update();
+    return texture;
+  };
+
+  // Unlit colour through an opacity texture, drawn without writing depth: discs and coronas.
+  AUR.softMaterial = function (scene, name, color, alpha, opacityTexture) {
+    const material = new BABYLON.StandardMaterial(name, scene);
+    material.emissiveColor = color;
+    material.opacityTexture = opacityTexture;
+    material.disableLighting = true;
+    material.disableDepthWrite = true;
+    material.alpha = alpha;
+    return material;
+  };
+
   // Attach normalized, renderer-owned identity to the actual hull mesh. This
   // keeps provider evidence observable without exposing raw log-source text.
   AUR.markShipMesh = function markShipMesh(mesh, ship) {
@@ -186,9 +213,20 @@
     };
   };
 
-  // Fullscreen GUI layer for a scene (exactly one per scene).
+  // Fullscreen GUI layer for a scene (exactly one per scene). Its labels keep their size and
+  // layout when the graphics setting renders the scene with fewer pixels; they share the scene's
+  // buffer, so they soften with it.
   AUR.guiLayer = function (scene) {
-    return BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI('ui', true, scene);
+    const gui = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI('ui', true, scene);
+    const engine = scene.getEngine();
+    const matchDisplay = () => {
+      gui.renderScale = Math.round(1000 * engine.getHardwareScalingLevel() * window.devicePixelRatio) / 1000;
+    };
+    matchDisplay();
+    // Ahead of the GUI's own resize handler, so the texture is sized once.
+    const resized = engine.onResizeObservable.add(matchDisplay, undefined, true);
+    gui.onDisposeObservable.addOnce(() => engine.onResizeObservable.remove(resized));
+    return gui;
   };
 
   // Map labels use the chrome's faces (shipped under fonts/, declared in styles/tokens.css); the GUI

@@ -1,6 +1,7 @@
-// scene-universe-galaxies.js — deterministic galaxy regions on the universe
-// map: disc, outline and label per galaxy, the project layout that places each
-// glyph inside its galaxy, and the camera framing that keeps them all on screen.
+// scene-universe-galaxies.js — galaxy regions on the universe map: each galaxy is a tilted, lifted
+// pivot carrying its body (scene-universe-stars.js), an outline and its project glyphs; the
+// project layout that places each glyph in its galaxy; and the camera framing that keeps them
+// all on screen, with the pan bounds and speed.
 'use strict';
 
 (function () {
@@ -20,40 +21,24 @@
     function buildGalaxyVisual(spec, memberCount) {
       const colorHex = GALAXY.galaxyColor(spec.key);
       const color = AUR.color3(colorHex);
-      const region = BABYLON.MeshBuilder.CreateDisc('galaxy-region:' + spec.key, {
-        radius: 1, tessellation: 64, sideOrientation: BABYLON.Mesh.DOUBLESIDE,
-      }, scene);
-      region.rotation.x = Math.PI / 2;
-      region.isPickable = false;
-      region.metadata = { isGalaxyRegion: true, galaxyKey: spec.key };
-      const material = new BABYLON.StandardMaterial('galaxy-region-mat:' + spec.key, scene);
-      material.emissiveColor = color.scale(spec.key === 'graveyard' ? 0.025 : 0.04);
-      material.diffuseColor = new BABYLON.Color3(0, 0, 0);
-      material.specularColor = new BABYLON.Color3(0, 0, 0);
-      material.alpha = spec.key === 'graveyard' ? 0.045 : 0.055;
-      material.backFaceCulling = false;
-      material.disableDepthWrite = true;
-      region.material = material;
+      const dim = spec.key === 'graveyard';
+      const pivot = new BABYLON.TransformNode('galaxy:' + spec.key, scene);
 
-      const outline = AUR.orbitRing(scene, 1, colorHex,
-        spec.key === 'graveyard' ? 0.12 : 0.19, -2.35);
+      const outline = AUR.orbitRing(scene, 1, colorHex, dim ? 0.03 : 0.05, 0);
       outline.name = 'galaxy-outline:' + spec.key;
+      outline.parent = pivot;
       outline.isPickable = false;
-      outline.metadata = { isGalaxyOutline: true, galaxyKey: spec.key };
 
       const label = AUR.label(gui, galaxyLabelText(spec, memberCount), {
         fontSize: 12, weight: '700', color: colorHex, outline: 4,
       });
       label.name = 'galaxy-label:' + spec.key;
-      label.linkWithMesh(outline);
+      label.linkWithMesh(pivot);
       label.linkOffsetY = -12;
       label.isVisible = false;
 
       const record = {
-        key: spec.key, labelText: spec.label, colorHex,
-        x: spec.x, z: spec.z, radius: spec.radius, memberCount,
-        region, material, outline, label,
-        labelWidth: Math.min(260, Math.max(90, label.text.length * 7.8)),
+        key: spec.key, colorHex, color, dim, pivot, outline, label,
         labelOffsetY: -12, labelScreen: null,
       };
       updateGalaxyVisual(record, spec, memberCount);
@@ -62,25 +47,23 @@
     }
 
     function updateGalaxyVisual(record, spec, memberCount) {
-      record.x = spec.x;
-      record.z = spec.z;
       record.radius = spec.radius;
       record.memberCount = memberCount;
       record.labelText = spec.label;
-      record.region.position.set(spec.x, -2.5, spec.z);
-      record.region.scaling.set(spec.radius, spec.radius, 1);
-      record.outline.position.set(spec.x, 0, spec.z);
+      record.pivot.position.set(spec.x, spec.y, spec.z);
+      record.pivot.rotation.set(spec.tiltX, 0, spec.tiltZ);
       record.outline.scaling.set(spec.radius, 1, spec.radius);
       record.label.text = galaxyLabelText(spec, memberCount);
       record.labelWidth = Math.min(260, Math.max(90, record.label.text.length * 7.8));
+      view.buildGalaxyStars(record, spec);
     }
 
+    // Called once the galaxy's glyphs have moved to another pivot; disposing the pivot takes the
+    // outline with it.
     function disposeGalaxyVisual(record) {
-      if (!record) return;
-      if (record.label) record.label.dispose();
-      if (record.outline) record.outline.dispose();
-      if (record.region) record.region.dispose();
-      if (record.material) record.material.dispose();
+      view.disposeGalaxyStars(record);
+      record.label.dispose();
+      record.pivot.dispose();
     }
 
     function rebuildGalaxyLayout() {
@@ -92,11 +75,6 @@
         memberCounts.set(item.galaxyKey, (memberCounts.get(item.galaxyKey) || 0) + 1);
       }
 
-      for (const [key, record] of galaxies) {
-        if (galaxySpecs.has(key)) continue;
-        disposeGalaxyVisual(record);
-        galaxies.delete(key);
-      }
       for (const spec of layout.galaxies) {
         const count = memberCounts.get(spec.key) || 0;
         const record = galaxies.get(spec.key);
@@ -104,35 +82,57 @@
         else buildGalaxyVisual(spec, count);
       }
 
+      // Glyphs ride their galaxy's pivot, so the tilt and lift reach them for free.
       for (const g of glyphs.values()) {
         const project = store.projects.get(g.id);
         const spec = projectSpecs.get(g.id);
-        if (!project || !spec) continue;
-        const y = ((((project.seed >>> 0) % 1009) / 1008) - 0.5) * 6;
-        g.root.position.set(spec.x, y, spec.z);
+        const galaxy = spec && galaxies.get(spec.galaxyKey);
+        if (!project || !spec || !galaxy) continue;
+        g.root.parent = galaxy.pivot;
+        g.root.position.set(spec.localX, spec.localY, spec.localZ);
         g.galaxyKey = spec.galaxyKey;
         view.refreshProjectLabel(g, project);
       }
+
+      for (const [key, record] of galaxies) {
+        if (galaxySpecs.has(key)) continue;
+        disposeGalaxyVisual(record);
+        galaxies.delete(key);
+      }
       view.markLabelLayoutDirty();
-      frameCamera();
+      if (galaxies.size === 0) return;
+      const box = galaxyBounds();
+      reframeCamera(box);
+      limitPanning(box);
     }
 
     const framed = { radius: NaN, x: NaN, z: NaN };
+    const CORNERS = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
 
-    function frameCamera() {
-      if (galaxies.size === 0) return;
-      let minX = Infinity; let maxX = -Infinity;
-      let minZ = Infinity; let maxZ = -Infinity;
+    // The world-space box of every galaxy's disc, tilt and lift included.
+    function galaxyBounds() {
+      const min = new BABYLON.Vector3(Infinity, Infinity, Infinity);
+      const max = new BABYLON.Vector3(-Infinity, -Infinity, -Infinity);
+      const corner = new BABYLON.Vector3();
       for (const galaxy of galaxies.values()) {
-        minX = Math.min(minX, galaxy.x - galaxy.radius);
-        maxX = Math.max(maxX, galaxy.x + galaxy.radius);
-        minZ = Math.min(minZ, galaxy.z - galaxy.radius);
-        maxZ = Math.max(maxZ, galaxy.z + galaxy.radius);
+        const world = galaxy.pivot.computeWorldMatrix(true);
+        for (const [x, z] of CORNERS) {
+          BABYLON.Vector3.TransformCoordinatesFromFloatsToRef(x * galaxy.radius, 0, z * galaxy.radius, world, corner);
+          min.minimizeInPlace(corner);
+          max.maximizeInPlace(corner);
+        }
       }
-      const cx = (minX + maxX) / 2;
-      const cz = (minZ + maxZ) / 2;
-      const extentX = (maxX - minX) / 2;
-      const extentZ = (maxZ - minZ) / 2;
+      return { min, max };
+    }
+
+    function frameCamera(box = galaxyBounds()) {
+      if (galaxies.size === 0) return;
+      const { min, max } = box;
+      const cx = (min.x + max.x) / 2;
+      const cz = (min.z + max.z) / 2;
+      const extentX = (max.x - min.x) / 2;
+      // Lift shows on screen much like depth does at this pitch, so it widens the depth extent.
+      const extentZ = (max.z - min.z) / 2 + Math.max(Math.abs(min.y), Math.abs(max.y));
       // Fit the world into the part of the canvas the chrome leaves clear. The near edge of the
       // tilted ground sits closest to the camera, so it decides the radius; the target then
       // shifts so the world's centre lands in the middle of the clear area, not of the canvas.
@@ -144,6 +144,7 @@
         camera.upperRadiusLimit = Math.max(320, desiredRadius * 1.25);
         camera.setTarget(new BABYLON.Vector3(cx, 0, cz));
         camera.radius = Math.min(desiredRadius, camera.upperRadiusLimit);
+        limitPanning(box);
         return;
       }
       const tanFov = Math.tan(camera.fov / 2);
@@ -165,15 +166,44 @@
       framed.radius = camera.radius;
       framed.x = camera.target.x;
       framed.z = camera.target.z;
+      limitPanning(box);
     }
 
-    // Re-fit after the chrome or the window changes size, unless the viewer has moved the camera.
-    function reframeCamera() {
-      const untouched = Math.abs(camera.radius - framed.radius) < 0.5 &&
-        Math.abs(camera.target.x - framed.x) < 0.5 && Math.abs(camera.target.z - framed.z) < 0.5;
-      if (untouched) frameCamera();
+    // Re-fit after the layout, the chrome or the window changes, unless the viewer moved the camera.
+    function reframeCamera(box) {
+      const untouched = Number.isNaN(framed.radius) || (Math.abs(camera.radius - framed.radius) < 0.5 &&
+        Math.abs(camera.target.x - framed.x) < 0.5 && Math.abs(camera.target.z - framed.z) < 0.5);
+      if (untouched) frameCamera(box);
     }
 
-    return { rebuildGalaxyLayout, reframeCamera };
+    // Panning stays over the galaxies: the target roams their footprint, and always reaches where
+    // it already is (framing shifts it to clear the chrome), since Babylon refuses any pan step
+    // that would end outside the limit.
+    function limitPanning({ min, max }) {
+      const cx = (min.x + max.x) / 2;
+      const cz = (min.z + max.z) / 2;
+      camera.panningOriginTarget.set(cx, 0, cz);
+      camera.panningDistanceLimit = Math.max((max.x - min.x) / 2, (max.z - min.z) / 2,
+        Math.hypot(camera.target.x - cx, camera.target.z - cz));
+    }
+
+    // A drag moves the ground about as far as the pointer at any zoom: Babylon divides the
+    // pointer's travel by the sensibility, then lets the pan coast out over panningInertia.
+    function updatePanSpeed() {
+      const unit = 2 * camera.radius * Math.tan(camera.fov / 2) / Math.max(1, canvas.clientHeight);
+      camera.panningSensibility = 1 / (unit * (1 - camera.panningInertia));
+    }
+
+    // The first galaxy up close: the kit's proof shot of a body.
+    function frameGalaxy() {
+      const galaxy = galaxies.values().next().value;
+      if (!galaxy) return false;
+      camera.setTarget(galaxy.pivot.getAbsolutePosition().clone());
+      camera.radius = Math.max(camera.lowerRadiusLimit, galaxy.radius * 2.2);
+      camera.beta = 1;
+      return true;
+    }
+
+    return { rebuildGalaxyLayout, frameCamera, reframeCamera, frameGalaxy, updatePanSpeed };
   };
 })();

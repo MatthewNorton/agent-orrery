@@ -9,11 +9,13 @@
   const VCS = AUR.ProjectVcsStatus;
 
   AUR.sceneParts.universe.stats = function (view) {
-    const { engine, scene, canvas, gui, store, glyphs, galaxies } = view;
+    const { scene, canvas, gui, store, glyphs, galaxies } = view;
 
     function measuredLabelStats() {
-      const scaleX = canvas.clientWidth / engine.getRenderWidth();
-      const scaleY = canvas.clientHeight / engine.getRenderHeight();
+      // Label measures are in the GUI texture's pixels, which the graphics quality keeps at the display's.
+      const guiSize = gui.getSize();
+      const scaleX = canvas.clientWidth / guiSize.width;
+      const scaleY = canvas.clientHeight / guiSize.height;
       const bounds = AUR.chromeBounds(canvas);
       const measured = [];
       const combined = [];
@@ -104,11 +106,12 @@
         const galaxy = galaxies.get(g.galaxyKey);
         g.root.computeWorldMatrix(true);
         const position = g.root.getAbsolutePosition();
-        const distance = galaxy
-          ? Math.hypot(position.x - galaxy.region.position.x, position.z - galaxy.region.position.z)
-          : Infinity;
+        // Containment is judged on the galaxy's own tilted disc, not on its ground shadow.
+        const local = galaxy ? BABYLON.Vector3.TransformCoordinates(
+          position, galaxy.pivot.computeWorldMatrix(true).clone().invert()) : null;
+        const distance = local ? Math.hypot(local.x, local.z) : Infinity;
         if (g.galaxyKey !== expectedKey) assignmentMismatchCount++;
-        if (!galaxy || distance > galaxy.region.scaling.x + 1e-6) memberOutsideCount++;
+        if (!galaxy || distance > galaxy.radius + 1e-6) memberOutsideCount++;
         assignments.push({
           projectId: g.id, expectedGalaxyKey: expectedKey,
           galaxyKey: g.galaxyKey, x: position.x, y: position.y, z: position.z,
@@ -119,19 +122,18 @@
 
       const clusters = [...galaxies.values()].map((galaxy) => {
         const members = assignments.filter((item) => item.galaxyKey === galaxy.key);
-        const actualColor = galaxy.outline.color.toHexString().toLowerCase();
+        const actualColor = galaxy.colorHex.toLowerCase();
         return {
           key: galaxy.key,
           label: galaxy.labelText,
           memberCount: members.length,
-          x: galaxy.region.position.x,
-          z: galaxy.region.position.z,
-          radius: galaxy.region.scaling.x,
+          x: galaxy.pivot.position.x,
+          z: galaxy.pivot.position.z,
+          radius: galaxy.radius,
           maxMemberDistance: members.reduce(
             (value, item) => Math.max(value, item.distanceFromCenter), 0),
           color: actualColor,
           expectedColor: GALAXY.galaxyColor(galaxy.key).toLowerCase(),
-          regionPickable: galaxy.region.isPickable,
           labelVisible: Boolean(galaxy.label.isVisible),
         };
       }).sort((a, b) => a.key.localeCompare(b.key));

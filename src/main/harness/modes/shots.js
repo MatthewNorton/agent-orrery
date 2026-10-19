@@ -12,16 +12,27 @@ async function runShotMode(ctx, driver) {
   const outDir = path.join(__dirname, '..', '..', '..', '..', '.shots');
   fs.mkdirSync(outDir, { recursive: true });
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const capture = async (name, settleMs) => {
+    await wait(settleMs);
+    const image = await ctx.win.webContents.capturePage();
+    fs.writeFileSync(path.join(outDir, name + '.png'), image.toPNG());
+    console.log('captured ' + name.replace(/^shot-/, '').replace(/-/g, ' '));
+  };
   await wait(4000);
   let leftRailState = null;
   for (const view of ['universe', 'system', 'planet']) {
     const ready = new Promise((resolve) => ipcMain.once('au:debug-ready', resolve));
     ctx.win.webContents.send('au:debug-view', view);
     await ready;
-    await wait(1800);
-    const img = await ctx.win.webContents.capturePage();
-    fs.writeFileSync(path.join(outDir, `shot-${view}.png`), img.toPNG());
-    console.log(`captured ${view}`);
+    await capture(`shot-${view}`, 1800);
+    if (view === 'universe') {
+      // One galaxy up close; the next view switch rebuilds the scene, so nothing needs restoring.
+      const framed = await rendererEval(`(() => {
+        const scene = BABYLON.EngineStore.LastCreatedScene;
+        return Boolean(scene && scene.metadata && scene.metadata.frameGalaxy && scene.metadata.frameGalaxy());
+      })()`);
+      if (framed) await capture('shot-galaxy-close', 300);
+    }
     if (view === 'planet') {
       // Every left-rail module folds to its header from its chevron, and unfolds again.
       const folded = await rendererEval(`(() => {
@@ -34,10 +45,7 @@ async function runShotMode(ctx, driver) {
             Math.abs(section.getBoundingClientRect().height - headerH) <= 3),
         };
       })()`);
-      await wait(220);
-      const foldedImage = await ctx.win.webContents.capturePage();
-      fs.writeFileSync(path.join(outDir, 'shot-left-rail-folded.png'), foldedImage.toPNG());
-      console.log('captured left rail folded');
+      await capture('shot-left-rail-folded', 220);
       const unfolded = await rendererEval(`(() => {
         for (const section of document.querySelectorAll('.rail--l .mod.is-collapsed')) {
           section.querySelector('.mod-h .mod-x')?.click();
@@ -52,10 +60,7 @@ async function runShotMode(ctx, driver) {
         return rails.every((rail) => rail.classList.contains('is-collapsed') && rail.getBoundingClientRect().width < 80) &&
           title.left < 100;
       })()`);
-      await wait(220);
-      const panelsImage = await ctx.win.webContents.capturePage();
-      fs.writeFileSync(path.join(outDir, 'shot-panels-folded.png'), panelsImage.toPNG());
-      console.log('captured panels folded');
+      await capture('shot-panels-folded', 220);
       await rendererEval(`document.getElementById('panels-toggle').click()`);
       const allOpen = await rendererEval(
         `['rail-left', 'sidebar'].every((id) => !document.getElementById(id).classList.contains('is-collapsed'))`);
@@ -82,10 +87,7 @@ async function runShotMode(ctx, driver) {
         return true;
       })()`);
       if (asteroidPreview) {
-        await wait(650);
-        const asteroidImage = await ctx.win.webContents.capturePage();
-        fs.writeFileSync(path.join(outDir, 'shot-asteroid.png'), asteroidImage.toPNG());
-        console.log('captured asteroid close-up');
+        await capture('shot-asteroid', 650);
       }
     }
   }
@@ -103,10 +105,7 @@ async function runShotMode(ctx, driver) {
       compactButtons: document.querySelectorAll('.compact-rail-button').length,
     };
   })()`);
-  await wait(350);
-  const compactRailImage = await ctx.win.webContents.capturePage();
-  fs.writeFileSync(path.join(outDir, 'shot-command-rail-compact.png'), compactRailImage.toPNG());
-  console.log('captured command rail compact');
+  await capture('shot-command-rail-compact', 350);
   const railStillCompact = await rendererEval(`(() => {
     const rail = document.getElementById('sidebar');
     return Boolean(rail && rail.classList.contains('is-collapsed'));
@@ -124,10 +123,7 @@ async function runShotMode(ctx, driver) {
       selectedCount: document.querySelectorAll('.project-directory-row.selected').length,
     };
   })()`);
-  await wait(350);
-  const directoryImage = await ctx.win.webContents.capturePage();
-  fs.writeFileSync(path.join(outDir, 'shot-projects.png'), directoryImage.toPNG());
-  console.log('captured projects');
+  await capture('shot-projects', 350);
   await rendererEval(`(() => {
     const input = document.getElementById('project-directory-input');
     if (!input) return;
