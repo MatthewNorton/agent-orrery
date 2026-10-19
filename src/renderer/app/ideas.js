@@ -9,7 +9,7 @@
   const AU = window.AU;
   const A = AUR.app;
   if (!A) throw new Error('app/state.js must load before app/ideas.js');
-  const S = A.state, C = A.const;
+  const S = A.state;
 
   // ---------- root task ideas ----------
   A.wireIdeasPanel = function wireIdeasPanel() {
@@ -28,7 +28,7 @@
     els.form.addEventListener('submit', (event) => {
       event.preventDefault();
       const text = els.input.value.trim();
-      if (!text || S.ideaPanel.busy || S.playback.mode !== 'live') return;
+      if (!text) return;
       mutateIdea(() => AU.rootTaskCreate(text), 'Idea created', true);
     });
   };
@@ -122,18 +122,21 @@
     if (refreshAgain) A.refreshIdeas();
   }
 
+  const IDEA_FAILURES = new Map([
+    ['REPLAY', 'Return to LIVE before changing task ideas.'],
+    ['PROJECT_BUSY', 'That project already has an agent working on a task.'],
+    ['UNAVAILABLE', 'Codex was not found on this computer.'],
+    ['LAUNCH_FAILED', 'Goal assigned, but the agent did not start. Retry when ready.'],
+    ['WRITE_FAILED', 'The project goal could not be written.'],
+    ['PROJECT_NOT_FOUND', 'That project is unavailable. Choose an existing project.'],
+    ['LIMIT_REACHED', 'The task idea list is full.'],
+    ['NOT_FOUND', 'That idea or project is no longer available.'],
+    ['BUSY', 'That idea is already being updated.'],
+    ['INVALID_TRANSITION', 'That idea can no longer be updated.'],
+  ]);
+
   function ideaFailureText(code) {
-    if (code === 'REPLAY') return 'Return to LIVE before changing task ideas.';
-    if (code === 'PROJECT_BUSY') return 'That project already has an agent working on a task.';
-    if (code === 'UNAVAILABLE') return 'Codex was not found on this computer.';
-    if (code === 'LAUNCH_FAILED') return 'Goal assigned, but the agent did not start. Retry when ready.';
-    if (code === 'WRITE_FAILED') return 'The project goal could not be written.';
-    if (code === 'PROJECT_NOT_FOUND') return 'That project is unavailable. Choose an existing project.';
-    if (code === 'LIMIT_REACHED') return 'The task idea list is full.';
-    if (code === 'NOT_FOUND') return 'That idea or project is no longer available.';
-    if (code === 'BUSY') return 'That idea is already being updated.';
-    if (code === 'INVALID_TRANSITION') return 'That idea can no longer be updated.';
-    return 'The task idea could not be updated.';
+    return IDEA_FAILURES.get(code) || 'The task idea could not be updated.';
   }
 
   A.confirmRemoval = function confirmRemoval(prompt, text) {

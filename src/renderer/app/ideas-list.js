@@ -11,37 +11,37 @@
   function liveIdeaProjects() {
     return [...S.store.projects.values()]
       .filter((project) => project && project.exists === true)
-      .sort((a, b) => String(a.name || a.id).localeCompare(String(b.name || b.id)) ||
-        String(a.id).localeCompare(String(b.id)));
+      .sort((a, b) => A.byProjectName(a, b) || String(a.id).localeCompare(String(b.id)));
   }
 
+  const WORKING = { label: 'Agent working', css: 'working' };
+  const ASSIGNED = { label: 'Assigned', css: '' };
+  const PHASE_META = new Map([
+    ['ready-for-review', { label: 'Ready for review', css: 'ready-for-review' }],
+    ['agent-working', WORKING], ['waiting-for-agent', WORKING], ['running', WORKING],
+    ['launch-requested', { label: 'Start requested', css: 'working' }],
+    ['launch-failed', { label: 'Start failed', css: 'failed' }],
+    ['agent-aborted', { label: 'Agent stopped', css: 'failed' }],
+    ['agent-departed', { label: 'Agent lost', css: 'failed' }],
+    ['agent-not-found', { label: 'Agent not found', css: 'failed' }],
+    ['completion-failed', { label: 'Completion failed', css: 'failed' }],
+    ['prepared', ASSIGNED], ['goal-written', ASSIGNED],
+    ['reopened', { label: 'Reopened', css: '' }],
+  ]);
+  const IDEA_META = { label: 'Idea', css: '' };
+
   function ideaPhaseMeta(phase) {
-    if (phase === 'ready-for-review') return { label: 'Ready for review', css: 'ready-for-review' };
-    if (phase === 'agent-working' || phase === 'waiting-for-agent' || phase === 'running') {
-      return { label: 'Agent working', css: 'working' };
-    }
-    if (phase === 'launch-requested') return { label: 'Start requested', css: 'working' };
-    if (phase === 'launch-failed') return { label: 'Start failed', css: 'failed' };
-    if (phase === 'agent-aborted') return { label: 'Agent stopped', css: 'failed' };
-    if (phase === 'agent-departed') return { label: 'Agent lost', css: 'failed' };
-    if (phase === 'agent-not-found') return { label: 'Agent not found', css: 'failed' };
-    if (phase === 'completion-failed') return { label: 'Completion failed', css: 'failed' };
-    if (phase === 'prepared' || phase === 'goal-written') return { label: 'Assigned', css: '' };
-    if (phase === 'reopened') return { label: 'Reopened', css: '' };
-    return { label: 'Idea', css: '' };
+    return PHASE_META.get(phase) || IDEA_META;
   }
 
   // Anything not mid-start or mid-run can go; the coordinator refuses the rest.
-  function removableIdeaPhase(phase) {
-    return phase !== 'launch-requested' && phase !== 'agent-working' &&
-      phase !== 'waiting-for-agent' && phase !== 'running' && phase !== 'completing';
-  }
-
-  function retryableIdeaPhase(phase) {
-    return phase === 'launch-failed' || phase === 'agent-aborted' ||
-      phase === 'agent-departed' || phase === 'agent-not-found' ||
-      phase === 'prepared' || phase === 'goal-written' || phase === 'reopened';
-  }
+  const UNREMOVABLE_PHASES = new Set([
+    'launch-requested', 'agent-working', 'waiting-for-agent', 'running', 'completing',
+  ]);
+  const RETRYABLE_PHASES = new Set([
+    'launch-failed', 'agent-aborted', 'agent-departed', 'agent-not-found',
+    'prepared', 'goal-written', 'reopened',
+  ]);
 
   function ideaRenderKey(items, projects) {
     const itemState = items.map((item) => [
@@ -132,141 +132,127 @@
     }
   }
 
+  function ideaButton(cls, text, action, describedBy, onClick) {
+    const button = AUR.button(cls, text, onClick);
+    button.dataset.ideaAction = action;
+    if (describedBy) button.setAttribute('aria-describedby', describedBy);
+    return button;
+  }
+
+  function ideaRow(item, projects) {
+    const row = AUR.el('article', 'idea-row');
+    row.dataset.ideaId = item.id;
+    const heading = AUR.el('div', 'idea-heading');
+    const taskText = AUR.el('div', 'idea-text', item.text);
+    taskText.id = `idea-text-${item.id}`;
+    taskText.tabIndex = -1;
+    const meta = ideaPhaseMeta(item.phase);
+    heading.append(taskText, AUR.el('span', `idea-phase ${meta.css}`.trim(), meta.label));
+    if (!UNREMOVABLE_PHASES.has(item.phase)) {
+      const prompt = item.projectId
+        ? 'Remove this idea? Its unfinished GOALS.md entry is removed from the project too.'
+        : 'Remove this unassigned idea?';
+      // removeIdea refuses on its own; this check only spares the confirm dialog.
+      const remove = ideaButton('idea-remove', '×', 'remove', null, () => {
+        if (ideaMutationsDisabled() || !A.confirmRemoval(prompt, item.text)) return;
+        A.removeIdea(item);
+      });
+      remove.setAttribute('aria-label', 'Remove idea');
+      remove.setAttribute('aria-describedby', taskText.id);
+      remove.title = 'Remove idea';
+      heading.appendChild(remove);
+    }
+    row.appendChild(heading);
+
+    const assigned = item.projectId ? S.store.projects.get(item.projectId) : null;
+    const assignedAvailable = Boolean(assigned && assigned.exists === true);
+    if (item.projectId) {
+      row.appendChild(AUR.el(
+        'div', 'idea-project', assignedAvailable
+          ? assigned.name : 'Assigned project unavailable'
+      ));
+    }
+    const controls = ideaControls(item, taskText.id, assignedAvailable, projects);
+    if (controls) row.appendChild(controls);
+    return row;
+  }
+
+  // Assign while an idea, retry after a failed start, view once the project has the task.
+  function ideaControls(item, describedBy, assignedAvailable, projects) {
+    const controls = AUR.el('div', 'idea-controls');
+    if (item.phase === 'idea') {
+      const select = document.createElement('select');
+      select.className = 'idea-select';
+      select.dataset.ideaAction = 'select';
+      select.setAttribute('aria-label', 'Project or star system');
+      select.setAttribute('aria-describedby', describedBy);
+      select.appendChild(new Option('Choose project…', ''));
+      for (const project of projects) {
+        const name = A.projectLabel(project);
+        const detail = A.projectSearchSubtitle(project);
+        select.appendChild(new Option(detail ? `${name} — ${detail}` : name, project.id));
+      }
+      const selected = S.ideaPanel.selections.get(item.id) || '';
+      if (projects.some((project) => project.id === selected)) select.value = selected;
+      const assign = ideaButton('idea-action', 'Assign & start', 'assign', describedBy,
+        () => A.assignIdea(item.id, select.value));
+      select.addEventListener('change', () => {
+        S.ideaPanel.selections.set(item.id, select.value);
+        assign.disabled = !select.value;
+      });
+      controls.append(select, assign);
+    } else if (RETRYABLE_PHASES.has(item.phase)) {
+      const retry = ideaButton('idea-action', 'Retry start', 'retry', describedBy,
+        () => A.retryIdea(item.id));
+      retry.dataset.unavailable = String(!assignedAvailable);
+      controls.append(AUR.el('span', 'idea-project', retryIdeaCopy(item.phase)), retry);
+    } else if (item.projectId &&
+        (item.phase === 'ready-for-review' || item.phase === 'completion-failed')) {
+      const view = ideaButton('idea-action', 'View project', 'view', describedBy,
+        () => A.jumpToProject(item.projectId));
+      view.disabled = !assignedAvailable;
+      controls.append(AUR.el('span', 'idea-project', 'Project task'), view);
+    } else {
+      return null;
+    }
+    return controls;
+  }
+
+  function showMoreButton(remaining) {
+    return ideaButton('idea-action idea-show-more', `Show ${Math.min(100, remaining)} more`,
+      'show-more', null, () => {
+        const firstNewItem = S.ideaPanel.items[S.ideaPanel.visibleLimit];
+        S.ideaPanel.visibleLimit += 100;
+        S.ideaPanel.focusAfterRender = firstNewItem
+          ? { id: firstNewItem.id, action: null, reveal: true } : null;
+        S.ideaPanel.renderKey = '';
+        A.renderIdeas();
+      });
+  }
+
   A.renderIdeas = function renderIdeas() {
     const els = S.ideaPanel.els;
     if (!els || !els.panel) return;
     const projects = liveIdeaProjects();
     const replay = S.playback.mode !== 'live' || S.replayTransitionPending;
     const disabled = ideaMutationsDisabled();
-    els.panel.classList.toggle('is-empty', S.ideaPanel.items.length === 0);
+    const count = S.ideaPanel.items.length;
+    A.setRailCount('ideas', count, count === 0);
     els.panel.setAttribute('aria-busy', String(S.ideaPanel.busy));
-    els.count.textContent = `${S.ideaPanel.items.length} idea${S.ideaPanel.items.length === 1 ? '' : 's'}`;
-    if (S.commandRail.els && S.commandRail.els.ideasCompactCount) {
-      S.commandRail.els.ideasCompactCount.textContent = String(S.ideaPanel.items.length);
-    }
+    els.count.textContent = `${count} idea${count === 1 ? '' : 's'}`;
     const nextRenderKey = ideaRenderKey(S.ideaPanel.items, projects);
     if (nextRenderKey !== S.ideaPanel.renderKey) {
       const previousFocus = ideaFocusedControl(els.list);
       S.ideaPanel.renderKey = nextRenderKey;
       AUR.clear(els.list);
-      if (S.ideaPanel.items.length === 0) {
+      if (count === 0) {
         els.list.appendChild(AUR.el(
           'div', 'empty-note', 'Capture an idea, then assign it to a project'
         ));
       } else {
         const visibleItems = S.ideaPanel.items.slice(0, S.ideaPanel.visibleLimit);
-        for (const item of visibleItems) {
-          const row = AUR.el('article', 'idea-row');
-          row.dataset.ideaId = item.id;
-          const heading = AUR.el('div', 'idea-heading');
-          const taskText = AUR.el('div', 'idea-text', item.text);
-          taskText.id = `idea-text-${item.id}`;
-          taskText.tabIndex = -1;
-          heading.appendChild(taskText);
-          const meta = ideaPhaseMeta(item.phase);
-          heading.appendChild(AUR.el('span', `idea-phase ${meta.css}`.trim(), meta.label));
-          if (removableIdeaPhase(item.phase)) {
-            const remove = AUR.el('button', 'idea-remove', '×');
-            remove.type = 'button';
-            remove.dataset.ideaAction = 'remove';
-            remove.setAttribute('aria-label', 'Remove idea');
-            remove.setAttribute('aria-describedby', taskText.id);
-            remove.title = 'Remove idea';
-            const prompt = item.projectId
-              ? 'Remove this idea? Its unfinished GOALS.md entry is removed from the project too.'
-              : 'Remove this unassigned idea?';
-            remove.addEventListener('click', () => {
-              if (ideaMutationsDisabled() || !A.confirmRemoval(prompt, item.text)) return;
-              if (!ideaMutationsDisabled()) A.removeIdea(item);
-            });
-            heading.appendChild(remove);
-          }
-          row.appendChild(heading);
-
-          const assigned = item.projectId ? S.store.projects.get(item.projectId) : null;
-          const assignedAvailable = Boolean(assigned && assigned.exists === true);
-          if (item.projectId) {
-            row.appendChild(AUR.el(
-              'div', 'idea-project', assignedAvailable
-                ? assigned.name : 'Assigned project unavailable'
-            ));
-          }
-
-          if (item.phase === 'idea') {
-            const controls = AUR.el('div', 'idea-controls');
-            const select = document.createElement('select');
-            select.className = 'idea-select';
-            select.dataset.ideaAction = 'select';
-            select.setAttribute('aria-label', 'Project or star system');
-            select.setAttribute('aria-describedby', taskText.id);
-            select.appendChild(new Option('Choose project…', ''));
-            for (const project of projects) {
-              const name = project.name || project.id;
-              const detail = A.projectSearchSubtitle(project);
-              select.appendChild(new Option(detail ? `${name} — ${detail}` : name, project.id));
-            }
-            const selected = S.ideaPanel.selections.get(item.id) || '';
-            if (projects.some((project) => project.id === selected)) select.value = selected;
-            select.addEventListener('change', () => {
-              S.ideaPanel.selections.set(item.id, select.value);
-              action.disabled = !select.value;
-            });
-            const action = AUR.el('button', 'idea-action', 'Assign & start');
-            action.type = 'button';
-            action.dataset.ideaAction = 'assign';
-            action.setAttribute('aria-describedby', taskText.id);
-            action.addEventListener('click', () => {
-              if (!ideaMutationsDisabled()) A.assignIdea(item.id, select.value);
-            });
-            controls.appendChild(select);
-            controls.appendChild(action);
-            row.appendChild(controls);
-          } else if (retryableIdeaPhase(item.phase)) {
-            const controls = AUR.el('div', 'idea-controls');
-            controls.appendChild(AUR.el('span', 'idea-project', retryIdeaCopy(item.phase)));
-            const retry = AUR.el('button', 'idea-action', 'Retry start');
-            retry.type = 'button';
-            retry.dataset.ideaAction = 'retry';
-            retry.dataset.unavailable = String(!assignedAvailable);
-            retry.setAttribute('aria-describedby', taskText.id);
-            retry.addEventListener('click', () => {
-              if (!ideaMutationsDisabled()) A.retryIdea(item.id);
-            });
-            controls.appendChild(retry);
-            row.appendChild(controls);
-          } else if (item.projectId &&
-              (item.phase === 'ready-for-review' || item.phase === 'completion-failed')) {
-            const controls = AUR.el('div', 'idea-controls');
-            controls.appendChild(AUR.el('span', 'idea-project', 'Project task'));
-            const view = AUR.el('button', 'idea-action', 'View project');
-            view.type = 'button';
-            view.dataset.ideaAction = 'view';
-            view.setAttribute('aria-describedby', taskText.id);
-            view.disabled = !assignedAvailable;
-            view.addEventListener('click', () => A.jumpToProject(item.projectId));
-            controls.appendChild(view);
-            row.appendChild(controls);
-          }
-          els.list.appendChild(row);
-        }
-        if (visibleItems.length < S.ideaPanel.items.length) {
-          const remaining = S.ideaPanel.items.length - visibleItems.length;
-          const showMore = AUR.el(
-            'button', 'idea-action idea-show-more',
-            `Show ${Math.min(100, remaining)} more`
-          );
-          showMore.type = 'button';
-          showMore.dataset.ideaAction = 'show-more';
-          showMore.addEventListener('click', () => {
-            const firstNewItem = S.ideaPanel.items[S.ideaPanel.visibleLimit];
-            S.ideaPanel.visibleLimit += 100;
-            S.ideaPanel.focusAfterRender = firstNewItem
-              ? { id: firstNewItem.id, action: null, reveal: true } : null;
-            S.ideaPanel.renderKey = '';
-            A.renderIdeas();
-          });
-          els.list.appendChild(showMore);
-        }
+        for (const item of visibleItems) els.list.appendChild(ideaRow(item, projects));
+        if (visibleItems.length < count) els.list.appendChild(showMoreButton(count - visibleItems.length));
       }
       restoreIdeaFocus(els.list, previousFocus);
     }

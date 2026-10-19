@@ -65,8 +65,10 @@ loaders), then:
 View contract: each `scene/<view>/view.js` registers
 `AUR.views.<name> = (engine, data, ctx) => ({ scene, update(eventBatch), dispose() })`
 where `ctx` provides `openSystem(projectId)`, `openPlanet(projectId, name)`, the
-shared `store` and the graphics `quality` tier. Views may expose extras the app layer
-probes for (`setSearchMatches`, `setQuality`, `focusShip`, `planetData`).
+shared `store` and the graphics `quality` tier. Views may also implement `resize`,
+`setQuality`, `setSearchMatches`, `setShipFocusVantage`, `focusShip` and `shipFocusState`;
+the app fills in a no-op default for any they leave out (`VIEW_DEFAULTS` in `app/boot.js`).
+`planetData` is an optional field, read through `A.activePlanetData()`.
 
 ## 3. The `window.AU` bridge (matches `src/preload.js`)
 

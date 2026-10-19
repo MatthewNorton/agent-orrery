@@ -7,7 +7,7 @@
   const VCS = AUR.ProjectVcsStatus;
   const A = AUR.app;
   if (!A) throw new Error('app/state.js must load before app/project/directory.js');
-  const S = A.state, C = A.const;
+  const S = A.state;
 
   // ---------- searchable all-projects directory ----------
   A.wireProjectDirectory = function wireProjectDirectory() {
@@ -32,33 +32,13 @@
     els.close.addEventListener('click', () => A.closeProjectDirectory());
     els.scrim.addEventListener('click', () => A.closeProjectDirectory());
     els.input.addEventListener('input', () => {
-      cancelProjectDirectoryTimer();
-      S.projectDirectory.timer = setTimeout(() => {
-        S.projectDirectory.timer = null;
-        updateProjectDirectory();
-      }, C.SEARCH_DEBOUNCE_MS);
+      A.debounceListbox(S.projectDirectory, updateProjectDirectory);
     });
-    els.input.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        event.stopPropagation();
-        A.closeProjectDirectory();
-        return;
-      }
-      if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp' && event.key !== 'Enter') return;
-      event.preventDefault();
-      event.stopPropagation();
-      flushProjectDirectory();
-      if (event.key === 'Enter') {
-        activateProjectDirectoryResult(S.projectDirectory.selected);
-        return;
-      }
-      if (S.projectDirectory.results.length === 0) return;
-      const delta = event.key === 'ArrowDown' ? 1 : -1;
-      S.projectDirectory.selected = (
-        S.projectDirectory.selected + delta + S.projectDirectory.results.length
-      ) % S.projectDirectory.results.length;
-      renderProjectDirectoryResults();
+    A.wireListboxKeys(els.input, S.projectDirectory, {
+      escape: () => A.closeProjectDirectory(),
+      update: updateProjectDirectory,
+      activate: activateProjectDirectoryResult,
+      render: renderProjectDirectoryResults,
     });
     document.addEventListener('keydown', (event) => {
       if (event.key !== 'Escape' || !S.projectDirectory.open) return;
@@ -83,7 +63,7 @@
   A.closeProjectDirectory = function closeProjectDirectory(restoreFocus = true) {
     const els = S.projectDirectory.els;
     if (!els || !S.projectDirectory.open) return;
-    cancelProjectDirectoryTimer();
+    A.cancelListboxTimer(S.projectDirectory);
     S.projectDirectory.open = false;
     S.projectDirectory.query = '';
     S.projectDirectory.results = [];
@@ -93,17 +73,6 @@
     A.syncProjectMatches();
     if (restoreFocus) els.button.focus();
   };
-
-  function cancelProjectDirectoryTimer() {
-    if (S.projectDirectory.timer != null) clearTimeout(S.projectDirectory.timer);
-    S.projectDirectory.timer = null;
-  }
-
-  function flushProjectDirectory() {
-    if (S.projectDirectory.timer == null) return;
-    cancelProjectDirectoryTimer();
-    updateProjectDirectory();
-  }
 
   function projectsByActivity() {
     const activeCounts = new Map();
@@ -117,7 +86,7 @@
       if (existsDelta !== 0) return existsDelta;
       const activityDelta = (Number(b.lastActivity) || 0) - (Number(a.lastActivity) || 0);
       if (activityDelta !== 0) return activityDelta;
-      return String(a.name || a.id).localeCompare(String(b.name || b.id));
+      return A.byProjectName(a, b);
     });
   }
 
@@ -132,28 +101,15 @@
     S.projectDirectory.query = query;
     if (query) {
       const matches = VCS.filterProjects(projects, { query });
-      const ranked = AUR.searchProjects(matches, query, Math.max(matches.length, 8));
-      const rankedIds = new Set(ranked.map((project) => project.id));
-      S.projectDirectory.results = [
-        ...ranked,
-        ...matches.filter((project) => !rankedIds.has(project.id)),
-      ];
+      S.projectDirectory.results = A.rankedFirst(
+        matches, AUR.searchProjects(matches, query, Math.max(matches.length, 8))
+      );
     } else {
       S.projectDirectory.results = projects;
     }
-    const previousIndex = previous
-      ? S.projectDirectory.results.findIndex((project) => project.id === previous.id)
-      : -1;
-    S.projectDirectory.selected = queryChanged ? 0 : previousIndex >= 0
-      ? previousIndex
-      : Math.min(S.projectDirectory.selected, Math.max(0, S.projectDirectory.results.length - 1));
+    A.keepSelection(S.projectDirectory, previous, queryChanged, (project) => project.id);
     A.renderProjectDirectory();
-    if (S.activeView && typeof S.activeView.setSearchMatches === 'function') {
-      const active = Boolean(query) || S.projectSearch.filter !== VCS.FILTERS.ALL;
-      S.activeView.setSearchMatches(active
-        ? new Set(S.projectDirectory.results.map((project) => project.id))
-        : null);
-    }
+    A.syncProjectMatches(allProjects, query);
   }
 
   A.refreshProjectDirectoryFromStore = function refreshProjectDirectoryFromStore() {
@@ -192,52 +148,40 @@
   function renderProjectDirectoryResults() {
     const els = S.projectDirectory.els;
     if (!els || !S.projectDirectory.open) return;
-    AUR.clear(els.list);
-    if (S.projectDirectory.results.length === 0) {
-      els.list.appendChild(AUR.el('div', 'project-directory-empty', 'No projects found'));
-      els.input.removeAttribute('aria-activedescendant');
-      return;
-    }
-
-    S.projectDirectory.results.forEach((project, index) => {
-      const ships = A.shipsInProject(project.id);
-      const active = ships.length > 0;
-      const missing = project.exists === false;
-      const selected = index === S.projectDirectory.selected;
-      const row = AUR.el(
-        'button', 'project-directory-row' + (active ? ' active' : '') +
-          (missing ? ' missing' : '') + (selected ? ' selected' : '')
-      );
-      row.type = 'button';
-      row.id = 'project-directory-result-' + index;
-      row.setAttribute('role', 'option');
-      row.setAttribute('aria-selected', String(selected));
-      row.title = missing ? 'Recover this project path' : 'Open ' + (project.name || project.id);
-
-      row.appendChild(AUR.el('span', 'project-directory-dot'));
-      const copy = AUR.el('span', 'project-directory-copy');
-      copy.appendChild(AUR.el('span', 'project-directory-name', project.name || project.id));
-      copy.appendChild(AUR.el('span', 'project-directory-path', project.path || 'No path available'));
-      row.appendChild(copy);
-
-      const meta = AUR.el('span', 'project-directory-meta');
-      const state = missing ? 'MISSING' : active
-        ? `${ships.length} AGENT${ships.length === 1 ? '' : 'S'}`
-        : AUR.relTime(project.lastActivity, A.playbackReferenceTs());
-      meta.appendChild(AUR.el('span', 'project-directory-state', state));
-      meta.appendChild(AUR.el('span', 'project-directory-galaxy', A.projectGalaxyLabel(project)));
-      const vcsMarkers = AUR.el('span', 'project-directory-vcs');
-      VCS.renderMarkers(vcsMarkers, project);
-      meta.appendChild(vcsMarkers);
-      row.appendChild(meta);
-      row.addEventListener('click', () => activateProjectDirectoryResult(index));
-      els.list.appendChild(row);
+    A.renderListbox(els.list, els.input, S.projectDirectory, {
+      idPrefix: 'project-directory-result-',
+      rowClass: (project) => 'project-directory-row' +
+        (A.shipsInProject(project.id).length > 0 ? ' active' : '') +
+        (project.exists === false ? ' missing' : ''),
+      emptyClass: 'project-directory-empty',
+      emptyText: 'No projects found',
+      fill: fillDirectoryRow,
+      activate: activateProjectDirectoryResult,
     });
-    els.input.setAttribute(
-      'aria-activedescendant', 'project-directory-result-' + S.projectDirectory.selected
+  }
+
+  function fillDirectoryRow(row, project) {
+    const ships = A.shipsInProject(project.id);
+    const missing = project.exists === false;
+    row.title = missing ? 'Recover this project path' : 'Open ' + A.projectLabel(project);
+
+    const copy = AUR.el('span', 'project-directory-copy');
+    copy.append(
+      AUR.el('span', 'project-directory-name', A.projectLabel(project)),
+      AUR.el('span', 'project-directory-path', project.path || 'No path available')
     );
-    const selectedRow = els.list.querySelector('.project-directory-row.selected');
-    if (selectedRow) selectedRow.scrollIntoView({ block: 'nearest' });
+    const meta = AUR.el('span', 'project-directory-meta');
+    const state = missing ? 'MISSING' : ships.length > 0
+      ? `${ships.length} AGENT${ships.length === 1 ? '' : 'S'}`
+      : AUR.relTime(project.lastActivity, A.playbackReferenceTs());
+    const vcsMarkers = AUR.el('span', 'project-directory-vcs');
+    VCS.renderMarkers(vcsMarkers, project);
+    meta.append(
+      AUR.el('span', 'project-directory-state', state),
+      AUR.el('span', 'project-directory-galaxy', A.projectGalaxyLabel(project)),
+      vcsMarkers
+    );
+    row.append(AUR.el('span', 'project-directory-dot'), copy, meta);
   }
 
   function activateProjectDirectoryResult(index) {
