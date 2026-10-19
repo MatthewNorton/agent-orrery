@@ -12,19 +12,19 @@
   // harness. This exposes measurements, never a second fake renderer state.
   function historyTestMetrics() {
     const bar = document.getElementById('history-bar');
-    const rect = bar ? bar.getBoundingClientRect() : null;
+    const edges = (element) => {
+      const value = element.getBoundingClientRect();
+      return { left: value.left, top: value.top, right: value.right, bottom: value.bottom };
+    };
     const visibleRect = (id) => {
       const element = document.getElementById(id);
       if (!element || element.classList.contains('hidden') ||
           getComputedStyle(element).display === 'none') return null;
-      const value = element.getBoundingClientRect();
-      return { left: value.left, top: value.top, right: value.right, bottom: value.bottom };
+      return edges(element);
     };
     const overlaps = (a, b) => Boolean(a && b && a.left < b.right && a.right > b.left &&
       a.top < b.bottom && a.bottom > b.top);
-    const barRect = rect
-      ? { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom }
-      : null;
+    const barRect = bar ? edges(bar) : null;
     const overlapIds = ['sidebar', 'summary-card', 'tabbar', 'project-card', 'planet-card']
       .filter((id) => overlaps(barRect, visibleRect(id)));
     const scene = S.activeScene && !S.activeScene.isDisposed ? S.activeScene : null;
@@ -42,6 +42,9 @@
     if (S.engine) {
       for (const item of S.engine.scenes || []) if (!item.isDisposed) liveSceneCount++;
     }
+    const els = S.historyEls || {};
+    const textOf = (key) => (els[key] ? els[key].textContent : '');
+    const markerCount = (selector) => (els.markers ? els.markers.querySelectorAll(selector).length : 0);
     return {
       streamEpoch: S.streamEpoch,
       playback: { ...S.playback },
@@ -55,23 +58,19 @@
           .reduce((latest, project) => Math.max(latest, Number(project.lastActivity) || 0), 0),
       },
       controls: {
-        playText: S.historyEls && S.historyEls.play ? S.historyEls.play.textContent : '',
-        speedText: S.historyEls && S.historyEls.speed ? S.historyEls.speed.textContent : '',
-        timeText: S.historyEls && S.historyEls.time ? S.historyEls.time.textContent : '',
-        livePressed: Boolean(S.historyEls && S.historyEls.live &&
-          S.historyEls.live.getAttribute('aria-pressed') === 'true'),
-        scrubberDisabled: Boolean(S.historyEls && S.historyEls.scrubber && S.historyEls.scrubber.disabled),
-        scrubberValue: S.historyEls && S.historyEls.scrubber ? Number(S.historyEls.scrubber.value) : null,
-        feedMode: S.historyEls && S.historyEls.feedLabel ? S.historyEls.feedLabel.textContent : '',
-        contextText: S.historyEls && S.historyEls.context ? S.historyEls.context.textContent : '',
-        startText: S.historyEls && S.historyEls.start ? S.historyEls.start.textContent : '',
-        endText: S.historyEls && S.historyEls.end ? S.historyEls.end.textContent : '',
-        markerCount: S.historyEls && S.historyEls.markers
-          ? S.historyEls.markers.querySelectorAll('.history-marker').length : 0,
-        newMarkerCount: S.historyEls && S.historyEls.markers
-          ? S.historyEls.markers.querySelectorAll('.history-marker.new').length : 0,
-        projectEventText: S.historyEls && S.historyEls.projectEvent
-          ? S.historyEls.projectEvent.textContent : '',
+        playText: textOf('play'),
+        speedText: textOf('speed'),
+        timeText: textOf('time'),
+        livePressed: Boolean(els.live && els.live.getAttribute('aria-pressed') === 'true'),
+        scrubberDisabled: Boolean(els.scrubber && els.scrubber.disabled),
+        scrubberValue: els.scrubber ? Number(els.scrubber.value) : null,
+        feedMode: textOf('feedLabel'),
+        contextText: textOf('context'),
+        startText: textOf('start'),
+        endText: textOf('end'),
+        markerCount: markerCount('.history-marker'),
+        newMarkerCount: markerCount('.history-marker.new'),
+        projectEventText: textOf('projectEvent'),
       },
       performance: { ...S.historyPerf },
       dom: {

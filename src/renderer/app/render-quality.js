@@ -20,7 +20,7 @@
     if (tier === S.renderQuality) return;
     S.renderQuality = tier;
     A.applyRenderScale();
-    if (S.activeView && S.activeView.setQuality) S.activeView.setQuality(tier);
+    if (S.activeView) S.activeView.setQuality(tier);
   }
 
   // The label follows the thumb while it moves; the scene rebuilds once, on release.

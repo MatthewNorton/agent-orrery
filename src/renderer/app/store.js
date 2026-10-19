@@ -99,7 +99,7 @@
   };
 
   function maybeNotifyAttention(previousAttention, ship) {
-    const entered = ship && (ship.attention === 'question' || ship.attention === 'permission');
+    const entered = ship && AUR.needsYou(ship.attention);
     if (S.playback.mode !== 'live' || previousAttention != null || !entered ||
         typeof window.Notification !== 'function') return;
 

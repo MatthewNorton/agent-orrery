@@ -57,9 +57,7 @@
     if (parts.lead) head.appendChild(parts.lead);
     head.appendChild(AUR.el('h2', 'mod-title', title));
     for (const node of parts.extras || []) head.appendChild(node);
-    const toggle = AUR.el('button', 'mod-x');
-    toggle.type = 'button';
-    head.appendChild(toggle);
+    head.appendChild(AUR.button('mod-x'));
     section.appendChild(head);
     applyModuleState(section);
   };

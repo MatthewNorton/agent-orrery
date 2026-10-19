@@ -27,28 +27,36 @@
     return 0;
   };
 
-  let chromePending = false;
+  // In render order: the summary's build histogram reads the history bar as it stands.
+  const RENDERERS = [
+    [CHROME.AGENTS, 'renderAgents'],
+    [CHROME.FEED, 'renderFeed'],
+    [CHROME.SUMMARY, 'renderSummary'],
+    [CHROME.PROJECT, 'renderProjectCard'],
+    [CHROME.PLANET, 'renderPlanetCard'],
+    [CHROME.GALAXIES, 'renderGalaxies'],
+    [CHROME.SEARCH, 'refreshProjectSearchFromStore'],
+    [CHROME.SETTINGS, 'renderProjectSettings'],
+    [CHROME.DIRECTORY, 'refreshProjectDirectoryFromStore'],
+    [CHROME.IDEAS, 'renderIdeas'],
+    [CHROME.FOCUS, 'renderAgentFocus'],
+    [CHROME.HISTORY, 'renderHistory'],
+  ];
+
+  /** Renders the panels in `mask` now; a frame already scheduled still renders its own. @param {number} mask */
+  A.renderChromeNow = function renderChromeNow(mask) {
+    for (const [bit, name] of RENDERERS) if (mask & bit) A[name]();
+  };
+
   let pendingChromeMask = 0;
   A.scheduleChrome = function scheduleChrome(mask) {
+    const idle = pendingChromeMask === 0;
     pendingChromeMask |= mask;
-    if (chromePending || pendingChromeMask === 0) return;
-    chromePending = true;
+    if (!idle || pendingChromeMask === 0) return;
     requestAnimationFrame(() => {
-      chromePending = false;
       const next = pendingChromeMask;
       pendingChromeMask = 0;
-      if (next & CHROME.AGENTS) A.renderAgents();
-      if (next & CHROME.FEED) A.renderFeed();
-      if (next & CHROME.SUMMARY) A.renderSummary();
-      if (next & CHROME.PROJECT) A.renderProjectCard();
-      if (next & CHROME.PLANET) A.renderPlanetCard();
-      if (next & CHROME.GALAXIES) A.renderGalaxies();
-      if (next & CHROME.SEARCH) A.refreshProjectSearchFromStore();
-      if (next & CHROME.SETTINGS) A.renderProjectSettings();
-      if (next & CHROME.DIRECTORY) A.refreshProjectDirectoryFromStore();
-      if (next & CHROME.IDEAS) A.renderIdeas();
-      if (next & CHROME.FOCUS) A.renderAgentFocus();
-      if (next & CHROME.HISTORY) A.renderHistory();
+      A.renderChromeNow(next);
     });
   };
 
