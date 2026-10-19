@@ -23,16 +23,14 @@
     if (view === 'system' || view === 'planet') {
       const project = S.store.projects.get(S.current.projectId);
       const ships = A.shipsInProject(S.current.projectId);
-      const pd = view === 'planet' && S.activeView && S.activeView.planetData ? S.activeView.planetData : null;
+      const pd = view === 'planet' ? A.activePlanetData() : null;
       title = pd ? String(pd.name) : (project ? project.name : 'System');
       const builds = project ? (project.totalBuilds || 0) : 0;
       line = pd
         ? (project ? project.name : '') + ' · ' + ships.length + ' agents'
         : ships.length + ' agents · ' + builds + ' builds';
     } else {
-      const online = new Set();
-      for (const s of S.store.ships.values()) online.add(s.project);
-      line = S.store.projects.size + ' projects · ' + online.size + ' systems online';
+      line = S.store.projects.size + ' projects · ' + A.onlineProjectCount() + ' systems online';
     }
     kind.textContent = VIEW_KIND[view] || VIEW_KIND.universe;
     name.textContent = title;
@@ -43,16 +41,16 @@
   // ---------- needs you: the alarm in the top bar and the module in the left rail ----------
   function needsRow(ship) {
     const meta = AUR.attentionMeta(ship.attention);
-    const row = AUR.el('button', 'needs-row');
-    row.type = 'button';
+    const row = AUR.button('needs-row', null, () => A.enterAgentFocus(ship.id));
     row.style.setProperty('--tint', meta ? meta.color : '');
     row.setAttribute('aria-label', 'Open ' + ship.name + ' in first-person view');
-    row.addEventListener('click', () => A.enterAgentFocus(ship.id));
     const name = AUR.el('span', 'needs-name', ship.name + ' · ');
     name.appendChild(AUR.el('em', null, meta ? meta.label : ''));
-    row.appendChild(name);
-    row.appendChild(AUR.el('span', 'needs-wait', AUR.relTime(ship.lastActivity, A.playbackReferenceTs())));
-    row.appendChild(AUR.el('span', 'needs-sub', A.projectName(ship.project) + ' · ' + ship.status));
+    row.append(
+      name,
+      AUR.el('span', 'needs-wait', AUR.relTime(ship.lastActivity, A.playbackReferenceTs())),
+      AUR.el('span', 'needs-sub', A.projectName(ship.project) + ' · ' + ship.status)
+    );
     return row;
   }
 
@@ -63,7 +61,7 @@
     const alarm = document.getElementById('needs-you');
     const alarmCount = document.getElementById('needs-you-count');
     if (!panel || !list || !alarm) return;
-    const waiting = ships.filter((s) => s.attention === 'question' || s.attention === 'permission');
+    const waiting = ships.filter((s) => AUR.needsYou(s.attention));
     panel.classList.toggle('hidden', waiting.length === 0);
     alarm.classList.toggle('hidden', waiting.length === 0);
     if (count) count.textContent = pad(waiting.length);
@@ -105,8 +103,7 @@
       const row = rows.get(keyOf.get(String(ship.project)));
       if (row) row.agents += 1;
     }
-    const els = S.commandRail.els;
-    if (els && els.galaxiesCompactCount) els.galaxiesCompactCount.textContent = String(rows.size);
+    A.setRailCount('galaxies', rows.size);
     if (count) count.textContent = rows.size + (rows.size === 1 ? ' galaxy' : ' galaxies');
     AUR.clear(list);
     if (rows.size === 0) { list.appendChild(AUR.el('div', 'empty-note', 'No galaxies yet')); return; }
@@ -114,11 +111,13 @@
       const el = AUR.el('div', 'galaxy-row');
       const swatch = AUR.el('i', 'galaxy-swatch');
       swatch.style.background = GALAXY.galaxyColor(row.key);
-      el.appendChild(swatch);
-      el.appendChild(AUR.el('span', 'galaxy-name', row.label));
-      el.appendChild(AUR.el('span', 'galaxy-builds', String(row.builds)));
-      el.appendChild(AUR.el('span', 'galaxy-sub',
-        row.systems + (row.systems === 1 ? ' system · ' : ' systems · ') + row.agents + (row.agents === 1 ? ' agent' : ' agents')));
+      el.append(
+        swatch,
+        AUR.el('span', 'galaxy-name', row.label),
+        AUR.el('span', 'galaxy-builds', String(row.builds)),
+        AUR.el('span', 'galaxy-sub', row.systems + (row.systems === 1 ? ' system · ' : ' systems · ') +
+          row.agents + (row.agents === 1 ? ' agent' : ' agents'))
+      );
       list.appendChild(el);
     }
   };
@@ -133,7 +132,7 @@
     const replay = Boolean(bar && bar.dataset.mode === 'replay');
     if (!h || replay) { svg.innerHTML = ''; if (total) total.textContent = ''; return; }
     const max = Math.max(1, ...h.bins);
-    const nowBin = Math.min(47, Math.max(0, Math.floor((Date.now() - h.day) / 1800000)));
+    const nowBin = AUR.clamp(Math.floor((Date.now() - h.day) / 1800000), 0, 47);
     let sum = 0, out = '';
     h.bins.forEach((v, i) => {
       sum += v;

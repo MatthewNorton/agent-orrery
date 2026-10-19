@@ -192,12 +192,25 @@
   AUR.storeJson = function storeJson(key, value) {
     try { localStorage.setItem(key, JSON.stringify(value)); } catch (error) { /* a convenience, never a requirement */ }
   };
+  // The raw string, or null when storage is unavailable.
+  AUR.storedText = function storedText(key) {
+    try { return localStorage.getItem(key); } catch (error) { return null; }
+  };
+  AUR.storeText = function storeText(key, value) {
+    try { localStorage.setItem(key, value); } catch (error) { /* a convenience, never a requirement */ }
+  };
 
   // ---- tiny DOM helpers ----
   AUR.el = function el(tag, cls, text) {
     const n = document.createElement(tag);
     if (cls) n.className = cls;
     if (text != null) n.textContent = text;
+    return n;
+  };
+  AUR.button = function button(cls, text, onClick) {
+    const n = AUR.el('button', cls, text);
+    n.type = 'button';
+    if (onClick) n.addEventListener('click', onClick);
     return n;
   };
   AUR.clear = (node) => { while (node.firstChild) node.removeChild(node.firstChild); };

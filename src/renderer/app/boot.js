@@ -36,7 +36,7 @@
     const onChromeResize = () => {
       A.applyRenderScale();
       S.engine.resize();
-      if (S.activeView && S.activeView.resize) S.activeView.resize();
+      if (S.activeView) S.activeView.resize();
     };
     window.addEventListener('resize', onChromeResize);
     const chromeObserver = new ResizeObserver(onChromeResize);
@@ -77,14 +77,6 @@
     const queuedVcs = S.bootVcsQueue;
     S.bootVcsQueue = [];
     for (const packet of queuedVcs) routeProjectVcsStatus(packet.status, packet.meta);
-
-    // Dev self-check: our copied hash must be bit-exact with the tracker's.
-    for (const p of S.store.projects.values()) {
-      if (AUR.fnv1a(p.id) !== p.seed) {
-        AUR.log('WARN fnv1a mismatch for', p.id, AUR.fnv1a(p.id), 'vs', p.seed);
-      }
-      break;
-    }
 
     await AUR.loadLabelFonts();
     wireBackButton();
@@ -134,7 +126,7 @@
     S.store.projects.set(status.projectId, { ...project, vcs: status });
     /** @type {ProjectVcsStatusEvent} */
     const event = { type: 'project-vcs-status', projectId: status.projectId, status };
-    if (S.activeView && typeof S.activeView.update === 'function') {
+    if (S.activeView) {
       try { S.activeView.update([event]); } catch (error) { AUR.log('VCS view update failed'); }
     }
     A.scheduleChrome(C.CHROME.PROJECT | C.CHROME.SEARCH | C.CHROME.DIRECTORY);
@@ -168,7 +160,6 @@
   // ---------- event routing ----------
   /** @param {AUEvent[]} batch */
   function handleEvents(batch) {
-    if (!Array.isArray(batch) || batch.length === 0) return;
     let chromeMask = 0;
     let recoveredRoute = null;
     for (const ev of batch) {
@@ -194,7 +185,7 @@
         recoveredRoute = { ...S.current };
       }
     }
-    if (S.activeView && S.activeView.update) {
+    if (S.activeView) {
       try { S.activeView.update(batch); } catch (e) { AUR.log('view update err', e && e.message); }
     }
     A.refreshShipHulls(A.workedShipIds(batch));
@@ -209,6 +200,12 @@
   }
 
   // ---------- view switching ----------
+  // The extras a view may leave out (kit/SPEC.md view contract), as no-ops.
+  const VIEW_DEFAULTS = {
+    resize() {}, setQuality() {}, setSearchMatches() {},
+    setShipFocusVantage: () => false, focusShip: () => false, shipFocusState: () => null,
+  };
+
   function makeCtx() {
     return {
       store: S.store, galaxyFields: S.galaxyFields, quality: S.renderQuality,
@@ -230,6 +227,9 @@
       AUR.log('view build failed:', name, e && e.message);
       if (name !== 'universe') return A.showUniverse();
       return;
+    }
+    for (const [key, fallback] of Object.entries(VIEW_DEFAULTS)) {
+      if (typeof next[key] !== 'function') next[key] = fallback;
     }
     const old = S.activeView;
     A.clearProjectSearch();
@@ -334,9 +334,9 @@
   function largestPlanet(planets) {
     if (!planets || !planets.length) return null;
     let best = planets[0];
-    let bestScore = (best.files || 0) + (best.builds || 0) * 5;
+    let bestScore = AUR.planetWeight(best);
     for (const p of planets) {
-      const s = (p.files || 0) + (p.builds || 0) * 5;
+      const s = AUR.planetWeight(p);
       if (s > bestScore) { best = p; bestScore = s; }
     }
     return best;

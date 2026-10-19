@@ -8,6 +8,9 @@
   const A = AUR.app;
   if (!A) throw new Error('app/state.js must load before app/agent-focus.js');
   const S = A.state, C = A.const;
+  // The overlay and the agent rows, which mark the focused ship.
+  const FOCUS_CHROME = C.CHROME.FOCUS | C.CHROME.AGENTS;
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
   // ---------- first-person agent focus ----------
   const AGENT_FOCUS_INERT_IDS = [
@@ -42,32 +45,11 @@
     };
     const els = S.agentFocus.els;
     if (!els.root || !els.frame || !els.exit || !els.folder || !els.terminal) return;
-    let environment = 'cockpit';
-    try {
-      const stored = localStorage.getItem(C.AGENT_FOCUS_ENVIRONMENT_STORAGE_KEY);
-      if (stored && Object.hasOwn(C.AGENT_FOCUS_ENVIRONMENTS, stored)) environment = stored;
-    } catch (e) { /* storage can be unavailable in hardened renderers */ }
-    setAgentFocusEnvironment(environment, false);
-    let vantage = 'forward';
-    try {
-      const stored = localStorage.getItem(C.AGENT_FOCUS_VANTAGE_STORAGE_KEY);
-      if (stored && Object.hasOwn(C.AGENT_FOCUS_VANTAGES, stored)) vantage = stored;
-    } catch (e) { /* storage can be unavailable in hardened renderers */ }
-    setAgentFocusVantage(vantage, false);
-    if (els.environments) {
-      for (const button of els.environments.querySelectorAll('[data-environment]')) {
-        button.addEventListener('click', () => {
-          setAgentFocusEnvironment(button.dataset.environment, true);
-        });
-      }
-    }
-    if (els.vantages) {
-      for (const button of els.vantages.querySelectorAll('[data-vantage]')) {
-        button.addEventListener('click', () => {
-          setAgentFocusVantage(button.dataset.vantage, true);
-        });
-      }
-    }
+    // The setters fall back to the defaults for a missing or unknown stored value.
+    setAgentFocusEnvironment(AUR.storedText(C.AGENT_FOCUS_ENVIRONMENT_STORAGE_KEY), false);
+    setAgentFocusVantage(AUR.storedText(C.AGENT_FOCUS_VANTAGE_STORAGE_KEY), false);
+    wireChoices(els.environments, 'environment', setAgentFocusEnvironment);
+    wireChoices(els.vantages, 'vantage', setAgentFocusVantage);
     for (const item of Object.values(C.AGENT_FOCUS_ENVIRONMENTS)) {
       if (item.asset === els.frame.getAttribute('src')) continue;
       const preload = new Image();
@@ -90,6 +72,21 @@
     });
   };
 
+  // A group of `[data-<attr>]` choice buttons: a click picks and persists its value.
+  function wireChoices(container, attr, set) {
+    if (!container) return;
+    for (const button of container.querySelectorAll(`[data-${attr}]`)) {
+      button.addEventListener('click', () => set(button.dataset[attr], true));
+    }
+  }
+
+  function pressChoice(container, attr, key) {
+    if (!container) return;
+    for (const button of container.querySelectorAll(`[data-${attr}]`)) {
+      button.setAttribute('aria-pressed', String(button.dataset[attr] === key));
+    }
+  }
+
   function setAgentFocusEnvironment(value, persist) {
     const key = typeof value === 'string' && Object.hasOwn(C.AGENT_FOCUS_ENVIRONMENTS, value)
       ? value : 'cockpit';
@@ -101,13 +98,8 @@
       els.frame.setAttribute('src', config.asset);
     }
     if (els && els.environmentLabel) els.environmentLabel.textContent = config.label;
-    if (els && els.environments) {
-      for (const button of els.environments.querySelectorAll('[data-environment]')) {
-        button.setAttribute('aria-pressed', String(button.dataset.environment === key));
-      }
-    }
-    if (!persist) return;
-    try { localStorage.setItem(C.AGENT_FOCUS_ENVIRONMENT_STORAGE_KEY, key); } catch (e) { /* ignore */ }
+    if (els) pressChoice(els.environments, 'environment', key);
+    if (persist) AUR.storeText(C.AGENT_FOCUS_ENVIRONMENT_STORAGE_KEY, key);
   }
 
   function setAgentFocusVantage(value, persist) {
@@ -116,16 +108,9 @@
     S.agentFocus.vantage = key;
     const els = S.agentFocus.els;
     if (els && els.root) els.root.dataset.vantage = key;
-    if (els && els.vantages) {
-      for (const button of els.vantages.querySelectorAll('[data-vantage]')) {
-        button.setAttribute('aria-pressed', String(button.dataset.vantage === key));
-      }
-    }
-    if (S.activeView && typeof S.activeView.setShipFocusVantage === 'function') {
-      S.activeView.setShipFocusVantage(key);
-    }
-    if (!persist) return;
-    try { localStorage.setItem(C.AGENT_FOCUS_VANTAGE_STORAGE_KEY, key); } catch (e) { /* ignore */ }
+    if (els) pressChoice(els.vantages, 'vantage', key);
+    if (S.activeView) S.activeView.setShipFocusVantage(key);
+    if (persist) AUR.storeText(C.AGENT_FOCUS_VANTAGE_STORAGE_KEY, key);
   }
 
   function setAgentFocusInert(value) {
@@ -155,7 +140,7 @@
 
     const ship = S.store.ships.get(id);
     const canFocus = ship && S.current.view === 'system' && S.current.projectId === ship.project &&
-      S.activeView && typeof S.activeView.focusShip === 'function' && S.activeView.focusShip(id);
+      S.activeView && S.activeView.focusShip(id);
     S.agentFocus.pendingShipId = null;
     if (!canFocus) {
       A.renderAgents();
@@ -166,8 +151,7 @@
     S.agentFocus.shipId = id;
     document.body.classList.add('agent-focus-active');
     setAgentFocusInert(true);
-    A.renderAgentFocus();
-    A.renderAgents();
+    A.renderChromeNow(FOCUS_CHROME);
     requestAnimationFrame(() => {
       if (S.agentFocus.shipId === id && S.agentFocus.els && S.agentFocus.els.exit) {
         S.agentFocus.els.exit.focus({ preventScroll: true });
@@ -185,8 +169,7 @@
     S.agentFocus.shipId = null;
     document.body.classList.remove('agent-focus-active');
     setAgentFocusInert(false);
-    A.renderAgentFocus();
-    A.renderAgents();
+    A.renderChromeNow(FOCUS_CHROME);
     if (!restoreFocus) return;
     requestAnimationFrame(() => {
       const previous = S.agentFocus.previousFocus;
@@ -216,12 +199,12 @@
     els.root.style.setProperty('--focus-alert', attention ? attention.color : tint);
     els.name.textContent = ship.name;
     els.context.textContent = (attention ? attention.label : ship.status) +
-      ' · ' + (project ? project.name : ship.project);
+      ' · ' + A.projectName(ship.project);
     renderAgentFocusHologram(project);
     A.renderAgentFocusFlightTarget();
     els.provider.textContent = [provider.label, AUR.modelLabel(ship)].filter(Boolean).join(' · ');
     els.status.textContent = attention ? attention.label : ship.status;
-    els.project.textContent = project ? project.name : ship.project;
+    els.project.textContent = A.projectName(ship.project);
     els.folder.disabled = !project || project.exists === false;
 
     const presentation = A.projectControlPresentation(ship.project);
@@ -282,14 +265,13 @@
           (systemPlanets.length === 1 ? ' BODY' : ' BODIES');
       }
     }
-    renderAgentFocusNavigationMap();
   }
 
-  function renderAgentFocusNavigationMap() {
+  // `state` is the view's shipFocusState().
+  function renderAgentFocusNavigationMap(state) {
     const els = S.agentFocus.els;
     if (!els || !els.hologramSystem) return;
-    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const time = reducedMotion ? 0 : performance.now() / 1000;
+    const time = reducedMotion.matches ? 0 : performance.now() / 1000;
     for (const orbit of els.hologramSystem.querySelectorAll('.agent-focus-hologram-orbit')) {
       const body = orbit.querySelector('b');
       if (!body) continue;
@@ -298,8 +280,6 @@
       body.style.top = (50 + Math.sin(angle) * 50) + '%';
     }
 
-    const state = S.activeView && typeof S.activeView.shipFocusState === 'function'
-      ? S.activeView.shipFocusState() : null;
     if (!els.hologramShip || !state || !state.map) {
       if (els.hologramShip) els.hologramShip.classList.add('hidden');
       return;
@@ -318,9 +298,8 @@
   A.renderAgentFocusFlightTarget = function renderAgentFocusFlightTarget() {
     const els = S.agentFocus.els;
     if (!S.agentFocus.shipId || !els || !els.target || !S.activeView) return;
-    renderAgentFocusNavigationMap();
-    const flight = typeof S.activeView.shipFocusState === 'function'
-      ? S.activeView.shipFocusState() : null;
+    const flight = S.activeView.shipFocusState();
+    renderAgentFocusNavigationMap(flight);
     const target = flight && flight.target
       ? String(flight.target).toUpperCase() : 'SYSTEM PATROL';
     if (els.target.textContent !== target) els.target.textContent = target;

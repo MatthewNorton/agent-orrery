@@ -9,31 +9,38 @@
   const S = A.state, C = A.const;
 
   // ---------- command rail: the rail and its sections fold through app/modules.js ----------
+  const RAIL_SECTIONS = ['ideas', 'agents', 'feed', 'galaxies'];
+
   A.wireCommandRail = function wireCommandRail() {
-    S.commandRail.els = {
-      ideasPanel: document.getElementById('ideas-panel'),
-      ideasCompact: document.getElementById('compact-ideas-button'),
-      ideasCompactCount: document.getElementById('compact-ideas-count'),
-      agentsPanel: document.getElementById('agents-panel'),
-      agentsCompact: document.getElementById('compact-agents-button'),
-      agentsCompactCount: document.getElementById('compact-agents-count'),
-      feedPanel: document.getElementById('feed-panel'),
-      feedCompact: document.getElementById('compact-feed-button'),
-      feedCompactCount: document.getElementById('compact-feed-count'),
-      galaxiesPanel: document.getElementById('galaxies-panel'),
-      galaxiesCompact: document.getElementById('compact-galaxies-button'),
-      galaxiesCompactCount: document.getElementById('compact-galaxies-count'),
-    };
-    const els = S.commandRail.els;
-    const compactButtons = [[els.ideasCompact, 'ideas'], [els.agentsCompact, 'agents'],
-      [els.feedCompact, 'feed'], [els.galaxiesCompact, 'galaxies']];
-    for (const [button, key] of compactButtons) {
+    /** @type {Record<string, HTMLElement | null>} */
+    const els = {};
+    for (const key of RAIL_SECTIONS) {
+      els[key + 'Panel'] = document.getElementById(`${key}-panel`);
+      els[key + 'Compact'] = document.getElementById(`compact-${key}-button`);
+      els[key + 'CompactCount'] = document.getElementById(`compact-${key}-count`);
+    }
+    S.commandRail.els = els;
+    for (const key of RAIL_SECTIONS) {
       // A compact-rail button opens the rail on that section, unfolded.
+      const button = els[key + 'Compact'];
       if (button) button.addEventListener('click', () => {
         A.setModuleCollapsed('rail-right', false);
         A.setModuleCollapsed(key, false);
       });
     }
+  };
+
+  /**
+   * A rail section's count on its compact button; `empty`, when given, also marks the section.
+   * @param {string} key @param {number} n @param {boolean} [empty]
+   */
+  A.setRailCount = function setRailCount(key, n, empty) {
+    const els = S.commandRail.els;
+    if (!els) return;
+    const panel = els[key + 'Panel'];
+    const count = els[key + 'CompactCount'];
+    if (panel && typeof empty === 'boolean') panel.classList.toggle('is-empty', empty);
+    if (count) count.textContent = String(n);
   };
 
   // ---------- agents / feed / summary renderers ----------
@@ -54,19 +61,35 @@
     return p ? p.name : id;
   };
 
+  /** What a list calls a project: its name, or its id when it has none. */
+  A.projectLabel = function projectLabel(project) {
+    return project.name || project.id;
+  };
+
+  /** A sort comparator on projectLabel, with no id tiebreak. */
+  A.byProjectName = function byProjectName(a, b) {
+    return String(A.projectLabel(a)).localeCompare(String(A.projectLabel(b)));
+  };
+
+  A.activePlanetData = function activePlanetData() {
+    return S.activeView && S.activeView.planetData ? S.activeView.planetData : null;
+  };
+
+  /** How many projects have a ship in flight. */
+  A.onlineProjectCount = function onlineProjectCount() {
+    const online = new Set();
+    for (const s of S.store.ships.values()) online.add(s.project);
+    return online.size;
+  };
+
   A.renderAgents = function renderAgents() {
     const list = document.getElementById('agents-list');
     const count = document.getElementById('agents-count');
     const ships = shipsSorted();
-    const railEls = S.commandRail.els;
-    const agentsPanel = railEls && railEls.agentsPanel;
-    if (agentsPanel) agentsPanel.classList.toggle('is-empty', ships.length === 0);
-    if (railEls && railEls.agentsCompactCount) {
-      railEls.agentsCompactCount.textContent = String(ships.length);
-    }
+    A.setRailCount('agents', ships.length, ships.length === 0);
     let needsYou = 0;
     for (const s of ships) {
-      if (s.attention === 'question' || s.attention === 'permission') needsYou++;
+      if (AUR.needsYou(s.attention)) needsYou++;
     }
     count.textContent = needsYou > 0 ? needsYou + ' need you' : ships.length + ' Running';
     count.classList.toggle('needs-you', needsYou > 0);
@@ -82,12 +105,12 @@
       const attention = AUR.attentionMeta(s.attention);
       const focused = S.agentFocus.shipId === String(s.id);
       const pending = S.agentFocus.pendingShipId === String(s.id);
-      const row = AUR.el(
-        'button',
+      const row = AUR.button(
         'agent-row clickable' + (s.kind === 'drone' ? ' drone' : '') +
-          (focused ? ' focused' : '') + (pending ? ' pending' : '')
+          (focused ? ' focused' : '') + (pending ? ' pending' : ''),
+        null,
+        () => A.enterAgentFocus(s.id)
       );
-      row.type = 'button';
       row.dataset.shipId = String(s.id);
       row.dataset.provider = provider.key;
       row.setAttribute('aria-pressed', String(focused));
@@ -100,7 +123,6 @@
         row.style.setProperty('--attention-color', attention.color);
       }
       row.title = focused ? 'Exit first-person view' : 'Enter first-person view';
-      row.addEventListener('click', () => A.enterAgentFocus(s.id));
       const glyph = AUR.el('div', 'agent-glyph');
       glyph.innerHTML = AUR.shipSvg(tint, AUR.isSignalEntity(s));
       const body = AUR.el('div', 'agent-body');
@@ -109,11 +131,8 @@
       const dotColor = attention ? attention.color : AUR.statusColor(s.status);
       dot.style.background = dotColor;
       dot.style.boxShadow = '0 0 7px ' + dotColor;
-      if (s.attention === 'question' || s.attention === 'permission') {
-        dot.classList.add('attention-pulse');
-      }
-      nameLine.appendChild(AUR.el('span', 'agent-name', s.name));
-      nameLine.appendChild(dot);
+      if (AUR.needsYou(s.attention)) dot.classList.add('attention-pulse');
+      nameLine.append(AUR.el('span', 'agent-name', s.name), dot);
       if (attention) {
         const badge = AUR.el('span', 'agent-attention-badge', attention.label);
         badge.style.color = attention.color;
@@ -132,12 +151,9 @@
       const subText = AUR.el(
         'span', 'agent-sub-text', s.status + ' · ' + A.projectName(s.project)
       );
-      sub.appendChild(providerTag);
-      sub.appendChild(subText);
-      body.appendChild(nameLine);
-      body.appendChild(sub);
-      row.appendChild(glyph);
-      row.appendChild(body);
+      sub.append(providerTag, subText);
+      body.append(nameLine, sub);
+      row.append(glyph, body);
       list.appendChild(row);
     }
   };
@@ -146,12 +162,7 @@
     const list = document.getElementById('feed-list');
     AUR.clear(list);
     const rows = S.store.feed.slice(-C.FEED_SHOW).reverse();
-    const railEls = S.commandRail.els;
-    const feedPanel = railEls && railEls.feedPanel;
-    if (feedPanel) feedPanel.classList.toggle('is-empty', rows.length === 0);
-    if (railEls && railEls.feedCompactCount) {
-      railEls.feedCompactCount.textContent = String(rows.length);
-    }
+    A.setRailCount('feed', rows.length, rows.length === 0);
     if (rows.length === 0) {
       list.appendChild(AUR.el('div', 'empty-note', 'No signals yet'));
       return;
@@ -165,18 +176,18 @@
       const dot = AUR.el('span', 'feed-dot');
       dot.style.background = AUR.feedColor(f.kind);
       const body = AUR.el('div', 'feed-body');
-      body.appendChild(AUR.el('div', 'feed-text', f.text));
-      body.appendChild(AUR.el('div', 'feed-time', AUR.relTime(f.ts, A.playbackReferenceTs())));
-      row.appendChild(dot);
-      row.appendChild(body);
+      body.append(
+        AUR.el('div', 'feed-text', f.text),
+        AUR.el('div', 'feed-time', AUR.relTime(f.ts, A.playbackReferenceTs()))
+      );
+      row.append(dot, body);
       list.appendChild(row);
     }
   };
 
   function statBlock(num, label) {
     const b = AUR.el('div', 'stat');
-    b.appendChild(AUR.el('div', 'stat-label', label));
-    b.appendChild(AUR.el('div', 'stat-num', String(num)));
+    b.append(AUR.el('div', 'stat-label', label), AUR.el('div', 'stat-num', String(num)));
     return b;
   }
 
@@ -203,11 +214,8 @@
   };
 
   function universeSummaryStats() {
-    const projects = S.store.projects.size;
-    const active = S.store.ships.size;
-    const online = new Set();
-    for (const s of S.store.ships.values()) online.add(s.project);
-    return [[projects, 'Projects'], [active, 'Agents'], [online.size, 'Online']];
+    return [[S.store.projects.size, 'Projects'], [S.store.ships.size, 'Agents'],
+      [A.onlineProjectCount(), 'Online']];
   }
 
   A.shipsInProject = function shipsInProject(projectId) {
@@ -230,7 +238,7 @@
 
   function planetSummaryStats() {
     const ships = A.shipsInProject(S.current.projectId);
-    const pd = S.activeView && S.activeView.planetData ? S.activeView.planetData : null;
+    const pd = A.activePlanetData();
     const structures = pd ? pd.subdirs : 0;
     const resources = pd && pd.resources ? pd.resources.length : 0;
     const builds = pd ? pd.builds : 0;
@@ -247,16 +255,14 @@
   }
   A.renderTabbar = function renderTabbar() {
     const bar = document.getElementById('tabbar');
-    if (S.current.view !== 'planet') { bar.classList.add('hidden'); return; }
-    if (bar.childElementCount) { bar.classList.remove('hidden'); return; }
-    bar.classList.remove('hidden');
-    AUR.clear(bar);
+    const planet = S.current.view === 'planet';
+    bar.classList.toggle('hidden', !planet);
+    if (!planet || bar.childElementCount) return;
     TABS.forEach((t, i) => {
       const tab = AUR.el('div', 'tab' + (i === 0 ? ' active' : ' disabled'));
       const ico = document.createElement('span');
       ico.innerHTML = tabIco();
-      tab.appendChild(ico.firstChild);
-      tab.appendChild(AUR.el('span', null, t));
+      tab.append(ico.firstChild, AUR.el('span', null, t));
       bar.appendChild(tab);
     });
   };

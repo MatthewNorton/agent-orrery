@@ -63,36 +63,26 @@
     A.renderHistory();
   };
 
-  let historyTimeFormatter = null;
-  let historyEdgeFormatter = null;
-  try {
-    historyTimeFormatter = new Intl.DateTimeFormat(undefined, {
-      month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit',
-    });
-    historyEdgeFormatter = new Intl.DateTimeFormat(undefined, {
-      month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
-    });
-  } catch (error) { /* ISO fallbacks below preserve older platforms */ }
-
-  function formatHistoryTime(ts) {
-    if (!Number.isFinite(ts)) return '—';
+  /** @param {Intl.DateTimeFormatOptions} options */
+  function historyFormat(options) {
+    let formatter = null;
     try {
-      return historyTimeFormatter
-        ? historyTimeFormatter.format(new Date(ts)) : new Date(ts).toISOString();
-    } catch (error) {
-      return new Date(ts).toISOString();
-    }
+      formatter = new Intl.DateTimeFormat(undefined, options);
+    } catch (error) { /* the ISO fallback below preserves older platforms */ }
+    /** @param {number} ts */
+    return (ts) => {
+      if (!Number.isFinite(ts)) return '—';
+      try {
+        return formatter ? formatter.format(new Date(ts)) : new Date(ts).toISOString();
+      } catch (error) {
+        return new Date(ts).toISOString();
+      }
+    };
   }
-
-  function formatHistoryEdge(ts) {
-    if (!Number.isFinite(ts)) return '—';
-    try {
-      return historyEdgeFormatter
-        ? historyEdgeFormatter.format(new Date(ts)) : new Date(ts).toISOString();
-    } catch (error) {
-      return new Date(ts).toISOString();
-    }
-  }
+  const formatHistoryTime = historyFormat({
+    month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit',
+  });
+  const formatHistoryEdge = historyFormat({ month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
   function historyTimestampFromPosition(value) {
     if (!Number.isFinite(S.playback.minTs) || !Number.isFinite(S.playback.maxTs)) return null;
@@ -205,9 +195,7 @@
     S.historyEls.live.disabled = !replayMode || S.replayBusy;
 
     if (hasRange) {
-      const fallback = replayMode ? S.playback.cursorTs : S.playback.maxTs;
-      const value = Number.isFinite(shownTs) ? shownTs : fallback;
-      const position = historyPositionFromTimestamp(value);
+      const position = historyPositionFromTimestamp(shownTs);
       S.historyEls.scrubber.value = String(position);
       S.historyEls.scrubber.dataset.minTs = String(S.playback.minTs);
       S.historyEls.scrubber.dataset.maxTs = String(S.playback.maxTs);

@@ -3,7 +3,7 @@
 'use strict';
 
 /**
- * @import { ReplayCommand, ReplayResult, ReplayStatePush } from '../../types/contract'
+ * @import { PlaybackStatus, ReplayCommand, ReplayResult, ReplayStatePush } from '../../types/contract'
  */
 
 (function () {
@@ -11,7 +11,9 @@
   const AU = window.AU;
   const A = AUR.app;
   if (!A) throw new Error('app/state.js must load before app/replay.js');
-  const S = A.state, C = A.const;
+  const S = A.state, CHROME = A.const.CHROME;
+  // What a replay command in flight disables, and what its settling re-enables.
+  const REPLAY_BUSY_CHROME = CHROME.HISTORY | CHROME.PROJECT | CHROME.FOCUS | CHROME.SETTINGS | CHROME.IDEAS;
 
   // ---------- epoch / playback / replay helpers ----------
   A.epochOf = function epochOf(value) {
@@ -33,51 +35,31 @@
     while (S.retiredEpochs.size > 64) S.retiredEpochs.delete(S.retiredEpochs.values().next().value);
   }
 
-  function finiteField(value, names, fallback) {
-    for (const name of names) {
-      if (value && Number.isFinite(value[name])) return value[name];
-    }
-    return fallback;
-  }
-
+  // Main's PlaybackStatus is complete (replay-control.js boundedReplayStatus), but a time it
+  // has not indexed is null, and the bar keeps the last known one.
+  /** @param {PlaybackStatus} value */
   function normalizePlayback(value) {
-    if (!value || typeof value !== 'object') return S.playback;
-    const minTs = finiteField(value, ['minTs', 'startTs', 'start'], S.playback.minTs);
-    const maxTs = finiteField(value, ['maxTs', 'endTs', 'end'], S.playback.maxTs);
-    let cursorTs = finiteField(value, ['cursorTs', 'cursor', 'ts'], S.playback.cursorTs);
-    const stateWord = typeof value.state === 'string' ? value.state.toLowerCase() : '';
-    let mode = value.mode === 'replay' || value.mode === 'live' ? value.mode : S.playback.mode;
-    if (stateWord === 'live') mode = 'live';
-    else if (!value.mode && (stateWord === 'playing' || stateWord === 'paused')) mode = 'replay';
-    if (mode === 'live' && Number.isFinite(maxTs)) cursorTs = maxTs;
-    const requestedSpeed = Number(value.speed);
-    const speed = C.REPLAY_SPEEDS.includes(requestedSpeed) ? requestedSpeed : S.playback.speed;
-    const available = typeof value.available === 'boolean'
-      ? value.available
-      : (Number.isFinite(minTs) && Number.isFinite(maxTs) && maxTs >= minTs);
-    const playingValue = typeof value.playing === 'boolean'
-      ? value.playing : stateWord === 'playing';
+    /** @param {'minTs' | 'maxTs' | 'cursorTs'} name */
+    const known = (name) => (Number.isFinite(value[name]) ? value[name] : S.playback[name]);
+    const { mode } = value;
+    const maxTs = known('maxTs');
     return {
       mode,
-      available,
-      indexing: typeof value.indexing === 'boolean' ? value.indexing : S.playback.indexing,
-      minTs,
+      available: value.available,
+      indexing: value.indexing,
+      minTs: known('minTs'),
       maxTs,
-      cursorTs,
-      playing: mode === 'replay' && playingValue,
-      speed,
-      truncated: typeof value.truncated === 'boolean' ? value.truncated : S.playback.truncated,
+      cursorTs: mode === 'live' && Number.isFinite(maxTs) ? maxTs : known('cursorTs'),
+      playing: mode === 'replay' && value.playing,
+      speed: value.speed,
+      truncated: value.truncated,
     };
   }
 
   A.applyPlayback = function applyPlayback(value, updateChrome = true) {
     if (value && typeof value === 'object') S.playback = normalizePlayback(value);
     if (updateChrome) {
-      A.renderHistory();
-      A.renderFeed();
-      A.renderProjectCard();
-      A.renderProjectSettings();
-      A.renderIdeas();
+      A.renderChromeNow(CHROME.HISTORY | CHROME.FEED | CHROME.PROJECT | CHROME.SETTINGS | CHROME.IDEAS);
     }
   };
 
@@ -124,9 +106,7 @@
       drainDeferredEpochEvents();
       return;
     }
-    A.renderHistory();
-    A.renderFeed();
-    A.renderProjectCard();
+    A.renderChromeNow(CHROME.HISTORY | CHROME.FEED | CHROME.PROJECT);
   }
 
   A.rebuildRoute = function rebuildRoute(route) {
@@ -162,16 +142,11 @@
     const modeBoundary = command.action === 'seek' || command.action === 'live';
     if (modeBoundary) S.replayTransitionPending = true;
     S.replayBusy = true;
-    A.renderHistory();
-    A.renderProjectCard();
-    A.renderAgentFocus();
-    A.renderProjectSettings();
-    A.renderIdeas();
+    A.renderChromeNow(REPLAY_BUSY_CHROME);
     try {
       const result = await AU.replay(command);
       if (request !== S.replayRequest) return;
-      const forceReset = command.action === 'seek' || command.action === 'live';
-      adoptReplayResult(result, forceReset);
+      adoptReplayResult(result, modeBoundary);
     } catch (error) {
       if (request === S.replayRequest) AUR.log('replay command failed', error && error.message);
     } finally {
@@ -182,11 +157,7 @@
         const queued = S.transitionEventQueue;
         S.transitionEventQueue = [];
         for (const packet of queued) A.handleSequencedEvents(packet.batch, packet.meta);
-        A.renderHistory();
-        A.renderProjectCard();
-        A.renderAgentFocus();
-        A.renderProjectSettings();
-        A.renderIdeas();
+        A.renderChromeNow(REPLAY_BUSY_CHROME);
       }
     }
   };
