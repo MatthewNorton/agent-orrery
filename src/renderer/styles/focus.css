@@ -3,6 +3,9 @@
 .agent-focus {
   --focus-accent: #f59e0b;
   --focus-alert: var(--focus-accent);
+  --focus-text-label: clamp(7px, 0.48vw, 10px);
+  --focus-text-value: clamp(9px, 0.6vw, 13px);
+  --focus-text-hologram: clamp(5px, 0.34vw, 7px);
   position: fixed;
   inset: 0;
   z-index: 60;
@@ -82,7 +85,7 @@
   gap: 6px;
   overflow: hidden;
   color: color-mix(in srgb, var(--focus-accent) 54%, #8da2ad);
-  font-size: clamp(5px, 0.34vw, 7px);
+  font-size: var(--focus-text-hologram);
   font-weight: 760;
   letter-spacing: 0.12em;
   white-space: nowrap;
@@ -199,7 +202,7 @@
   max-width: 80px;
   overflow: hidden;
   color: #baf8ff;
-  font-size: clamp(5px, 0.34vw, 7px);
+  font-size: var(--focus-text-hologram);
   font-style: normal;
   font-weight: 780;
   letter-spacing: 0.05em;

@@ -13,7 +13,8 @@
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.32), inset 0 1px rgba(255, 255, 255, 0.04);
   pointer-events: auto;
 }
-.agent-focus-environments button {
+.agent-focus-environments button,
+.agent-focus-vantages button {
   min-height: 30px;
   padding: 0 12px;
   border: 1px solid transparent;
@@ -61,20 +62,6 @@
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
-.agent-focus-vantages button {
-  min-height: 30px;
-  padding: 0 12px;
-  border: 1px solid transparent;
-  border-radius: 2px;
-  color: #8f897c;
-  background: transparent;
-  font: inherit;
-  font-size: 11px;
-  font-weight: 720;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  cursor: pointer;
-}
 .agent-focus-vantages button:hover,
 .agent-focus-vantages button:focus-visible {
   color: #f1e7d2;
@@ -103,32 +90,22 @@
 .agent-focus-mode {
   display: flex; align-items: center; gap: 8px;
   color: color-mix(in srgb, var(--focus-accent) 76%, #ddd);
-  font-size: clamp(7px, 0.48vw, 10px); font-weight: 750; letter-spacing: 0.18em;
+  font-size: var(--focus-text-label); font-weight: 750; letter-spacing: 0.18em;
 }
 .agent-focus-mode i {
   width: 5px; height: 5px; border-radius: 50%; background: var(--focus-alert);
   box-shadow: 0 0 10px var(--focus-alert); animation: cockpit-pulse 1.6s ease-in-out infinite;
 }
 .agent-focus-ident h2 {
-  margin: 5px 0 2px; max-width: 100%; overflow: hidden; text-overflow: ellipsis;
-  color: #f0eadc; font-size: clamp(12px, 1.35vw, 22px); font-weight: 560;
-  letter-spacing: 0.025em; white-space: nowrap;
+  margin: 2px 0 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis;
+  color: #f0eadc; font-size: clamp(10px, 1.08vw, 18px); font-weight: 560;
+  letter-spacing: 0.025em; line-height: 1; white-space: nowrap;
 }
-.agent-focus-ident p {
-  max-width: 100%; margin: 0; overflow: hidden; color: #9f9a8c;
-  font-size: clamp(7px, 0.53vw, 11px); letter-spacing: 0.07em;
-  text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap;
-}
-.agent-focus[data-environment] .agent-focus-ident h2 {
-  margin: 2px 0 0;
-  font-size: clamp(10px, 1.08vw, 18px);
-  line-height: 1;
-}
-.agent-focus[data-environment] .agent-focus-ident p { display: none; }
+.agent-focus-ident p { display: none; }
 .agent-focus-target {
   top: 14%; left: 50%; transform: translateX(-50%);
   display: flex; align-items: center; gap: 9px;
-  color: #77736a; font-size: clamp(7px, 0.48vw, 10px); font-weight: 700; letter-spacing: 0.18em;
+  color: #77736a; font-size: var(--focus-text-label); font-weight: 700; letter-spacing: 0.18em;
 }
 .agent-focus-target strong {
   color: color-mix(in srgb, var(--focus-accent) 76%, #ddd);
@@ -147,10 +124,10 @@
 }
 .agent-focus-telemetry div:last-child { border-bottom: 0; }
 .agent-focus-telemetry dt {
-  color: #746f64; font-size: clamp(7px, 0.48vw, 10px); font-weight: 750; letter-spacing: 0.11em;
+  color: #746f64; font-size: var(--focus-text-label); font-weight: 750; letter-spacing: 0.11em;
 }
 .agent-focus-telemetry dd {
-  margin: 0; overflow: hidden; color: #d8cba9; font-size: clamp(9px, 0.6vw, 13px);
+  margin: 0; overflow: hidden; color: #d8cba9; font-size: var(--focus-text-value);
   text-overflow: ellipsis; white-space: nowrap;
 }
 .agent-focus-actions {
@@ -161,7 +138,7 @@
 .agent-focus-actions button {
   min-height: 0; padding: 0 8px; border: 1px solid rgba(245, 158, 11, 0.16);
   border-radius: 2px; color: #b9ad91; background: rgba(10, 10, 9, 0.76);
-  font: inherit; font-size: clamp(9px, 0.6vw, 13px); font-weight: 690;
+  font: inherit; font-size: var(--focus-text-value); font-weight: 690;
   letter-spacing: 0.08em; cursor: pointer; text-transform: uppercase;
 }
 .agent-focus-actions button:hover:not(:disabled), .agent-focus-actions button:focus-visible {
@@ -227,14 +204,8 @@
 }
 .agent-focus[data-environment='station'] .agent-focus-target { display: none; }
 
-/* The chrome agent-focus.js makes inert: the bars, both rails and the view title. */
-body.agent-focus-active .topbar,
-body.agent-focus-active .sidebar,
-body.agent-focus-active .rail--l,
-body.agent-focus-active .view-title,
-body.agent-focus-active .view-hint,
-body.agent-focus-active .tabbar,
-body.agent-focus-active .history-bar {
+/* Focus mode fades out the chrome agent-focus.js makes inert. */
+body.agent-focus-active [inert] {
   opacity: 0;
   pointer-events: none;
   transition: opacity 180ms ease;
@@ -247,17 +218,13 @@ body.agent-focus-active .history-bar {
 @media (max-width: 1280px) {
   .agent-focus-actions button { padding-inline: 3px; letter-spacing: 0.04em; }
   .agent-focus-environments { top: 10px; left: 10px; }
-  .agent-focus-environments button { min-height: 26px; padding-inline: 8px; font-size: 9px; }
+  .agent-focus-environments button, .agent-focus-vantages button { min-height: 26px; padding-inline: 8px; font-size: 9px; }
   .agent-focus-vantages { top: 10px; right: 10px; }
   .agent-focus-vantages > span { display: none; }
-  .agent-focus-vantages button { min-height: 26px; padding-inline: 8px; font-size: 9px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .agent-focus-mode i { animation: none; }
   .agent-focus-frame { transition: none; }
-  body.agent-focus-active .topbar, body.agent-focus-active .sidebar,
-  body.agent-focus-active .rail--l, body.agent-focus-active .view-title,
-  body.agent-focus-active .view-hint, body.agent-focus-active .tabbar,
-  body.agent-focus-active .history-bar { transition: none; }
+  body.agent-focus-active [inert] { transition: none; }
 }

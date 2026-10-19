@@ -13,10 +13,9 @@
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
   // ---------- first-person agent focus ----------
+  // The chrome roots focus mode makes inert; focus-rooms.css fades whatever is [inert].
   const AGENT_FOCUS_INERT_IDS = [
-    'topbar', 'sidebar', 'back-btn', 'project-card', 'tasks-panel',
-    'planet-card', 'summary-card', 'tabbar', 'history-bar',
-    'rail-left', 'view-title', 'view-hint', 'needs-you-panel',
+    'topbar', 'sidebar', 'rail-left', 'view-title', 'view-hint', 'tabbar', 'history-bar',
   ];
 
   A.wireAgentFocus = function wireAgentFocus() {
