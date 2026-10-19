@@ -6,7 +6,7 @@
 (function () {
   const AUR = window.AUR;
   const GALAXY = window.AUR_GALAXY;
-  const UNIVERSE_SKY_LEVEL = 0.04;
+  const UNIVERSE_SKY_LEVEL = 0.028;
 
   AUR.views.universe = function (engine, data, ctx) {
     const store = ctx.store;
