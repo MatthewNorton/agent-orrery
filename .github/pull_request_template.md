@@ -9,6 +9,6 @@
 - [ ] Manual smoke (`npm start`)
 
 ## Frozen files
-List any edits to frozen files (see the **Frozen files** bullet in `CLAUDE.md`) and why they were unavoidable.
+List any edits to frozen files (see the **Frozen files** bullet in `AGENTS.md`) and why they were unavoidable.
 
 ## Screenshots (if renderer)

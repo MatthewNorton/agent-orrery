@@ -11,10 +11,10 @@ const { createAgentLauncher } = require('./agent-launcher');
 const { TaskRunTracker } = require('./task-runs');
 const { RootTaskStore } = require('./root-tasks');
 const { RootTaskCoordinator } = require('./root-task-coordinator');
-const { createLocalGitStatusCollector } = require('./project-vcs-status');
-const { createGitHubMetadataProvider } = require('./github-metadata-provider');
-const { createProjectVcsStatusService } = require('./project-vcs-status-service');
-const { createProjectVcsStatusController } = require('./project-vcs-status-controller');
+const { createLocalGitStatusCollector } = require('./vcs-status/collector');
+const { createGitHubMetadataProvider } = require('./vcs-status/github-metadata-provider');
+const { createProjectVcsStatusService } = require('./vcs-status/service');
+const { createProjectVcsStatusController } = require('./vcs-status/controller');
 const { adoptLegacyUserData } = require('./user-data');
 
 /** @import { AUEvent, BatchMeta, TasksChangedPush } from '../types/contract' */

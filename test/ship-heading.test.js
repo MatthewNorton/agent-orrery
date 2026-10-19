@@ -5,14 +5,9 @@
 // directions; about half the ships circle clockwise, and they used to fly tail first.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
+const { rendererSource } = require('./support/renderer-source');
 
-const RENDERER = path.join(__dirname, '..', 'src', 'renderer');
-// A view's source is its scene-<view>*.js files.
-const viewSource = (view) => fs.readdirSync(RENDERER)
-  .filter((file) => file.startsWith(`scene-${view}`) && file.endsWith('.js')).sort()
-  .map((file) => fs.readFileSync(path.join(RENDERER, file), 'utf8')).join('\n');
+const viewSource = (view) => rendererSource(`scene/${view}`);
 function headingCode(view, pattern) {
   const match = viewSource(view).match(pattern);
   assert.ok(match, `${view} view: heading code not found`);
@@ -40,12 +35,12 @@ test('system view: a patrolling ship faces along its orbit either way round', ()
 });
 
 test('planet view: an orbiting ship faces along its orbit either way round', () => {
-  const look = new Function('r', 'BABYLON',
-    headingCode('planet', /r\.mesh\.lookAt\(new BABYLON\.Vector3\([\s\S]*?\)\);/));
-  const BABYLON = { Vector3: function Vector3(x, y, z) { Object.assign(this, { x, y, z }); } };
+  const look = new Function('r', 'heading',
+    headingCode('planet', /const ahead = [^;]+;\s*r\.mesh\.lookAt\(heading\.set\([^;]+\);/));
+  const heading = { set(x, y, z) { return { x, y, z }; } };
   for (const orbit of ORBITS) {
     let target = null;
-    look({ ...orbit, r: R, yoff: 0, mesh: { lookAt: (v) => { target = v; } } }, BABYLON);
+    look({ ...orbit, r: R, yoff: 0, mesh: { lookAt: (v) => { target = v; } } }, heading);
     const forward = [target.x - Math.cos(orbit.a) * R, target.z - Math.sin(orbit.a) * R];
     assert.ok(along(orbit, forward) > 0.99, `a=${orbit.a.toFixed(1)} speed=${orbit.speed}`);
   }

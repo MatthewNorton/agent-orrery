@@ -51,8 +51,8 @@ flowchart LR
   end
   BR["preload.js<br/>window.AU — 26 methods"]
   subgraph Ren["Renderer — src/renderer (browser)"]
-    APP["app.js + app-*.js<br/>shared state · panels · routing"]
-    VW["scene-universe / system / planet<br/>Babylon.js views"]
+    APP["app/boot.js + app/*.js<br/>shared state · panels · routing"]
+    VW["scene/universe / system / planet<br/>Babylon.js views"]
   end
   UD[("userData JSON<br/>universe-state · root-tasks · task-runs")]
   EXT["External programs<br/>git · gh · wt.exe / Terminal · codex"]
@@ -90,7 +90,7 @@ or the record of how the app was built.
 | `kit/` | 23 | — | Kit tooling, two stubs **and** 13 regression gate scripts | No (gates matter, see §9) |
 | `scripts/` | 11 | — | One-step setup (run by the root `Install Agent Orrery.cmd` / `.command`), ship generators, the fleet-v2 LOD build, launcher shortcuts, demo screenshots and their synthetic profile, a VCS UI lab | No |
 | `docs/` | 16 | — | Feature notes and plans; four of them are also gate fixtures | No |
-| root | 11 | — | README, CLAUDE.md, SECURITY, LICENSE, `package.json` + lockfile, git config, 3 mockup PNGs | Mockups are the visual "gold samples" |
+| root | 11 | — | README, AGENTS.md (CLAUDE.md imports it), SECURITY, LICENSE, `package.json` + lockfile, git config, 3 mockup PNGs | Mockups are the visual "gold samples" |
 | `.github/` | 4 | — | CI (Ubuntu + Windows), Dependabot, CODEOWNERS, PR template | No |
 
 Generated and ignored: `.shots/` (gate screenshots), `kit/done/*/output/` (old gate evidence),
@@ -105,21 +105,21 @@ Start here when you want to change something. Paths under "Main process" are rel
 
 | Feature | Main process | IPC (`au:*`) | Renderer | Persisted in | Checked by |
 |---|---|---|---|---|---|
-| **Universe / system / planet views** | `tracker.js` façade over `live/` (`live/system-view.js` `getSystem`, `getPlanet`); `ipc/register.js` | `snapshot`, `system`, `planet`, push `events` | `app.js` (routing), `app-store.js` (`applyEvent`), `scene-universe*.js`, `scene-system*.js`, `scene-planet.js`, `scene-common.js` | `universe-state.json` (build counts) | `kit/grade.mjs`, polish + galaxy gates |
-| **Galaxy grouping** | `universe/galaxy.js`: `deriveGalaxy` (live), `historyGalaxy` (history) | in project payload | `galaxy-layout.js`, `scene-universe-galaxies.js` | — | `grade-galaxies.mjs` |
+| **Universe / system / planet views** | `tracker.js` façade over `live/` (`live/system-view.js` `getSystem`, `getPlanet`); `ipc/register.js` | `snapshot`, `system`, `planet`, push `events` | `app/boot.js` (routing), `app/store.js` (`applyEvent`), `scene/universe/*.js`, `scene/system/*.js`, `scene/planet/view.js`, `scene/common.js` | `universe-state.json` (build counts) | `kit/grade.mjs`, polish + galaxy gates |
+| **Galaxy grouping** | `universe/galaxy.js`: `deriveGalaxy` (live), `historyGalaxy` (history) | in project payload | `galaxy-layout.js`, `scene/universe/galaxies.js` | — | `grade-galaxies.mjs` |
 | **Claude / Codex / Signal providers** | `provider-adapters.js`, `live/claude-source.js`, `live/codex-source.js`, `live/signal-source.js`, `live/claude-records.js`, `live/provider-records.js` | push `events` | `util.js` (`PROVIDERS`, colours), `ship-assets*.js` (hulls) | `providers.json` (Signal config, read-only) | `grade-providers.mjs` |
-| **Needs-attention + desktop notifications** | `live/attention.js` `classifyAttention` | `ship-updated` events | `app-store.js` `maybeNotifyAttention`, `app-chrome.js` agent list, halos in scenes | — | `grade-attention.mjs` |
-| **History playback (scrubber)** | `replay-source.js` façade over `history/`, `replay-control.js` | `replay`, push `replay-state` | `app-playback.js` (history bar), `app-replay.js` (epochs, `issueReplay`), `app-history-metrics.js` (test metrics) | nothing (index in memory) | `grade-history.mjs`, `replay-source.test.js` |
-| **Open Terminal** (LIVE only) | `ipc/terminal.js` → `terminal-launcher.js`, `path-safety.js` | `open-terminal` | `app-project-control.js`, `app-agent-focus.js` | — | `grade-control.mjs`, `terminal-launcher.test.js` |
-| **Open folder / GitHub link** | `ipc/register.js` (inline handlers) | `open`, `open-external` | `app-project-control.js` | — | — |
-| **Per-project TASKS panel** (`GOALS.md`) | `ipc/tasks.js` → `goals.js` | `tasks-get`, `task-add`, `task-set-done`, `task-remove`, push `tasks-changed` | `app-project-tasks.js` | `<project>/GOALS.md` | `grade-tasks.mjs`, `task-runs.test.js` |
-| **IDEAS queue → start Codex** (LIVE only) | `ipc/root-tasks.js` → `root-task-coordinator.js`, `root-tasks.js`, `task-runs.js`, `agent-launcher.js`, `goals.js` | `root-tasks-get`, `root-task-create/remove/assign/retry`, push `root-tasks-changed` | `app-ideas.js`, `app-ideas-list.js` | `root-tasks.json`, `task-runs.json`, `GOALS.md` | 4 unit test files |
-| **Project search + ALL PROJECTS list** | — (renderer only) | — | `search-core.js`, `app-project-search.js`, `app-project-directory.js` | — | `grade-search.mjs` |
-| **Git / GitHub status markers** | `project-vcs-status.js` (git), `github-metadata-provider.js` (`gh`), `-service.js` (cache), `-controller.js` (wiring) | push `project-vcs-status-changed` (from `replay-control.js`), `vcs` field in snapshot | `components/project-vcs-status.js` + `.css` | memory only | 5 `project-vcs-status*` tests |
-| **Find a moved project** (settings dialog) | `ipc/project-paths.js` → `project-paths.js` | `project-paths-scan`, `project-path-locate`, `project-path-apply` | `app-project-settings.js` | `universe-state.json` `pathOverrides` | **none** |
-| **First-person ship cockpit** | — | — | `app-agent-focus.js`, `scene-system.js` `focusShip`, `scene-system-focus.js`, `assets/*.png` | `localStorage` | `agent-focus-hologram.test.js` (source text) |
-| **Ship 3D models** | `live/ships.js` + `live/builds.js`, `history/apply-record.js` (each ship's `builds` count); `universe/ships.js` `createShipRecord` | `builds` on every ship | `ship-assets.js` (manifest, rank → hull), `ship-assets-hulls.js` (far / near file per view), `ship-assets-api.js` (`AUR.ships`, in-place `refresh`) + `assets/ships/manifest.json` + GLBs; `app-store.js` `refreshShipHulls` | — | ship tests, `grade-ships.mjs` |
-| **Headless test modes** (`--shots`, `--polish-test`, …) | `flags.js`, `harness/fixtures.js`, `harness/driver.js`, `harness/metrics.js`, `harness/modes/*.js` | `debug-view`, `debug-ready` | `app.js` `handleDebugView` | `.shots/`, `result.json` | every dynamic gate |
+| **Needs-attention + desktop notifications** | `live/attention.js` `classifyAttention` | `ship-updated` events | `app/store.js` `maybeNotifyAttention`, `app/chrome.js` agent list, halos in scenes | — | `grade-attention.mjs` |
+| **History playback (scrubber)** | `replay-source.js` façade over `history/`, `replay-control.js` | `replay`, push `replay-state` | `app/playback.js` (history bar), `app/replay.js` (epochs, `issueReplay`), `app/history-metrics.js` (test metrics) | nothing (index in memory) | `grade-history.mjs`, `replay-source.test.js` |
+| **Open Terminal** (LIVE only) | `ipc/terminal.js` → `terminal-launcher.js`, `path-safety.js` | `open-terminal` | `app/project/control.js`, `app/agent-focus.js` | — | `grade-control.mjs`, `terminal-launcher.test.js` |
+| **Open folder / GitHub link** | `ipc/register.js` (inline handlers) | `open`, `open-external` | `app/project/control.js` | — | — |
+| **Per-project TASKS panel** (`GOALS.md`) | `ipc/tasks.js` → `goals.js` | `tasks-get`, `task-add`, `task-set-done`, `task-remove`, push `tasks-changed` | `app/project/tasks.js` | `<project>/GOALS.md` | `grade-tasks.mjs`, `task-runs.test.js` |
+| **IDEAS queue → start Codex** (LIVE only) | `ipc/root-tasks.js` → `root-task-coordinator.js`, `root-tasks.js`, `task-runs.js`, `agent-launcher.js`, `goals.js` | `root-tasks-get`, `root-task-create/remove/assign/retry`, push `root-tasks-changed` | `app/ideas.js`, `app/ideas-list.js` | `root-tasks.json`, `task-runs.json`, `GOALS.md` | 4 unit test files |
+| **Project search + ALL PROJECTS list** | — (renderer only) | — | `search-core.js`, `app/project/search.js`, `app/project/directory.js` | — | `grade-search.mjs` |
+| **Git / GitHub status markers** | `vcs-status/`: `collector.js` (git), `github-metadata-provider.js` (`gh`), `service.js` (cache), `controller.js` (wiring) | push `project-vcs-status-changed` (from `replay-control.js`), `vcs` field in snapshot | `components/project-vcs-status.js` + `.css` | memory only | `vcs-status-*` tests |
+| **Find a moved project** (settings dialog) | `ipc/project-paths.js` → `project-paths.js` | `project-paths-scan`, `project-path-locate`, `project-path-apply` | `app/project/settings.js` | `universe-state.json` `pathOverrides` | **none** |
+| **First-person ship cockpit** | — | — | `app/agent-focus.js`, `scene/system/view.js` `focusShip`, `scene/system/focus.js`, `assets/*.png` | `localStorage` | `agent-focus-hologram.test.js` (source text) |
+| **Ship 3D models** | `live/ships.js` + `live/builds.js`, `history/apply-record.js` (each ship's `builds` count); `universe/ships.js` `createShipRecord` | `builds` on every ship | `ship-assets.js` (manifest, rank → hull), `ship-assets-hulls.js` (far / near file per view), `ship-assets-api.js` (`AUR.ships`, in-place `refresh`) + `assets/ships/manifest.json` + GLBs; `app/store.js` `refreshShipHulls` | — | ship tests, `grade-ships.mjs` |
+| **Headless test modes** (`--shots`, `--polish-test`, …) | `flags.js`, `harness/fixtures.js`, `harness/driver.js`, `harness/metrics.js`, `harness/modes/*.js` | `debug-view`, `debug-ready` | `app/boot.js` `handleDebugView` | `.shots/`, `result.json` | every dynamic gate |
 
 ---
 
@@ -128,8 +128,8 @@ Start here when you want to change something. Paths under "Main process" are rel
 ```
  main process (Node, full OS access)          preload            renderer (sandboxed browser)
  ─────────────────────────────────────        ───────            ────────────────────────────
- ipcMain.handle('au:snapshot', …)   ◄── invoke ── AU.snapshot()    ◄── app.js boot
- webContents.send('au:events', …)   ── push  ──► AU.onEvents(cb)   ──► app.js routeEvents
+ ipcMain.handle('au:snapshot', …)   ◄── invoke ── AU.snapshot()    ◄── app/boot.js boot
+ webContents.send('au:events', …)   ── push  ──► AU.onEvents(cb)   ──► app/boot.js routeEvents
 ```
 
 - Window (`window.js`): `contextIsolation`, no Node integration, `sandbox: true`.
@@ -147,19 +147,19 @@ Start here when you want to change something. Paths under "Main process" are rel
 
 | `window.AU` method | Channel | Kind | Main-process handler | Used by (renderer) |
 |---|---|---|---|---|
-| `snapshot` | `au:snapshot` | invoke | `ipc/register.js` → `replay-control.js` | `app.js` |
-| `getSystem` / `getPlanet` | `au:system` / `au:planet` | invoke | `ipc/register.js` | `app.js`, `scene-system.js` |
-| `openProject` / `openExternal` | `au:open` / `au:open-external` | invoke | `ipc/register.js` | `app-project-control.js`, `app-agent-focus.js` |
-| `openTerminal` | `au:open-terminal` | invoke | `ipc/terminal.js` | `app-project-control.js` |
-| `tasksGet`, `taskAdd`, `taskSetDone`, `taskRemove` | `au:tasks-get`, `au:task-*` | invoke | `ipc/tasks.js` | `app-project-tasks.js` |
-| `rootTasksGet`, `rootTaskCreate/Remove/Assign/Retry` | `au:root-task*` | invoke | `ipc/root-tasks.js` | `app-ideas.js` |
-| `projectPathsScan/Locate/Apply` | `au:project-path*` | invoke | `ipc/project-paths.js` | `app-project-settings.js` |
-| `replay` | `au:replay` | invoke | `replay-control.js` | `app-playback.js` |
-| `onEvents` | `au:events` | push | `app-context.js` | `app.js` |
-| `onReplayState` | `au:replay-state` | push | `replay-control.js` | `app.js` |
-| `onTasksChanged` / `onRootTasksChanged` | `au:tasks-changed` / `au:root-tasks-changed` | push | `app-context.js` / `ipc/root-tasks.js` | `app.js` |
-| `onProjectVcsStatusChanged` | `au:project-vcs-status-changed` | push | `replay-control.js` | `app.js` |
-| `onDebugView` / `debugReady` | `au:debug-view` / `au:debug-ready` | push / send | `harness/modes/*.js` | `app.js` (test modes only) |
+| `snapshot` | `au:snapshot` | invoke | `ipc/register.js` → `replay-control.js` | `app/boot.js` |
+| `getSystem` / `getPlanet` | `au:system` / `au:planet` | invoke | `ipc/register.js` | `app/boot.js`, `scene/system/view.js` |
+| `openProject` / `openExternal` | `au:open` / `au:open-external` | invoke | `ipc/register.js` | `app/project/control.js`, `app/agent-focus.js` |
+| `openTerminal` | `au:open-terminal` | invoke | `ipc/terminal.js` | `app/project/control.js` |
+| `tasksGet`, `taskAdd`, `taskSetDone`, `taskRemove` | `au:tasks-get`, `au:task-*` | invoke | `ipc/tasks.js` | `app/project/tasks.js` |
+| `rootTasksGet`, `rootTaskCreate/Remove/Assign/Retry` | `au:root-task*` | invoke | `ipc/root-tasks.js` | `app/ideas.js` |
+| `projectPathsScan/Locate/Apply` | `au:project-path*` | invoke | `ipc/project-paths.js` | `app/project/settings.js` |
+| `replay` | `au:replay` | invoke | `replay-control.js` | `app/playback.js` |
+| `onEvents` | `au:events` | push | `app-context.js` | `app/boot.js` |
+| `onReplayState` | `au:replay-state` | push | `replay-control.js` | `app/boot.js` |
+| `onTasksChanged` / `onRootTasksChanged` | `au:tasks-changed` / `au:root-tasks-changed` | push | `app-context.js` / `ipc/root-tasks.js` | `app/boot.js` |
+| `onProjectVcsStatusChanged` | `au:project-vcs-status-changed` | push | `replay-control.js` | `app/boot.js` |
+| `onDebugView` / `debugReady` | `au:debug-view` / `au:debug-ready` | push / send | `harness/modes/*.js` | `app/boot.js` (test modes only) |
 
 The `on*` wrappers return nothing, so listeners cannot be removed.
 
@@ -235,12 +235,12 @@ in a closure, and anything shared is a field of `ctx`.
 | `goals.js` | 352 | functions | Line-preserving `GOALS.md` parse / write (temp file + rename, refuses symlinks) | — |
 | `root-tasks.js` | 344 | `class RootTaskStore` | IDEAS queue records and phase transitions → `root-tasks.json` | — |
 | `agent-launcher.js` | 391 | factory → `{launch}` | Finds the native `codex` binary on PATH, spawns `codex exec` detached | `path-safety` |
-| `github-metadata-provider.js` | 301 | factory | Open-PR counts via `gh api graphql` (batches of 25, 5 min cache) | — |
-| `project-vcs-status.js` | 284 | factories | Runs `git status --porcelain=v2` + remote lookup (4 s timeout) | — |
-| `project-vcs-status-service.js` | 307 | factory | 15 s cache, ≤4 concurrent reads, merges GitHub data | — |
+| `vcs-status/github-metadata-provider.js` | 301 | factory | Open-PR counts via `gh api graphql` (batches of 25, 5 min cache) | — |
+| `vcs-status/collector.js` | 284 | factories | Runs `git status --porcelain=v2` + remote lookup (4 s timeout) | — |
+| `vcs-status/service.js` | 307 | factory | 15 s cache, ≤4 concurrent reads, merges GitHub data | — |
 | `terminal-launcher.js` | 206 | factory → `{open}` | `wt.exe -d <cwd>` (Windows) or `open -a Terminal` (macOS); Linux unsupported | `path-safety` |
 | `project-paths.js` | 162 | functions | Bounded folder search for a moved project (depth 6, 12k dirs, 8 s) | — |
-| `project-vcs-status-controller.js` | 127 | factory | Tracker events → debounced (400 ms) per-project git refresh | — |
+| `vcs-status/controller.js` | 127 | factory | Tracker events → debounced (400 ms) per-project git refresh | — |
 | `path-safety.js` | 121 | functions | Shared "is this a canonical local path / inside that path" checks, `relativeInside` | `provider-adapters` |
 | `window-security.js` | 55 | functions | Navigation / pop-up / permission lockdown, trusted-frame check | — |
 | `shared/bounded-process.js` | 96 | function | One child-process runner with a timeout and output cap (git and gh) | `shared/values` |
@@ -320,16 +320,16 @@ sequenceDiagram
   participant T as tracker.js + live/
   participant C as app-context.js
   participant P as preload
-  participant A as app.js
+  participant A as app/boot.js
   participant V as active view
   T->>F: pollFiles every 1 s reads new bytes
   T->>T: transcripts/claude.js or adaptLine turns lines into signals, live/*-records.js apply them to the LiveModel
   T-->>C: emit events batch
   C->>P: send au:events with streamEpoch and mode, only while LIVE
   P->>A: onEvents callback
-  A->>A: drop stale epoch or seq, applyEvent (app-store.js) into AUR.app.state.store
+  A->>A: drop stale epoch or seq, applyEvent (app/store.js) into AUR.app.state.store
   A->>V: view.update(batch), once per batch
-  A->>A: scheduleChrome (app-chrome-queue.js) redraws panels next frame
+  A->>A: scheduleChrome (app/chrome-queue.js) redraws panels next frame
 ```
 
 **Project identity.** Claude: the project id is the `~/.claude/projects/<slug>` folder name
@@ -433,20 +433,20 @@ file attaches to the global `window.AUR`. A file may only use what loaded above 
 flowchart TB
   V["1 · Vendor — babylon.js, babylon.gui, babylonjs.loaders (UMD from node_modules)"]
   L["2 · Shared libraries — util.js creates window.AUR · util-scene · procedural-worlds · ship-assets · ship-assets-hulls · ship-assets-api · polish-math · galaxy-layout · search-core · components/project-vcs-status"]
-  S["3 · Views — scene-common creates AUR.sceneParts · scene-universe-* parts · scene-universe · scene-system-* parts · scene-system · scene-planet → AUR.views.*"]
-  ST["4 · app-state.js — the only file that creates AUR.app.state and AUR.app.const"]
-  M["5 · Feature modules — app-agent-focus · app-chrome · app-chrome-queue · app-history-metrics · app-ideas · app-ideas-list · app-playback · app-project-control · app-project-directory · app-project-search · app-project-settings · app-project-tasks · app-replay · app-store"]
-  A["6 · app.js — boot, event routing, view switching, debug hooks"]
+  S["3 · Views — scene/common creates AUR.sceneParts · scene/universe/* parts · scene/universe · scene/system/* parts · scene/system · scene/planet → AUR.views.*"]
+  ST["4 · app/state.js — the only file that creates AUR.app.state and AUR.app.const"]
+  M["5 · Feature modules — app/agent-focus · app/chrome · app/chrome-queue · app/history-metrics · app/ideas · app/ideas-list · app/playback · app/project/control · app/project/directory · app/project/search · app/project/settings · app/project/tasks · app/replay · app/store"]
+  A["6 · app/boot.js — boot, event routing, view switching, debug hooks"]
   V --> L --> S --> ST --> M --> A
 ```
 
 Exceptions to "everything on `AUR`": `polish-math.js` publishes `window.AUR_POLISH`,
 `galaxy-layout.js` publishes `window.AUR_GALAXY`, and `search-core.js` also leaks a bare
 global `searchProjects`. These three plus the VCS component are UMD so Node can load them.
-The split views follow one pattern: `scene-common.js` creates `AUR.sceneParts` (and
-`AUR.disposeMeshAndMaterial`), each `scene-<view>-*.js` part registers its builders on
-`AUR.sceneParts.<view>` and loads before its view, and the view builds one explicit `view`
-object and merges its parts into it.
+The split views follow one pattern: `scene/common.js` creates `AUR.sceneParts` (and the
+helpers every view shares: `viewCamera`, `shipMesh`, `disposeView`, `disposeMeshAndMaterial`),
+each part in `scene/<view>/` registers its builders on `AUR.sceneParts.<view>` and loads
+before its view, and the view builds one explicit `view` object and merges its parts into it.
 
 For the type check, `src/types/renderer-globals.d.ts` declares the globals `AU` (typed by the
 contract), `AUR`, `AUR_POLISH` and `AUR_GALAXY` (all `any` for now).
@@ -455,68 +455,70 @@ contract), `AUR`, `AUR_POLISH` and `AUR_GALAXY` (all `any` for now).
 
 | File | Lines | Job |
 |---|---|---|
-| `util.js` | 213 | Creates `AUR`; hashes, colours, provider metadata, motion tuning, asset paths, DOM helpers |
-| `util-scene.js` | 209 | Babylon helpers on `AUR`: skybox (PhotoDome), starfield, orbit rings, ship and signal markers, GUI labels |
+| `util.js` | 246 | Creates `AUR`; hashes, colours, provider metadata, motion tuning, asset paths, DOM helpers |
+| `util-scene.js` | 274 | Babylon helpers on `AUR`: skybox (PhotoDome), starfield, orbit rings, ship and signal markers, GUI labels |
 | `procedural-worlds.js` | 329 | Planet and asteroid surfaces (authored textures + generated normal maps) |
 | `ship-assets.js` | 254 | Manifest, per-scene state, hull choice by rank (`builds` against the manifest ladder), container loading; procedural dart fallback |
 | `ship-assets-hulls.js` | 252 | Builds a hull from a loaded model: provider livery, far-file instances on the universe map, near-file clones in system / planet views, within a 100k-triangle budget |
-| `ship-assets-api.js` | 123 | `AUR.ships`: instantiate, upgrade a fallback dart, `refresh` in place on promotion, dispose a scene's hull state |
-| `galaxy-layout.js` | 178 | Pure: galaxy grouping, spiral placement, Graveyard |
-| `polish-math.js` | 56 | Pure: label overlap, sun pulse |
-| `search-core.js` | 34 | Pure: project ranking |
+| `ship-assets-api.js` | 118 | `AUR.ships`: instantiate, upgrade a fallback dart, `refresh` in place on promotion, dispose a scene's hull state |
+| `galaxy-layout.js` | 284 | Pure: galaxy grouping, spiral placement, Graveyard |
+| `polish-math.js` | 67 | Pure: label overlap, sun pulse |
+| `search-core.js` | 87 | Pure: project ranking |
 | `components/project-vcs-status.js` | 268 | Pure presentation for git / GitHub markers and details |
-| `scene-common.js` | 18 | Creates `AUR.sceneParts` and `AUR.disposeMeshAndMaterial` |
-| `scene-universe.js` | 274 | Galaxy map: builds the `view` object and merges its parts |
-| `scene-universe-galaxies.js` | 145 | Galaxy discs, outlines, labels, glyph placement, camera framing |
-| `scene-universe-glyphs.js` | 138 | A project glyph's live state: dimming, search focus, attention halo, VCS markers, sun pulse |
-| `scene-universe-labels.js` | 238 | Dirty-driven label layout (`updateLabelLayout`) |
-| `scene-universe-ships.js` | 64 | Ships orbiting their project's glyph |
-| `scene-universe-stats.js` | 218 | Measured metrics for the harness and gates |
-| `scene-system.js` | 337 | Solar system + first-person focus camera (`focusShip`) |
-| `scene-system-belt.js` | 46 | Asteroid belt (thin instances) |
-| `scene-system-focus.js` | 94 | Fades the other ships while one is followed; focus stats |
-| `scene-system-ships.js` | 193 | Ships: build / remove, patrols, fly-to-planet builds, `refetchPlanets`, the view's `update` |
-| `scene-planet.js` | 196 | Planet close-up |
-| `app-state.js` | 180 | Shared state and constants (including the chrome dirty bits, `AUR.app.const.CHROME`) |
-| `app-store.js` | 113 | `seedStore`, `applyEvent`, `maybeNotifyAttention`, `refreshShipHulls`, `workedShipIds` |
-| `app-chrome-queue.js` | 71 | `chromeMaskFor`, `scheduleChrome`, `renderChrome`: one panel redraw per frame |
-| `app-playback.js` | 244 | History bar |
-| `app-replay.js` | 193 | Stream epochs, playback state, `issueReplay` |
-| `app-history-metrics.js` | 97 | `AUR.historyTestMetrics` for the history harness |
-| `app-project-search.js` | 237 | Search box, GitHub filter |
-| `app-project-directory.js` | 257 | ALL PROJECTS dialog |
-| `app.js` | 369 | Boot, routing, view switching, debug hooks |
-| `app-ideas.js` | 144 | IDEAS panel |
-| `app-ideas-list.js` | 274 | IDEAS list rendering |
-| `app-chrome.js` | 369 | Command rail, RECENT strip, agent list, feed, summary, tabs |
-| `app-agent-focus.js` | 327 | Cockpit overlay, hologram mini-map |
-| `app-project-settings.js` | 340 | Moved-project dialog |
-| `app-project-tasks.js` | 286 | TASKS panel |
-| `app-project-control.js` | 244 | Project card, Open Terminal button, planet card |
-| `index.html` | 374 | All panels exist in the HTML up front; modules show / hide them |
+| `scene/common.js` | 70 | Creates `AUR.sceneParts`; the shared camera, ship mesh, teardown and mesh disposal |
+| `scene/universe/view.js` | 282 | Galaxy map: builds the `view` object and merges its parts |
+| `scene/universe/galaxies.js` | 207 | Galaxy discs, outlines, labels, glyph placement, camera framing |
+| `scene/universe/glyphs.js` | 143 | A project glyph's live state: dimming, search focus, attention halo, VCS markers, sun pulse |
+| `scene/universe/labels.js` | 223 | Dirty-driven label layout (`updateLabelLayout`) |
+| `scene/universe/ships.js` | 54 | Ships orbiting their project's glyph |
+| `scene/universe/stats.js` | 165 | Measured metrics for the harness and gates |
+| `scene/system/view.js` | 319 | Solar system + first-person focus camera (`focusShip`) |
+| `scene/system/belt.js` | 45 | Asteroid belt (thin instances) |
+| `scene/system/focus.js` | 59 | Fades the other ships while one is followed |
+| `scene/system/ships.js` | 170 | Ships: build / remove, patrols, fly-to-planet builds, `refetchPlanets`, the view's `update` |
+| `scene/planet/view.js` | 167 | Planet close-up |
+| `app/state.js` | 184 | Shared state and constants (including the chrome dirty bits, `AUR.app.const.CHROME`) |
+| `app/store.js` | 121 | `seedStore`, `applyEvent`, `maybeNotifyAttention`, `refreshShipHulls`, `workedShipIds` |
+| `app/chrome-queue.js` | 78 | `chromeMaskFor`, `scheduleChrome`, `renderChrome`, `renderChromeNow`: one panel redraw per frame, or now |
+| `app/playback.js` | 232 | History bar |
+| `app/replay.js` | 164 | Stream epochs, playback state, `issueReplay` |
+| `app/history-metrics.js` | 96 | `AUR.historyTestMetrics` for the history harness |
+| `app/project/search.js` | 275 | Search box, GitHub filter; the listbox helpers the ALL PROJECTS dialog shares |
+| `app/project/directory.js` | 197 | ALL PROJECTS dialog |
+| `app/boot.js` | 384 | Boot, routing, view switching, debug hooks |
+| `app/ideas.js` | 148 | IDEAS panel |
+| `app/ideas-list.js` | 268 | IDEAS list rendering |
+| `app/chrome.js` | 278 | Command rail, RECENT strip, agent list, feed, summary, tabs |
+| `app/agent-focus.js` | 307 | Cockpit overlay, hologram mini-map |
+| `app/project/settings.js` | 320 | Moved-project dialog |
+| `app/project/tasks.js` | 268 | TASKS panel |
+| `app/project/control.js` | 217 | Project card, Open Terminal button, planet card |
+| `index.html` | 428 | All panels exist in the HTML up front; modules show / hide them |
 | `style.css` | 2,110 | All styles; ~470 lines are the cockpit |
 
 ### 6.3 Shared state and routing
 
-- `AUR.app.state` (`S`) is one mutable object that every `app-*` module reads and writes:
+- `AUR.app.state` (`S`) is one mutable object that every `app/*` module reads and writes:
   the model copy (`S.store` = projects, ships, feed), the active view, epoch / sequence
   cursors, replay flags, and one sub-object per panel.
-- **Boot** (`app.js` `boot`, from line 18): create the Babylon engine → wire every panel → subscribe to
+- **Boot** (`app/boot.js` `boot`, from line 18): create the Babylon engine → wire every panel → subscribe to
   pushes → `AU.snapshot()` → seed the store → drain anything queued during boot →
   show the universe.
-- **Routing**: `routeEvents` (`app.js`) → epoch / `seq` checks → `applyEvent` (`app-store.js`)
-  per event → `activeView.update(batch)` once → `scheduleChrome` (`app-chrome-queue.js`) sets
+- **Routing**: `routeEvents` (`app/boot.js`) → epoch / `seq` checks → `applyEvent` (`app/store.js`)
+  per event → `activeView.update(batch)` once → `scheduleChrome` (`app/chrome-queue.js`) sets
   `AUR.app.const.CHROME` bits, and one `requestAnimationFrame` re-renders only those panels.
 - **View switch** (`setView`): build the new scene first, swap, then dispose the old one —
   after polling up to 4 s for Babylon's BRDF texture, because disposing too early throws.
 - **Views** are `AUR.views.<name>(engine, data, ctx) → {scene, update, dispose, …}`. The app
-  layer also probes for view-specific extras (`setSearchMatches`, `focusShip`, `planetData`).
+  layer fills in no-op defaults for the optional methods (`VIEW_DEFAULTS` in `app/boot.js`:
+  `resize`, `setQuality`, `setSearchMatches`, `setShipFocusVantage`, `focusShip`,
+  `shipFocusState`) and reads the optional `planetData` field through `A.activePlanetData()`.
 
 ### 6.4 Who owns which part of the screen
 
 | Region | Element | Owner |
 |---|---|---|
-| 3D canvas | `#renderCanvas` | `app.js` + active view |
+| 3D canvas | `#renderCanvas` | `app/boot.js` + active view |
 | Top bar: RECENT / search / ALL PROJECTS / settings | `#recent`, `#project-search`, `#project-directory-button`, `#settings-button` | chrome / search / search / settings |
 | Command rail: IDEAS, AGENTS, FEED | `#sidebar` (`#ideas-panel`, `#agents-panel`, `#feed-panel`) | chrome + ideas |
 | Project card, planet card | `#project-card`, `#planet-card` | project-control |
@@ -558,7 +560,7 @@ never writes to the old folder, and skips the copy in every test mode.
 | `assets/ships/*.glb`, `manifest.json`, `textures/` | ~9 MB | `ship-assets.js` (manifest only) | The 6-hull shared fleet and `aur-aster-kite` are still in the manifest but no provider maps to them |
 | `assets/ships/fleet-scale-v2/` | **123 MB** | **nothing** | Blender sources, FBX, build scripts, QA renders; the source the `fleet-v2/` files are built from |
 | `assets/palettes/`, `assets/manifest.json` | 48 KB | **nothing** (one test reads the manifest) | Colours are hard-coded in `util.js` |
-| `src/renderer/assets/*.png` | 6 MB | `app-agent-focus.js` | Cockpit backdrops; no provenance file |
+| `src/renderer/assets/*.png` | 6 MB | `app/agent-focus.js` | Cockpit backdrops; no provenance file |
 | root `1.planet-view.png`, `2.…`, `3.…` | 5 MB | nobody at runtime | Mockups the renderer is graded against |
 
 The older ship GLBs are regenerated by `npm run ships:generate` (`scripts/generate-*.mjs`); the
@@ -598,11 +600,11 @@ There are four layers of checking, and only the first three run in CI.
 Six of the older gates grep "the main process" by concatenating every `.js` file under `src/main`,
 so they keep passing wherever code moves inside that folder. The galaxy and provider gates read
 `tracker.js` together with `live/` and `universe/`. The galaxy, provider, polish and history
-gates read a view's source as its `scene-<view>*.js` files plus the shared `scene-*.js` and
+gates read a view's source as its `scene/<view>/` files plus the shared `scene/` files and
 `ship-assets*.js`, and util source as `util.js` plus `util-*.js`.
 
 **How "frozen" is enforced.** By review, not by the gates: the **Frozen files** bullet in
-`CLAUDE.md` lists what changes only on the owner's request. Until October 2026 two gates also
+`AGENTS.md` lists what changes only on the owner's request. Until October 2026 two gates also
 stored SHA-256 fingerprints of 7 renderer files; they were retired because every edit needed a
 re-pin step and the fingerprints caught nothing the PR diff doesn't show. The control and
 history gates still fail if a dependency is added. Every source file is held to 400 lines
@@ -620,8 +622,8 @@ not reproduced.
 ### Too much in one place
 1. *(resolved)* `tracker.js` (180) and `replay-source.js` (359) are façades over `live/` and
    `history/`; the public shapes, galaxies, planets and ship records are shared in `universe/`.
-2. *(resolved)* `scene-universe.js` is split into five parts (§6.2). `updateLabelLayout`
-   (`scene-universe-labels.js`) is still one 158-line function.
+2. *(resolved)* `scene/universe/view.js` is split into five parts (§6.2). `updateLabelLayout`
+   (`scene/universe/labels.js`) is still one 158-line function.
 3. `style.css` is 2,110 lines in one file.
 4. `ctx` is a service locator: `app-context.js` `start()` calls into `ctx.ipc.*` and
    `ctx.replay.*`, which `main.js` must attach first, and test-fixture branches are mixed into
@@ -638,8 +640,8 @@ not reproduced.
    `isPathInside` — which accepts UNC roots and long paths — `isInside`, which treats an equal
    path as outside, and `relativeInside`, whose callers choose the separator).
 8. *(resolved)* `tracker.js` now uses `shared/atomic-write.js`.
-9. Ship building / removal in all three scenes (3 copies that already differ: `scene-universe-ships.js`,
-   `scene-system-ships.js`, `scene-planet.js`); camera,
+9. Ship building / removal in all three scenes (3 copies that already differ: `scene/universe/ships.js`,
+   `scene/system/ships.js`, `scene/planet/view.js`); camera,
    skybox, starfield and dispose setup also ×3.
 10. "Question or permission" attention check hard-coded in 6 places.
 
@@ -650,7 +652,7 @@ not reproduced.
     names (`ucam` / `scam` / `pcam`).
 13. Four `docs/*.md` files and a section of `kit/ASSET-REQUESTS.md` are gate fixtures —
     editing their wording can fail a gate.
-14. *(resolved)* The file fingerprints are retired; the frozen list in `CLAUDE.md` is the only one.
+14. *(resolved)* The file fingerprints are retired; the frozen list in `AGENTS.md` is the only one.
 15. *(resolved)* The scene caps no longer equal the current sizes; every source file shares the
     400-line cap.
 16. *(resolved)* `kit/grade.mjs` replaces only its own files in `.shots/`.
@@ -669,7 +671,7 @@ not reproduced.
     fleet — not loaded at runtime.
 21. *(resolved)* `edge-validation.mjs` was folded into `test/tracker.test.js`.
 22. Unused by the app: `providerToolStatus` (only `grade-providers.mjs` calls it),
-    `AUR.attentionLabel`, `scene-system.js` `focusStats`.
+    `AUR.attentionLabel`. *(resolved)* The unread `focusStats`, `searchStats` and `vcsStats` scene hooks are gone.
 
 ### Stale documentation
 23. Older docs quote line numbers in the pre-split `main.js` (§5.3 maps them).
@@ -683,7 +685,7 @@ not reproduced.
 27. *(mostly resolved)* The wiring has unit tests (`app-context`, `replay-control`, `ipc-*`), and
     `tracker.js` / `replay-source.js` have characterization tests, plus unit tests for the `live/`
     and `history/` modules. Still open: `goals.js` is tested
-    only indirectly, and every `app-*.js` file is checked by source-text grep only.
+    only indirectly, and every `app/*.js` file is checked by source-text grep only.
 28. *(resolved)* `kit/grade.mjs` runs against a synthetic profile (`scripts/lib/synthetic-profile.mjs`);
     `--real` uses your own transcripts and userData.
 
@@ -691,7 +693,7 @@ not reproduced.
 29. *(resolved)* A Claude session that resumes after 15 quiet minutes no longer re-counts its
     old edits.
 30. *(resolved)* Signal ships for files 5–15 min old no longer depart and respawn every scan.
-31. `scene-system-ships.js` `refetchPlanets` can add meshes to a scene that has already been
+31. `scene/system/ships.js` `refetchPlanets` can add meshes to a scene that has already been
     disposed after a quick view switch.
 32. Every scan stats every Claude transcript and lists all Codex history (all years) every
     3 s — cost grows with history size.
@@ -704,7 +706,7 @@ not reproduced.
 |---|---|
 | Kit | A contract + grading script handed to an agent to build one feature. Finished ones keep only their gate, in `kit/done/`. |
 | Gate | A `grade-*.mjs` script that exits 0 / 1. |
-| Frozen | A file that changes only on the owner's request (`CLAUDE.md`, Frozen files). |
+| Frozen | A file that changes only on the owner's request (`AGENTS.md`, Frozen files). |
 | `ctx` | The one shared object in the main process (`app-context.js`); holds the window, sources and services. |
 | LIVE / REPLAY | Whether the window shows the Tracker or the history ReplaySource. |
 | Epoch | Counter that increments on every LIVE ↔ REPLAY switch; stale batches are dropped. |

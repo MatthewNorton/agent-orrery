@@ -101,9 +101,11 @@ else {
   if (n > 150) fail('TE', `main.js is ${n} lines (cap 150)`);
   if (/^let /m.test(mainSrc)) fail('TE', 'main.js still has module-level let');
   if (/^const \w+ = (new (Map|Set)\(|\[\])/m.test(mainSrc)) fail('TE', 'main.js still has a file-scope mutable collection');
-  const claude = read('CLAUDE.md');
-  const frozenBullet = (claude.match(/\*\*Frozen files\*\*[^\n]*/) || [''])[0];
-  if (/src\/main\/main\.js/.test(frozenBullet)) fail('TE', 'CLAUDE.md frozen-files bullet still lists main.js');
+  // 2026-10-18: the agent instructions moved from CLAUDE.md to AGENTS.md.
+  const agents = read('AGENTS.md');
+  const frozenBullet = (agents.match(/\*\*Frozen files\*\*[^\n]*/) || [''])[0];
+  if (!frozenBullet) fail('TE', 'AGENTS.md has no frozen-files bullet');
+  if (/src\/main\/main\.js/.test(frozenBullet)) fail('TE', 'AGENTS.md frozen-files bullet still lists main.js');
   const spec = read('kit/SPEC.md');
   const specFrozen = spec.slice(spec.indexOf('Frozen files'), spec.indexOf('Frozen files') + 1500);
   if (/`src\/main\/main\.js`/.test(specFrozen)) fail('TE', 'kit/SPEC.md frozen list still includes main.js');

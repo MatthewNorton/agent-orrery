@@ -1,4 +1,4 @@
-// polish-math.js — pure, dependency-free layout and color helpers shared by
+// Pure, dependency-free layout and color helpers shared by
 // the renderer and the item-02 Node grader.
 'use strict';
 
@@ -15,6 +15,17 @@
       a.y - gap < b.y + b.height + gap &&
       a.y + a.height + gap > b.y - gap
     );
+  }
+
+  // Pairs of items whose rects overlap within the padding.
+  function countOverlaps(items, padding) {
+    let overlaps = 0;
+    for (let i = 0; i < items.length; i++) {
+      for (let j = i + 1; j < items.length; j++) {
+        if (rectsOverlap(items[i].rect, items[j].rect, padding)) overlaps++;
+      }
+    }
+    return overlaps;
   }
 
   function insideBounds(rect, bounds) {
@@ -52,5 +63,5 @@
     return factor;
   }
 
-  return { rectsOverlap, selectLabelLayout, applySunPulse };
+  return { rectsOverlap, countOverlaps, insideBounds, selectLabelLayout, applySunPulse };
 });

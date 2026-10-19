@@ -70,7 +70,7 @@ a to-do, assign it to a live project, and start Codex on the exact tagged
 clustered galaxy universe map → solar system → planet, matching the three
 mockup PNGs in the repo root.
 
-Frozen for executors: the **Frozen files** bullet in `CLAUDE.md` is the one authoritative list.
+Frozen for executors: the **Frozen files** bullet in `AGENTS.md` is the one authoritative list.
 
 Gates check behaviour and shape, never file hashes: no gate pins a SHA of any file, ever (the
 last pins were retired on 2026-10-13, PR #29). A frozen file is protected by review, not by a hash.
