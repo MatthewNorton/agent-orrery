@@ -148,23 +148,17 @@
    * @returns {Promise<T | Failure<ProjectPathFailureCode> | null>}
    */
   async function runSettingsRequest(statusText, call) {
-    if (S.projectSettings.busy || S.playback.mode !== 'live') return null;
+    if (S.projectSettings.busy || S.playback.mode !== 'live' || S.replayTransitionPending) return null;
     const owner = S.projectSettings.owner;
     const request = ++S.projectSettings.request;
     S.projectSettings.busy = true;
     setProjectSettingsStatus(statusText);
     A.renderProjectSettings();
     S.projectSettings.els.close.focus();
-    /** @type {T | null} */
-    let result = null;
-    try {
-      result = await call();
-    } catch {
-      result = null;
-    }
+    const result = await AUR.settle(call);
     if (!settingsRequestIsCurrent(owner, request)) return null;
     S.projectSettings.busy = false;
-    return result || { ok: false, code: 'FAILED' };
+    return result;
   }
 
   async function scanForProjectPaths() {

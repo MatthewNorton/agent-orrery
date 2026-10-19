@@ -141,16 +141,19 @@
     }
 
     // The atlas depends on the spiral's arms and the texture size, not its radius, so its pixels
-    // outlive the body and the view.
+    // outlive the body and the view. Each galaxy keeps one atlas and one set of star samples.
     function atlasPixels(record, spiral, size) {
-      const key = record.key + ':' + spiral.arms + ':' + size;
-      let pixels = fields.get(key);
-      if (!pixels) {
-        const tint = [record.color.r, record.color.g, record.color.b];
-        pixels = FIELD.buildAtlas(spiral, AUR.fnv1a('field:' + record.key), tint, size);
-        fields.set(key, pixels);
-      }
+      const slot = fields.get('atlas:' + record.key);
+      if (slot && slot.arms === spiral.arms && slot.size === size) return slot.pixels;
+      const tint = [record.color.r, record.color.g, record.color.b];
+      const pixels = FIELD.buildAtlas(spiral, AUR.fnv1a('field:' + record.key), tint, size);
+      fields.set('atlas:' + record.key, { arms: spiral.arms, size, pixels });
       return pixels;
+    }
+
+    function forgetGalaxyFields(key) {
+      fields.delete('atlas:' + key);
+      fields.delete('stars:' + key);
     }
 
     const atlasSize = (spiral) => spiral.radius < 60 ? 256 : 512;
@@ -184,13 +187,15 @@
 
       const count = Math.round(AUR.clamp(R * R * STARS_PER_AREA, STARS_MIN, STARS_MAX) * view.quality.stars);
       // The samples follow from the atlas, the key and the count, so they are kept beside the atlas.
-      const starsKey = 'stars:' + record.key + ':' + body.spiral.arms + ':' + size + ':' + count;
-      let stars = fields.get(starsKey);
-      if (!stars) {
-        stars = FIELD.sampleStars(atlasPixels(record, body.spiral, size), size,
+      const arms = body.spiral.arms;
+      let slot = fields.get('stars:' + record.key);
+      if (!slot || slot.arms !== arms || slot.size !== size || slot.count !== count) {
+        const samples = FIELD.sampleStars(atlasPixels(record, body.spiral, size), size,
           AUR.fnv1a('stars:' + record.key), count);
-        fields.set(starsKey, stars);
+        slot = { arms, size, count, stars: samples };
+        fields.set('stars:' + record.key, slot);
       }
+      const { stars } = slot;
       body.stars = new BABYLON.Mesh('galaxy-stars:' + record.key, scene);
       body.stars.setVerticesData(BABYLON.VertexBuffer.PositionKind, stars.positions);
       body.stars.setVerticesData(BABYLON.VertexBuffer.ColorKind, stars.colors, false, 4);
@@ -250,6 +255,6 @@
       }
     }
 
-    return { buildGalaxyStars, disposeGalaxyStars, setStarsQuality, animateStars };
+    return { buildGalaxyStars, disposeGalaxyStars, forgetGalaxyFields, setStarsQuality, animateStars };
   };
 })();

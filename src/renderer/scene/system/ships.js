@@ -22,7 +22,7 @@
     function applyShipAttention(rec, ship) {
       const text = attentionSuffix(ship.attention);
       rec.suffix.text = text;
-      rec.suffix.isVisible = text !== '';
+      rec.suffix.isVisible = text !== '' && !view.shipFocus;
       if (!text) return;
       rec.suffix.color = AUR.attentionColor(ship.attention);
       // Both controls are linked to the ship. Offset the suffix beyond the

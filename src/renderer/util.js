@@ -106,7 +106,6 @@
     ship && (ship.kind === 'drone' || AUR.providerKey(ship.provider) === 'generic')
   );
   AUR.sunColor = (seed) => AUR.SUN_COLORS[seed % AUR.SUN_COLORS.length];
-  // What a planet's size grows with: its files, and five per build.
   AUR.planetWeight = (pd) => (pd.files || 0) + (pd.builds || 0) * 5;
 
   AUR.clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
@@ -198,6 +197,13 @@
   };
   AUR.storeText = function storeText(key, value) {
     try { localStorage.setItem(key, value); } catch (error) { /* a convenience, never a requirement */ }
+  };
+
+  // ---- main-process calls ----
+  // A call's result, or a shared FAILED one when the call throws or resolves empty.
+  const FAILED = Object.freeze({ ok: false, code: 'FAILED' });
+  AUR.settle = async function settle(call) {
+    try { return (await call()) || FAILED; } catch (error) { return FAILED; }
   };
 
   // ---- tiny DOM helpers ----

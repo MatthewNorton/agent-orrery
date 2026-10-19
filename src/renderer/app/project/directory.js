@@ -139,20 +139,12 @@
     renderProjectDirectoryResults();
   };
 
-  A.projectGalaxyLabel = function projectGalaxyLabel(project) {
-    if (typeof project.galaxy === 'string') return project.galaxy;
-    if (project.galaxy) return project.galaxy.label || project.galaxy.key || '';
-    return '';
-  };
-
   function renderProjectDirectoryResults() {
     const els = S.projectDirectory.els;
     if (!els || !S.projectDirectory.open) return;
     A.renderListbox(els.list, els.input, S.projectDirectory, {
       idPrefix: 'project-directory-result-',
-      rowClass: (project) => 'project-directory-row' +
-        (A.shipsInProject(project.id).length > 0 ? ' active' : '') +
-        (project.exists === false ? ' missing' : ''),
+      rowClass: 'project-directory-row',
       emptyClass: 'project-directory-empty',
       emptyText: 'No projects found',
       fill: fillDirectoryRow,
@@ -163,6 +155,8 @@
   function fillDirectoryRow(row, project) {
     const ships = A.shipsInProject(project.id);
     const missing = project.exists === false;
+    if (ships.length > 0) row.classList.add('active');
+    if (missing) row.classList.add('missing');
     row.title = missing ? 'Recover this project path' : 'Open ' + A.projectLabel(project);
 
     const copy = AUR.el('span', 'project-directory-copy');

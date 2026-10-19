@@ -95,7 +95,7 @@
 
     // ---- planets ----
     const topNames = planetList.slice()
-      .sort((a, b) => (b.files + b.builds * 5) - (a.files + a.builds * 5))
+      .sort((a, b) => AUR.planetWeight(b) - AUR.planetWeight(a))
       .slice(0, 3).map((p) => p.name);
 
     function buildPlanet(pd, i) {
@@ -264,8 +264,10 @@
         const hit = pick && pick.hit ? pick.pickedMesh.metadata.planetName : null;
         canvas.style.cursor = hit ? 'pointer' : 'default';
         if (hit !== hovered) {
-          if (hovered && planets.has(hovered) && !planets.get(hovered).persistent) planets.get(hovered).label.isVisible = false;
-          if (hit && planets.has(hit)) Object.assign(planets.get(hit).label, { isVisible: true, alpha: 0.98 });
+          const left = hovered && planets.get(hovered);
+          const entered = hit && planets.get(hit);
+          if (left && !left.persistent) left.label.isVisible = false;
+          if (entered) Object.assign(entered.label, { isVisible: true, alpha: 0.98 });
           hovered = hit;
         }
       }

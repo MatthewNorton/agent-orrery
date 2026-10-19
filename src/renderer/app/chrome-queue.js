@@ -8,8 +8,7 @@
   const AUR = window.AUR;
   const A = AUR.app;
   if (!A) throw new Error('app/state.js must load before app/chrome-queue.js');
-  const C = A.const;
-  const CHROME = C.CHROME;
+  const CHROME = A.const.CHROME;
 
   /** @param {AUEvent} ev */
   A.chromeMaskFor = function chromeMaskFor(ev) {
@@ -27,7 +26,6 @@
     return 0;
   };
 
-  // In render order: the summary's build histogram reads the history bar as it stands.
   const RENDERERS = [
     [CHROME.AGENTS, 'renderAgents'],
     [CHROME.FEED, 'renderFeed'],

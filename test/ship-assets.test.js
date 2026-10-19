@@ -18,6 +18,28 @@ function loadShipAssetFiles(context) {
   }
 }
 
+const providerKey = (value) => value === 'codex' ? 'codex' :
+  value === 'signal' ? 'generic' : 'claude';
+const colors = { claude: '#b026ff', codex: '#2f7dff', generic: '#94a3b8' };
+
+// The AUR helpers ship-assets reads. Each test brings its own Color class and ship marker.
+function fakeAur({ Color, markShipMesh }) {
+  return {
+    log() {},
+    fnv1a() { return 0; },
+    providerKey,
+    providerMeta(value) {
+      const key = providerKey(value);
+      return { key, label: key, color: colors[key] };
+    },
+    shipTint(_id, provider) { return colors[providerKey(provider)]; },
+    shipColor(ship) { return ship && ship.local === true ? '#ff3344' : colors[providerKey(ship && ship.provider)]; },
+    color3(hex) { return new Color(hex); },
+    isNodeDisposed(node) { return !node || node.isDisposed(); },
+    markShipMesh,
+  };
+}
+
 test('index.html loads every ship-assets file, the core first', () => {
   const onDisk = fs.readdirSync(RENDERER).filter((file) => /^ship-assets.*\.js$/.test(file)).sort();
   assert.equal(SHIP_ASSET_FILES[0], 'ship-assets.js');
@@ -112,21 +134,8 @@ test('shared hulls receive fixed provider palettes while signals and drones load
       correction: { rotateY: 0, scale: 1, offset: [0, 0, 0] },
     }],
   };
-  const providerKey = (value) => value === 'codex' ? 'codex' :
-    value === 'signal' ? 'generic' : 'claude';
-  const colors = { claude: '#b026ff', codex: '#2f7dff', generic: '#94a3b8' };
-  const AUR = {
-    log() {},
-    fnv1a() { return 0; },
-    providerKey,
-    providerMeta(value) {
-      const key = providerKey(value);
-      return { key, label: key, color: colors[key] };
-    },
-    shipTint(_id, provider) { return colors[providerKey(provider)]; },
-    shipColor(ship) { return ship && ship.local === true ? '#ff3344' : colors[providerKey(ship && ship.provider)]; },
-    color3(hex) { return new Color(hex); },
-    isNodeDisposed(node) { return !node || node.isDisposed(); },
+  const AUR = fakeAur({
+    Color,
     markShipMesh(mesh, ship) {
       mesh.metadata = {
         ...(mesh.metadata || {}), isShip: true, shipId: ship.id,
@@ -135,7 +144,7 @@ test('shared hulls receive fixed provider palettes while signals and drones load
       const key = providerKey(ship.provider);
       return { key, label: key };
     },
-  };
+  });
   const context = {
     window: { AUR },
     fetch: async () => ({ ok: true, status: 200, json: async () => manifest }),
@@ -301,25 +310,13 @@ function loadShipAssets(manifest, trianglesByFile) {
     },
     dispose() {},
   });
-  const providerKey = (value) => value === 'codex' ? 'codex' : value === 'signal' ? 'generic' : 'claude';
-  const colors = { claude: '#b026ff', codex: '#2f7dff', generic: '#94a3b8' };
-  const AUR = {
-    log() {},
-    fnv1a() { return 0; },
-    providerKey,
-    providerMeta(value) {
-      const key = providerKey(value);
-      return { key, label: key, color: colors[key] };
-    },
-    shipTint(_id, provider) { return colors[providerKey(provider)]; },
-    shipColor(ship) { return ship && ship.local === true ? '#ff3344' : colors[providerKey(ship && ship.provider)]; },
-    color3(hex) { return new Color(hex); },
-    isNodeDisposed(node) { return !node || node.isDisposed(); },
+  const AUR = fakeAur({
+    Color,
     markShipMesh(mesh, ship) {
       mesh.metadata = { ...(mesh.metadata || {}), isShip: true, shipId: ship.id };
       return { key: providerKey(ship.provider), label: '' };
     },
-  };
+  });
   const context = {
     window: { AUR },
     fetch: async () => ({ ok: true, status: 200, json: async () => manifest }),

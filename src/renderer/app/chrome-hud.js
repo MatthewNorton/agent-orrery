@@ -128,9 +128,7 @@
     const total = document.getElementById('history-builds');
     if (!svg) return;
     const h = S.store.buildHistogram;
-    const bar = document.getElementById('history-bar');
-    const replay = Boolean(bar && bar.dataset.mode === 'replay');
-    if (!h || replay) { svg.innerHTML = ''; if (total) total.textContent = ''; return; }
+    if (!h || S.playback.mode === 'replay') { svg.innerHTML = ''; if (total) total.textContent = ''; return; }
     const max = Math.max(1, ...h.bins);
     const nowBin = AUR.clamp(Math.floor((Date.now() - h.day) / 1800000), 0, 47);
     let sum = 0, out = '';
@@ -149,8 +147,7 @@
     const date = document.getElementById('clock-date');
     const mode = document.getElementById('clock-mode');
     if (!time || !date || !mode) return;
-    const bar = document.getElementById('history-bar');
-    const replay = Boolean(bar && bar.dataset.mode === 'replay');
+    const replay = S.playback.mode === 'replay';
     const d = new Date(replay ? A.playbackReferenceTs() : Date.now());
     time.textContent = pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
     date.textContent = DAYS[d.getDay()] + ' ' + d.getDate() + ' ' + MONTHS[d.getMonth()];
