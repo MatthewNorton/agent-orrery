@@ -1,6 +1,6 @@
 // Pure deterministic galaxy colors and cluster packing.
 // Galaxies huddle around the largest one at hashed bearings, heights and tilts; inside a galaxy
-// the recently active projects sit at the core and dormant ones drift to the rim.
+// the recently active projects lean toward the core and dormant ones toward the rim.
 // UMD keeps the same implementation available to the renderer and Node gates.
 'use strict';
 
@@ -10,9 +10,12 @@
   if (root) root.AUR_GALAXY = api;
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   const MEMBER_STEP = 16;
-  const MEMBER_JITTER = 1.5;
-  const MEMBER_LIFT = 1.5;
-  const CORE_LIFT = 3;
+  const MEMBER_ROOMY = 18;
+  const MEMBER_SPACING = 14;
+  const MEMBER_SCATTER = 0.35;
+  const MEMBER_TRIES = 24;
+  const MEMBER_LIFT = 3;
+  const CORE_LIFT = 1.5;
   const CORE_RADIUS = 10;
   const CORE_BULGE = 0.28;
   const ARM_TWIST = 3;
@@ -83,14 +86,9 @@
     return { key, label };
   }
 
-  // Angle of a point on an arm at a given radius.
-  function armAngle(spiral, arm, radius) {
-    return spiral.phase + arm * Math.PI * 2 / spiral.arms + (radius / spiral.radius) * ARM_TWIST;
-  }
-
-  // The radii of a galaxy's systems along one arm, each a MEMBER_STEP chord from the last.
+  // The radii of MEMBER_STEP chords out along one arm, which size the disc.
   function armRadii(spiral) {
-    const point = (r) => { const a = armAngle(spiral, 0, r); return [Math.cos(a) * r, Math.sin(a) * r]; };
+    const point = (r) => { const a = spiral.phase + (r / spiral.radius) * ARM_TWIST; return [Math.cos(a) * r, Math.sin(a) * r]; };
     const radii = [CORE_RADIUS + MEMBER_STEP * 0.35];
     while (radii.length < spiral.perArm) {
       const prev = radii[radii.length - 1];
@@ -107,11 +105,10 @@
     return radii;
   }
 
-  // The spiral a galaxy's systems sit on: a few arms twisting out from a core, the systems a
-  // step apart along them, wound loosely enough that neighbouring arms stay a system apart (the
-  // galaxy's light winds tighter on its own; see galaxy-field.js). The twist is per radius and
-  // the radius follows the last system, so the two settle together. A lone system sits at the
-  // centre.
+  // A galaxy's spiral and size: a few arms twisting out from a core, the disc as wide as its
+  // systems would reach a step apart along them (the systems scatter through that disc instead;
+  // the galaxy's light winds on its own, see galaxy-field.js). The twist is per radius and the
+  // radius follows the last step, so the two settle together.
   function spiralFor(key, count) {
     const arms = count < 8 ? 2 : count < 24 ? 3 : 4;
     const spiral = { arms, perArm: Math.ceil(count / arms), phase: hashAngle(key), radii: [0], radius: MIN_RADIUS };
@@ -127,24 +124,42 @@
     return spiral;
   }
 
-  // How thick the disc is at a radius: a bulge at the core, thin at the rim.
+  // How thick the disc is at a radius: a bulge at the core, thinner at the rim, and thicker the
+  // wider the galaxy.
   function discThickness(spiral, radius) {
-    return MEMBER_LIFT + CORE_LIFT * Math.exp(-((radius / (spiral.radius * CORE_BULGE)) ** 2));
+    const bulge = Math.exp(-((radius / (spiral.radius * CORE_BULGE)) ** 2));
+    return (MEMBER_LIFT + CORE_LIFT * bulge) * Math.sqrt(spiral.radius / MIN_RADIUS);
   }
 
-  // Core to rim by recency along the arms: the most recent system sits nearest the core, the
-  // next on the next arm, and so on outward, each nudged off its arm by its own jitter (a
-  // distance, so it stays small at any radius).
+  // Scattered through the disc, core to rim loosely by recency: the most recent systems lean
+  // toward the core but neighbours in the ranking mix freely. Each system tries spots drawn from
+  // its own seed and takes the first one clear of the systems placed before it: a roomy spacing
+  // for the first half of its tries, the minimum after that, or else the clearest spot. A lone
+  // system sits at the centre.
   function memberLayout(group) {
-    const spiral = spiralFor(group.key, group.members.length);
+    const count = group.members.length;
+    const spiral = spiralFor(group.key, count);
+    const inner = spiral.radii[0];
+    const outer = count === 1 ? inner : spiral.radius - MEMBER_MARGIN;
     group.members.sort((a, b) => (b.lastActivity - a.lastActivity) || a.id.localeCompare(b.id));
     group.members.forEach((project, index) => {
-      const [radial, angular, lift] = seedJitter(project.seed);
-      const radius = spiral.radii[Math.floor(index / spiral.arms)] + radial * MEMBER_JITTER;
-      const angle = armAngle(spiral, index % spiral.arms, radius) + angular * MEMBER_JITTER / radius;
-      project.localX = Math.cos(angle) * radius;
-      project.localY = lift * discThickness(spiral, radius);
-      project.localZ = Math.sin(angle) * radius;
+      let best = null;
+      for (let attempt = 0; attempt < MEMBER_TRIES; attempt++) {
+        const [radial, angular, lift] = seedJitter((project.seed ^ Math.imul(attempt, 0x9e3779b9)) >>> 0);
+        const share = Math.min(1, Math.max(0, (index + 0.5) / count + radial * MEMBER_SCATTER));
+        const radius = inner + (outer - inner) * Math.sqrt(share);
+        const x = Math.cos(angular * Math.PI) * radius;
+        const z = Math.sin(angular * Math.PI) * radius;
+        let clearance = Infinity;
+        for (const other of group.members.slice(0, index)) {
+          clearance = Math.min(clearance, Math.hypot(x - other.localX, z - other.localZ));
+        }
+        if (!best || clearance > best.clearance) best = { x, z, radius, lift, clearance };
+        if (clearance >= (attempt < MEMBER_TRIES / 2 ? MEMBER_ROOMY : MEMBER_SPACING)) break;
+      }
+      project.localX = best.x;
+      project.localY = best.lift * discThickness(spiral, best.radius);
+      project.localZ = best.z;
     });
     group.spiral = spiral;
     group.radius = spiral.radius;
@@ -280,5 +295,5 @@
     };
   }
 
-  return { layoutGalaxyProjects, galaxyColor, projectGalaxy, armAngle };
+  return { layoutGalaxyProjects, galaxyColor, projectGalaxy };
 });

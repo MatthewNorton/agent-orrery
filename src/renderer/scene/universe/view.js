@@ -6,7 +6,7 @@
 (function () {
   const AUR = window.AUR;
   const GALAXY = window.AUR_GALAXY;
-  const UNIVERSE_SKY_LEVEL = 0.04;
+  const UNIVERSE_SKY_LEVEL = 0.028;
 
   AUR.views.universe = function (engine, data, ctx) {
     const store = ctx.store;
@@ -43,7 +43,7 @@
       engine, scene, canvas, camera, gui, store, glyphs, ships, galaxies, glow,
       fields: ctx.galaxyFields || new Map(),
       softDisc: AUR.softDiscTexture(scene), coronaMaterials: new Map(),
-      skyLevel: UNIVERSE_SKY_LEVEL, searchMatchIds: null, hoveredProjectId: null,
+      searchMatchIds: null, hoveredProjectId: null,
       quality: ctx.quality,
     };
     const parts = AUR.sceneParts.universe;
