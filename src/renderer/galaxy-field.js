@@ -2,7 +2,7 @@
 // The light of a galaxy as a field: an emission and dust atlas over its disc,
 // and the stars drawn from that atlas, in a fixed local frame (disc radius DISC) that the renderer
 // scales to the galaxy's radius. The arms wind logarithmically, as a spiral galaxy's do; the
-// galaxy's systems sit on their own, looser placement spiral (galaxy-layout.js). Pure and
+// galaxy's systems scatter through the disc on their own (galaxy-layout.js). Pure and
 // dependency-free; the Node tests load it directly.
 'use strict';
 

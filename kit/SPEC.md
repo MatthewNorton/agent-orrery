@@ -296,11 +296,15 @@ Design tokens (put in `:root`):
   galaxy, or ship state becomes dirty.
 - **Deterministic galaxy layout** (persistent universe — same every launch):
   group projects by their additive `galaxy.key`. A galaxy is a spiral: two to four
-  arms (by member count) twisting out from a core, and its systems sit on those arms
-  by recency, the most recently active nearest the core, each on the next arm outward,
-  with a per-project nudge off the arm and a lift that follows the disc's thickness
-  (a bulge at the core, thin at the rim). The same layout for the same activity
-  history; a project moves inward when it is worked on. The largest galaxy anchors the
+  arms (by member count) twisting out from a core, sized as if its systems sat a step
+  apart along them. The systems scatter through that disc instead of lining the arms:
+  core to rim loosely by recency (the most recently active lean toward the core, with
+  neighbours in the ranking mixing freely), each at the first of its own seeded spots
+  that clears the systems placed before it (a roomy spacing first, then a minimum,
+  else the clearest spot), and lifted within the
+  disc's thickness (a bulge at the core, thicker in wider galaxies). A lone system sits
+  at the centre. The same layout for the same activity history; a project drifts
+  inward when it is worked on. The largest galaxy anchors the
   cluster and each other one touches a placed galaxy at the free slot nearest the
   cluster's centre, with a positive gap; every galaxy is lifted and tilted on its own
   pivot, which everything of its rides: the glyphs (and so their ships, pulses and
@@ -309,8 +313,8 @@ Design tokens (put in `:root`):
   computes an emission/dust atlas over the disc (cloudy logarithmic arms from the
   galaxy's spiral phase, a warm core, star-forming knots, dust lanes inside the arms,
   the arms leaning toward the galaxy's colour) and draws the resolved stars from it; the
-  systems sit on their own, looser placement spiral, so the light winds as a galaxy's
-  does while neighbouring systems stay a step apart. The renderer gives each galaxy a
+  systems scatter through the disc on their own, so the light winds as a galaxy's does
+  while neighbouring systems stay a spacing apart. The renderer gives each galaxy a
   non-pickable volume box (the region mesh) that raymarches the atlas with a luminous
   bulge and dust extinction, and one point cloud of stars dimmed by the dust column in
   front of them; both are children of the pivot in the field's local frame scaled to the
