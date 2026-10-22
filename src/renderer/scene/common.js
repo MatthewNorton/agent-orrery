@@ -23,6 +23,52 @@
     return { x: left, y: top, width: Math.max(1, right - left), height: Math.max(1, bottom - top) };
   };
 
+  // Scene units per screen pixel at unit distance from the view's camera: the per-frame constant
+  // of the ship size floor, computed once per animate loop.
+  AUR.unitsPerPixel = function (scene) {
+    const camera = scene.activeCamera;
+    if (!camera) return 0;
+    return 2 * Math.tan((camera.fov || 0.8) / 2) / Math.max(1, scene.getEngine().getRenderHeight());
+  };
+
+  // What one animate loop needs to size its ships: the camera and the floor per unit of distance.
+  AUR.shipFit = function (scene, minPx) {
+    return { camera: scene.activeCamera, floorPerUnit: minPx * AUR.unitsPerPixel(scene) };
+  };
+
+  // A ship's display scale this frame: its view scale, the warp-in growth since `rec.born` (none
+  // without one), and a floor keeping the view's pixel minimum of hull on screen (1 up close).
+  AUR.fitShip = function (fit, rec, position, now) {
+    const floor = fit.camera
+      ? Math.max(1, fit.floorPerUnit * BABYLON.Vector3.Distance(fit.camera.globalPosition, position) / rec.scale)
+      : 1;
+    const grow = rec.born == null ? 1 : Math.min(1, 0.3 + 0.7 * (now - rec.born) / 900);
+    rec.mesh.scaling.setAll(rec.scale * grow * floor);
+  };
+
+  // Ship-only key and rim: hull maps need a viewer-relative key while the planets keep their sun
+  // (the studio environment is the fill). The lights follow the active camera each frame and
+  // affect only meshes carrying AUR.SHIP_LAYER, which every dart and hull mesh gets at birth.
+  function shipLight(light, intensity, diffuse) {
+    light.intensity = intensity;
+    light.diffuse = diffuse;
+    light.specular = diffuse.clone();
+    light.includeOnlyWithLayerMask = AUR.SHIP_LAYER;
+    return light;
+  }
+  AUR.shipLights = function (scene) {
+    const keyDir = new BABYLON.Vector3(0.45, -0.55, 1); // camera-relative: over the right shoulder
+    const rimDir = new BABYLON.Vector3(-0.5, -0.3, -1); // and from behind the ship, cool
+    const key = shipLight(new BABYLON.DirectionalLight('ship-key', keyDir.clone(), scene), 2.6, new BABYLON.Color3(1, 0.96, 0.9));
+    const rim = shipLight(new BABYLON.DirectionalLight('ship-rim', rimDir.clone(), scene), 1.3, new BABYLON.Color3(0.7, 0.82, 1));
+    scene.onBeforeRenderObservable.add(() => {
+      const camera = scene.activeCamera;
+      if (!camera) return;
+      camera.getDirectionToRef(keyDir, key.direction);
+      camera.getDirectionToRef(rimDir, rim.direction);
+    });
+  };
+
   // Every view's orbit camera; settings are properties set on it, such as its radius and beta limits.
   AUR.viewCamera = function (scene, name, beta, radius, settings) {
     const camera = new BABYLON.ArcRotateCamera(name, -Math.PI / 2, beta, radius, BABYLON.Vector3.Zero(), scene);
@@ -31,21 +77,22 @@
     return AUR.configureComfortCamera(camera);
   };
 
-  // A ship's mesh: a transmission glyph for signals and drones, else its hull, or a dart until
-  // the hull loads (upgrade is that load's promise, null otherwise). Names start with prefix.
-  AUR.shipMesh = function (scene, ship, prefix, signalScale, hullScale) {
+  // A ship's mesh: a transmission glyph for signals, else its hull, or a dart until the hull loads
+  // (upgrade is that load's promise, null otherwise). Names start with prefix; `size` is the view's
+  // AUR.SHIP_SIZE entry, and the root carries the resulting scale (the views animate it).
+  AUR.shipMesh = function (scene, ship, prefix, size) {
     const tint = AUR.shipTint(ship.id, ship.provider);
     const signal = AUR.isSignalEntity(ship);
-    const scale = signal ? signalScale : hullScale;
+    const scale = signal ? size.signal : size.hull * (ship.kind === 'drone' ? AUR.DRONE_SCALE : 1);
     let mesh = signal
       ? AUR.signalMarker(scene, prefix + 'sig_' + ship.id, tint)
       : AUR.ships.instantiate(scene, ship);
     const usedFallback = !signal && !mesh;
-    if (usedFallback) mesh = AUR.dartMesh(scene, prefix + 'shp_' + ship.id, tint, scale);
-    else mesh.scaling.setAll(scale);
+    if (usedFallback) mesh = AUR.dartMesh(scene, prefix + 'shp_' + ship.id, tint);
+    mesh.scaling.setAll(scale);
     const provider = AUR.markShipMesh(mesh, ship);
-    const upgrade = usedFallback ? AUR.ships.upgrade(scene, ship, mesh, scale) : null;
-    return { mesh, tint, providerKey: provider.key, upgrade };
+    const upgrade = usedFallback ? AUR.ships.upgrade(scene, ship, mesh) : null;
+    return { mesh, tint, providerKey: provider.key, upgrade, scale };
   };
 
   // The teardown every view ends with, after its own.

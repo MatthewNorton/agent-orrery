@@ -1,0 +1,36 @@
+{
+  "objects": 8,
+  "mesh_objects": 7,
+  "vertices_before_modifier_evaluation": 33236,
+  "polygons_before_modifier_evaluation": 27654,
+  "triangles_before_modifier_evaluation": 58456,
+  "materials": 7,
+  "exports": {
+    "blend": "aur-ark-carrier.blend",
+    "glb": "aur-ark-carrier.glb",
+    "fbx": "aur-ark-carrier.fbx",
+    "babylon_viewer": "babylon_viewer.html"
+  },
+  "qa_views": [
+    "front_three_quarter",
+    "rear_three_quarter",
+    "side_profile",
+    "top_or_underside"
+  ],
+  "dimensions_m": [
+    2532.0,
+    2532.0,
+    1422.8
+  ],
+  "hero_materials": [
+    "hull_white",
+    "hull_grey",
+    "hull_dark"
+  ],
+  "portable_materials": [
+    "hull_dark",
+    "hull_grey",
+    "hull_white"
+  ],
+  "texture_tile_m": 60.0
+}

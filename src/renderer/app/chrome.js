@@ -117,13 +117,13 @@
       row.setAttribute('aria-pressed', String(focused));
       row.setAttribute('aria-busy', String(pending));
       row.setAttribute('aria-label', focused
-        ? `Exit first-person view for ${s.name}`
-        : `Enter first-person view for ${s.name} in ${A.projectName(s.project)}`);
+        ? `Exit agent focus for ${s.name}`
+        : `Enter agent focus for ${s.name} in ${A.projectName(s.project)}`);
       if (attention) {
         row.classList.add('has-attention');
         row.style.setProperty('--attention-color', attention.color);
       }
-      row.title = focused ? 'Exit first-person view' : 'Enter first-person view';
+      row.title = focused ? 'Exit agent focus' : 'Enter agent focus';
       const glyph = AUR.el('div', 'agent-glyph');
       glyph.innerHTML = AUR.shipSvg(tint, AUR.isSignalEntity(s));
       const body = AUR.el('div', 'agent-body');

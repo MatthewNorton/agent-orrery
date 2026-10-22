@@ -1,5 +1,5 @@
 // One project's solar system: central sun, orbit rings,
-// textured planets and the first-person focus camera. The asteroid belt, the
+// textured planets and the agent-focus camera (chase or first person). The asteroid belt, the
 // ships and the focus fade are the belt, ships and focus parts in this folder.
 'use strict';
 
@@ -70,8 +70,11 @@
     // State shared with the parts in scene/system/.
     const planets = new Map(); // name -> record
     const ships = new Map();
+    // The asteroid belt sits between the middle orbits (past the last one in a small system),
+    // `beltWidth` across; ships patrol outside it.
+    const beltR = planetList.length >= 2 ? (orbitR(Math.floor(planetList.length / 2) - 1) + orbitR(Math.floor(planetList.length / 2))) / 2 : outer + 4;
     const view = {
-      scene, gui, sys, projectId, orbitR, outer, planets, ships,
+      scene, gui, sys, projectId, orbitR, outer, beltR, beltWidth: 3.4, planets, ships,
       shipFocus: null, buildPlanet, clearShipFocus,
     };
     const parts = AUR.sceneParts.system;
@@ -102,7 +105,7 @@
       const rand = AUR.mulberry32(AUR.fnv1a(projectId + ':' + pd.name));
       const r = orbitR(i);
       const ring = AUR.orbitRing(scene, r, '#9fb0e0', 0.16, 0);
-      const dia = AUR.clamp(1.1 + Math.sqrt(AUR.planetWeight(pd)) * 0.18, 1.1, 4.5);
+      const dia = AUR.clamp(AUR.PLANET_DIA.min + Math.sqrt(AUR.planetWeight(pd)) * 0.18, AUR.PLANET_DIA.min, AUR.PLANET_DIA.max);
       const mesh = BABYLON.MeshBuilder.CreateSphere('pl_' + pd.name, { diameter: dia, segments: 24 }, scene);
       const mat = new BABYLON.StandardMaterial('plm_' + pd.name, scene);
       const world = AUR.applyPlanetSurface(scene, mat, projectId, pd.name, {
@@ -115,7 +118,7 @@
       mesh.material = mat;
       mesh.metadata = { planetName: pd.name, isPlanet: true, worldType: world.key };
       const a0 = rand() * Math.PI * 2;
-      mesh.position.set(Math.cos(a0) * r, 0, Math.sin(a0) * r);
+      AUR.orbitPoint(a0, r, 0, mesh.position);
 
       const label = AUR.label(gui, pd.name, {
         fontSize: 12.5, weight: '600', mesh, offsetY: -(18 + dia * 5),
@@ -156,6 +159,10 @@
     const focusLookDesired = new BABYLON.Vector3();
     const focusLookCurrent = new BABYLON.Vector3();
     const focusOffset = new BABYLON.Vector3();
+    const focusChaseOffset = new BABYLON.Vector3();
+    // The chase camera in hull diagonals: how far back it stands, how high, and how far it swings
+    // off the vantage so a long hull shows its length, not its stern.
+    const CHASE = { distance: 1.2, rise: 0.45, yaw: 0.6 };
 
     function updateShipFocusCamera(immediate, dt) {
       const { shipFocus } = view;
@@ -172,40 +179,65 @@
       if (focusRight.lengthSquared() < 0.0001) focusRight.set(1, 0, 0);
       focusRight.normalize();
 
-      const yaw = SHIP_FOCUS_VANTAGE_YAW[shipFocus.vantage] || 0;
+      const yaw = (SHIP_FOCUS_VANTAGE_YAW[shipFocus.vantage] || 0) + (shipFocus.exterior ? CHASE.yaw : 0);
       focusForward.scaleToRef(Math.cos(yaw), focusVantageDirection);
       focusRight.scaleToRef(Math.sin(yaw), focusOffset);
       focusVantageDirection.addInPlace(focusOffset).normalize();
-
-      focusDesired.copyFrom(shipPosition);
-      focusVantageDirection.scaleToRef(0.28, focusOffset);
-      focusDesired.addInPlace(focusOffset);
-      focusUp.scaleToRef(0.18, focusOffset);
-      focusDesired.addInPlace(focusOffset);
-      focusLookDesired.copyFrom(focusDesired);
-      focusVantageDirection.scaleToRef(18, focusOffset);
-      focusLookDesired.addInPlace(focusOffset);
-      focusUp.scaleToRef(0.35, focusOffset);
-      focusLookDesired.addInPlace(focusOffset);
 
       const followRate = reducedMotion
         ? AUR.MOTION.reducedFocusFollowRate
         : AUR.MOTION.focusFollowRate;
       const amount = immediate ? 1 : AUR.dampedAmount(followRate, dt);
-      BABYLON.Vector3.LerpToRef(focusCamera.position, focusDesired, amount, focusCamera.position);
-      BABYLON.Vector3.LerpToRef(focusLookCurrent, focusLookDesired, amount, focusLookCurrent);
+      if (shipFocus.exterior) {
+        // Chase camera: a three-quarter view from behind and above, looking at the hull. It rides
+        // the ship's position and eases only its offset, so a turn swings it around the hull and
+        // the ship's own motion never pulls it away.
+        const back = Math.max(0.25, hullSpan(rec) * CHASE.distance);
+        place(focusDesired, BABYLON.Vector3.ZeroReadOnly, -back, back * CHASE.rise);
+        BABYLON.Vector3.LerpToRef(focusChaseOffset, focusDesired, amount, focusChaseOffset);
+        shipPosition.addToRef(focusChaseOffset, focusCamera.position);
+        focusLookCurrent.copyFrom(shipPosition);
+      } else {
+        // First person: the eye just inside the hull, looking far ahead along the vantage.
+        place(focusDesired, shipPosition, 0.28, 0.18);
+        place(focusLookDesired, shipPosition, 18.28, 0.53);
+        BABYLON.Vector3.LerpToRef(focusCamera.position, focusDesired, amount, focusCamera.position);
+        BABYLON.Vector3.LerpToRef(focusLookCurrent, focusLookDesired, amount, focusLookCurrent);
+      }
       focusCamera.setTarget(focusLookCurrent);
     }
 
-    function focusShip(shipId) {
+    // out = the ship's position, `along` units down the vantage direction and `rise` units up.
+    function place(out, shipPosition, along, rise) {
+      out.copyFrom(shipPosition);
+      focusVantageDirection.scaleToRef(along, focusOffset);
+      out.addInPlace(focusOffset);
+      focusUp.scaleToRef(rise, focusOffset);
+      out.addInPlace(focusOffset);
+    }
+
+    // The hull's diagonal this frame: measured once per hull node (the asset root under the dart,
+    // the dart alone until its hull arrives) per unit of the ship's scaling, then scaled by the
+    // size the pixel floor gives the ship right now.
+    function hullSpan(rec) {
+      const { shipFocus } = view;
+      const node = rec.mesh.getChildren()[0] || rec.mesh;
+      if (shipFocus.measured !== node) {
+        const bounds = node.getHierarchyBoundingVectors();
+        const diagonal = bounds.max.subtract(bounds.min).length() / (rec.mesh.scaling.x || 1);
+        shipFocus.measured = node;
+        shipFocus.unitSpan = Number.isFinite(diagonal) && diagonal > 0 ? diagonal : 1.2;
+      }
+      return shipFocus.unitSpan * rec.mesh.scaling.x;
+    }
+
+    function focusShip(shipId, settings) {
       const id = String(shipId || '');
       const rec = ships.get(id);
       if (!rec) return false;
       clearShipFocus();
-      view.shipFocus = { shipId: id, vantage: 'forward', saved: new Map() };
-      for (const item of ships.values()) {
-        view.applyShipFocusVisual(item, item.id === id ? 0 : 0.16);
-      }
+      view.shipFocus = { shipId: id, vantage: 'forward', exterior: true, saved: new Map(), measured: null, unitSpan: 0 };
+      setShipFocus(settings);
       camera.detachControl(canvas);
       scene.activeCamera = focusCamera;
       focusLookCurrent.copyFrom(rec.mesh.getAbsolutePosition());
@@ -213,11 +245,15 @@
       return true;
     }
 
-    function setShipFocusVantage(value) {
+    // Where the viewer sits: `vantage` (a heading in SHIP_FOCUS_VANTAGE_YAW) and `exterior` (the
+    // chase camera outside the hull, else a first-person room inside it).
+    function setShipFocus(settings) {
       const { shipFocus } = view;
       if (!shipFocus) return false;
-      shipFocus.vantage = typeof value === 'string' &&
-        Object.hasOwn(SHIP_FOCUS_VANTAGE_YAW, value) ? value : 'forward';
+      const { vantage, exterior } = settings || {};
+      shipFocus.vantage = typeof vantage === 'string' && Object.hasOwn(SHIP_FOCUS_VANTAGE_YAW, vantage) ? vantage : 'forward';
+      shipFocus.exterior = exterior !== false;
+      for (const item of ships.values()) view.applyShipFocusVisual(item);
       return true;
     }
 
@@ -251,6 +287,7 @@
     }
 
     // ---- ships ----
+    AUR.shipLights(scene);
     for (const s of store.ships.values()) if (s.project === projectId) view.buildShip(s);
 
     // ---- interaction ----
@@ -283,7 +320,7 @@
 
       for (const p of planets.values()) {
         p.a += p.speed * dt;
-        p.mesh.position.set(Math.cos(p.a) * p.r, 0, Math.sin(p.a) * p.r);
+        AUR.orbitPoint(p.a, p.r, 0, p.mesh.position);
         p.mesh.rotation.y += dt * p.axialSpeed;
         if (p.world.key === 'gas' && p.mat.diffuseTexture) {
           const drift = dt * 0.0035;
@@ -309,7 +346,7 @@
       systemData: sys,
       update: view.update,
       focusShip,
-      setShipFocusVantage,
+      setShipFocus,
       clearShipFocus,
       shipFocusState,
       dispose() {

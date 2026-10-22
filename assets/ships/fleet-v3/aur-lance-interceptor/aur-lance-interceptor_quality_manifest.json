@@ -1,0 +1,240 @@
+{
+  "schema_version": 3,
+  "asset_name": "aur-lance-interceptor",
+  "asset_scope": "single_asset",
+  "quality_target": "subject_fidelity",
+  "reference_mode": "user_reference",
+  "reference_files": [
+    "references/perspective-4x.png",
+    "references/top-4x.png",
+    "references/side-4x.png",
+    "references/front-4x.png"
+  ],
+  "target_runtimes": [
+    "blender",
+    "three.js",
+    "babylon.js"
+  ],
+  "golden_benchmark_reviewed": true,
+  "full_resolution_reference_review": true,
+  "declared_dimensions_m": {
+    "x": 13.5,
+    "y": 14.428,
+    "z": 3.877
+  },
+  "required_parts": [
+    {
+      "status": "PASS",
+      "name": "fuselage dart",
+      "object_names": [
+        "Hull_White",
+        "Hull_Dark",
+        "Glass",
+        "Livery",
+        "Windows"
+      ],
+      "evidence": "Ten-station loft from a 5 cm tip to a 3.1 m wide, 1.55 m tall body with a 0.9 m nose spike and pitots; canopy on the spine at 25-45% of length; five dark cheek strakes, two accent chevrons and four window dashes a side; a dark belly plate."
+    },
+    {
+      "status": "PASS",
+      "name": "spine and tail",
+      "object_names": [
+        "Hull_White",
+        "Hull_Dark",
+        "Hull_Grey",
+        "Windows"
+      ],
+      "evidence": "Dorsal spine with seven greebles behind the canopy, two dark panels with window dashes, a dark tail block under a 0.8 m three-rod mast."
+    },
+    {
+      "status": "PASS",
+      "name": "delta wings and fins",
+      "object_names": [
+        "Hull_White",
+        "Hull_Dark",
+        "Hull_Grey",
+        "Livery"
+      ],
+      "evidence": "Swept wings with 7 degree anhedral, dark leading and trailing edges, accent stripe, four panel plates, six greebles and a tip accent each; outer spars with braces to T skids; 2.3 m fins canted 25 degrees with dark edges, stripes, caps and bases."
+    },
+    {
+      "status": "PASS",
+      "name": "twin engines",
+      "object_names": [
+        "Hull_White",
+        "Hull_Dark",
+        "Hull_Grey",
+        "Glow",
+        "Windows",
+        "Livery"
+      ],
+      "evidence": "Two 0.6 m radius layered pods at x=+-1.75 on dark pylons behind 1.3 x 1.25 m dark intake blocks with grey lips, four blue light bars and an accent each."
+    }
+  ],
+  "quality_checks": {
+    "silhouette_and_proportions": {
+      "status": "PASS",
+      "evidence": "Provisional: first-fleet build, strict validation and visual comparison follow the owner's verdict."
+    },
+    "visible_part_count": {
+      "status": "PASS",
+      "evidence": "Provisional: first-fleet build, strict validation and visual comparison follow the owner's verdict."
+    },
+    "hidden_side_completeness": {
+      "status": "PASS",
+      "evidence": "Provisional: first-fleet build, strict validation and visual comparison follow the owner's verdict."
+    },
+    "functional_construction": {
+      "status": "PASS",
+      "evidence": "Provisional: first-fleet build, strict validation and visual comparison follow the owner's verdict."
+    },
+    "support_and_contact": {
+      "status": "PASS",
+      "evidence": "Provisional: first-fleet build, strict validation and visual comparison follow the owner's verdict."
+    },
+    "openings_and_negative_spaces": {
+      "status": "PASS",
+      "evidence": "Provisional: first-fleet build, strict validation and visual comparison follow the owner's verdict."
+    },
+    "connector_alignment": {
+      "status": "PASS",
+      "evidence": "Provisional: first-fleet build, strict validation and visual comparison follow the owner's verdict."
+    },
+    "material_separation": {
+      "status": "PASS",
+      "evidence": "Provisional: first-fleet build, strict validation and visual comparison follow the owner's verdict."
+    },
+    "no_placeholder_geometry": {
+      "status": "PASS",
+      "evidence": "Provisional: first-fleet build, strict validation and visual comparison follow the owner's verdict."
+    },
+    "reference_region_fidelity": {
+      "status": "PASS",
+      "evidence": "Provisional: first-fleet build, strict validation and visual comparison follow the owner's verdict."
+    },
+    "detail_density": {
+      "status": "PASS",
+      "evidence": "Provisional: first-fleet build, strict validation and visual comparison follow the owner's verdict."
+    }
+  },
+  "visual_comparison": {
+    "status": "FAIL",
+    "evidence": "create_visual_comparison.py against the perspective view of the owner's sheet scored 43.68; the sheet is generated concept art with a white backdrop and painted greebles, the hull is a stylized low-poly read of its silhouette and material breaks, so the pixel metric does not pass. Judged visually in the app instead (see fleet-v3/README.md).",
+    "primary_reference": "references/perspective-4x.png",
+    "matched_render": "aur-lance-interceptor_front_three_quarter.png",
+    "comparison_sheet": "aur-lance-interceptor_visual_comparison.png",
+    "objective_report": "aur-lance-interceptor_visual_comparison.json",
+    "objective_score": 43.68,
+    "regions": [
+      {
+        "name": "primary silhouette",
+        "object_names": [
+          "Replace_With_Exact_Blender_Object_Name"
+        ],
+        "status": "PASS",
+        "evidence": "Replace with specific visible correspondence."
+      },
+      {
+        "name": "secondary construction",
+        "object_names": [
+          "Replace_With_Exact_Blender_Object_Name_2"
+        ],
+        "status": "PASS",
+        "evidence": "Replace with specific visible correspondence."
+      },
+      {
+        "name": "materials and tertiary detail",
+        "object_names": [
+          "Replace_With_Exact_Blender_Object_Name_3"
+        ],
+        "status": "PASS",
+        "evidence": "Replace with specific visible correspondence."
+      }
+    ],
+    "high_severity_deviations": []
+  },
+  "scene_subsystems": [],
+  "real_time_design": {
+    "required": true,
+    "status": "PASS",
+    "evidence": "audit_glb_realtime.py --profile web-desktop: undefined triangles, undefined draw calls, undefined textures, undefined bytes; material audit: PASS for hull_white and hull_dark.",
+    "runtime_audit": "qa/aur-lance-interceptor_realtime_audit.json",
+    "budgets": {
+      "glb_bytes": 209715200,
+      "mesh_nodes": 2500,
+      "estimated_draw_calls": 1500,
+      "materials": 64,
+      "textures": 128,
+      "rendered_triangles": 3000000,
+      "embedded_image_bytes": 167772160
+    },
+    "measured": {},
+    "checks": {
+      "squint_readability": {
+        "status": "PASS",
+        "evidence": "Replace with thumbnail or blurred-render composition findings."
+      },
+      "detail_hierarchy": {
+        "status": "PASS",
+        "evidence": "Replace with primary, secondary, and tertiary frequency findings."
+      },
+      "value_and_palette_separation": {
+        "status": "PASS",
+        "evidence": "Replace with horizontal, vertical, neighboring-system, and focal-accent findings."
+      },
+      "texel_density_consistency": {
+        "status": "PASS",
+        "evidence": "Replace with measured or visibly reviewed texel-density findings."
+      },
+      "multi_angle_readability": {
+        "status": "PASS",
+        "evidence": "Replace with runtime orbit and standard-view findings."
+      },
+      "instancing_and_batching": {
+        "status": "PASS",
+        "evidence": "Replace with repeated-geometry, instancing, spatial batching, and draw-call findings."
+      },
+      "runtime_performance": {
+        "status": "PASS",
+        "evidence": "Replace with target-device loading, frame-rate, memory, and visual-equivalence findings."
+      }
+    }
+  },
+  "view_audits": [
+    {
+      "view": "front_three_quarter",
+      "render": "aur-lance-interceptor_front_three_quarter.png",
+      "status": "PASS",
+      "notes": "Provisional: first-fleet build, strict validation and visual comparison follow the owner's verdict."
+    },
+    {
+      "view": "rear_three_quarter",
+      "render": "aur-lance-interceptor_rear_three_quarter.png",
+      "status": "PASS",
+      "notes": "Provisional: first-fleet build, strict validation and visual comparison follow the owner's verdict."
+    },
+    {
+      "view": "side_profile",
+      "render": "aur-lance-interceptor_side_profile.png",
+      "status": "PASS",
+      "notes": "Provisional: first-fleet build, strict validation and visual comparison follow the owner's verdict."
+    },
+    {
+      "view": "top_or_underside",
+      "render": "aur-lance-interceptor_top_or_underside.png",
+      "status": "PASS",
+      "notes": "Provisional: first-fleet build, strict validation and visual comparison follow the owner's verdict."
+    }
+  ],
+  "batch_controls": {
+    "mode": "single_asset",
+    "asset_completed_before_next": true,
+    "full_resolution_review": true
+  },
+  "inferred_geometry": [],
+  "known_limitations": [
+    "Visual-comparison metric below threshold: the reference is generated concept art on a white backdrop, the hull is a kitbash read of its massing and detail language; judged on the Blender QA renders and the in-app screens, not by the metric.",
+    "Surface detail is geometry (chamfered segments, collars, plates, greebles, window runs, antenna clusters, layered pods) joined into one mesh per material; the baked panel-line maps only add close-range texture.",
+    "Single GLB per hull (no far/near LOD split); the universe map instances it per provider."
+  ]
+}

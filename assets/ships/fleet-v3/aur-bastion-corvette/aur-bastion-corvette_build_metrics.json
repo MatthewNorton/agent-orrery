@@ -1,0 +1,36 @@
+{
+  "objects": 7,
+  "mesh_objects": 6,
+  "vertices_before_modifier_evaluation": 5504,
+  "polygons_before_modifier_evaluation": 5038,
+  "triangles_before_modifier_evaluation": 9724,
+  "materials": 6,
+  "exports": {
+    "blend": "aur-bastion-corvette.blend",
+    "glb": "aur-bastion-corvette.glb",
+    "fbx": "aur-bastion-corvette.fbx",
+    "babylon_viewer": "babylon_viewer.html"
+  },
+  "qa_views": [
+    "front_three_quarter",
+    "rear_three_quarter",
+    "side_profile",
+    "top_or_underside"
+  ],
+  "dimensions_m": [
+    61.4,
+    89.23,
+    45.58
+  ],
+  "hero_materials": [
+    "hull_white",
+    "hull_grey",
+    "hull_dark"
+  ],
+  "portable_materials": [
+    "hull_dark",
+    "hull_grey",
+    "hull_white"
+  ],
+  "texture_tile_m": 6.0
+}

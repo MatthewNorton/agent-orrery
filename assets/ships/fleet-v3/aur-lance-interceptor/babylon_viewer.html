@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AUR Lance Interceptor (fleet v3 Scout) · Babylon Viewer</title>
+  <!--
+    Delivered interactive preview of the UNCHANGED GLB. Written by scripts/write_babylon_viewer.mjs from the
+    skill's assets/babylon_viewer.html; regenerate it rather than hand-editing. Same engine build (9.29.0),
+    tone mapping and light rig as the runtime proof, so the default view matches <asset>_babylonjs_runtime.png.
+    Never add material overrides here.
+    Served over http it auto-loads DEFAULT_GLB (?glb=<file> picks another). Opened straight from disk,
+    browsers block that fetch, so drop the .glb on the page instead.
+  -->
+  <style>
+    :root { --bg: #444b54; --chip: rgba(18, 22, 28, .78); --chip-hi: rgba(46, 54, 66, .92); --ink: #f5f7fa; --dim: #a9b3c1; --accent: #e8b04a; }
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: var(--bg); color: var(--ink); font: 13px/1.35 system-ui, sans-serif; }
+    canvas { display: block; width: 100%; height: 100%; touch-action: none; outline: none; }
+    #hud { position: fixed; left: 14px; top: 12px; z-index: 2; display: grid; gap: 6px; max-width: min(420px, calc(100vw - 28px)); }
+    #hud > div { padding: 7px 10px; border-radius: 6px; background: var(--chip); }
+    #stats { color: var(--dim); font-variant-numeric: tabular-nums; }
+    #stats:empty { display: none; }
+    #bar { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 2; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; max-width: calc(100vw - 28px); }
+    button { font: inherit; color: var(--ink); background: var(--chip); border: 1px solid transparent; border-radius: 6px; padding: 6px 10px; cursor: pointer; }
+    button:hover { background: var(--chip-hi); }
+    button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+    kbd { font: 11px ui-monospace, monospace; color: var(--dim); margin-left: 4px; }
+    #drop { position: fixed; inset: 0; z-index: 3; display: grid; place-content: center; gap: 6px; text-align: center; cursor: pointer; background: rgba(20, 24, 30, .55); }
+    #drop[hidden] { display: none; }
+    body.dragging #drop, body.dragging #drop[hidden] { display: grid; outline: 2px dashed var(--accent); outline-offset: -18px; }
+    #drop strong { font-size: 18px; }
+    #drop span { color: var(--dim); }
+  </style>
+  <script src="https://cdn.babylonjs.com/v9.29.0/babylon.js"></script>
+  <script src="https://cdn.babylonjs.com/v9.29.0/loaders/babylonjs.loaders.min.js"></script>
+</head>
+<body data-status="starting">
+  <canvas id="viewport"></canvas>
+  <div id="hud"><div id="status">Starting Babylon.js…</div><div id="stats"></div></div>
+  <div id="bar">
+    <button data-act="frame">Frame<kbd>F</kbd></button>
+    <button data-act="ibl" aria-pressed="false">IBL<kbd>L</kbd></button>
+    <button data-act="wire" aria-pressed="false">Wireframe<kbd>W</kbd></button>
+    <button data-act="spin" aria-pressed="false">Auto-rotate<kbd>R</kbd></button>
+    <button data-act="insp" aria-pressed="false">Inspector<kbd>I</kbd></button>
+    <button data-act="open">Open .glb<kbd>O</kbd></button>
+  </div>
+  <label id="drop" hidden>
+    <input id="file" type="file" accept=".glb" hidden>
+    <strong>Drop a .glb here</strong>
+    <span>or click to choose one. Browsers block auto-loading models from a page opened off disk.</span>
+  </label>
+  <script>
+    const DEFAULT_GLB = "aur-lance-interceptor.glb";
+    const IBL_URL = 'https://assets.babylonjs.com/environments/environmentSpecular.env';
+    const $ = (id) => document.getElementById(id);
+    const statusEl = $('status'), statsEl = $('stats'), drop = $('drop'), fileInput = $('file');
+    // data-status (starting | loading | ready | waiting-for-file | error) lets headless checks read the outcome.
+    const setStatus = (text, state) => { statusEl.textContent = text; if (state) document.body.dataset.status = state; };
+
+    if (!globalThis.BABYLON) {
+      setStatus('Babylon.js did not load — this viewer needs network access to cdn.babylonjs.com.', 'error');
+      throw new Error('Babylon.js missing');
+    }
+
+    const canvas = $('viewport');
+    const engine = new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true });
+    const scene = new BABYLON.Scene(engine);
+    scene.clearColor = new BABYLON.Color4(.266, .294, .329, 1);
+    const ip = scene.imageProcessingConfiguration;
+    ip.toneMappingEnabled = true;
+    ip.toneMappingType = BABYLON.ImageProcessingConfiguration.TONEMAPPING_ACES;
+    ip.exposure = 1.15;
+    ip.contrast = 1.08;
+
+    // Light rig and camera direction copied from assets/runtime_viewer.html so the default view matches the proof.
+    const camera = new BABYLON.ArcRotateCamera('camera', 2.249, 1.138, 4, BABYLON.Vector3.Zero(), scene);
+    camera.fov = .66;
+    camera.wheelDeltaPercentage = .01;
+    camera.attachControl(canvas, true);
+    const hemi = new BABYLON.HemisphericLight('hemi', new BABYLON.Vector3(0, 0, 1), scene);
+    hemi.intensity = 1.45;
+    hemi.diffuse = new BABYLON.Color3(.95, .97, 1.0);
+    hemi.groundColor = new BABYLON.Color3(.12, .15, .20);
+    const key = new BABYLON.DirectionalLight('key', new BABYLON.Vector3(-.5, .7, -1), scene);
+    key.intensity = 2.0;
+    key.diffuse = new BABYLON.Color3(1.0, .93, .84);
+    const fill = new BABYLON.DirectionalLight('fill', new BABYLON.Vector3(.7, .25, -.65), scene);
+    fill.intensity = .85;
+    fill.diffuse = new BABYLON.Color3(.70, .84, 1.0);
+
+    let loaded = null, home = null, ibl = null;
+
+    function frameModel() {
+      if (!home) return;
+      camera.setTarget(home.target);
+      camera.setPosition(home.position);
+    }
+
+    function computeHome(result) {
+      let min = new BABYLON.Vector3(Infinity, Infinity, Infinity);
+      let max = new BABYLON.Vector3(-Infinity, -Infinity, -Infinity);
+      for (const mesh of result.meshes) {
+        if (!mesh.getBoundingInfo || !mesh.getTotalVertices()) continue;
+        mesh.computeWorldMatrix(true);
+        const box = mesh.getBoundingInfo().boundingBox;
+        min = BABYLON.Vector3.Minimize(min, box.minimumWorld);
+        max = BABYLON.Vector3.Maximize(max, box.maximumWorld);
+      }
+      const center = min.add(max).scale(.5);
+      const extent = max.subtract(min);
+      const span = Math.max(extent.x, extent.y, extent.z) || 1;
+      // glTF-space view direction mapped through the loader's handedness conversion, as in the runtime proof.
+      const rootMatrix = result.meshes[0].computeWorldMatrix(true);
+      const viewDir = BABYLON.Vector3.TransformNormal(new BABYLON.Vector3(1.25, .92, 1.55), rootMatrix).normalize();
+      camera.minZ = Math.max(span / 1000, .001);
+      camera.maxZ = span * 20;
+      camera.lowerRadiusLimit = span * .02;
+      camera.upperRadiusLimit = span * 8;
+      camera.panningSensibility = 4000 / span;
+      return { target: center, position: center.add(viewDir.scale(span * 1.82)), extent };
+    }
+
+    function showStats(result, label, bytes) {
+      // Babylon splits each glTF mesh into one mesh per primitive, so this counts primitives.
+      const meshes = result.meshes.filter((m) => m.getTotalVertices && m.getTotalVertices() > 0);
+      const tris = meshes.reduce((sum, m) => sum + (m.getTotalIndices() || m.getTotalVertices()) / 3, 0);
+      const materials = new Set(meshes.map((m) => m.material).filter(Boolean));
+      const textures = new Set([...materials].flatMap((m) => m.getActiveTextures()));
+      const e = home.extent;
+      statsEl.textContent =
+        `${meshes.length} primitives · ${materials.size} materials · ${textures.size} textures · ` +
+        `${Math.round(tris).toLocaleString()} tris · ${(bytes / 1048576).toFixed(1)} MB · ` +
+        `${e.x.toFixed(2)} × ${e.y.toFixed(2)} × ${e.z.toFixed(2)} m`;
+      setStatus(`${label} — Babylon.js ${BABYLON.Engine.Version}. Drag to orbit, right-drag to pan, wheel to zoom.`, 'ready');
+    }
+
+    async function load(source, label, bytes) {
+      drop.hidden = true;
+      if (loaded) { loaded.meshes[0].dispose(false, true); loaded = null; }
+      setStatus(`Loading ${label}…`, 'loading');
+      const onProgress = (evt) => {
+        if (evt.lengthComputable) setStatus(`Loading ${label}… ${Math.round(evt.loaded / evt.total * 100)}%`);
+      };
+      const result = typeof source === 'string'
+        ? await BABYLON.SceneLoader.ImportMeshAsync(null, '', source, scene, onProgress)
+        : await BABYLON.SceneLoader.ImportMeshAsync(null, '', source, scene, onProgress, '.glb');
+      loaded = result;
+      home = computeHome(result);
+      frameModel();
+      await scene.whenReadyAsync();
+      showStats(result, label, bytes);
+    }
+
+    async function loadFile(file) {
+      if (!file) return;
+      try {
+        await load(new Uint8Array(await file.arrayBuffer()), file.name, file.size);
+      } catch (error) {
+        setStatus(`Could not load ${file.name}: ${error?.message || error}`, 'error');
+      }
+    }
+
+    function askForFile(reason) {
+      setStatus(reason, 'waiting-for-file');
+      drop.hidden = false;
+    }
+
+    const actions = {
+      frame: () => frameModel(),
+      ibl: (btn) => {
+        if (!ibl) ibl = BABYLON.CubeTexture.CreateFromPrefilteredData(IBL_URL, scene);
+        scene.environmentTexture = scene.environmentTexture ? null : ibl;
+        btn.setAttribute('aria-pressed', String(!!scene.environmentTexture));
+      },
+      wire: (btn) => { scene.forceWireframe = !scene.forceWireframe; btn.setAttribute('aria-pressed', String(scene.forceWireframe)); },
+      spin: (btn) => {
+        camera.useAutoRotationBehavior = !camera.useAutoRotationBehavior;
+        if (camera.autoRotationBehavior) camera.autoRotationBehavior.idleRotationSpeed = .25;
+        btn.setAttribute('aria-pressed', String(camera.useAutoRotationBehavior));
+      },
+      insp: async (btn) => {
+        if (scene.debugLayer.isVisible()) scene.debugLayer.hide();
+        else await scene.debugLayer.show({ embedMode: true });
+        btn.setAttribute('aria-pressed', String(scene.debugLayer.isVisible()));
+      },
+      open: () => fileInput.click(),
+    };
+    const keys = { f: 'frame', l: 'ibl', w: 'wire', r: 'spin', i: 'insp', o: 'open' };
+    const button = (act) => document.querySelector(`[data-act="${act}"]`);
+    document.getElementById('bar').addEventListener('click', (e) => {
+      const btn = e.target.closest('button');
+      if (btn) actions[btn.dataset.act](btn);
+    });
+    addEventListener('keydown', (e) => {
+      if (e.ctrlKey || e.metaKey || e.altKey || e.target.closest?.('input, textarea, [contenteditable]')) return;
+      const act = keys[e.key.toLowerCase()];
+      if (act) { e.preventDefault(); actions[act](button(act)); }
+    });
+
+    fileInput.addEventListener('change', () => loadFile(fileInput.files[0]));
+    addEventListener('dragover', (e) => { e.preventDefault(); document.body.classList.add('dragging'); });
+    addEventListener('dragleave', (e) => { if (!e.relatedTarget) document.body.classList.remove('dragging'); });
+    addEventListener('drop', (e) => {
+      e.preventDefault();
+      document.body.classList.remove('dragging');
+      loadFile([...e.dataTransfer.files].find((f) => /\.glb$/i.test(f.name)));
+    });
+
+    engine.runRenderLoop(() => scene.render());
+    addEventListener('resize', () => engine.resize());
+
+    const glb = new URLSearchParams(location.search).get('glb') || DEFAULT_GLB;
+    const glbLabel = decodeURIComponent(glb.split('/').pop());
+    if (location.protocol === 'file:') {
+      askForFile(`Opened from disk — drop ${glbLabel} on the page (or click) to view it.`);
+    } else {
+      fetch(glb, { method: 'HEAD' })
+        .then((r) => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          return load(glb, glbLabel, Number(r.headers.get('content-length')) || 0);
+        })
+        .catch((error) => askForFile(`Could not auto-load ${glbLabel} (${error?.message || error}). Drop it here instead.`));
+    }
+  </script>
+</body>
+</html>

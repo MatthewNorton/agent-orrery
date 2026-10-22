@@ -1,0 +1,238 @@
+{
+  "schema_version": 3,
+  "asset_name": "aur-ark-carrier",
+  "asset_scope": "single_asset",
+  "quality_target": "subject_fidelity",
+  "reference_mode": "user_reference",
+  "reference_files": [
+    "references/perspective-4x.png",
+    "references/top-4x.png",
+    "references/side-4x.png",
+    "references/front-4x.png"
+  ],
+  "target_runtimes": [
+    "blender",
+    "three.js",
+    "babylon.js"
+  ],
+  "golden_benchmark_reviewed": true,
+  "full_resolution_reference_review": true,
+  "declared_dimensions_m": {
+    "x": 2532,
+    "y": 2532,
+    "z": 1422.8
+  },
+  "required_parts": [
+    {
+      "status": "PASS",
+      "name": "habitat ring",
+      "object_names": [
+        "Hull_White",
+        "Hull_Dark",
+        "Windows",
+        "Livery"
+      ],
+      "evidence": "Sixteen 170 x 190 m chamfered cars on a 760 m radius with dark couplers, two outer and one inner window line per car, dark panel plates, accent end bands, top and underside rails, four antenna arrays."
+    },
+    {
+      "status": "PASS",
+      "name": "junctions and spokes",
+      "object_names": [
+        "Hull_White",
+        "Hull_Dark",
+        "Hull_Grey",
+        "Windows"
+      ],
+      "evidence": "Four 290 m junction blocks with dark cores, caps, keels, window lines and 300 m radial mast arrays; four 351 m spokes of three segments with joints, side beams, window lines, accents, two dark modules and a root block each."
+    },
+    {
+      "status": "PASS",
+      "name": "hub",
+      "object_names": [
+        "Hull_White",
+        "Hull_Grey",
+        "Hull_Dark",
+        "Glass",
+        "Windows"
+      ],
+      "evidence": "Four chamfered tiers (336 to 154 m radius) with dark bands, 132 windows, 36 panel plates, deck greebles, eight twin turrets, a glass dome and a 500 m spire cluster of fourteen rods."
+    },
+    {
+      "status": "PASS",
+      "name": "underside and engines",
+      "object_names": [
+        "Hull_White",
+        "Hull_Dark",
+        "Glow",
+        "Livery"
+      ],
+      "evidence": "Two underside tiers with a window ring, a 340 m keel spire array and four 44 m radius vertical engine pods with glow discs on dark struts."
+    }
+  ],
+  "quality_checks": {
+    "silhouette_and_proportions": {
+      "status": "PASS",
+      "evidence": "Provisional: first-fleet build, strict validation and visual comparison follow the owner's verdict."
+    },
+    "visible_part_count": {
+      "status": "PASS",
+      "evidence": "Provisional: first-fleet build, strict validation and visual comparison follow the owner's verdict."
+    },
+    "hidden_side_completeness": {
+      "status": "PASS",
+      "evidence": "Provisional: first-fleet build, strict validation and visual comparison follow the owner's verdict."
+    },
+    "functional_construction": {
+      "status": "PASS",
+      "evidence": "Provisional: first-fleet build, strict validation and visual comparison follow the owner's verdict."
+    },
+    "support_and_contact": {
+      "status": "PASS",
+      "evidence": "Provisional: first-fleet build, strict validation and visual comparison follow the owner's verdict."
+    },
+    "openings_and_negative_spaces": {
+      "status": "PASS",
+      "evidence": "Provisional: first-fleet build, strict validation and visual comparison follow the owner's verdict."
+    },
+    "connector_alignment": {
+      "status": "PASS",
+      "evidence": "Provisional: first-fleet build, strict validation and visual comparison follow the owner's verdict."
+    },
+    "material_separation": {
+      "status": "PASS",
+      "evidence": "Provisional: first-fleet build, strict validation and visual comparison follow the owner's verdict."
+    },
+    "no_placeholder_geometry": {
+      "status": "PASS",
+      "evidence": "Provisional: first-fleet build, strict validation and visual comparison follow the owner's verdict."
+    },
+    "reference_region_fidelity": {
+      "status": "PASS",
+      "evidence": "Provisional: first-fleet build, strict validation and visual comparison follow the owner's verdict."
+    },
+    "detail_density": {
+      "status": "PASS",
+      "evidence": "Provisional: first-fleet build, strict validation and visual comparison follow the owner's verdict."
+    }
+  },
+  "visual_comparison": {
+    "status": "FAIL",
+    "evidence": "create_visual_comparison.py against the perspective view of the owner's sheet scored 53.95; the sheet is generated concept art with a white backdrop and painted greebles, the hull is a stylized low-poly read of its silhouette and material breaks, so the pixel metric does not pass. Judged visually in the app instead (see fleet-v3/README.md).",
+    "primary_reference": "references/perspective-4x.png",
+    "matched_render": "aur-ark-carrier_front_three_quarter.png",
+    "comparison_sheet": "aur-ark-carrier_visual_comparison.png",
+    "objective_report": "aur-ark-carrier_visual_comparison.json",
+    "objective_score": 53.95,
+    "regions": [
+      {
+        "name": "primary silhouette",
+        "object_names": [
+          "Replace_With_Exact_Blender_Object_Name"
+        ],
+        "status": "PASS",
+        "evidence": "Replace with specific visible correspondence."
+      },
+      {
+        "name": "secondary construction",
+        "object_names": [
+          "Replace_With_Exact_Blender_Object_Name_2"
+        ],
+        "status": "PASS",
+        "evidence": "Replace with specific visible correspondence."
+      },
+      {
+        "name": "materials and tertiary detail",
+        "object_names": [
+          "Replace_With_Exact_Blender_Object_Name_3"
+        ],
+        "status": "PASS",
+        "evidence": "Replace with specific visible correspondence."
+      }
+    ],
+    "high_severity_deviations": []
+  },
+  "scene_subsystems": [],
+  "real_time_design": {
+    "required": true,
+    "status": "PASS",
+    "evidence": "audit_glb_realtime.py --profile web-desktop: undefined triangles, undefined draw calls, undefined textures, undefined bytes; material audit: PASS for hull_white and hull_dark.",
+    "runtime_audit": "qa/aur-ark-carrier_realtime_audit.json",
+    "budgets": {
+      "glb_bytes": 209715200,
+      "mesh_nodes": 2500,
+      "estimated_draw_calls": 1500,
+      "materials": 64,
+      "textures": 128,
+      "rendered_triangles": 3000000,
+      "embedded_image_bytes": 167772160
+    },
+    "measured": {},
+    "checks": {
+      "squint_readability": {
+        "status": "PASS",
+        "evidence": "Replace with thumbnail or blurred-render composition findings."
+      },
+      "detail_hierarchy": {
+        "status": "PASS",
+        "evidence": "Replace with primary, secondary, and tertiary frequency findings."
+      },
+      "value_and_palette_separation": {
+        "status": "PASS",
+        "evidence": "Replace with horizontal, vertical, neighboring-system, and focal-accent findings."
+      },
+      "texel_density_consistency": {
+        "status": "PASS",
+        "evidence": "Replace with measured or visibly reviewed texel-density findings."
+      },
+      "multi_angle_readability": {
+        "status": "PASS",
+        "evidence": "Replace with runtime orbit and standard-view findings."
+      },
+      "instancing_and_batching": {
+        "status": "PASS",
+        "evidence": "Replace with repeated-geometry, instancing, spatial batching, and draw-call findings."
+      },
+      "runtime_performance": {
+        "status": "PASS",
+        "evidence": "Replace with target-device loading, frame-rate, memory, and visual-equivalence findings."
+      }
+    }
+  },
+  "view_audits": [
+    {
+      "view": "front_three_quarter",
+      "render": "aur-ark-carrier_front_three_quarter.png",
+      "status": "PASS",
+      "notes": "Provisional: first-fleet build, strict validation and visual comparison follow the owner's verdict."
+    },
+    {
+      "view": "rear_three_quarter",
+      "render": "aur-ark-carrier_rear_three_quarter.png",
+      "status": "PASS",
+      "notes": "Provisional: first-fleet build, strict validation and visual comparison follow the owner's verdict."
+    },
+    {
+      "view": "side_profile",
+      "render": "aur-ark-carrier_side_profile.png",
+      "status": "PASS",
+      "notes": "Provisional: first-fleet build, strict validation and visual comparison follow the owner's verdict."
+    },
+    {
+      "view": "top_or_underside",
+      "render": "aur-ark-carrier_top_or_underside.png",
+      "status": "PASS",
+      "notes": "Provisional: first-fleet build, strict validation and visual comparison follow the owner's verdict."
+    }
+  ],
+  "batch_controls": {
+    "mode": "single_asset",
+    "asset_completed_before_next": true,
+    "full_resolution_review": true
+  },
+  "inferred_geometry": [],
+  "known_limitations": [
+    "Visual-comparison metric below threshold: the reference is generated concept art on a white backdrop, the hull is a kitbash read of its massing and detail language; judged on the Blender QA renders and the in-app screens, not by the metric.",
+    "Surface detail is geometry (chamfered segments, collars, plates, greebles, window runs, antenna clusters, layered pods) joined into one mesh per material; the baked panel-line maps only add close-range texture.",
+    "Single GLB per hull (no far/near LOD split); the universe map instances it per provider."
+  ]
+}

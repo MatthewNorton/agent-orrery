@@ -9,8 +9,12 @@
   const { disposeMeshAndMaterial } = AUR;
 
   AUR.sceneParts.system.ships = function (view) {
-    const { scene, gui, ships, planets, projectId, outer } = view;
+    const { scene, gui, ships, planets, projectId, outer, beltR, beltWidth } = view;
+    const SIZE = AUR.SHIP_SIZE.system;
+    const STANDOFF = 0.9;        // clear water between a planet's surface and a ship at work
+    const BELT_CLEARANCE = 0.9;  // and between the belt's outer edge and the patrol ring
     const shipLookTarget = new BABYLON.Vector3();
+    const standoff = new BABYLON.Vector3();
     let refetching = false;
 
     function attentionSuffix(attention) {
@@ -31,11 +35,12 @@
     }
 
     function buildShip(s) {
-      const { mesh, tint, providerKey, upgrade } = AUR.shipMesh(scene, s, 's', 0.72, 1.1);
+      const { mesh, tint, providerKey, upgrade, scale } = AUR.shipMesh(scene, s, 's', SIZE);
       const rand = AUR.mulberry32(AUR.fnv1a(s.id));
-      const r = outer + 3 + rand() * 4;
+      // Outside the last orbit and the belt (one-planet systems put the belt out here).
+      const r = Math.max(outer + 3, beltR + beltWidth / 2 + BELT_CLEARANCE) + rand() * 4;
       const a0 = rand() * Math.PI * 2;
-      mesh.position.set(Math.cos(a0) * r, (rand() - 0.5) * 2, Math.sin(a0) * r);
+      AUR.orbitPoint(a0, r, (rand() - 0.5) * 2, mesh.position);
       const trail = new BABYLON.TrailMesh('t_' + s.id, mesh, scene, 0.08, 18, true);
       trail.material = AUR.unlitMaterial(scene, 'tm_' + s.id, AUR.color3(tint), 0.24);
       const label = AUR.label(gui, s.name, { fontSize: 12, mono: true, mesh, offsetY: -22 });
@@ -43,21 +48,15 @@
         fontSize: 12, mono: true, color: AUR.attentionColor(s.attention), mesh, offsetY: -22,
       });
       const rec = {
-        id: s.id, mesh, trail, label, suffix, tint, providerKey,
+        id: s.id, mesh, trail, label, suffix, tint, providerKey, scale,
         r, a: a0, speed: (AUR.MOTION.systemShipOrbitMin +
           rand() * AUR.MOTION.systemShipOrbitRange) * (rand() > 0.5 ? 1 : -1),
         bob: rand() * 6.28, mode: 'patrol', fly: null, born: performance.now(),
       };
       applyShipAttention(rec, s);
       ships.set(s.id, rec);
-      if (view.shipFocus) view.applyShipFocusVisual(rec, 0.16);
-      if (upgrade) {
-        upgrade.then(() => {
-          if (view.shipFocus && ships.has(s.id)) {
-            view.applyShipFocusVisual(rec, view.shipFocus.shipId === rec.id ? 0 : 0.16);
-          }
-        });
-      }
+      view.applyShipFocusVisual(rec);
+      if (upgrade) upgrade.then(() => { if (ships.has(s.id)) view.applyShipFocusVisual(rec); });
       return rec;
     }
     function removeShip(id) {
@@ -76,7 +75,7 @@
     function beamTo(shipRec, planetRec) {
       const beam = BABYLON.MeshBuilder.CreateTube('beam', {
         path: [shipRec.mesh.position.clone(), planetRec.mesh.position.clone()],
-        radius: 0.06, tessellation: 6, updatable: false,
+        radius: SIZE.hull / 10, tessellation: 6, updatable: false,
       }, scene);
       beam.material = AUR.unlitMaterial(scene, 'beamm', AUR.color3(shipRec.tint), 0.7);
       beam.isPickable = false;
@@ -85,41 +84,58 @@
 
     function ease(x) { return x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2; }
 
+    // Where a ship works on a planet: on the line it approached along, a standoff above the surface.
+    function standoffPoint(fly) {
+      fly.dir.scaleToRef(fly.planet.dia / 2 + STANDOFF, standoff);
+      return standoff.addInPlace(fly.planet.mesh.position);
+    }
+
+    // How high a flight climbs over the ecliptic: above the belt and the largest planet it may cross.
+    function flightArc() {
+      let radius = 0;
+      for (const p of planets.values()) radius = Math.max(radius, p.dia / 2);
+      return Math.max(1.4, 0.6 + radius);
+    }
+
+    // One leg of a flight: an eased lerp from `f.from` to `target` over `seconds`, arcing `f.arc`
+    // over the ecliptic, nose on `lookAt`. True once it has arrived.
+    function flight(r, f, dt, seconds, target, lookAt) {
+      f.t = Math.min(1, f.t + dt / seconds);
+      BABYLON.Vector3.LerpToRef(f.from, target, ease(f.t), r.mesh.position);
+      r.mesh.position.y += Math.sin(f.t * Math.PI) * f.arc;
+      r.mesh.lookAt(lookAt);
+      return f.t >= 1;
+    }
+
     function animateShips(dt, now, t) {
+      const fit = AUR.shipFit(scene, SIZE.minPx);
       for (const r of ships.values()) {
+        const f = r.fly;
         if (r.mode === 'patrol') {
           r.a += r.speed * dt;
-          r.mesh.position.set(
-            Math.cos(r.a) * r.r,
-            Math.sin(r.bob + t * AUR.MOTION.systemShipBobRate) * AUR.MOTION.systemShipBobAmount,
-            Math.sin(r.a) * r.r
-          );
-          shipLookTarget.set(Math.cos(r.a + Math.sign(r.speed) * 0.025) * r.r, 0, Math.sin(r.a + Math.sign(r.speed) * 0.025) * r.r);
-          r.mesh.lookAt(shipLookTarget);
+          AUR.orbitPoint(r.a, r.r, Math.sin(r.bob + t * AUR.MOTION.systemShipBobRate) * AUR.MOTION.systemShipBobAmount, r.mesh.position);
+          r.mesh.lookAt(AUR.orbitPoint(r.a + Math.sign(r.speed) * 0.025, r.r, 0, shipLookTarget));
         } else if (r.mode === 'flyto') {
-          const f = r.fly;
-          f.t = Math.min(1, f.t + dt / AUR.MOTION.flyToSeconds);
-          const target = f.planet.mesh.position;
-          BABYLON.Vector3.LerpToRef(f.from, target, ease(f.t), r.mesh.position);
-          r.mesh.lookAt(target);
-          if (f.t >= 1) {
+          if (flight(r, f, dt, AUR.MOTION.flyToSeconds, standoffPoint(f), f.planet.mesh.position)) {
             f.beam = beamTo(r, f.planet);
             f.planet.pulseUntil = now + 600;
             r.mode = 'hold'; f.hold = now + 2400;
           }
         } else if (r.mode === 'hold') {
-          const f = r.fly;
+          r.mesh.position.copyFrom(standoffPoint(f)); // the planet keeps orbiting; stay above it
           r.mesh.lookAt(f.planet.mesh.position);
           if (now >= f.hold) {
             if (f.beam) disposeMeshAndMaterial(f.beam);
-            const px = r.mesh.position.x, pz = r.mesh.position.z;
-            r.r = Math.max(outer + 2, Math.hypot(px, pz));
-            r.a = Math.atan2(pz, px);
-            r.mode = 'patrol'; r.fly = null;
+            f.beam = null;
+            // Back to the patrol ring at this bearing, on a flight, not a snap.
+            r.a = Math.atan2(r.mesh.position.z, r.mesh.position.x);
+            r.mode = 'return'; f.t = 0; f.from = r.mesh.position.clone();
+            f.to = AUR.orbitPoint(r.a, r.r, 0, new BABYLON.Vector3());
           }
+        } else if (r.mode === 'return') {
+          if (flight(r, f, dt, AUR.MOTION.returnSeconds, f.to, f.to)) { r.mode = 'patrol'; r.fly = null; }
         }
-        const age = (now - r.born) / 900;
-        if (age < 1) r.mesh.scaling.setAll(0.3 + 0.7 * age);
+        AUR.fitShip(fit, r, r.mesh.position, now);
       }
     }
 
@@ -140,7 +156,10 @@
             pr.pulseUntil = performance.now() + 600;
             if (sh && sh.mode === 'patrol') {
               sh.mode = 'flyto';
-              sh.fly = { planet: pr, t: 0, from: sh.mesh.position.clone(), beam: null };
+              const dir = sh.mesh.position.subtract(pr.mesh.position);
+              dir.y = 0;
+              sh.fly = { planet: pr, t: 0, from: sh.mesh.position.clone(), beam: null, arc: flightArc(),
+                dir: dir.lengthSquared() > 0.001 ? dir.normalize() : new BABYLON.Vector3(1, 0, 0) };
             }
           }
         } else if (ev.type === 'activity' && ev.project === projectId) {

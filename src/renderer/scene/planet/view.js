@@ -75,6 +75,7 @@
 
     // ---- moons ----
     const moons = [];
+    const MOON_ORBIT = { min: 0.9, max: 1.4 }; // in planet diameters; ships orbit beyond it
     (function buildMoons() {
       const rand = AUR.mulberry32(AUR.fnv1a(projectId + ':moons:' + name));
       const nm = 1 + Math.floor(rand() * 2);
@@ -88,7 +89,7 @@
         moon.material = mm;
         moon.isPickable = false;
         moons.push({
-          mesh: moon, r: PDIA * (0.9 + rand() * 0.5), a: rand() * 6.28,
+          mesh: moon, r: PDIA * (MOON_ORBIT.min + rand() * (MOON_ORBIT.max - MOON_ORBIT.min)), a: rand() * 6.28,
           speed: (0.006 + rand() * 0.006) * (rand() > 0.5 ? 1 : -1),
           tilt: (rand() - 0.5) * 0.8, yoff: (rand() - 0.5) * PDIA * 0.4,
         });
@@ -97,13 +98,16 @@
 
     // ---- ships ----
     const ships = new Map();
+    const SIZE = AUR.SHIP_SIZE.planet;
+    const MOON_SHELL = PDIA * (MOON_ORBIT.max + 0.1); // beyond the outermost moon and half a moon
+    AUR.shipLights(scene);
     function buildShip(s) {
-      const { mesh, tint, providerKey } = AUR.shipMesh(scene, s, 'p', 0.72, 1.1);
+      const { mesh, tint, providerKey, scale } = AUR.shipMesh(scene, s, 'p', SIZE);
       const rand = AUR.mulberry32(AUR.fnv1a(s.id));
       const label = AUR.label(gui, s.name, { fontSize: 12, mono: true, mesh, offsetY: -20 });
       const rec = {
-        id: s.id, mesh, label, tint, providerKey,
-        r: PDIA * (0.82 + rand() * 0.5), a: rand() * 6.28,
+        id: s.id, mesh, label, tint, providerKey, scale,
+        r: MOON_SHELL + rand() * PDIA * 0.25, a: rand() * 6.28,
         speed: (AUR.MOTION.planetShipOrbitMin +
           rand() * AUR.MOTION.planetShipOrbitRange) * (rand() > 0.5 ? 1 : -1),
         tilt: (rand() - 0.5) * 0.7, yoff: (rand() - 0.5) * PDIA * 0.5,
@@ -121,7 +125,6 @@
     for (const s of store.ships.values()) if (s.project === projectId) buildShip(s);
 
     // ---- animation ----
-    const tmp = new BABYLON.Vector3();
     const heading = new BABYLON.Vector3();
     scene.onBeforeRenderObservable.add(() => {
       const dt = engine.getDeltaTime() / 1000;
@@ -133,15 +136,15 @@
       }
       for (const m of moons) {
         m.a += m.speed * dt;
-        tmp.set(Math.cos(m.a) * m.r, m.yoff + Math.sin(m.a) * m.r * m.tilt, Math.sin(m.a) * m.r);
-        m.mesh.position.copyFrom(tmp);
+        AUR.orbitPoint(m.a, m.r, m.yoff + Math.sin(m.a) * m.r * m.tilt, m.mesh.position);
       }
+      const fit = AUR.shipFit(scene, SIZE.minPx);
       for (const r of ships.values()) {
         r.a += r.speed * dt;
-        tmp.set(Math.cos(r.a) * r.r, r.yoff + Math.sin(r.a) * r.r * r.tilt, Math.sin(r.a) * r.r);
-        r.mesh.position.copyFrom(tmp);
+        AUR.orbitPoint(r.a, r.r, r.yoff + Math.sin(r.a) * r.r * r.tilt, r.mesh.position);
         const ahead = r.a + Math.sign(r.speed) * 0.025;
-        r.mesh.lookAt(heading.set(Math.cos(ahead) * r.r, r.yoff, Math.sin(ahead) * r.r));
+        r.mesh.lookAt(AUR.orbitPoint(ahead, r.r, r.yoff, heading));
+        AUR.fitShip(fit, r, r.mesh.position);
       }
     });
 

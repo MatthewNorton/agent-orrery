@@ -1,0 +1,48 @@
+{
+  "status": "PASS",
+  "glb": "C:\\workspace\\code\\experimental\\agent-orrery\\assets\\ships\\fleet-v3\\aur-ark-carrier\\aur-ark-carrier.glb",
+  "profile": "web-desktop",
+  "budgets": {
+    "glb_bytes": 209715200,
+    "mesh_nodes": 2500,
+    "estimated_draw_calls": 1500,
+    "materials": 64,
+    "textures": 128,
+    "rendered_triangles": 3000000,
+    "embedded_image_bytes": 167772160
+  },
+  "metrics": {
+    "glb_bytes": 4421388,
+    "nodes": 8,
+    "mesh_nodes": 7,
+    "mesh_definitions": 7,
+    "unique_mesh_references": 7,
+    "unique_primitives": 7,
+    "estimated_draw_calls": 7,
+    "materials": 7,
+    "textures": 9,
+    "images": 9,
+    "embedded_image_bytes": 401326,
+    "external_images": 0,
+    "unique_triangles": 58456,
+    "rendered_triangles": 58456,
+    "gpu_instancing_nodes": 0,
+    "repeated_mesh_definitions": 0,
+    "exact_duplicate_mesh_groups": 0,
+    "exact_duplicate_mesh_definitions": 0,
+    "instance_candidate_nodes": 0,
+    "potential_draw_call_savings": 0,
+    "extensions_used": [
+      "KHR_materials_clearcoat"
+    ],
+    "extensions_required": [],
+    "repeated_mesh_references": {}
+  },
+  "requirements": {
+    "instancing_when_repeated": false,
+    "instancing_threshold": 25,
+    "meshopt": false,
+    "ktx2": false
+  },
+  "errors": []
+}

@@ -58,8 +58,8 @@ test('first-person mode offers persistent ship-relative camera headings', () => 
     assert.match(html, new RegExp(`data-vantage="${vantage}"`));
   }
   assert.match(app, /AGENT_FOCUS_VANTAGE_STORAGE_KEY/);
-  assert.match(app, /activeView\.setShipFocusVantage\(key\)/);
+  assert.match(app, /activeView\.setShipFocus\(focusSettings\(\)\)/);
   assert.match(system, /SHIP_FOCUS_VANTAGE_YAW/);
   assert.match(system, /BABYLON\.Vector3\.CrossToRef\(focusUp, focusForward, focusRight\)/);
-  assert.match(system, /setShipFocusVantage,/);
+  assert.match(system, /setShipFocus,/);
 });

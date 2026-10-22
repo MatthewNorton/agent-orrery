@@ -13,3 +13,7 @@ kit/done/*/output/
 
 # Tricolor design renders: regenerate with node design/tricolor/render.cjs; the design canvas holds the reference images.
 design/tricolor/renders/
+*.blend1
+
+# Owner working folder for ship reference images; the fleet keeps its own copies under assets/ships/fleet-v3.
+.docs/ships/

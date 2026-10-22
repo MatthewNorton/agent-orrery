@@ -261,15 +261,16 @@
   <!-- Bottom-center tab bar (planet view) -->
   <nav class="tabbar hidden" id="tabbar"></nav>
 
-  <!-- Immersive first-person agent focus. The transparent foreground is a
+  <!-- Agent focus: a chase camera outside the ship, or a first-person room whose transparent foreground is a
        physical cockpit while the live Babylon view remains visible outside. -->
   <section class="agent-focus hidden" id="agent-focus" role="dialog" aria-modal="true"
     aria-labelledby="agent-focus-name" aria-describedby="agent-focus-context">
     <div class="agent-focus-vignette" aria-hidden="true"></div>
 
     <nav class="agent-focus-environments" id="agent-focus-environments"
-      aria-label="First-person environment">
-      <button type="button" data-environment="cockpit" aria-pressed="true">Cockpit</button>
+      aria-label="Focus environment">
+      <button type="button" data-environment="exterior" aria-pressed="true">Exterior</button>
+      <button type="button" data-environment="cockpit" aria-pressed="false">Cockpit</button>
       <button type="button" data-environment="quarters" aria-pressed="false">Quarters</button>
       <button type="button" data-environment="office" aria-pressed="false">Office</button>
       <button type="button" data-environment="station" aria-pressed="false">Station</button>
@@ -310,8 +311,8 @@
       </div>
 
       <header class="agent-focus-ident">
-        <span class="agent-focus-mode">FIRST PERSON <i></i>
-          <span id="agent-focus-environment-label">COCKPIT LINK</span>
+        <span class="agent-focus-mode"><span id="agent-focus-mode-label">EXTERIOR</span> <i></i>
+          <span id="agent-focus-environment-label">CHASE CAMERA</span>
         </span>
         <h2 id="agent-focus-name">Agent</h2>
         <p id="agent-focus-context">System patrol</p>

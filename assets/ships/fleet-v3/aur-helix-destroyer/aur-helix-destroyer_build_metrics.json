@@ -1,0 +1,36 @@
+{
+  "objects": 7,
+  "mesh_objects": 6,
+  "vertices_before_modifier_evaluation": 14712,
+  "polygons_before_modifier_evaluation": 12972,
+  "triangles_before_modifier_evaluation": 25960,
+  "materials": 6,
+  "exports": {
+    "blend": "aur-helix-destroyer.blend",
+    "glb": "aur-helix-destroyer.glb",
+    "fbx": "aur-helix-destroyer.fbx",
+    "babylon_viewer": "babylon_viewer.html"
+  },
+  "qa_views": [
+    "front_three_quarter",
+    "rear_three_quarter",
+    "side_profile",
+    "top_or_underside"
+  ],
+  "dimensions_m": [
+    168.38,
+    453.4,
+    172.52
+  ],
+  "hero_materials": [
+    "hull_white",
+    "hull_grey",
+    "hull_dark"
+  ],
+  "portable_materials": [
+    "hull_dark",
+    "hull_grey",
+    "hull_white"
+  ],
+  "texture_tile_m": 20.0
+}

@@ -67,8 +67,12 @@ View contract: each `scene/<view>/view.js` registers
 `AUR.views.<name> = (engine, data, ctx) => ({ scene, update(eventBatch), dispose() })`
 where `ctx` provides `openSystem(projectId)`, `openPlanet(projectId, name)`, the
 shared `store`, the graphics `quality` tier and the `galaxyFields` cache. Views may also implement `resize`,
-`setQuality`, `setSearchMatches`, `setShipFocusVantage`, `focusShip` and `shipFocusState`;
+`setQuality`, `setSearchMatches`, `setShipFocus`, `focusShip` and `shipFocusState`;
 the app fills in a no-op default for any they leave out (`VIEW_DEFAULTS` in `app/boot.js`).
+Agent focus (`focusShip(id, settings)`, `setShipFocus(settings)`) takes `{ vantage, exterior }`:
+`exterior` (the default environment, a chase camera outside the hull that stands off by the hull's
+own span) or one of the first-person rooms, each a `camera: 'room'` entry in
+`C.AGENT_FOCUS_ENVIRONMENTS`.
 Three more members are optional and have no default: the `planetData` field, read through
 `A.activePlanetData()`, and the `systemData` field and `clearShipFocus()` method, which
 `app/agent-focus.js` checks for before using them.
@@ -250,8 +254,8 @@ Design tokens (put in `:root`):
 - Status dot colors: Building `#4da3ff`, Exploring `#a78bfa`,
   Gathering Resources `#ffb454`, Scanning `#34d399`, Delegating `#f472b6`,
   Planning `#facc15`, Working `#94a3b8`.
-- Provider colors (`AUR.PROVIDERS`): Claude neon purple `#b026ff`, Codex blue
-  `#2f7dff`, generic Signal `#94a3b8`; a `local` ship of either provider is red
+- Provider colors (`AUR.PROVIDERS`): Claude terracotta `#d97757`, Codex pearl
+  `#f2f0ea`, generic Signal `#94a3b8`; a `local` ship of either provider is red
   `#ff3344` (`AUR.LOCAL_MODEL`). `AUR.shipColor(ship)` and `AUR.shipTint(id,
   provider)` both resolve local, so hulls, agent rows and focus mode agree. The
   chrome says it too: a fleet row ends with the ship's `model` (`.agent-model-tag`,
@@ -259,18 +263,26 @@ Design tokens (put in `:root`):
   the provider, and the universe legend lists "Local model".
   Missing provider values in legacy fixtures normalize to Claude; raw/unknown
   values normalize to Signal.
-- Fleet hulls wear a livery: graphite hull and armor, the structure (ivory)
-  parts in the ship color, accents emitting exactly the ship color.
-- Main Claude/Codex ships fly the `aur-fleet-v2` rank ladder in
+- Fleet hulls (`assets/ships/fleet-v3`) carry authored hull maps the app never
+  repaints; the livery is the provider color on `accent_livery` and
+  `engine_glow` only, `window_light` glows cool white, and `canopy_glass` takes
+  a faint tint (`materialRole` in `ship-assets-hulls.js`). Every fleet material
+  gets a procedural studio environment for reflections; the system and planet
+  views add a viewer-relative key and rim that only ship meshes see
+  (`AUR.shipLights`).
+- Main Claude/Codex ships fly the `aur-fleet-v3` rank ladder in
   `assets/ships/manifest.json`: the hull is the highest rank whose `minBuilds`
-  the ship's `builds` has reached (interceptor 0 → carrier 200); display size
-  grows ~1.8× over the ladder. `AUR.ships` loads the hull's far file (`lods.far`,
-  instanced from a per-provider template) on the universe map and its near
-  `file` (clones, so focus mode can fade ships one by one) in system and planet
-  views; a near view steps down to far, then to the dart, at 100k hull
-  triangles per scene. `AUR.ships.refresh(scene, ship)` swaps the hull inside
-  the asset root the scene already holds; `app/boot.js` calls it after `ship-updated`
-  and `build` events, and it waits while focus mode has the ship faded.
+  the ship's `builds` has reached (Scout 0, Workhorse 5, Capital 20, Flagship
+  60); display length grows 1.9× over the ladder. A drone flies the first rank
+  at `AUR.DRONE_SCALE` of its size. Each hull is one file: the universe map
+  instances it from a per-provider template, the system and planet views clone
+  it (so focus mode can fade ships one by one); a view steps down to the dart at
+  400k hull triangles per scene. Ship size is one policy (`AUR.SHIP_SIZE` per
+  view, `AUR.fitShip` with a pixel floor so a hull sized to its planets still
+  reads from the default orbit). `AUR.ships.refresh(scene, ship)` swaps the hull
+  inside the asset root the scene already holds; `app/boot.js` calls it after
+  `ship-updated` and `build` events, and it waits while focus mode has the ship
+  faded.
 
 ## 5. Universe view (`3.universe-map-view.png`)
 
@@ -340,10 +352,9 @@ Design tokens (put in `:root`):
 - While project search is active, matching system glyphs and labels brighten
   through those same state materials and nonmatches dim; clearing or leaving
   the universe restores the ordinary online/idle/derelict appearance.
-- Ships: every live ship = small dart mesh cruising near its project's system
-  (slow orbit at radius ~6 around the glyph, gentle bob). Optional short
-  `TrailMesh` (≤30 length). Drones smaller. On `ship-spawned`: warp-in flash;
-  `ship-departed`: fade out.
+- Ships: every live ship = its hull (a dart until it loads) cruising outside
+  its project's glyph rings (slow orbit, gentle bob), instanced per provider.
+  Drones smaller. On `ship-spawned`: warp-in grow; `ship-departed`: removed.
 - Events: `build`/`activity` → that system's sun does a quick pulse.
   `project-added` → glyph grows in from zero.
 - Interaction: hover glyph → highlight + pointer cursor; click → zoom/fade
@@ -369,11 +380,13 @@ Data: `AU.getSystem(projectId)`.
 - Asteroid belt: ring of instanced small rocks (one low-poly mesh +
   `thinInstance` transforms), count `min(beltDensity*4, 300)`, placed in an
   annulus between two middle orbits, slow rotation.
-- Ships (only ships where `ship.project === projectId`): dart mesh + name label
-  (GUI, always visible, like `Claude-1` callouts in the mockup) + short trail.
-  Idle behavior: patrol orbit. On `build` event: fly to the `bucket` planet
-  (~1.5s ease), fire a thin emissive beam at it for ~1s, planet pulses
-  (scale 1 → 1.15 → 1). On `build` with `isNew: true`: re-fetch
+- Ships (only ships where `ship.project === projectId`): the hull of §4 (a dart
+  until it loads) + name label (GUI, always visible, like `Claude-1` callouts in
+  the mockup) + short trail. Modes: `patrol` outside the last orbit and the
+  belt; on `build` → `flyto` (`AUR.MOTION.flyToSeconds`, arcing over the belt
+  and the largest planet) to a standoff beside the `bucket` planet → `hold`
+  (~2.4s, a thin emissive beam, planet pulses 1 → 1.15 → 1) → `return` to the
+  ring (`AUR.MOTION.returnSeconds`). On `build` with `isNew: true`: re-fetch
   `AU.getSystem`, grow the new planet in from zero, feed shows planet formation.
   On `activity`: brief thruster flash.
 - Project card (top-left, panel): `PROJECT: <NAME>`; rows: `STATE` (any ship
@@ -382,7 +395,7 @@ Data: `AU.getSystem(projectId)`.
   `Open Folder` button → `AU.openProject(id)` and a LIVE-only `Open Terminal`
   button → `AU.openTerminal(id)` (both hidden when `exists` is false). History
   replay keeps the terminal action visible but disabled. The renderer supplies
-  only the project ID, or the exact ship ID from the first-person cockpit; main
+  only the project ID, or the exact ship ID from the agent-focus overlay; main
   resolves and revalidates the live working directory and session. A project with
   one live agent focuses that session, several agents require selecting a ship,
   and a dormant project opens a new shell. Unavailable session terminals report

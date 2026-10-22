@@ -20,7 +20,7 @@ function loadShipAssetFiles(context) {
 
 const providerKey = (value) => value === 'codex' ? 'codex' :
   value === 'signal' ? 'generic' : 'claude';
-const colors = { claude: '#b026ff', codex: '#2f7dff', generic: '#94a3b8' };
+const colors = { claude: '#d97757', codex: '#f2f0ea', generic: '#94a3b8' };
 
 // The AUR helpers ship-assets reads. Each test brings its own Color class and ship marker.
 function fakeAur({ Color, markShipMesh }) {
@@ -36,6 +36,8 @@ function fakeAur({ Color, markShipMesh }) {
     shipColor(ship) { return ship && ship.local === true ? '#ff3344' : colors[providerKey(ship && ship.provider)]; },
     color3(hex) { return new Color(hex); },
     isNodeDisposed(node) { return !node || node.isDisposed(); },
+    SHIP_LAYER: 0x10000000,
+    nodeFamily(node) { return !node ? [] : typeof node.getChildMeshes === 'function' ? [node, ...node.getChildMeshes(false)] : [node]; },
     markShipMesh,
   };
 }
@@ -46,7 +48,7 @@ test('index.html loads every ship-assets file, the core first', () => {
   assert.deepEqual([...SHIP_ASSET_FILES].sort(), onDisk);
 });
 
-test('shared hulls receive fixed provider palettes while signals and drones load no models', async () => {
+test('shared hulls receive fixed provider palettes; a signal loads no model and a drone flies its family hull', async () => {
   let containerLoads = 0;
   let materialClones = 0;
   const instantiatedMeshes = [];
@@ -171,18 +173,18 @@ test('shared hulls receive fixed provider palettes while signals and drones load
   const codexFallback = fallback('codex-a');
   const claude = await AUR.ships.upgrade(scene, {
     id: 'claude-a', provider: 'claude', project: 'project-1',
-  }, claudeFallback, 1);
+  }, claudeFallback);
   const codex = await AUR.ships.upgrade(scene, {
     id: 'codex-a', provider: 'codex', project: 'project-1',
-  }, codexFallback, 1);
+  }, codexFallback);
 
   assert.equal(containerLoads, 1);
   assert.equal(materialClones, 2);
   assert.notEqual(claude.material, codex.material);
-  assert.equal(claude.material.emissiveColor.toHexString(), '#b026ff');
-  assert.equal(codex.material.emissiveColor.toHexString(), '#2f7dff');
-  assert.equal(claude.metadata.providerTint, '#b026ff');
-  assert.equal(codex.metadata.providerTint, '#2f7dff');
+  assert.equal(claude.material.emissiveColor.toHexString(), '#d97757');
+  assert.equal(codex.material.emissiveColor.toHexString(), '#f2f0ea');
+  assert.equal(claude.metadata.providerTint, '#d97757');
+  assert.equal(codex.metadata.providerTint, '#f2f0ea');
   assert.equal(claudeFallback.metadata.isShip, false);
   assert.equal(codexFallback.metadata.isShip, false);
   assert.ok(instantiatedMeshes.every((mesh) => mesh.isPickable === false));
@@ -191,13 +193,14 @@ test('shared hulls receive fixed provider palettes while signals and drones load
   const droneFallback = fallback('drone-a');
   assert.equal(await AUR.ships.upgrade(scene, {
     id: 'signal-a', provider: 'signal', project: 'project-1',
-  }, signalFallback, 1), null);
-  assert.equal(await AUR.ships.upgrade(scene, {
+  }, signalFallback), null);
+  const drone = await AUR.ships.upgrade(scene, {
     id: 'drone-a', provider: 'codex', kind: 'drone', project: 'project-1',
-  }, droneFallback, 1), null);
-  assert.equal(containerLoads, 1, 'signals and drones do not request model containers');
+  }, droneFallback);
+  assert.equal(containerLoads, 1, 'a signal requests no model; a drone shares its family container');
   assert.equal(signalFallback.metadata.isShip, true);
-  assert.equal(droneFallback.metadata.isShip, true);
+  assert.notEqual(drone, null, 'a drone flies its family hull');
+  assert.equal(droneFallback.metadata.isShip, false);
 });
 
 // ---------- rank ladder, LODs and in-place refresh ----------
@@ -364,19 +367,19 @@ test('main ships take the highest rank their build count has reached', async () 
   const scene = assets.scene('system');
   const ranks = [];
   for (const builds of [0, 2, 3, 9, 10, 500, undefined]) {
-    ranks.push(hullId(await assets.ships.upgrade(scene, ship('s' + builds, builds), assets.fallback('s' + builds), 1)));
+    ranks.push(hullId(await assets.ships.upgrade(scene, ship('s' + builds, builds), assets.fallback('s' + builds))));
   }
   assert.deepEqual(ranks, ['small', 'small', 'mid', 'mid', 'big', 'big', 'small']);
-  assert.equal(await assets.ships.upgrade(scene, ship('d', 50, { kind: 'drone' }), assets.fallback('d'), 1), null);
+  assert.equal(hullId(await assets.ships.upgrade(scene, ship('d', 50, { kind: 'drone' }), assets.fallback('d'))), 'small', 'a drone flies the first rank at any build count');
   assert.ok(!assets.loads.some((file) => file.startsWith('escort')), 'the reserved escort is never a rank');
 });
 
 test('the universe instances far hulls from one template per provider; other views clone near hulls', async () => {
   const assets = loadShipAssets(LADDER_MANIFEST, {});
   const universe = assets.scene('universe');
-  const first = await assets.ships.upgrade(universe, ship('a', 0), assets.fallback('a'), 1);
-  const second = await assets.ships.upgrade(universe, ship('b', 0), assets.fallback('b'), 1);
-  const codex = await assets.ships.upgrade(universe, ship('c', 0, { provider: 'codex' }), assets.fallback('c'), 1);
+  const first = await assets.ships.upgrade(universe, ship('a', 0), assets.fallback('a'));
+  const second = await assets.ships.upgrade(universe, ship('b', 0), assets.fallback('b'));
+  const codex = await assets.ships.upgrade(universe, ship('c', 0, { provider: 'codex' }), assets.fallback('c'));
   assert.deepEqual(assets.loads, ['small-far.glb']);
   for (const root of [first, second, codex]) {
     const parts = root.getChildMeshes(false).filter((mesh) => mesh.material);
@@ -388,13 +391,13 @@ test('the universe instances far hulls from one template per provider; other vie
   const sources = (root) => root.getChildMeshes(false).filter((mesh) => mesh.sourceMesh).map((mesh) => mesh.sourceMesh);
   assert.deepEqual(sources(first), sources(second), 'one template per provider');
   assert.notDeepEqual(sources(first), sources(codex));
-  assert.equal(first.material.emissiveColor.toHexString(), '#b026ff');
-  assert.equal(codex.material.emissiveColor.toHexString(), '#2f7dff');
+  assert.equal(first.material.emissiveColor.toHexString(), '#d97757');
+  assert.equal(codex.material.emissiveColor.toHexString(), '#f2f0ea');
   const hull = first.getChildMeshes(false).find((mesh) => mesh.material && mesh.material.name.includes('hull_primary'));
   assert.ok(hull.material.emissiveColor.r > 0, 'far hulls carry a faint self-light on the unlit map');
 
   const system = assets.scene('system');
-  const near = await assets.ships.upgrade(system, ship('a', 0), assets.fallback('a'), 1);
+  const near = await assets.ships.upgrade(system, ship('a', 0), assets.fallback('a'));
   assert.equal(assets.loads.at(-1), 'small-near.glb');
   assert.ok(near.getChildMeshes(false).every((mesh) => !(mesh instanceof assets.InstancedMesh)));
   const nearHull = near.getChildMeshes(false).find((mesh) => mesh.material && mesh.material.name.includes('hull_primary'));
@@ -404,11 +407,11 @@ test('the universe instances far hulls from one template per provider; other vie
 test('a scene that has not declared its view loads nothing until upgrade, which defaults to far', async () => {
   const assets = loadShipAssets(LADDER_MANIFEST, {});
   const scene = assets.scene(null);
-  await assets.ships.upgrade(scene, ship('warm', 0), assets.fallback('warm'), 1); // settles the manifest
+  await assets.ships.upgrade(scene, ship('warm', 0), assets.fallback('warm')); // settles the manifest
   assets.loads.length = 0;
   assert.equal(assets.ships.instantiate(scene, ship('a', 0)), null);
   assert.deepEqual(assets.loads, [], 'instantiate starts no load before the view is known');
-  const root = await assets.ships.upgrade(scene, ship('a', 0), assets.fallback('a'), 1);
+  const root = await assets.ships.upgrade(scene, ship('a', 0), assets.fallback('a'));
   assert.equal(root.metadata.assetLod, 'far');
   scene.metadata = { view: 'planet' };
   assert.equal(assets.ships.instantiate(scene, ship('b', 0)), null, 'first sight of a file only starts its load');
@@ -421,21 +424,21 @@ test('refresh swaps the hull inside the same root and keeps the fallback valid',
   const assets = loadShipAssets(LADDER_MANIFEST, {});
   const scene = assets.scene('system');
   const fallback = assets.fallback('a');
-  const root = await assets.ships.upgrade(scene, ship('a', 0), fallback, 1.1);
+  const root = await assets.ships.upgrade(scene, ship('a', 0), fallback);
   const firstCorrection = root.children[0];
   assert.equal(firstCorrection.scaling.x, 0.2);
 
   assert.equal(await assets.ships.refresh(scene, ship('a', 2)), null, 'same rank: nothing to do');
   assert.equal(await assets.ships.refresh(scene, ship('a', 4)), root);
   assert.equal(root.parent, fallback);
-  assert.equal(root.scaling.x, 1.1, 'the scene-owned display scale is untouched');
+  assert.equal(root.scaling.x, 1, 'the hull sits at unit scale; the dart root carries the display scale');
   assert.equal(hullId(root), 'mid');
   assert.equal(root.metadata.isShip, true);
   assert.equal(fallback.metadata.upgradedHullId, 'mid');
   assert.equal(firstCorrection.disposed, true);
   assert.equal(root.children.length, 1);
   assert.equal(root.children[0].scaling.x, 0.3, 'class display size lives on the correction node');
-  assert.equal(root.material.emissiveColor.toHexString(), '#b026ff');
+  assert.equal(root.material.emissiveColor.toHexString(), '#d97757');
 
   assert.equal(await assets.ships.refresh(scene, ship('unknown', 50)), null);
   root.dispose();
@@ -445,8 +448,8 @@ test('refresh swaps the hull inside the same root and keeps the fallback valid',
 test('refresh re-tints a ship that turns out to run a local model, keeping its hull', async () => {
   const assets = loadShipAssets(LADDER_MANIFEST, {});
   const scene = assets.scene('system');
-  const root = await assets.ships.upgrade(scene, ship('a', 0), assets.fallback('a'), 1);
-  assert.equal(root.material.emissiveColor.toHexString(), '#b026ff');
+  const root = await assets.ships.upgrade(scene, ship('a', 0), assets.fallback('a'));
+  assert.equal(root.material.emissiveColor.toHexString(), '#d97757');
   assert.equal(await assets.ships.refresh(scene, ship('a', 0, { local: true })), root);
   assert.equal(hullId(root), 'small', 'same rank, new colors');
   assert.equal(root.material.emissiveColor.toHexString(), '#ff3344');
@@ -457,7 +460,7 @@ test('refresh re-tints a ship that turns out to run a local model, keeping its h
 test('refresh waits while focus mode fades the ship and only applies the latest request', async () => {
   const assets = loadShipAssets(LADDER_MANIFEST, {});
   const scene = assets.scene('system');
-  const root = await assets.ships.upgrade(scene, ship('a', 0), assets.fallback('a'), 1);
+  const root = await assets.ships.upgrade(scene, ship('a', 0), assets.fallback('a'));
   for (const mesh of root.getChildMeshes(false)) mesh.visibility = 0.16;
   assert.equal(await assets.ships.refresh(scene, ship('a', 10)), null);
   assert.equal(hullId(root), 'small');
@@ -475,21 +478,21 @@ test('refresh waits while focus mode fades the ship and only applies the latest 
 
 test('the triangle budget steps near hulls down to far before falling back to the dart', async () => {
   const assets = loadShipAssets(LADDER_MANIFEST, {
-    'small-near.glb': 40000, 'small-far.glb': 15000, 'mid-near.glb': 60000, 'mid-far.glb': 20000,
+    'small-near.glb': 160000, 'small-far.glb': 60000, 'mid-near.glb': 240000, 'mid-far.glb': 80000, // a 400k budget
   });
   const scene = assets.scene('system');
   const lods = [];
   const roots = [];
   for (const id of ['a', 'b', 'c', 'd']) {
-    const root = await assets.ships.upgrade(scene, ship(id, 0), assets.fallback(id), 1);
+    const root = await assets.ships.upgrade(scene, ship(id, 0), assets.fallback(id));
     roots.push(root);
     lods.push(root ? root.metadata.assetLod : 'dart');
   }
   assert.deepEqual(lods, ['near', 'near', 'far', 'dart']);
   roots[0].dispose();
-  const freed = await assets.ships.upgrade(scene, ship('e', 0), assets.fallback('e'), 1);
+  const freed = await assets.ships.upgrade(scene, ship('e', 0), assets.fallback('e'));
   assert.equal(freed.metadata.assetLod, 'near', 'a disposed hull returns its triangles');
-  // 40k + 15k + 40k are in use: the 60k near hull of the next rank does not
+  // 160k + 60k + 160k are in use: the 240k near hull of the next rank does not
   // fit, so the promoted ship takes that rank's far file.
   assert.equal(await assets.ships.refresh(scene, ship('b', 3)), roots[1]);
   assert.equal(hullId(roots[1]), 'mid');

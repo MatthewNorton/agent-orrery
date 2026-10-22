@@ -1,4 +1,4 @@
-// First-person focus support: fades the other ships and hides every ship's
+// Agent focus support: fades the other ships and hides every ship's
 // labels while one is followed, and restores them after.
 // The focus camera itself lives in scene/system/view.js.
 'use strict';
@@ -10,7 +10,7 @@
     const { ships } = view;
 
     function recordVisualNodes(rec) {
-      const nodes = [rec.mesh, ...rec.mesh.getChildMeshes(false)];
+      const nodes = AUR.nodeFamily(rec.mesh);
       if (!nodes.includes(rec.trail)) nodes.push(rec.trail);
       return nodes;
     }
@@ -22,8 +22,12 @@
       return saved.get(rec.id);
     }
 
-    function applyShipFocusVisual(rec, visibility) {
-      if (!view.shipFocus) return;
+    // What focus mode shows of a ship: the focused one in full from outside, hidden from inside
+    // (the viewer sits in it), every other ship faded.
+    function applyShipFocusVisual(rec) {
+      const { shipFocus } = view;
+      if (!shipFocus) return;
+      const visibility = rec.id !== shipFocus.shipId ? 0.16 : shipFocus.exterior ? 1 : 0;
       const saved = savedVisibilities(rec);
       for (const node of recordVisualNodes(rec)) {
         if (!saved.has(node)) saved.set(node, node.visibility);
