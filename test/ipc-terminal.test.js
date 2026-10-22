@@ -172,3 +172,89 @@ test('reset clears an in-flight launch and the cooldown', async (t) => {
   launcher.next = null;
   assert.deepEqual(await terminal.handleOpenTerminal(event, 'alpha'), { ok: true }, 'flight cleared');
 });
+
+function addSession(ctx, dir, session, provider = 'claude', extra = {}) {
+  const id = provider === 'claude' ? `ship:alpha:${session}` : `ship:${provider}:${session}`;
+  const ship = { id, name: session, project: 'alpha', provider, kind: 'main', ...extra };
+  ctx.tracker.ships.set(id, ship);
+  ctx.tracker.files ||= new Map();
+  ctx.tracker.files.set(path.join(dir, `${session}.jsonl`), { project: 'alpha', session, provider });
+  ctx.tracker.model = { claudeProjectsDir: path.join(dir, '.claude', 'projects') };
+  return ship;
+}
+
+test('focuses the sole live session instead of opening a fresh terminal', async (t) => {
+  const { ctx, terminal, launcher, dir, event } = terminalCtx(t);
+  const ship = addSession(ctx, dir, 'first');
+  const focused = [];
+  ctx.terminalFocus = { focus: async (request) => { focused.push(request); return { ok: true }; } };
+  assert.deepEqual(await terminal.handleOpenTerminal(event, 'alpha'), { ok: true });
+  assert.equal(launcher.requests.length, 0);
+  assert.deepEqual(focused, [{ cwd: dir, provider: 'claude', sessionId: ship.name,
+    transcriptPath: path.join(dir, 'first.jsonl'), registryDirectory: path.join(dir, '.claude', 'sessions') }]);
+});
+
+test('two agents in the same project require a selection and the exact ship selects its own session', async (t) => {
+  const { ctx, terminal, launcher, dir, event } = terminalCtx(t);
+  addSession(ctx, dir, 'first');
+  const second = addSession(ctx, dir, 'second', 'codex');
+  const focused = [];
+  ctx.terminalFocus = { focus: async (request) => { focused.push(request); return { ok: true }; } };
+  assert.deepEqual(await terminal.handleOpenTerminal(event, 'alpha'), { ok: false, code: 'AMBIGUOUS' });
+  assert.equal(focused.length, 0);
+  assert.deepEqual(await terminal.handleOpenTerminal(event, second.id), { ok: true });
+  assert.equal(focused[0].sessionId, 'second');
+  assert.equal(focused[0].provider, 'codex');
+  assert.equal(focused[0].registryDirectory, null);
+  assert.equal(launcher.requests.length, 0);
+});
+
+test('a drone targets its parent session, and missing parents or sessions never open a shell', async (t) => {
+  const { ctx, terminal, launcher, dir, event } = terminalCtx(t);
+  const parent = addSession(ctx, dir, 'parent');
+  const drone = { id: 'drone:tool-use', name: 'drone', project: 'alpha', provider: 'claude',
+    kind: 'drone', parentName: parent.name };
+  ctx.tracker.ships.set(drone.id, drone);
+  const focused = [];
+  ctx.terminalFocus = { focus: async (request) => { focused.push(request); return { ok: false, code: 'TERMINAL_NOT_FOUND' }; } };
+  assert.deepEqual(await terminal.handleOpenTerminal(event, drone.id), { ok: false, code: 'TERMINAL_NOT_FOUND' });
+  assert.equal(focused[0].sessionId, 'parent');
+  ctx.tracker.ships.delete(parent.id);
+  assert.deepEqual(await terminal.handleOpenTerminal(event, drone.id), { ok: false, code: 'TERMINAL_NOT_FOUND' });
+  assert.deepEqual(await terminal.handleOpenTerminal(event, 'alpha'), { ok: false, code: 'TERMINAL_NOT_FOUND' });
+  assert.equal(focused.length, 1);
+  assert.equal(launcher.requests.length, 0);
+});
+
+test('stale, replay, spoofed, and unsupported session targets cannot invoke a terminal', async (t) => {
+  const { ctx, terminal, launcher, dir, event } = terminalCtx(t);
+  const ship = addSession(ctx, dir, 'first');
+  ctx.terminalFocus = { focus() { assert.fail('must not focus'); } };
+  assert.deepEqual(await terminal.handleOpenTerminal(untrustedEvent(ctx.win), ship.id), { ok: false, code: 'INVALID' });
+  assert.deepEqual(await terminal.handleOpenTerminal(event, { pid: 123, cwd: dir }), { ok: false, code: 'INVALID' });
+  ctx.activeSource = ctx.replaySource;
+  assert.deepEqual(await terminal.handleOpenTerminal(event, ship.id), { ok: false, code: 'REPLAY' });
+  ctx.activeSource = ctx.tracker;
+  ctx.tracker.files.clear();
+  assert.deepEqual(await terminal.handleOpenTerminal(event, ship.id), { ok: false, code: 'TERMINAL_NOT_FOUND' });
+  ctx.tracker.files.set('\\\\server\\share\\session.jsonl', { provider: 'claude', project: 'alpha', session: 'first' });
+  assert.deepEqual(await terminal.handleOpenTerminal(event, ship.id), { ok: false, code: 'TERMINAL_NOT_FOUND' });
+  ctx.tracker.ships.clear();
+  assert.deepEqual(await terminal.handleOpenTerminal(event, ship.id), { ok: false, code: 'NOT_FOUND' });
+  const signal = addSession(ctx, dir, 'signal', 'signal');
+  assert.deepEqual(await terminal.handleOpenTerminal(event, signal.id), { ok: false, code: 'TERMINAL_NOT_FOUND' });
+  assert.equal(launcher.requests.length, 0);
+});
+
+test('focus requests share the same in-flight and cooldown guard as shell launches', async (t) => {
+  const { ctx, terminal, launcher, dir, event } = terminalCtx(t);
+  const ship = addSession(ctx, dir, 'first');
+  const pending = deferred();
+  ctx.terminalFocus = { focus: () => pending.promise };
+  const first = terminal.handleOpenTerminal(event, ship.id);
+  assert.deepEqual(await terminal.handleOpenTerminal(event, 'alpha'), { ok: false, code: 'BUSY' });
+  pending.resolve({ ok: true });
+  assert.deepEqual(await first, { ok: true });
+  assert.deepEqual(await terminal.handleOpenTerminal(event, ship.id), { ok: false, code: 'BUSY' });
+  assert.equal(launcher.requests.length, 0);
+});

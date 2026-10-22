@@ -61,7 +61,7 @@
     });
     els.terminal.addEventListener('click', () => {
       const ship = S.store.ships.get(S.agentFocus.shipId);
-      if (ship) A.requestProjectTerminal(ship.project);
+      if (ship) A.requestProjectTerminal(ship.project, ship.id);
     });
     document.addEventListener('keydown', (event) => {
       if (event.key !== 'Escape' || !S.agentFocus.shipId) return;
@@ -206,7 +206,7 @@
     els.project.textContent = A.projectName(ship.project);
     els.folder.disabled = !project || project.exists === false;
 
-    const presentation = A.projectControlPresentation(ship.project);
+    const presentation = A.projectControlPresentation(ship.project, ship.id);
     els.terminal.textContent = presentation.buttonText;
     els.terminal.disabled = presentation.disabled;
     els.terminal.setAttribute('aria-busy', String(presentation.busy));

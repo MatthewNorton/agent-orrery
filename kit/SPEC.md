@@ -6,8 +6,9 @@ streams one normalized event vocabulary to three Babylon.js views over a
 context-isolated bridge. An independent read-only replay source can reconstruct
 that same vocabulary from bounded historical ranges. Passive observation does
 not launch or own agent processes. Two explicit LIVE-only controls sit outside
-that boundary: Open Terminal opens the host terminal (Windows Terminal on
-Windows, Terminal.app on macOS) without starting an agent,
+that boundary: Open Terminal focuses the selected live agent's existing terminal
+(Windows Terminal/classic console on Windows, Terminal.app on macOS). Only dormant
+projects open a fresh shell; no agent is started by this action,
 while the global IDEAS queue can assign a tagged goal to a trusted project and
 start Codex for that exact task.
 
@@ -85,8 +86,8 @@ AU.getSystem(projectId)          -> Promise<SystemData | null>
 AU.getPlanet(projectId, name)    -> Promise<PlanetData | null>
 AU.openProject(projectId)        -> Promise<void>   // opens folder in Explorer
 AU.openExternal(url)             -> Promise          // only https://github.com/<owner>/<repo>
-AU.openTerminal(projectId)       -> Promise<{ok:Boolean, code?:String}>
-                                   // LIVE-only host terminal request (win32/darwin)
+AU.openTerminal(targetId)        -> Promise<{ok:Boolean, code?:String}>
+                                   // LIVE-only project or ship ID (win32/darwin)
 AU.onEvents(cb)                  // cb(eventBatch: Event[], {streamEpoch, mode})
 AU.replay({ action, ts?, speed? }) -> Promise<{playback, streamEpoch, snapshot?}>
 AU.onReplayState(cb)             // bounded playback progress/status updates
@@ -381,7 +382,11 @@ Data: `AU.getSystem(projectId)`.
   `Open Folder` button → `AU.openProject(id)` and a LIVE-only `Open Terminal`
   button → `AU.openTerminal(id)` (both hidden when `exists` is false). History
   replay keeps the terminal action visible but disabled. The renderer supplies
-  only the project ID; main resolves and revalidates the live working directory.
+  only the project ID, or the exact ship ID from the first-person cockpit; main
+  resolves and revalidates the live working directory and session. A project with
+  one live agent focuses that session, several agents require selecting a ship,
+  and a dormant project opens a new shell. Unavailable session terminals report
+  failure without opening a substitute shell. Drones use their known parent.
   (The mockup shows a fake progress %; we deliberately show honest metrics in
   the same visual style.)
 - TASKS panel (system view only, below the project card): reads the trusted
@@ -461,8 +466,8 @@ screenshots plus bounded `result.json`. It never reads the real profile.
 
 Item-07 adds `electron . --control-test --control-output=<dir>`. It owns an
 isolated live/history fixture and an injected recording launcher, drives the
-real project/history controls at 1200×720, proves LIVE-only behavior and safe
-fixed Windows Terminal arguments, and writes two screenshots plus a bounded
+real project/history controls at 1200×720, proves LIVE-only behavior, exact session
+targeting and safe Windows Terminal fallback arguments, and writes two screenshots plus a bounded
 `result.json`. It never reads the real profile or opens a real terminal.
 
 ## 9. Performance guardrails

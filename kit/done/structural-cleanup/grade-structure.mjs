@@ -116,9 +116,9 @@ else {
     if (!/require\(['"]\.\/provider-adapters['"]\)/.test(ps)) fail('T4', 'path-safety.js must re-export from ./provider-adapters');
     if (/^\s*import\s/m.test(ps)) fail('T4', 'path-safety.js must be CommonJS');
   }
-  for (const rel of ['src/main/agent-launcher.js', 'src/main/terminal-launcher.js']) {
+  for (const rel of ['src/main/agent-launcher.js', 'src/main/terminal/launcher.js']) {
     const src = read(rel);
-    if (!/require\(['"]\.\/path-safety['"]\)/.test(src)) fail('T4', `${rel} does not require ./path-safety`);
+    if (!/require\(['"]\.\.?\/path-safety['"]\)/.test(src)) fail('T4', `${rel} does not require path-safety`);
     for (const name of HELPERS) {
       if (new RegExp(`^\\s*function\\s+${name}\\s*\\(`, 'm').test(src)) fail('T4', `${rel} still defines ${name} locally`);
     }

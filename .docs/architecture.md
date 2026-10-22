@@ -110,7 +110,7 @@ Start here when you want to change something. Paths under "Main process" are rel
 | **Claude / Codex / Signal providers** | `provider-adapters.js`, `live/claude-source.js`, `live/codex-source.js`, `live/signal-source.js`, `live/claude-records.js`, `live/provider-records.js` | push `events` | `util.js` (`PROVIDERS`, colours), `ship-assets*.js` (hulls) | `providers.json` (Signal config, read-only) | `grade-providers.mjs` |
 | **Needs-attention + desktop notifications** | `live/attention.js` `classifyAttention` | `ship-updated` events | `app/store.js` `maybeNotifyAttention`, `app/chrome.js` agent list, halos in scenes | — | `grade-attention.mjs` |
 | **History playback (scrubber)** | `replay-source.js` façade over `history/`, `replay-control.js` | `replay`, push `replay-state` | `app/playback.js` (history bar), `app/replay.js` (epochs, `issueReplay`), `app/history-metrics.js` (test metrics) | nothing (index in memory) | `grade-history.mjs`, `replay-source.test.js` |
-| **Open Terminal** (LIVE only) | `ipc/terminal.js` → `terminal-launcher.js`, `path-safety.js` | `open-terminal` | `app/project/control.js`, `app/agent-focus.js` | — | `grade-control.mjs`, `terminal-launcher.test.js` |
+| **Open Terminal** (LIVE only) | `ipc/terminal.js` → `terminal/` (target, focus, launcher), `path-safety.js` | `open-terminal` | `app/project/control.js`, `app/agent-focus.js` | — | `grade-control.mjs`, `terminal-*.test.js`, `ipc-terminal.test.js` |
 | **Open folder / GitHub link** | `ipc/register.js` (inline handlers) | `open`, `open-external` | `app/project/control.js` | — | — |
 | **Per-project TASKS panel** (`GOALS.md`) | `ipc/tasks.js` → `goals.js` | `tasks-get`, `task-add`, `task-set-done`, `task-remove`, push `tasks-changed` | `app/project/tasks.js` | `<project>/GOALS.md` | `grade-tasks.mjs`, `task-runs.test.js` |
 | **IDEAS queue → start Codex** (LIVE only) | `ipc/root-tasks.js` → `root-task-coordinator.js`, `root-tasks.js`, `task-runs.js`, `agent-launcher.js`, `goals.js` | `root-tasks-get`, `root-task-create/remove/assign/retry`, push `root-tasks-changed` | `app/ideas.js`, `app/ideas-list.js` | `root-tasks.json`, `task-runs.json`, `GOALS.md` | 4 unit test files |
@@ -238,7 +238,8 @@ in a closure, and anything shared is a field of `ctx`.
 | `vcs-status/github-metadata-provider.js` | 301 | factory | Open-PR counts via `gh api graphql` (batches of 25, 5 min cache) | — |
 | `vcs-status/collector.js` | 284 | factories | Runs `git status --porcelain=v2` + remote lookup (4 s timeout) | — |
 | `vcs-status/service.js` | 307 | factory | 15 s cache, ≤4 concurrent reads, merges GitHub data | — |
-| `terminal-launcher.js` | 206 | factory → `{open}` | `wt.exe -d <cwd>` (Windows) or `open -a Terminal` (macOS); Linux unsupported | `path-safety` |
+| `terminal/launcher.js` | 206 | factory → `{open}` | dormant-project shell: `wt.exe -d <cwd>` or `open -a Terminal` | `path-safety` |
+| `terminal/target.js`, `focus.js` | <400 each | live target resolver; factory → `{focus}` | exact session → owning process → Windows console/tab/pane or macOS Terminal TTY; Linux unsupported | fixed native helpers; bounded `process.js` |
 | `project-paths.js` | 162 | functions | Bounded folder search for a moved project (depth 6, 12k dirs, 8 s) | — |
 | `vcs-status/controller.js` | 127 | factory | Tracker events → debounced (400 ms) per-project git refresh | — |
 | `path-safety.js` | 121 | functions | Shared "is this a canonical local path / inside that path" checks, `relativeInside` | `provider-adapters` |
