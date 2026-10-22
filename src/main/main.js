@@ -19,6 +19,7 @@ const { createTerminalIpc } = require('./ipc/terminal');
 const { createTasksIpc } = require('./ipc/tasks');
 const { createRootTasksIpc } = require('./ipc/root-tasks');
 const { createProjectPathsIpc } = require('./ipc/project-paths');
+const { createBackupIpc } = require('./ipc/backup');
 const { registerIpc } = require('./ipc/register');
 
 const flags = readFlags(process.argv);
@@ -29,6 +30,7 @@ ctx.ipc = {
   tasks: createTasksIpc(ctx),
   rootTasks: createRootTasksIpc(ctx),
   projectPaths: createProjectPathsIpc(ctx),
+  backup: createBackupIpc(ctx),
 };
 registerIpc(ctx, { replay: ctx.replay, ...ctx.ipc });
 const driver = createDriver(ctx);

@@ -17,7 +17,10 @@ function registerIpc(ctx, handlers, electron = require('electron')) {
   const {
     handleRootTasksGet, handleRootTaskCreate, handleRootTaskRemove, handleRootTaskAssign, handleRootTaskRetry,
   } = handlers.rootTasks;
-  const { handleProjectPathsScan, handleProjectPathLocate, handleProjectPathApply } = handlers.projectPaths;
+  const {
+    handleProjectPathsScan, handleProjectPathLocate, handleProjectPathApply, handleProjectForget,
+  } = handlers.projectPaths;
+  const { handleUniverseExport, handleUniverseImport } = handlers.backup;
 
   ipcMain.handle('au:snapshot', (event) => (trustedMainFrame(event) ? visibleSnapshot() : null));
   ipcMain.handle('au:open-external', /** @returns {Promise<OpenExternalResult>} */ async (event, url) => {
@@ -61,6 +64,9 @@ function registerIpc(ctx, handlers, electron = require('electron')) {
   ipcMain.handle('au:project-path-apply', (event, projectId, token) => (
     handleProjectPathApply(event, projectId, token)
   ));
+  ipcMain.handle('au:project-forget', (event, projectId) => handleProjectForget(event, projectId));
+  ipcMain.handle('au:universe-export', (event) => handleUniverseExport(event));
+  ipcMain.handle('au:universe-import', (event) => handleUniverseImport(event));
   ipcMain.handle('au:open', (event, id) => {
     if (!trustedMainFrame(event)) return '';
     const p = visibleProject(id);

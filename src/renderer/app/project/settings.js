@@ -1,5 +1,6 @@
 // @ts-check
-// Project path settings (missing-folder recovery).
+// Project path settings (missing-folder recovery, forgetting a missing project). The
+// dialog's backup section is app/project/backup.js.
 'use strict';
 
 /**
@@ -40,6 +41,7 @@
         event.clientY >= rect.top && event.clientY <= rect.bottom;
       if (!inside) closeProjectSettings();
     });
+    A.wireUniverseBackup();
     A.renderProjectSettings();
   };
 
@@ -80,6 +82,7 @@
     S.projectSettings.scanRoot = '';
     S.projectSettings.matches.clear();
     setProjectSettingsStatus('');
+    A.setBackupStatus('');
   }
 
   function finishProjectSettingsClose() {
@@ -120,8 +123,8 @@
       if (!S.projectSettings.open || !S.projectSettings.els) return;
       const els = S.projectSettings.els;
       let target = null;
-      if (kind === 'locate') {
-        target = [...els.projects.querySelectorAll('.settings-locate')].find(
+      if (kind === 'locate' || kind === 'forget') {
+        target = [...els.projects.querySelectorAll(`.settings-${kind}`)].find(
           (button) => button.dataset.projectId === projectId && !button.disabled
         );
       } else if (kind === 'candidate') {
@@ -140,19 +143,20 @@
   }
 
   /**
-   * One folder picker or scan with the dialog busy. Null when refused (busy, not LIVE) or
-   * superseded; a missing or thrown result becomes FAILED.
+   * One folder picker, scan or confirmation with the dialog busy. Null when refused (busy,
+   * not LIVE) or superseded; a missing or thrown result becomes FAILED.
    * @template T
    * @param {string} statusText
    * @param {() => Promise<T>} call
+   * @param {(message: string) => void} [setStatus] where statusText shows
    * @returns {Promise<T | Failure<ProjectPathFailureCode> | null>}
    */
-  async function runSettingsRequest(statusText, call) {
+  async function runSettingsRequest(statusText, call, setStatus = setProjectSettingsStatus) {
     if (S.projectSettings.busy || S.playback.mode !== 'live' || S.replayTransitionPending) return null;
     const owner = S.projectSettings.owner;
     const request = ++S.projectSettings.request;
     S.projectSettings.busy = true;
-    setProjectSettingsStatus(statusText);
+    setStatus(statusText);
     A.renderProjectSettings();
     S.projectSettings.els.close.focus();
     const result = await AUR.settle(call);
@@ -160,6 +164,7 @@
     S.projectSettings.busy = false;
     return result;
   }
+  A.runSettingsRequest = runSettingsRequest;
 
   async function scanForProjectPaths() {
     const result = await runSettingsRequest('Choose a parent folder to scan.', () => AU.projectPathsScan());
@@ -230,6 +235,18 @@
     focusProjectSettingsControl(result.ok !== true ? 'candidate' : 'scan', projectId, token);
   }
 
+  async function forgetMissingProject(project) {
+    const result = await runSettingsRequest(
+      'Confirm in the dialog to forget this project.', () => A.forgetProject(project.id)
+    );
+    if (!result) return;
+    const forgotten = result.ok === true && !result.canceled;
+    if (forgotten) S.projectSettings.matches.delete(project.id);
+    setProjectSettingsStatus(A.forgetResultText(result, A.projectLabel(project)), result.ok !== true);
+    A.renderProjectSettings();
+    focusProjectSettingsControl(forgotten ? 'scan' : 'forget', project.id);
+  }
+
   A.renderProjectSettings = function renderProjectSettings() {
     const els = S.projectSettings.els;
     if (!els || !els.button || !els.count) return;
@@ -252,6 +269,7 @@
       ? 'Return to LIVE before changing project paths.' : S.projectSettings.status;
     els.status.textContent = visibleStatus;
     els.status.classList.toggle('error', !live || S.projectSettings.error);
+    A.renderUniverseBackup(live);
 
     AUR.clear(els.projects);
     if (missingCount === 0) {
@@ -271,10 +289,15 @@
         'div', 'settings-project-path', project.path || 'No recorded folder path'
       ));
       const locate = AUR.button('settings-locate', 'Locate…', () => locateProjectPath(project.id));
-      locate.disabled = S.projectSettings.busy || !live;
-      locate.dataset.projectId = project.id;
-      locate.setAttribute('aria-label', `Locate folder for ${projectName}`);
-      head.append(copy, locate);
+      const forget = AUR.button('settings-forget', 'Forget…', () => forgetMissingProject(project));
+      const buttons = AUR.el('div', 'settings-project-buttons');
+      for (const [button, label] of [[locate, 'Locate folder for'], [forget, 'Forget']]) {
+        button.disabled = S.projectSettings.busy || !live;
+        button.dataset.projectId = project.id;
+        button.setAttribute('aria-label', `${label} ${projectName}`);
+        buttons.appendChild(button);
+      }
+      head.append(copy, buttons);
       row.appendChild(head);
 
       const candidates = S.projectSettings.matches.get(project.id) || [];

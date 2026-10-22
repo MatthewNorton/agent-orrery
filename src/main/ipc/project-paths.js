@@ -5,11 +5,12 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const { scanProjectCandidates, isPathInside } = require('../project-paths');
+const { projectHasShips } = require('../live/ships');
 const guards = require('./guards');
 const { validProjectId } = guards;
 
 /**
- * @import { Failure, ProjectPathFailureCode, ProjectPathRecoveryResult,
+ * @import { Failure, ProjectForgetResult, ProjectPathFailureCode, ProjectPathRecoveryResult,
  *   ProjectPathsScanResult } from '../../types/contract'
  */
 
@@ -26,16 +27,14 @@ function createProjectPathsIpc(ctx, electron = require('electron')) {
   function projectPathFailure(code) {
     const allowed = new Set([
       'INVALID', 'REPLAY', 'BUSY', 'NOT_FOUND', 'NOT_MISSING',
-      'IN_USE', 'EXPIRED', 'FAILED',
+      'IN_USE', 'EXPIRED', 'ACTIVE', 'FAILED',
     ]);
     return { ok: false, code: allowed.has(code) ? code : 'FAILED' };
   }
 
   function projectPathRequestAllowed(event) {
     if (!trustedMainFrame(event)) return projectPathFailure('INVALID');
-    if (!ctx.tracker || ctx.activeSource !== ctx.tracker || ctx.replay.replayBoundaryOperations > 0) {
-      return projectPathFailure('REPLAY');
-    }
+    if (!guards.showingLive(ctx)) return projectPathFailure('REPLAY');
     return null;
   }
 
@@ -225,6 +224,43 @@ function createProjectPathsIpc(ctx, electron = require('electron')) {
     }
   }
 
+  /** @returns {Promise<ProjectForgetResult>} */
+  async function handleProjectForget(event, projectId) {
+    const denied = projectPathRequestAllowed(event);
+    if (denied) return denied;
+    if (!validProjectId(projectId)) return projectPathFailure('INVALID');
+    const project = ctx.tracker.projects.get(projectId);
+    if (!project) return projectPathFailure('NOT_FOUND');
+    if (projectHasShips(ctx.tracker.ships, projectId)) return projectPathFailure('ACTIVE');
+    if (projectPathDialogInFlight) return projectPathFailure('BUSY');
+
+    projectPathDialogInFlight = true;
+    try {
+      // Main asks, so nothing but the user can drop a project's history.
+      const { response } = await dialog.showMessageBox(ctx.win, {
+        type: 'warning',
+        buttons: ['Forget', 'Cancel'],
+        defaultId: 1,
+        cancelId: 1,
+        noLink: true,
+        title: 'Forget project',
+        message: `Forget ${project.name || 'this project'}?`,
+        detail: 'It leaves the map with its build history. Its folder and transcripts stay where ' +
+          'they are, and it comes back as a new system the next time an agent works there.',
+      });
+      if (response !== 0) return { ok: true, canceled: true };
+      const afterConfirmDenied = projectPathRequestAllowed(event);
+      if (afterConfirmDenied) return afterConfirmDenied;
+      ctx.tracker.forgetProject(projectId);
+      revokeProjectPathCandidates(projectId);
+      return { ok: true, canceled: false, ...ctx.replay.restartStream() };
+    } catch (error) {
+      return pathRecoveryError(error);
+    } finally {
+      projectPathDialogInFlight = false;
+    }
+  }
+
   function reset() {
     if (projectPathScanAbort) projectPathScanAbort.abort();
     projectPathScanAbort = null;
@@ -236,6 +272,7 @@ function createProjectPathsIpc(ctx, electron = require('electron')) {
     handleProjectPathsScan,
     handleProjectPathLocate,
     handleProjectPathApply,
+    handleProjectForget,
     revokeProjectPathCandidates,
     reset,
   };

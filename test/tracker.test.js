@@ -15,7 +15,7 @@ const {
 } = require('../src/main/provider-adapters');
 const {
   SEC, MIN, T0, SLUG, CLAUDE_SESSION, CODEX_SESSION, TASK_ID,
-  fnv1a, hex8, appendJsonl, setMtime, createWorld, ofType, claude, codex,
+  fnv1a, hex8, appendJsonl, setMtime, writeState, createWorld, ofType, claude, codex,
 } = require('./support/transcripts');
 
 const SHIP_ID = `ship:${SLUG}:${CLAUDE_SESSION}`;
@@ -34,10 +34,7 @@ const SHIP_KEYS = [
 // `saved` is the projects map of a universe-state.json left by an earlier run.
 function startClaude(t, { mtime = T0, saved } = {}) {
   const world = createWorld(t);
-  if (saved) {
-    fs.mkdirSync(path.dirname(world.statePath), { recursive: true });
-    fs.writeFileSync(world.statePath, JSON.stringify({ projects: saved }));
-  }
+  if (saved) writeState(world.statePath, { projects: saved });
   const file = world.claudeFile();
   appendJsonl(file, [claude.prompt(world.projectDir, mtime)], mtime);
   const live = world.live();
@@ -1013,6 +1010,7 @@ test('saveState()/loadState() round-trip buckets, totals, firstSeen and path ids
     },
     pathIds: { [canonicalProjectPath(dir)]: SLUG },
     pathOverrides: {},
+    forgotten: {},
   });
   assert.deepEqual(fs.readdirSync(path.dirname(world.statePath)), ['universe-state.json'],
     'the temp file is renamed into place');

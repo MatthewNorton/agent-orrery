@@ -167,6 +167,16 @@ function departIdleShips(model, now) {
   }
 }
 
+/**
+ * Whether an agent is working in the project.
+ * @param {LiveModel['ships']} ships
+ * @param {string} projectId
+ */
+function projectHasShips(ships, projectId) {
+  for (const ship of ships.values()) if (ship && ship.project === projectId) return true;
+  return false;
+}
+
 module.exports = {
   ensureShip,
   spawnDrone,
@@ -175,4 +185,5 @@ module.exports = {
   addPending,
   clearPending,
   departIdleShips,
+  projectHasShips,
 };

@@ -2,9 +2,10 @@
 'use strict';
 
 // universe-state.json: every project the app has ever seen, with its path, name, last activity
-// and build counts per folder; which id each project path maps to; and the paths the user
-// recovered by hand. Ships and the feed are never saved. A project stays in the file after its
-// transcripts are pruned: the providers keep those on their own schedule, the universe keeps the file.
+// and build counts per folder; which id each project path maps to; the paths the user
+// recovered by hand; and the projects the user forgot (forgotten.js). Ships and the feed are
+// never saved. A project stays in the file after its transcripts are pruned: the providers keep
+// those on their own schedule, the universe keeps the file.
 
 const fs = require('fs');
 const path = require('path');
@@ -63,17 +64,18 @@ function loadState(statePath) {
 }
 
 /**
+ * universe-state.json as the model stands; backups carry the same shape.
  * @param {LiveModel} model
- * @param {boolean} [throwOnError]
- * @returns {boolean} whether the file was written
+ * @returns {PersistedState}
  */
-function saveState(model, throwOnError = false) {
+function serializeState(model) {
   /** @type {PersistedState} */
   const out = {
     version: STATE_VERSION,
     projects: {},
     pathIds: { ...model.pathIds },
     pathOverrides: { ...model.pathOverrides },
+    forgotten: { ...model.forgotten },
   };
   for (const [id, p] of model.projects) {
     out.projects[id] = {
@@ -81,9 +83,26 @@ function saveState(model, throwOnError = false) {
       buckets: p.buckets, totalBuilds: p.totalBuilds, firstSeen: p.firstSeen,
     };
   }
+  return out;
+}
+
+/**
+ * @param {string} statePath
+ * @param {PersistedState} out
+ */
+function writeState(statePath, out) {
+  fs.mkdirSync(path.dirname(statePath), { recursive: true });
+  writeFileAtomic(statePath, JSON.stringify(out));
+}
+
+/**
+ * @param {LiveModel} model
+ * @param {boolean} [throwOnError]
+ * @returns {boolean} whether the file was written
+ */
+function saveState(model, throwOnError = false) {
   try {
-    fs.mkdirSync(path.dirname(model.statePath), { recursive: true });
-    writeFileAtomic(model.statePath, JSON.stringify(out));
+    writeState(model.statePath, serializeState(model));
     return true;
   } catch (e) {
     if (throwOnError) throw e;
@@ -92,4 +111,4 @@ function saveState(model, throwOnError = false) {
   }
 }
 
-module.exports = { loadState, saveState };
+module.exports = { loadState, serializeState, writeState, saveState };

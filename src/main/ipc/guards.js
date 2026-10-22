@@ -9,4 +9,9 @@ function trustedMainFrame(ctx, event) {
   return isTrustedMainFrame(event, ctx.win, RENDERER_ENTRY_URL);
 }
 
-module.exports = { validProjectId, trustedMainFrame };
+// The live Tracker is what the window shows, and no history seek is crossing over.
+function showingLive(ctx) {
+  return Boolean(ctx.tracker) && ctx.activeSource === ctx.tracker && ctx.replay.replayBoundaryOperations === 0;
+}
+
+module.exports = { validProjectId, trustedMainFrame, showingLive };

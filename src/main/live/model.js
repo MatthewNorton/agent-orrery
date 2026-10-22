@@ -9,6 +9,7 @@ const { createHistogram } = require('../shared/build-histogram');
 const os = require('os');
 const path = require('path');
 const { loadState } = require('./state-file');
+const { loadForgotten } = require('./forgotten');
 
 /**
  * @import { AUEvent } from '../../types/contract'
@@ -63,6 +64,8 @@ function createLiveModel(statePath, options, publish) {
     persisted,
     pathIds: Object.assign(Object.create(null), persisted.pathIds || {}),
     pathOverrides,
+    forgotten: loadForgotten(persisted),
+    forgottenSlugs: new Map(),
     projectPathIndex: new Map(),
     codexTailsBySession: new Map(),
     codexMetaCache: new Map(),

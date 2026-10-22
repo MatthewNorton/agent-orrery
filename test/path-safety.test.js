@@ -171,6 +171,15 @@ test('path-safety exports the shared classifier and re-exports the project-path 
   assert.equal(pathSafety.canonicalProjectPath, canonicalProjectPath);
 });
 
+test('localAbsolutePath normalizes a local absolute path and refuses UNC, device and relative ones', () => {
+  const { localAbsolutePath } = pathSafety;
+  for (const bad of ['\\\\server\\share', '//server/share', '\\\\?\\C:\\x', 'C://?/x', 'rel/p', 'C:x', '', null, 7]) {
+    assert.equal(localAbsolutePath(bad), null, String(bad));
+  }
+  const local = process.platform === 'win32' ? 'C:/Work/a/../b' : '/work/a/../b';
+  assert.equal(localAbsolutePath(local), path.normalize(local));
+});
+
 test('relativeInside ignores case only under a Windows-style root and keeps the file\'s casing', () => {
   const { relativeInside, ignoresCase } = pathSafety;
   assert.equal(relativeInside('C:\\Work\\Demo', 'c:/work/demo/Docs/Guide.md', { separator: '/' }), 'Docs/Guide.md');

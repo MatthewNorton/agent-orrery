@@ -58,6 +58,18 @@ function isAbsolutePosixPath(value) {
     path.posix.normalize(value) === value;
 }
 
+/**
+ * A path the app may stat or open, normalized: absolute and on a local disk. Null for UNC and
+ * device paths (see isLocalProjectPath), relative paths and non-strings.
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+function localAbsolutePath(value) {
+  if (typeof value !== 'string' || !isLocalProjectPath(value)) return null;
+  const normalized = path.normalize(value);
+  return isLocalProjectPath(normalized) && path.isAbsolute(normalized) ? normalized : null;
+}
+
 /** candidate equals or lies beneath root; both canonical and of the same flavor. */
 function isInsidePath(root, candidate) {
   if (!isCanonicalPath(root) || !isCanonicalPath(candidate)) return false;
@@ -112,6 +124,7 @@ module.exports = {
   isCanonicalPath,
   isCanonicalPathFor,
   isAbsolutePosixPath,
+  localAbsolutePath,
   isInsidePath,
   ignoresCase,
   relativeInside,

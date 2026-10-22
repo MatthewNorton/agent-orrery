@@ -53,6 +53,24 @@ test('requires an absolute state path and creates normalized public records', ()
   });
 });
 
+test('creates many ideas in one write, skipping queued, repeated and invalid text', () => {
+  withTempStore(({ statePath }) => {
+    const uuids = [TASK_ID, OTHER_ID, '323e4567-e89b-42d3-a456-426614174000'];
+    let renames = 0;
+    const fsImpl = { ...fs, renameSync(from, to) { renames++; return fs.renameSync(from, to); } };
+    const store = makeStore(statePath, { fsImpl, randomUUID: () => uuids.shift() });
+    store.create('first');
+    renames = 0;
+
+    const created = store.createMany([' first ', 'second', 'second', '', 'agent-universe:x', 'third']);
+    assert.deepEqual(created.map((item) => [item.text, item.phase]), [['second', 'idea'], ['third', 'idea']]);
+    assert.equal(renames, 1);
+    assert.deepEqual(makeStore(statePath).list().map((item) => item.text), ['first', 'second', 'third']);
+    assert.deepEqual(store.createMany(['first']), []);
+    assert.equal(renames, 1, 'nothing new, nothing written');
+  });
+});
+
 test('rejects invalid text, IDs, clocks, and project IDs', () => {
   withTempStore(({ statePath }) => {
     const invalidText = ['', '   ', 'two\nlines', 'trailing newline\n', '\tleading tab',

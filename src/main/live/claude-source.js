@@ -10,9 +10,10 @@ const { canonicalProjectPath, isLocalProjectPath } = require('../provider-adapte
 const { pushFeed } = require('./events');
 const { ACTIVE_WINDOW_MS, HOT_WINDOW_MS } = require('./model');
 const {
-  createProject, adoptProjectPath, updateProjectExists, preferredProjectPath,
+  createProject, adoptProjectPath, updateProjectExists, preferredProjectPath, projectIdAtPath,
 } = require('./projects');
 const { ensureShip } = require('./ships');
+const { stillForgotten } = require('./forgotten');
 
 /** @import { LiveModel, LiveTail } from '../../types/live-model' */
 
@@ -55,11 +56,19 @@ function scanClaude(model, isStartup) {
       if (st.mtimeMs > newest) { newest = st.mtimeMs; newestFile = fp; }
     }
 
+    // A forgotten project's folder is skipped before its head is read again.
+    if (!project && stillForgotten(model, model.forgottenSlugs.get(slug) || slug, newest)) continue;
+
     if (!project || (!project.path && newest > project.lastActivity)) {
       const discoveredPath = newestFile ? readCwd(newestFile) : null;
       const pathKey = canonicalProjectPath(discoveredPath);
-      const mappedId = pathKey && (model.projectPathIndex.get(pathKey) || model.pathIds[pathKey]);
+      const mappedId = projectIdAtPath(model, pathKey);
       if (mappedId) project = model.projects.get(mappedId);
+      const forgotten = !project && stillForgotten(model, mappedId || slug, newest);
+      if (forgotten) {
+        model.forgottenSlugs.set(slug, forgotten);
+        continue;
+      }
       const projectId = project ? project.id : (mappedId || slug);
       const projPath = preferredProjectPath(model, projectId, discoveredPath);
       if (!project) {
@@ -106,7 +115,11 @@ function scanClaude(model, isStartup) {
  */
 function claudeTail(model, fp, projectId, size, isStartup) {
   const known = model.claudeTails.get(fp);
-  if (known && known.offset <= size) return known;
+  if (known && known.offset <= size) {
+    // A forgotten project can return under another id.
+    known.project = projectId;
+    return known;
+  }
   const tail = {
     provider: 'claude', project: projectId, session: path.basename(fp, '.jsonl'),
     offset: isStartup ? size : 0, catchup: !isStartup, remainder: '',

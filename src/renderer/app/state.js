@@ -169,8 +169,12 @@
       matches: new Map(),
       status: '',
       error: false,
+      backupStatus: '',
+      backupError: false,
       els: null,
     },
+    // The project card's Forget button.
+    projectForget: { projectId: null, pending: false, note: '' },
     playback: {
       mode: 'live', available: false, indexing: true,
       minTs: null, maxTs: null, cursorTs: null,
