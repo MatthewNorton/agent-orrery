@@ -19,12 +19,12 @@
   "author": "matt",
   "license": "MIT",
   "devDependencies": {
-    "electron": "^44.7.0",
+    "electron": "^44.8.0",
     "typescript": "7.0.2"
   },
   "dependencies": {
-    "babylonjs": "^9.30.0",
-    "babylonjs-gui": "^9.30.0",
-    "babylonjs-loaders": "9.30.0"
+    "babylonjs": "^9.31.0",
+    "babylonjs-gui": "^9.31.0",
+    "babylonjs-loaders": "9.31.0"
   }
 }
