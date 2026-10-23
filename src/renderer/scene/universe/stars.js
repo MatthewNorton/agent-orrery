@@ -245,7 +245,7 @@
     // Each frame: the camera in every galaxy's local frame, and the pixel size of a unit.
     function animateStars() {
       camera.getViewMatrix();
-      const pixelsPerUnit = scene.getEngine().getRenderHeight() / (2 * Math.tan(camera.fov / 2));
+      const pixelsPerUnit = 1 / AUR.unitsPerPixel(scene);
       for (const galaxy of galaxies.values()) {
         const body = galaxy.body;
         if (!body) continue;

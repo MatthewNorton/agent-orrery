@@ -14,6 +14,8 @@ function headingCode(view, pattern) {
   return match[0];
 }
 
+const AUR = { orbitPoint(angle, radius, y, out) { return out.set(Math.cos(angle) * radius, y, Math.sin(angle) * radius); } };
+// The views aim through the shared orbit helper; the heading lines run against this copy of it.
 const R = 10;
 const ORBITS = [];
 for (const speed of [0.3, -0.3]) for (let a = 0; a < 2 * Math.PI; a += 0.7) ORBITS.push({ a, speed });
@@ -24,23 +26,23 @@ const along = ({ a, speed }, [x, z]) => {
 };
 
 test('system view: a patrolling ship faces along its orbit either way round', () => {
-  const look = new Function('r', 'shipLookTarget',
-    headingCode('system', /shipLookTarget\.set\([^;]+\);/));
+  const look = new Function('r', 'shipLookTarget', 'AUR',
+    headingCode('system', /r\.mesh\.lookAt\(AUR\.orbitPoint\([^;]+\);/));
   for (const orbit of ORBITS) {
-    const target = { set(x, y, z) { Object.assign(this, { x, z }); } };
-    look({ ...orbit, r: R }, target);
+    const target = { set(x, y, z) { Object.assign(this, { x, z }); return this; } };
+    look({ ...orbit, r: R, mesh: { lookAt() {} } }, target, AUR);
     const forward = [target.x - Math.cos(orbit.a) * R, target.z - Math.sin(orbit.a) * R];
     assert.ok(along(orbit, forward) > 0.99, `a=${orbit.a.toFixed(1)} speed=${orbit.speed}`);
   }
 });
 
 test('planet view: an orbiting ship faces along its orbit either way round', () => {
-  const look = new Function('r', 'heading',
-    headingCode('planet', /const ahead = [^;]+;\s*r\.mesh\.lookAt\(heading\.set\([^;]+\);/));
+  const look = new Function('r', 'heading', 'AUR',
+    headingCode('planet', /const ahead = [^;]+;\s*r\.mesh\.lookAt\(AUR\.orbitPoint\([^;]+\);/));
   const heading = { set(x, y, z) { return { x, y, z }; } };
   for (const orbit of ORBITS) {
     let target = null;
-    look({ ...orbit, r: R, yoff: 0, mesh: { lookAt: (v) => { target = v; } } }, heading);
+    look({ ...orbit, r: R, yoff: 0, mesh: { lookAt: (v) => { target = v; } } }, heading, AUR);
     const forward = [target.x - Math.cos(orbit.a) * R, target.z - Math.sin(orbit.a) * R];
     assert.ok(along(orbit, forward) > 0.99, `a=${orbit.a.toFixed(1)} speed=${orbit.speed}`);
   }

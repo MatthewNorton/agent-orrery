@@ -20,6 +20,71 @@
   // The universe map has no lights, so far hulls carry a faint tint of their
   // own; without it they read as black cut-outs behind their accent lights.
   const FAR_SELF_LIGHT = 0.1;
+  const ENV_SIZE = 64;
+  const SUN_LENGTH = Math.hypot(0.45, 0.72, 0.5);
+  const SUN = [0.45 / SUN_LENGTH, 0.72 / SUN_LENGTH, -0.5 / SUN_LENGTH]; // the warm spot's direction
+  // A cube face texel (u, v) to its direction, in Babylon's face order (+x, -x, +y, -y, +z, -z).
+  const FACE_DIRECTION = [
+    (u, v) => [1, -v, -u], (u, v) => [-1, -v, u], (u, v) => [u, 1, v],
+    (u, v) => [u, -1, -v], (u, v) => [u, -v, 1], (u, v) => [-u, -v, -1],
+  ];
+  let studioFaces = null; // the six float faces, computed once for the app
+  const environments = new WeakMap();
+
+  // A procedural studio sky for the hulls' reflections: cool light from above, a warm sun spot, dark
+  // below. Built from arrays (no asset, no network); each scene prefilters its own copy for roughness.
+  function studioFace(face) {
+    const data = new Float32Array(ENV_SIZE * ENV_SIZE * 4);
+    const direction = FACE_DIRECTION[face];
+    for (let j = 0; j < ENV_SIZE; j++) {
+      for (let i = 0; i < ENV_SIZE; i++) {
+        const d = direction((i + 0.5) / ENV_SIZE * 2 - 1, (j + 0.5) / ENV_SIZE * 2 - 1);
+        const len = Math.hypot(d[0], d[1], d[2]);
+        const up = d[1] / len;
+        const sky = AUR.clamp((up + 0.1) / 0.7, 0, 1);
+        const ground = AUR.clamp((-up - 0.05) / 0.5, 0, 1);
+        let r = 0.40 + 0.28 * sky - 0.33 * ground;
+        let g = 0.39 + 0.32 * sky - 0.33 * ground;
+        let b = 0.38 + 0.44 * sky - 0.32 * ground;
+        const spot = Math.pow(Math.max(0, (d[0] * SUN[0] + d[1] * SUN[1] + d[2] * SUN[2]) / len), 36);
+        r += spot * 2.4; g += spot * 2.0; b += spot * 1.5;
+        const o = (j * ENV_SIZE + i) * 4;
+        data[o] = r; data[o + 1] = g; data[o + 2] = b; data[o + 3] = 1;
+      }
+    }
+    return data;
+  }
+
+  function shipEnvironment(scene) {
+    let texture = environments.get(scene);
+    if (texture) return texture;
+    studioFaces = studioFaces || FACE_DIRECTION.map((_, face) => studioFace(face));
+    texture = new BABYLON.RawCubeTexture(scene, studioFaces, ENV_SIZE,
+      BABYLON.Constants.TEXTUREFORMAT_RGBA, BABYLON.Constants.TEXTURETYPE_FLOAT, true, false,
+      BABYLON.Constants.TEXTURE_TRILINEAR_SAMPLINGMODE);
+    texture.name = 'ship-studio-env';
+    texture.gammaSpace = false;
+    environments.set(scene, texture);
+    const unfiltered = () => logOnce('env:prefilter', 'Ship environment left unfiltered.');
+    try {
+      const filtering = new BABYLON.HDRFiltering(scene.getEngine(), { quality: BABYLON.Constants.TEXTURE_FILTERING_QUALITY_LOW });
+      const done = filtering.prefilter(texture);
+      if (done && typeof done.catch === 'function') done.catch(unfiltered);
+    } catch (error) {
+      unfiltered();
+    }
+    return texture;
+  }
+
+  // What every fleet material gets in Babylon: the studio reflections, its normal map boosted
+  // (1.6x, so baked seams read at hero distance), and specular anti-aliasing against edge sparkle.
+  function finishFleetMaterial(scene, material, intensity) {
+    if (typeof material.environmentIntensity !== 'number') return;
+    material.reflectionTexture = shipEnvironment(scene);
+    material.environmentIntensity = intensity;
+    material.enableSpecularAntiAliasing = true;
+    if (material.bumpTexture) material.bumpTexture.level = 1.6;
+  }
 
   // ---------- materials ----------
 
@@ -27,16 +92,46 @@
     const meshes = [];
     const seen = new Set();
     for (const root of rootNodes) {
-      const candidates = [];
-      if (root && root.material) candidates.push(root);
-      if (root && typeof root.getChildMeshes === 'function') candidates.push(...root.getChildMeshes(false));
-      for (const mesh of candidates) {
-        if (!mesh || seen.has(mesh) || !mesh.material) continue;
+      for (const mesh of AUR.nodeFamily(root)) {
+        if (seen.has(mesh) || !mesh.material) continue;
         seen.add(mesh);
         meshes.push(mesh);
       }
     }
     return meshes;
+  }
+
+  // Every material name Blender gives a fleet hull falls into one role; the legacy vocabulary of
+  // the shared fleet maps onto the same roles. The livery roles alone wear the provider color.
+  /** @type {Array<[string, RegExp]>} */
+  const ROLE_PATTERNS = [
+    ['window', /window/], ['glow', /engine|glow/], ['accent', /accent|energy|metalred|orange/],
+    ['glass', /canopy|glass/], ['structure', /structure|ivory/], ['mechanical', /mechanical|gunmetal/],
+    ['recess', /recess/], ['solar', /solar/], ['armor', /armor_secondary|hull_textured/],
+  ];
+  const LIVERY_ROLES = new Set(['accent', 'glow']);
+  function materialRole(name) {
+    const lower = String(name || '').toLowerCase();
+    const match = ROLE_PATTERNS.find(([, pattern]) => pattern.test(lower));
+    return match ? match[0] : 'hull';
+  }
+
+  // The surface and emission a role wears for a ship tint (null emission: unlit).
+  function roleLook(role, tint) {
+    switch (role) {
+      case 'accent': return [paletteTone(tint, 0.76, 0.10), tint.clone()];
+      // A nozzle is all glow: a dark surface so the lights add no white, the tint as its emission.
+      case 'glow': return [paletteTone(tint, 0.25, 0.0), tint.clone()];
+      // Lit windows glow the same cool white on every provider; the livery carries the color.
+      case 'window': return [new BABYLON.Color3(0.05, 0.06, 0.08), new BABYLON.Color3(0.62, 0.8, 1.0)];
+      case 'glass': return [paletteTone(tint, 0.16, 0.015), tint.scale(0.07)];
+      case 'structure': return [paletteTone(tint, 0.85, 0.0), tint.scale(0.12)];
+      case 'mechanical': return [paletteTone(tint, 0.06, 0.045), null];
+      case 'recess': return [paletteTone(tint, 0.03, 0.02), null];
+      case 'solar': return [paletteTone(tint, 0.12, 0.03), null];
+      case 'armor': return [paletteTone(tint, 0.14, 0.07), null];
+      default: return [paletteTone(tint, 0.10, 0.06), null];
+    }
   }
 
   function paletteTone(color, strength, lift) {
@@ -57,8 +152,8 @@
     return hull.id + '|' + paletteKey(ship);
   }
 
-  // Livery: graphite hull and armor, the structure parts in the ship color, and
-  // accents emitting exactly the ship color (the scenes' provider evidence).
+  // Livery: an authored hull map keeps its own colors; every other material wears its role's look
+  // in the ship color, the livery roles emitting exactly it (the scenes' provider evidence).
   function fleetMaterial(scene, state, file, selfLight, ship, baseMaterial) {
     const palette = paletteKey(ship);
     const sourceName = String(baseMaterial && baseMaterial.name || 'material');
@@ -69,40 +164,31 @@
     material = baseMaterial && typeof baseMaterial.clone === 'function'
       ? baseMaterial.clone(id)
       : new BABYLON.StandardMaterial(id, scene);
-    const tint = AUR.color3(AUR.shipColor(ship));
-    const name = sourceName.toLowerCase();
-    let surface = paletteTone(tint, 0.10, 0.06);
-    let emissive = null;
-
-    if (/armor_secondary|hull_textured/.test(name)) surface = paletteTone(tint, 0.14, 0.07);
-    if (/structure|ivory/.test(name)) {
-      surface = paletteTone(tint, 0.85, 0.0);
-      emissive = tint.scale(0.12);
+    const role = materialRole(sourceName);
+    const authored = material.albedoTexture || material.diffuseTexture;
+    if (authored && !LIVERY_ROLES.has(role)) {
+      // On the lightless map the hull map lights itself.
+      material.emissiveTexture = selfLight ? authored : null;
+      material.emissiveColor = selfLight ? new BABYLON.Color3(0.6, 0.6, 0.6) : new BABYLON.Color3(0, 0, 0);
+      finishFleetMaterial(scene, material, selfLight ? 0.6 : 1.3);
+    } else {
+      const [surface, emissive] = roleLook(role, AUR.color3(AUR.shipColor(ship)));
+      if (material.albedoColor) material.albedoColor = surface;
+      if (material.diffuseColor) material.diffuseColor = surface;
+      material.emissiveColor = emissive || (selfLight ? surface.scale(FAR_SELF_LIGHT) : new BABYLON.Color3(0, 0, 0));
+      if (LIVERY_ROLES.has(role)) {
+        if (typeof material.metallic === 'number') material.metallic = 0.42;
+        if (typeof material.roughness === 'number') material.roughness = 0.22;
+      }
+      finishFleetMaterial(scene, material, selfLight ? 0.5 : 1.0);
     }
-    if (/mechanical|gunmetal/.test(name)) surface = paletteTone(tint, 0.06, 0.045);
-    if (/recess/.test(name)) surface = paletteTone(tint, 0.03, 0.02);
-    if (/solar/.test(name)) surface = paletteTone(tint, 0.12, 0.03);
-    if (/canopy|glass/.test(name)) {
-      surface = paletteTone(tint, 0.16, 0.015);
-      emissive = tint.scale(0.07);
-    }
-    if (/accent|energy|engine|glow|metalred|orange/.test(name)) {
-      surface = paletteTone(tint, 0.76, 0.10);
-      emissive = tint.clone();
-    }
-
-    if (material.albedoColor) material.albedoColor = surface;
-    if (material.diffuseColor) material.diffuseColor = surface;
-    material.emissiveColor = emissive || (selfLight ? surface.scale(FAR_SELF_LIGHT) : new BABYLON.Color3(0, 0, 0));
-    if (typeof material.metallic === 'number' && /accent|energy|engine|glow/.test(name)) material.metallic = 0.42;
-    if (typeof material.roughness === 'number' && /accent|energy|engine|glow/.test(name)) material.roughness = 0.22;
     state.materials.set(key, material);
     return material;
   }
 
   // ---------- building a hull ----------
 
-  /** One tinted, hidden copy of a hull per provider; universe ships draw as its instances. */
+  /** One tinted, hidden copy of a hull per provider; universe ships (lightless, self-lit) draw as its instances. */
   function providerTemplate(scene, state, asset, ship) {
     const key = asset.file + '|' + paletteKey(ship);
     let roots = state.templates.get(key);
@@ -113,7 +199,7 @@
       { doNotInstantiate: true }
     );
     for (const mesh of childMeshes(entries.rootNodes)) {
-      mesh.material = fleetMaterial(scene, state, asset.file, asset.lod === 'far', ship, mesh.material);
+      mesh.material = fleetMaterial(scene, state, asset.file, true, ship, mesh.material);
       mesh.isPickable = false;
       mesh.isVisible = false;
     }
@@ -137,7 +223,7 @@
     return meshes;
   }
 
-  function placeClones(scene, state, asset, ship, pivot) {
+  function placeClones(scene, state, asset, ship, pivot, selfLight) {
     const entries = asset.record.container.instantiateModelsToScene(
       (sourceName) => 'ship_' + String(ship.id) + '_' + sourceName,
       false,
@@ -146,7 +232,7 @@
     for (const node of entries.rootNodes) node.parent = pivot;
     const meshes = childMeshes(entries.rootNodes);
     for (const mesh of meshes) {
-      mesh.material = fleetMaterial(scene, state, asset.file, asset.lod === 'far', ship, mesh.material);
+      mesh.material = fleetMaterial(scene, state, asset.file, selfLight, ship, mesh.material);
     }
     return meshes;
   }
@@ -169,7 +255,7 @@
     try {
       meshes = viewLod(scene) === 'far'
         ? placeInstances(scene, state, asset, ship, pivot)
-        : placeClones(scene, state, asset, ship, pivot);
+        : placeClones(scene, state, asset, ship, pivot, asset.lod === 'far'); // a stepped-down far file lights itself
     } catch (error) {
       correction.dispose();
       logOnce('instance:' + hull.id, 'Hull ' + hull.id + ' could not be instantiated; using procedural hulls.');
@@ -178,8 +264,8 @@
     let evidence = null;
     for (const mesh of meshes) {
       mesh.isPickable = false;
-      const sourceName = String(mesh.material && mesh.material.name || '');
-      if (!evidence || /accent|energy|engine|glow/i.test(sourceName)) evidence = mesh.material;
+      mesh.layerMask |= AUR.SHIP_LAYER;
+      if (!evidence || LIVERY_ROLES.has(materialRole(mesh.material && mesh.material.name))) evidence = mesh.material;
       mesh.metadata = {
         ...(mesh.metadata || {}),
         providerPalette: true,

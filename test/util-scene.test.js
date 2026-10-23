@@ -48,8 +48,8 @@ test('sceneProviderStats counts ship meshes per provider and flags tint mismatch
   };
   const stats = AUR.sceneProviderStats({
     meshes: [
-      shipMesh('b', 'codex', '#2f7dff'),
-      shipMesh('a', 'claude', '#b026ff'),
+      shipMesh('b', 'codex', '#f2f0ea'),
+      shipMesh('a', 'claude', '#d97757'),
       shipMesh('c', 'claude', '#123456'),
       { metadata: { isShip: false } },
       {},
@@ -63,6 +63,6 @@ test('sceneProviderStats counts ship meshes per provider and flags tint mismatch
   assert.equal(stats.distinctColorCount, 3);
   assert.equal(stats.colorMismatchCount, 1);
   assert.deepEqual([...stats.ships].map((ship) => ship.shipId), ['a', 'b', 'c']);
-  assert.equal(stats.ships[2].expectedColor, '#b026ff');
+  assert.equal(stats.ships[2].expectedColor, '#d97757');
   assert.equal(AUR.sceneProviderStats(null).shipMeshCount, 0);
 });

@@ -4,7 +4,7 @@
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
-const { createTerminalLauncher } = require('../terminal-launcher');
+const { createTerminalLauncher } = require('../terminal/launcher');
 
 function createProviderFixture() {
   const providerFixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-universe-provider-render-'));
@@ -91,7 +91,8 @@ function createHistoryFixture() {
   const codexDay = path.join(codexActive, '2026', '07', '21');
   fs.mkdirSync(codexDay, { recursive: true });
   fs.mkdirSync(codexArchive, { recursive: true });
-  fs.writeFileSync(path.join(codexDay, `rollout-history-${codexId}.jsonl`), [
+  const codexFile = path.join(codexDay, `rollout-history-${codexId}.jsonl`);
+  fs.writeFileSync(codexFile, [
     { timestamp: iso(2_000), type: 'session_meta', payload: {
       id: codexId, session_id: codexId, cwd: projectDir, thread_source: 'user',
       base_instructions: 'private fixture instructions' } },
@@ -109,6 +110,7 @@ function createHistoryFixture() {
     root: historyFixtureRoot,
     projectDir,
     claudeFile,
+    codexFile,
     claudeRoot,
     t0,
     earlyTs: t0 + 10_000,
@@ -129,12 +131,16 @@ function createHistoryFixture() {
 
 function createControlFixture() {
   const fixture = createHistoryFixture();
+  // Keep one live agent for the project action, while retaining both providers in replay.
+  const cold = new Date(Date.now() - 10 * 60 * 1000);
+  fs.utimesSync(fixture.codexFile, cold, cold);
   fixture.localAppData = path.win32.join(fixture.root, 'Local App Data & (Orbit)');
   return fixture;
 }
 
 function createRecordingTerminalLauncher(fixture) {
   const controlTerminalCalls = [];
+  const focusRequests = [];
   let controlTerminalUnrefs = 0;
   const fakeFs = {
     constants: { F_OK: fs.constants.F_OK },
@@ -159,7 +165,14 @@ function createRecordingTerminalLauncher(fixture) {
   let delayFirstOpen = true;
   return Object.freeze({
     calls: controlTerminalCalls,
+    focusRequests,
     get unrefs() { return controlTerminalUnrefs; },
+    async focus(request) {
+      focusRequests.push(request);
+      // The harness records focus requests and exercises the same asynchronous UI
+      // without inspecting real processes or touching any host terminal.
+      return this.open({ cwd: request.cwd });
+    },
     async open(request) {
       if (delayFirstOpen) {
         delayFirstOpen = false;

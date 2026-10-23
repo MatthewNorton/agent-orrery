@@ -7,7 +7,7 @@ const { spawn } = require('node:child_process');
 const {
   validPathString,
   isAbsolutePosixPath,
-} = require('./path-safety');
+} = require('../path-safety');
 
 const ALIAS_SEGMENTS = Object.freeze(['Microsoft', 'WindowsApps', 'wt.exe']);
 // macOS: the fixed system launcher opens the stock Terminal app at a directory.

@@ -13,7 +13,7 @@ const require = createRequire(import.meta.url);
 const failures = [];
 const notes = [];
 const ERROR_RE = /Uncaught|ReferenceError|TypeError|SyntaxError|is not defined|Failed to load resource|boot-failure/i;
-const launcherRel = 'src/main/terminal-launcher.js';
+const launcherRel = 'src/main/terminal/launcher.js';
 const launcherPath = path.join(root, launcherRel);
 
 function fail(id, message) { failures.push(`${id}: ${message}`); }
@@ -367,6 +367,7 @@ if (failures.length === 0) {
         replayMainRejected: true,
         planetRendered: true,
         noProcessOwnership: true,
+        exactSessionTargeted: true,
       };
       for (const [key, value] of Object.entries(expectedMetrics)) {
         if (metrics[key] !== value) fail('C5', `metric ${key}: ${JSON.stringify(metrics[key])} != ${value}`);

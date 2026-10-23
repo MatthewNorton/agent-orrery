@@ -6,7 +6,8 @@ const fs = require('fs');
 const os = require('os');
 const { Tracker } = require('./tracker');
 const { ReplaySource } = require('./replay-source');
-const { createTerminalLauncher } = require('./terminal-launcher');
+const { createTerminalLauncher } = require('./terminal/launcher');
+const { createTerminalFocus } = require('./terminal/focus');
 const { createAgentLauncher } = require('./agent-launcher');
 const { TaskRunTracker } = require('./task-runs');
 const { RootTaskStore } = require('./root-tasks');
@@ -35,6 +36,7 @@ function createAppContext({ flags, fixtures }, electron = require('electron')) {
     replaySource: null,
     activeSource: null,
     terminalLauncher: null,
+    terminalFocus: null,
     taskRuns: null,
     rootTasks: null,
     rootTaskCoordinator: null,
@@ -154,6 +156,7 @@ function createAppContext({ flags, fixtures }, electron = require('electron')) {
     ctx.terminalLauncher = ctx.flags.controlTest
       ? fixtures.createRecordingTerminalLauncher(ctx.harness.controlFixture)
       : createTerminalLauncher();
+    ctx.terminalFocus = ctx.flags.controlTest ? ctx.terminalLauncher : createTerminalFocus();
     ctx.ipc.terminal.reset();
     ctx.activeSource = ctx.tracker;
     ctx.tracker.on('events', (/** @type {AUEvent[]} */ batch) => {
@@ -224,6 +227,7 @@ function createAppContext({ flags, fixtures }, electron = require('electron')) {
     }
     ctx.activeSource = null;
     ctx.terminalLauncher = null;
+    ctx.terminalFocus = null;
     ctx.rootTaskCoordinator = null;
     ctx.rootTasks = null;
     ctx.taskRuns = null;

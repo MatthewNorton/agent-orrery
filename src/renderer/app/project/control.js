@@ -40,28 +40,32 @@
   const TERMINAL_FAILURES = new Map([
     ['UNAVAILABLE', 'A terminal app is unavailable on this computer.'],
     ['REPLAY', 'Return to LIVE to open a terminal.'],
-    ['NOT_FOUND', 'This project is unavailable.'],
-    ['BUSY', 'A terminal launch was just requested.'],
+    ['NOT_FOUND', 'This project or agent is unavailable.'],
+    ['TERMINAL_NOT_FOUND', 'The agent\u2019s existing terminal could not be found. It may be closed or running without a terminal.'],
+    ['AMBIGUOUS', 'Select an agent to open its terminal.'],
+    ['BUSY', 'A terminal request is already in progress.'],
     ['INVALID', 'The terminal request was rejected.'],
   ]);
 
   function terminalFailureText(code) {
-    return TERMINAL_FAILURES.get(code) || 'Terminal launch failed. Try again.';
+    return TERMINAL_FAILURES.get(code) || 'Could not open the terminal. Try again.';
   }
 
   const CONTROL_NOTES = new Map([
     ['replay', TERMINAL_FAILURES.get('REPLAY')],
     ['transition', 'History view is changing.'],
-    ['pending', 'Requesting terminal launch\u2026'],
-    ['success', 'Terminal launch requested'],
+    ['pending', 'Opening terminal\u2026'],
+    ['success', 'Terminal opened'],
     ['idle', ''],
   ]);
 
-  A.projectControlPresentation = function projectControlPresentation(projectId) {
+  A.projectControlPresentation = function projectControlPresentation(projectId, shipId = null) {
     const state = ensureProjectControl(projectId);
+    const matches = (state.targetId || state.projectId) === (shipId || projectId);
     const phase = S.playback.mode !== 'live' ? 'replay'
       : S.replayTransitionPending || S.replayBusy ? 'transition'
-        : ['pending', 'success', 'failure'].includes(state.phase) ? state.phase : 'idle';
+        : state.phase === 'pending' ? 'pending'
+          : matches && ['success', 'failure'].includes(state.phase) ? state.phase : 'idle';
     const busy = phase === 'transition' || phase === 'pending';
     return {
       phase, disabled: busy || phase === 'replay', busy,
@@ -70,21 +74,23 @@
     };
   };
 
-  A.requestProjectTerminal = async function requestProjectTerminal(projectId) {
-    if (A.projectControlPresentation(projectId).disabled) return;
+  A.requestProjectTerminal = async function requestProjectTerminal(projectId, shipId = null) {
+    if (A.projectControlPresentation(projectId, shipId).disabled) return;
 
     const requestId = ++S.terminalRequestSerial;
-    S.projectControl = { projectId, requestId, phase: 'pending', code: null };
+    const targetId = shipId || projectId;
+    S.projectControl = { projectId, targetId, requestId, phase: 'pending', code: null };
     A.renderChromeNow(C.CHROME.PROJECT | C.CHROME.FOCUS);
 
     /** @type {OpenTerminalResult} */
-    const result = await AUR.settle(() => AU.openTerminal(projectId));
+    const result = await AUR.settle(() => AU.openTerminal(targetId));
     if (S.projectControl.projectId !== projectId || S.projectControl.requestId !== requestId) return;
 
     const ok = result.ok === true;
     const code = !ok && typeof result.code === 'string' ? result.code : 'FAILED';
     S.projectControl = {
       projectId,
+      targetId,
       requestId,
       phase: ok ? 'success' : 'failure',
       code: ok ? null : code,

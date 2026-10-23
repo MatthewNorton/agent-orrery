@@ -1,0 +1,92 @@
+{
+  "status": "PASS",
+  "glb": "C:\\workspace\\code\\experimental\\agent-orrery\\assets\\ships\\fleet-v3\\aur-lance-interceptor\\aur-lance-interceptor.glb",
+  "materials": 7,
+  "images": 9,
+  "textures": 9,
+  "hero_materials": [
+    "hull_white",
+    "hull_dark",
+    "hull_grey"
+  ],
+  "records": {
+    "canopy_glass": {
+      "base_color_texture": false,
+      "base_color_factor": [
+        0.02500000037252903,
+        0.03999999910593033,
+        0.07000000029802322,
+        1
+      ],
+      "normal_texture": false,
+      "metallic_roughness_texture": false
+    },
+    "engine_glow": {
+      "base_color_texture": false,
+      "base_color_factor": [
+        0.20000000298023224,
+        0.6000000238418579,
+        1,
+        1
+      ],
+      "normal_texture": false,
+      "metallic_roughness_texture": false
+    },
+    "hull_dark": {
+      "base_color_texture": true,
+      "base_color_factor": [
+        0.95,
+        0.95,
+        0.95,
+        1.0
+      ],
+      "normal_texture": true,
+      "metallic_roughness_texture": true
+    },
+    "hull_grey": {
+      "base_color_texture": true,
+      "base_color_factor": [
+        0.95,
+        0.95,
+        0.95,
+        1.0
+      ],
+      "normal_texture": true,
+      "metallic_roughness_texture": true
+    },
+    "hull_white": {
+      "base_color_texture": true,
+      "base_color_factor": [
+        0.95,
+        0.95,
+        0.95,
+        1.0
+      ],
+      "normal_texture": true,
+      "metallic_roughness_texture": true
+    },
+    "accent_livery": {
+      "base_color_texture": false,
+      "base_color_factor": [
+        0.9300000071525574,
+        0.44999998807907104,
+        0.1599999964237213,
+        1
+      ],
+      "normal_texture": false,
+      "metallic_roughness_texture": false
+    },
+    "window_light": {
+      "base_color_texture": false,
+      "base_color_factor": [
+        0.44999998807907104,
+        0.699999988079071,
+        1,
+        1
+      ],
+      "normal_texture": false,
+      "metallic_roughness_texture": false
+    }
+  },
+  "errors": []
+}

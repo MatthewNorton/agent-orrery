@@ -39,7 +39,9 @@
   const AUR = window.AUR;
   const MANIFEST_PATH = '../../assets/ships/manifest.json';
   const HULL_ROOT = '../../assets/ships/';
-  const TRIANGLE_BUDGET = 100000;
+  // Fleet v3 hulls carry their detail as geometry (6k to 58k triangles each); the budget holds a
+  // busy system of flagships before the step-down to darts starts.
+  const TRIANGLE_BUDGET = 400000;
   /** @type {WeakMap<object, SceneState>} */
   const sceneStates = new WeakMap();
   const logged = new Set();
@@ -153,7 +155,7 @@
     const role = ['main-s', 'main-m', 'main-l'][hash % 3];
     const exact = manifest.hulls.filter((hull) => hull.family === family && hull.role === role);
     if (exact.length) return exact[hash % exact.length];
-    const familyHulls = manifest.hulls.filter((hull) => hull.family === family && hull.role !== 'drone');
+    const familyHulls = manifest.hulls.filter((hull) => hull.family === family);
     return familyHulls.length ? familyHulls[hash % familyHulls.length] : null;
   }
 
@@ -161,12 +163,13 @@
   function selectHull(manifest, ship) {
     if (!manifest) return null;
     const providerKey = AUR.providerKey(ship && ship.provider);
-    if (ship && (ship.kind === 'drone' || providerKey === 'generic')) return null;
+    if (providerKey === 'generic') return null;
     const family = manifest.providerFamilies[providerKey];
     if (!family) return null;
     const ladder = rankLadder(manifest, family);
-    if (ladder.length) return rankedHull(ladder, Number(ship && ship.builds) || 0);
-    return hashedHull(manifest, family, ship);
+    if (!ladder.length) return hashedHull(manifest, family, ship);
+    // A drone (subagent) flies the family's first rank whatever its build count; the view shrinks it.
+    return ship && ship.kind === 'drone' ? ladder[0] : rankedHull(ladder, Number(ship && ship.builds) || 0);
   }
 
   /**

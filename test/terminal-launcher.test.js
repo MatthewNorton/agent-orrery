@@ -7,7 +7,7 @@ const {
   createTerminalLauncher,
   buildMacTerminalSpec,
   resolveMacOpen,
-} = require('../src/main/terminal-launcher');
+} = require('../src/main/terminal/launcher');
 
 const MAC_CWD = "/Users/coder/Projects/Orbit & (Mission) O'Brien";
 

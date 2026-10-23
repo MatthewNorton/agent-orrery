@@ -1,0 +1,14 @@
+{
+  "silhouette_iou": 0.5361,
+  "edge_similarity": 0.9161,
+  "grayscale_similarity": 0.5932,
+  "detail_density_similarity": 0.6215,
+  "objective_score": 64.15,
+  "schema_version": 1,
+  "reference": "C:\\workspace\\code\\experimental\\agent-orrery\\assets\\ships\\fleet-v3\\aur-bastion-corvette\\references\\perspective-4x.png",
+  "render": "C:\\workspace\\code\\experimental\\agent-orrery\\assets\\ships\\fleet-v3\\aur-bastion-corvette\\aur-bastion-corvette_front_three_quarter.png",
+  "comparison_sheet": "C:\\workspace\\code\\experimental\\agent-orrery\\assets\\ships\\fleet-v3\\aur-bastion-corvette\\aur-bastion-corvette_visual_comparison.png",
+  "threshold": 82.0,
+  "passed_threshold": false,
+  "warning": "Objective score is a rejection tripwire and never overrides visible human-audit failures."
+}

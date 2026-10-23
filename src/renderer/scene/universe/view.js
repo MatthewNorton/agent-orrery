@@ -153,7 +153,7 @@
         halo, haloMat, attention: null,
         lastActivity: p.lastActivity || 0, recencyRank: Number.MAX_SAFE_INTEGER,
         labelBaseAlpha: 0.85, labelOffsetY, labelScreen: null,
-        sunR, pulseUntil: 0, phase: rand() * Math.PI * 2, appear: 0,
+        sunR, outerR: ringRadii[ringRadii.length - 1], pulseUntil: 0, phase: rand() * Math.PI * 2, appear: 0,
         derelict: false, searchFactor: 1, searchLabelFactor: 1,
       };
       // The label text and width, the VCS markers and the sun's projectExists flag.

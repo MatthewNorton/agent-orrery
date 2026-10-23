@@ -16,7 +16,7 @@
     HISTORY_MARKER_LIMIT: 24,
     SEARCH_DEBOUNCE_MS: 120,
     MODULES_STORAGE_KEY: 'agent-universe.modules.v1',
-    AGENT_FOCUS_ENVIRONMENT_STORAGE_KEY: 'agent-universe.focus-environment.v1',
+    AGENT_FOCUS_ENVIRONMENT_STORAGE_KEY: 'agent-universe.focus-environment.v2', // v2: exterior is the default
     AGENT_FOCUS_VANTAGE_STORAGE_KEY: 'agent-universe.focus-vantage.v1',
     RENDER_QUALITY_STORAGE_KEY: 'agent-universe.render-quality.v1',
     // Graphics tiers, cheapest first; the last is the default (app/render-quality.js).
@@ -25,11 +25,14 @@
       Object.freeze({ key: 'balanced', label: 'Balanced', resolution: 0.8, steps: 32, stars: 0.7 }),
       Object.freeze({ key: 'high', label: 'High', resolution: 1, steps: 48, stars: 1 }),
     ]),
+    // Where agent focus puts the viewer: `camera` is 'exterior' (a chase camera outside the hull,
+    // the default) or 'room' (first person inside it, behind a generated foreground `asset`).
     AGENT_FOCUS_ENVIRONMENTS: Object.freeze({
-      cockpit: { label: 'COCKPIT LINK', asset: 'assets/cockpit-frame.png' },
-      quarters: { label: 'LIVING QUARTERS', asset: 'assets/environment-quarters.png' },
-      office: { label: 'ORBITAL OFFICE', asset: 'assets/environment-office.png' },
-      station: { label: 'STATION OBSERVATORY', asset: 'assets/environment-station.png' },
+      exterior: { camera: 'exterior', label: 'CHASE CAMERA', asset: null },
+      cockpit: { camera: 'room', label: 'COCKPIT LINK', asset: 'assets/cockpit-frame.png' },
+      quarters: { camera: 'room', label: 'LIVING QUARTERS', asset: 'assets/environment-quarters.png' },
+      office: { camera: 'room', label: 'ORBITAL OFFICE', asset: 'assets/environment-office.png' },
+      station: { camera: 'room', label: 'STATION OBSERVATORY', asset: 'assets/environment-station.png' },
     }),
     AGENT_FOCUS_VANTAGES: Object.freeze({
       forward: 'FORWARD',
@@ -155,7 +158,7 @@
       pendingShipId: null,
       previousFocus: null,
       lastFlightUpdate: 0,
-      environment: 'cockpit',
+      environment: 'exterior',
       vantage: 'forward',
       els: null,
     },

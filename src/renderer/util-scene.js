@@ -69,11 +69,10 @@
     return line;
   };
 
-  // Small emissive dart mesh for ships (stretched octahedron).
-  AUR.dartMesh = function (scene, name, hex, scale) {
-    const s = scale || 1;
+  // Small emissive dart mesh for ships (an octahedron; the view scales it like any hull root).
+  AUR.dartMesh = function (scene, name, hex) {
     const m = BABYLON.MeshBuilder.CreatePolyhedron(name, { type: 1, size: 0.5 }, scene);
-    m.scaling = new BABYLON.Vector3(0.42 * s, 0.42 * s, 1.35 * s);
+    m.layerMask |= AUR.SHIP_LAYER;
     const mat = new BABYLON.StandardMaterial(name + '_m', scene);
     const c = BABYLON.Color3.FromHexString(hex);
     mat.emissiveColor = c;
@@ -83,8 +82,13 @@
     return m;
   };
 
-  // Signal and drone agents are information sources, not physical spacecraft.
-  // A billboarded transmission glyph keeps them visible without assigning a hull.
+  // A point on an orbit in the XZ plane at `angle`, written into `out`.
+  AUR.orbitPoint = function (angle, radius, y, out) {
+    return out.set(Math.cos(angle) * radius, y, Math.sin(angle) * radius);
+  };
+
+  // A metadata-only Signal agent is an information source, not a spacecraft: a billboarded
+  // transmission glyph keeps it visible without a hull.
   AUR.signalMarker = function signalMarker(scene, name, hex) {
     const texture = new BABYLON.DynamicTexture(name + '_signal_texture', {
       width: 128, height: 128,
@@ -158,6 +162,12 @@
     material.disableDepthWrite = true;
     material.alpha = alpha;
     return material;
+  };
+
+  // A node and every mesh under it (a mesh root included), in one list.
+  AUR.nodeFamily = function (node) {
+    if (!node) return [];
+    return typeof node.getChildMeshes === 'function' ? [node, ...node.getChildMeshes(false)] : [node];
   };
 
   // A missing node counts as disposed.

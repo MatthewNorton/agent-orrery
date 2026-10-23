@@ -1,5 +1,5 @@
-/* focus.css — First-person agent cockpit: stage, frame, hologram. Split from style.css on 2026-10-14; rules unchanged. */
-/* ---- first-person agent cockpit ---- */
+/* focus.css — Agent focus (chase camera or first-person rooms): stage, frame, hologram. Split from style.css on 2026-10-14. */
+/* ---- agent focus ---- */
 .agent-focus {
   --focus-accent: #f59e0b;
   --focus-alert: var(--focus-accent);
@@ -11,7 +11,7 @@
   z-index: 60;
   overflow: hidden;
   color: #edf4ff;
-  pointer-events: auto;
+  pointer-events: none; /* the scene keeps the pointer (the chase camera orbits on it); the button groups opt back in */
   isolation: isolate;
 }
 .agent-focus-vignette {
@@ -45,6 +45,8 @@
   filter: drop-shadow(0 14px 26px rgba(0, 0, 0, 0.72));
   transition: opacity 160ms ease;
 }
+/* The exterior chase camera has no room: no screen hologram (the frame is .hidden), the hull in clear view. */
+.agent-focus[data-camera='exterior'] .agent-focus-hologram { display: none; }
 .agent-focus-ident, .agent-focus-target, .agent-focus-telemetry,
 .agent-focus-actions { position: absolute; z-index: 2; }
 .agent-focus-ident { z-index: 3; }

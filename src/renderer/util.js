@@ -45,10 +45,10 @@
   };
   const PROVIDERS = Object.freeze({
     claude: Object.freeze({
-      key: 'claude', label: 'Claude', color: '#b026ff',
+      key: 'claude', label: 'Claude', color: '#d97757',
     }),
     codex: Object.freeze({
-      key: 'codex', label: 'Codex', color: '#2f7dff',
+      key: 'codex', label: 'Codex', color: '#f2f0ea',
     }),
     generic: Object.freeze({
       key: 'generic', label: 'Signal', color: '#94a3b8',
@@ -102,8 +102,9 @@
     const ship = typeof AUR.shipLookup === 'function' ? AUR.shipLookup(shipId) : null;
     return AUR.shipColor(ship && ship.local === true ? ship : { provider });
   };
+  // Only a metadata-only provider draws as a signal marker; a drone flies its family's first rank.
   AUR.isSignalEntity = (ship) => Boolean(
-    ship && (ship.kind === 'drone' || AUR.providerKey(ship.provider) === 'generic')
+    ship && AUR.providerKey(ship.provider) === 'generic'
   );
   AUR.sunColor = (seed) => AUR.SUN_COLORS[seed % AUR.SUN_COLORS.length];
   AUR.planetWeight = (pd) => (pd.files || 0) + (pd.builds || 0) * 5;
@@ -133,7 +134,26 @@
     focusFollowRate: 0.72,
     reducedFocusFollowRate: 0.24,
     flyToSeconds: 9,
+    returnSeconds: 3,
   });
+
+  // System-view planet diameters in scene units: the clamp on a planet's weight, and what ships
+  // and flights are sized against.
+  AUR.PLANET_DIA = Object.freeze({ min: 1.1, max: 4.5 });
+
+  // Ship display size per view: the signal marker's plane, a hull's length in scene units (a
+  // fifth of the smallest planet in the system view), and the pixel floor AUR.fitShip keeps so a
+  // hull sized to its planets still reads from the default orbit.
+  AUR.SHIP_SIZE = Object.freeze({
+    universe: Object.freeze({ signal: 0.64, hull: 0.2, minPx: 12 }),
+    system: Object.freeze({ signal: 0.72, hull: AUR.PLANET_DIA.min / 5, minPx: 20 }),
+    planet: Object.freeze({ signal: 0.72, hull: 0.6, minPx: 22 }),
+  });
+  // A drone (subagent) flies its family's first rank at this fraction of the rank's size.
+  AUR.DRONE_SCALE = 0.6;
+  // The layer bit every ship mesh carries: the ship-only lights (AUR.shipLights) affect only
+  // meshes with it, and it sits outside the cameras' default mask so visibility is unchanged.
+  AUR.SHIP_LAYER = 0x10000000;
   AUR.dampedAmount = (rate, dt) => 1 - Math.exp(-Math.max(0, rate) * Math.max(0, dt || 0));
   AUR.configureComfortCamera = function configureComfortCamera(camera) {
     camera.wheelDeltaPercentage = 0.012;
