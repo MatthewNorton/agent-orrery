@@ -119,14 +119,12 @@
     return match ? match[0] : 'hull';
   }
 
-  // The surface and emission (null: unlit) a role wears for a ship tint, sRGB like every AUR
-  // color. A PBR material's albedo and emissive slots are linear, so a tint is linearized on its
-  // way in and the frame then shows the exact hex.
+  // The surface and emission (null: unlit) a role wears for a ship tint, sRGB like every AUR color.
   function roleLook(role, tint) {
     switch (role) {
       // Trim lights: the livery stripes and the nozzles are all glow, a dark surface so the lights
-      // add no white, the ship color as the emission the glow pass blooms.
-      case 'accent': case 'glow': return [paletteTone(tint, 0.25, 0.0), tint.toLinearSpace()];
+      // add no white, the ship color as the emission.
+      case 'accent': case 'glow': return [paletteTone(tint, 0.25, 0.0), tint.clone()];
       // Lit windows: the same cool pane on every provider, lit, not blown out.
       case 'window': return [new BABYLON.Color3(0.25, 0.33, 0.42), new BABYLON.Color3(0.26, 0.4, 0.6)];
       case 'structure': return [paletteTone(tint, 0.85, 0.0), tint.scale(0.12)];
@@ -183,7 +181,11 @@
       if (material.albedoColor) material.albedoColor = surface.toLinearSpace();
       if (material.diffuseColor) material.diffuseColor = surface;
       material.emissiveColor = emissive || (selfLight ? surface.scale(FAR_SELF_LIGHT) : new BABYLON.Color3(0, 0, 0));
-      if (LIVERY_ROLES.has(role)) material.emissiveIntensity = TRIM_LIGHT;
+      if (LIVERY_ROLES.has(role)) {
+        // The PBR emissive slot is linear: linearized, the frame shows the exact hex; then run hot.
+        material.emissiveColor = emissive.toLinearSpace();
+        material.emissiveIntensity = TRIM_LIGHT;
+      }
       finishFleetMaterial(scene, material, selfLight ? 0.5 : 1.0);
     }
     material.metadata = { ...(material.metadata || {}), role }; // what the exhaust part asks
@@ -192,15 +194,10 @@
   }
 
   // What the root wears as provider evidence (the scenes read its emission as the exact hex): an
-  // unlit material in the ship color, one per palette. The hull's trim emits the same, linearized.
+  // unlit material in the ship color, one per palette.
   function evidenceMaterial(scene, state, ship) {
     const key = 'evidence:' + paletteKey(ship);
-    let material = state.materials.get(key);
-    if (!material) {
-      material = AUR.unlitMaterial(scene, 'ship_' + key, AUR.color3(AUR.shipColor(ship)));
-      state.materials.set(key, material);
-    }
-    return material;
+    return AUR.memo(state.materials, key, () => AUR.unlitMaterial(scene, 'ship_' + key, AUR.color3(AUR.shipColor(ship))));
   }
 
   // ---------- building a hull ----------

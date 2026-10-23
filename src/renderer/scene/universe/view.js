@@ -53,12 +53,8 @@
     // ---- glyphs ----
     // Suns come in five colours, so five corona materials serve every glyph.
     function coronaMaterial(hex) {
-      let material = view.coronaMaterials.get(hex);
-      if (!material) {
-        material = AUR.softMaterial(scene, 'corona:' + hex, AUR.color3(hex).scale(0.85), 1, view.softDisc);
-        view.coronaMaterials.set(hex, material);
-      }
-      return material;
+      return AUR.memo(view.coronaMaterials, hex,
+        () => AUR.softMaterial(scene, 'corona:' + hex, AUR.color3(hex).scale(0.85), 1, view.softDisc));
     }
 
     function buildGlyph(p) {

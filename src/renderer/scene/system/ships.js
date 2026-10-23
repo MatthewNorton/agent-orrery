@@ -45,14 +45,14 @@
         fontSize: 12, mono: true, color: AUR.attentionColor(s.attention), mesh, offsetY: -22,
       });
       const rec = {
-        id: s.id, mesh, label, suffix, tint, providerKey, scale, hull: AUR.shipHullId(mesh), plumes: [],
+        id: s.id, mesh, label, suffix, tint, providerKey, scale, hull: null, plumes: [],
         r, a: a0, speed: (AUR.MOTION.systemShipOrbitMin +
           rand() * AUR.MOTION.systemShipOrbitRange) * (rand() > 0.5 ? 1 : -1),
         bob: rand() * 6.28, mode: 'patrol', fly: null, born: performance.now(),
       };
       applyShipAttention(rec, s);
       ships.set(s.id, rec);
-      view.attachExhaust(rec);
+      view.refreshExhaust(rec);
       view.applyShipFocusVisual(rec);
       return rec;
     }
@@ -107,14 +107,9 @@
     function animateShips(dt, now, t) {
       const fit = AUR.shipFit(scene, SIZE.minPx);
       for (const r of ships.values()) {
-        // A hull arriving or swapping (a promotion, a local model) re-anchors the plumes on its
-        // nozzles, and focus mode's fade covers the new meshes.
-        const hull = AUR.shipHullId(r.mesh);
-        if (r.hull !== hull) {
-          r.hull = hull;
-          view.attachExhaust(r);
-          view.applyShipFocusVisual(r);
-        }
+        // The plumes follow the hull (its arrival, a promotion, a local model); focus mode's fade
+        // covers the new meshes.
+        if (view.refreshExhaust(r)) view.applyShipFocusVisual(r);
         const f = r.fly;
         if (r.mode === 'patrol') {
           r.a += r.speed * dt;

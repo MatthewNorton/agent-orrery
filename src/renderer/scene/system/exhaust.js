@@ -6,26 +6,23 @@
 (function () {
   const AUR = window.AUR;
   // Ribbon history in frames, its blend, the share of the hull's length from the stern that holds
-  // its nozzles (lit intakes further forward are no exhaust), and the dart's tail (an octahedron of
-  // size 0.5).
+  // its nozzles, and the dart's tail (an octahedron of size 0.5).
   const PLUME = Object.freeze({ length: 18, alpha: 0.5, sternShare: 0.25, dartTail: -0.5, dartRadius: 0.08 });
 
   AUR.sceneParts.system.exhaust = function (view) {
     const { scene, glow } = view;
     const materials = new Map(); // tint -> the plume material every ship of that tint shares
+    const hulls = new Map(); // hull id -> its stern nozzles, the same for every ship of that hull
+    const dartNozzles = [{ position: new BABYLON.Vector3(0, 0, PLUME.dartTail), radius: PLUME.dartRadius }];
 
-    function plumeMaterial(tint) {
-      let material = materials.get(tint);
-      if (!material) {
-        material = AUR.unlitMaterial(scene, 'plume_' + tint, AUR.color3(tint), PLUME.alpha);
-        material.alphaMode = BABYLON.Constants.ALPHA_ADD;
-        materials.set(tint, material);
-      }
+    const plumeMaterial = (tint) => AUR.memo(materials, tint, () => {
+      const material = AUR.unlitMaterial(scene, 'plume_' + tint, AUR.color3(tint), PLUME.alpha);
+      material.alphaMode = BABYLON.Constants.ALPHA_ADD;
       return material;
-    }
+    });
 
-    // Each glow island of a ship's hull as a centre and radius in the ship root's frame (the root
-    // carries the display scale, so the plumes follow it), with the hull's length along its +Z nose.
+    // Each glow island of a hull as a centre and radius in the ship root's frame (the root carries
+    // the display scale, so the plumes follow it), with the hull's length along its +Z nose.
     function glowIslands(root) {
       root.computeWorldMatrix(true);
       const toRoot = root.getWorldMatrix().clone().invert();
@@ -55,15 +52,17 @@
       return { islands, length: zMax - zMin };
     }
 
-    // The nozzles a ship trails from: its hull's stern glow discs, else a dart's tail.
+    // The nozzles a ship trails from: its hull's stern glow discs (found once per hull), else a
+    // dart's tail.
     function nozzles(rec) {
-      const { islands, length } = glowIslands(rec.mesh);
-      if (!islands.length) return [{ position: new BABYLON.Vector3(0, 0, PLUME.dartTail), radius: PLUME.dartRadius }];
-      return AUR.sternIslands(islands, length, PLUME.sternShare);
+      const found = rec.hull ? AUR.memo(hulls, rec.hull, () => {
+        const { islands, length } = glowIslands(rec.mesh);
+        return AUR.sternIslands(islands, length, PLUME.sternShare);
+      }) : [];
+      return found.length ? found : dartNozzles;
     }
 
     function attachExhaust(rec) {
-      detachExhaust(rec);
       const material = plumeMaterial(rec.tint);
       rec.plumes = nozzles(rec).map(({ position, radius }, i) => {
         const id = rec.id + '_' + i;
@@ -78,15 +77,26 @@
       });
     }
 
+    // Hangs the plumes on the ship's current hull unless they are there already: its arrival under
+    // the dart, a promotion, a local-model swap. True when it did, so focus mode can fade the new
+    // meshes; the ships part asks every frame.
+    function refreshExhaust(rec) {
+      const hull = AUR.shipHullId(rec.mesh);
+      if (rec.plumes.length && rec.hull === hull) return false;
+      detachExhaust(rec);
+      rec.hull = hull;
+      attachExhaust(rec);
+      return true;
+    }
+
     function detachExhaust(rec) {
       for (const plume of rec.plumes) {
-        glow.removeExcludedMesh(plume.trail);
-        plume.trail.dispose();
+        plume.trail.dispose(); // takes itself out of the glow pass's excluded set
         plume.anchor.dispose();
       }
       rec.plumes = [];
     }
 
-    return { attachExhaust, detachExhaust };
+    return { refreshExhaust, detachExhaust };
   };
 })();

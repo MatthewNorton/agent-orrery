@@ -208,7 +208,8 @@
     for (const vertices of members.values()) {
       if (vertices.length < 3) continue;
       const center = [0, 0, 0];
-      for (const v of vertices) for (let k = 0; k < 3; k++) center[k] += positions[v * 3 + k] / vertices.length;
+      for (const v of vertices) for (let k = 0; k < 3; k++) center[k] += positions[v * 3 + k];
+      for (let k = 0; k < 3; k++) center[k] /= vertices.length;
       let radius = 0;
       for (const v of vertices) {
         radius = Math.max(radius, Math.hypot(positions[v * 3] - center[0], positions[v * 3 + 1] - center[1], positions[v * 3 + 2] - center[2]));

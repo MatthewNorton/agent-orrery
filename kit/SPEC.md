@@ -286,13 +286,13 @@ Design tokens (put in `:root`):
   hull's trim lighting: `accent_livery` (stripes, chevrons, collars) and
   `engine_glow` emit it over a dark surface (Claude terracotta, Codex pearl, a
   local model red; linearized for the PBR slot, at 1.5x so a line outshines the
-  lit hull) and the system view's glow pass blooms them. The root's unlit evidence material
-  carries the exact hex. `window_light` is a cool lit pane and `canopy_glass`
-  keeps its authored smoke with stronger reflections (`materialRole` in
-  `ship-assets-hulls.js`). Every
-  fleet material gets a procedural studio environment for reflections; the
-  system and planet views add a viewer-relative key and rim that only ship
-  meshes see (`AUR.shipLights`).
+  lit hull) and the system view's glow pass blooms them. The root's unlit
+  evidence material carries the exact hex. `window_light` is a cool lit pane
+  and `canopy_glass` keeps its authored smoke with stronger reflections
+  (`materialRole` in `ship-assets-hulls.js`). Every fleet material gets a
+  procedural studio environment for reflections; the system and planet views
+  add a viewer-relative key and rim that only ship meshes see
+  (`AUR.shipLights`).
 - Main Claude/Codex ships fly the `aur-fleet-v3` rank ladder in
   `assets/ships/manifest.json`: the hull is the highest rank whose `minBuilds`
   the ship's `builds` has reached (Scout 0, Workhorse 5, Capital 20, Flagship

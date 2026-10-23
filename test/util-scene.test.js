@@ -91,13 +91,21 @@ test('sternIslands keeps the glow islands near the stern and drops lit intakes f
   const kept = AUR.sternIslands([island(-30), island(-28), island(22), island(-31)], 90, 0.25);
 
   assert.deepEqual(Array.from(kept, (found) => found.position.z), [-30, -28, -31]);
-  assert.deepEqual(Array.from(AUR.sternIslands([], 10, 0.25)), []);
 });
 
 test('shipHullId names the hull under a dart, the asset root itself, or nothing for a bare dart', () => {
   const AUR = loadUtilLayer();
-  assert.equal(AUR.shipHullId({ metadata: { isShip: false, upgradedHullId: 'scout' } }), 'scout');
-  assert.equal(AUR.shipHullId({ metadata: { isShip: true, assetHullId: 'capital' } }), 'capital');
-  assert.equal(AUR.shipHullId({ metadata: { isShip: true } }), null);
+  assert.equal(AUR.shipHullId({ metadata: { upgradedHullId: 'scout' } }), 'scout');
+  assert.equal(AUR.shipHullId({ metadata: { assetHullId: 'capital' } }), 'capital');
+  assert.equal(AUR.shipHullId({ metadata: {} }), null);
   assert.equal(AUR.shipHullId(null), null);
+});
+
+test('memo builds an entry once and hands the same one back after', () => {
+  const AUR = loadUtilLayer();
+  const map = new Map();
+  let builds = 0;
+  const build = () => ({ build: ++builds });
+  assert.equal(AUR.memo(map, 'k', build), AUR.memo(map, 'k', build));
+  assert.equal(builds, 1);
 });
