@@ -98,6 +98,8 @@ namespace Orrery {
         static bool Activate(IntPtr window) {
             if (IsIconic(window)) ShowWindow(window, 9); // SW_RESTORE only when minimized.
             SetForegroundWindow(window);
+            // Another thread's window activates asynchronously; the foreground reads NULL until it lands.
+            for (int i = 0; i < 20 && GetForegroundWindow() != window; i++) Thread.Sleep(25);
             return GetForegroundWindow() == window;
         }
 
