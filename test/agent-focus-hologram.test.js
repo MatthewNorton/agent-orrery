@@ -75,6 +75,6 @@ test('the chase camera orbits with a left drag and zooms with the wheel, through
   assert.match(focus, /orbit\.yaw \+= \(event\.clientX - drag\.x\) \/ sensibility/);
   assert.match(focus, /POINTERWHEEL/);
   assert.match(focus, /shipFocus\.orbit = \{ yaw: CHASE\.yaw, pitch: CHASE\.pitch, zoom: 1 \}/, 'a chosen vantage or environment re-seats the camera');
-  assert.match(system, /if \(view\.shipFocus\) \{\s*leaveHover\(\);.*\n\s*view\.orbitShipFocus\(pi\);/, 'no planet opens or lights up while a ship is followed');
+  assert.match(system, /if \(view\.shipFocus\) \{\s*leaveHover\(\);[^\n]*\s*view\.orbitShipFocus\(pi\);/, 'no planet opens or lights up while a ship is followed');
   assert.match(css, /\.agent-focus-vantages\s*\{[^}]*pointer-events:\s*auto;/, 'the button groups take the pointer back');
 });
