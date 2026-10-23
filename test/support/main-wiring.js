@@ -47,6 +47,11 @@ function fakeTracker({ projects = [], ships = [] } = {}) {
   tracker.projects = new Map(projects.map((project) => [project.id, project]));
   tracker.ships = new Map(ships.map((ship) => [ship.id, ship]));
   tracker.remapped = [];
+  tracker.forgotten = [];
+  tracker.forgetProject = (id) => {
+    tracker.forgotten.push(id);
+    tracker.projects.delete(id);
+  };
   tracker.snapshot = () => ({
     projects: [...tracker.projects.values()], ships: [...tracker.ships.values()], feed: [], eventSequence: 3,
   });

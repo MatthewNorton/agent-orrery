@@ -1,4 +1,5 @@
-/* settings.css — The settings dialog: graphics quality and recovering moved projects.
+/* settings.css — The settings dialog: graphics quality, backups, and recovering or forgetting
+   moved projects.
    Values come from tokens.css only. */
 .settings-dialog {
   width: min(680px, calc(100vw - 40px));
@@ -46,8 +47,8 @@
   cursor: pointer;
 }
 .settings-close:hover { color: var(--ink); background: var(--plate); }
-.settings-close:focus-visible, .settings-primary:focus-visible,
-.settings-locate:focus-visible, .settings-candidate-use:focus-visible {
+.settings-close:focus-visible, .settings-primary:focus-visible, .settings-locate:focus-visible,
+.settings-forget:focus-visible, .settings-candidate-use:focus-visible {
   outline: 2px solid var(--orange);
   outline-offset: 2px;
 }
@@ -73,7 +74,7 @@
 }
 .settings-actions { display: flex; align-items: center; gap: var(--space-3); }
 .settings-actions span { color: var(--ink-3); font-size: 12px; line-height: 1.4; }
-.settings-primary, .settings-locate, .settings-candidate-use {
+.settings-primary, .settings-locate, .settings-forget, .settings-candidate-use {
   flex: 0 0 auto;
   display: inline-flex; align-items: center; justify-content: center;
   border: 1px solid var(--hair-2);
@@ -85,10 +86,16 @@
   transition: background var(--dur-fast) var(--ease);
 }
 .settings-primary { min-width: 108px; height: var(--control-h-lg); padding: 0 12px; border-color: var(--armour); background: var(--armour); color: var(--on-armour); }
-.settings-locate, .settings-candidate-use { height: var(--control-h); padding: 0 10px; }
+.settings-locate, .settings-forget, .settings-candidate-use { height: var(--control-h); padding: 0 10px; }
 .settings-primary:hover:not(:disabled) { background: var(--armour-2); border-color: var(--armour-2); }
 .settings-locate:hover:not(:disabled), .settings-candidate-use:hover:not(:disabled) { background: var(--plate); }
-.settings-primary:disabled, .settings-locate:disabled, .settings-candidate-use:disabled { opacity: 0.45; cursor: default; }
+/* Forget is the quiet one: no frame until hovered, red only then. */
+.settings-forget { border-color: transparent; color: var(--ink-3); }
+.settings-forget:hover:not(:disabled) { color: var(--red); border-color: var(--hair-2); }
+.settings-primary:disabled, .settings-locate:disabled, .settings-forget:disabled,
+.settings-candidate-use:disabled { opacity: 0.45; cursor: default; }
+.settings-project-buttons { flex: 0 0 auto; display: flex; gap: 6px; }
+.settings-actions .settings-locate { height: var(--control-h-lg); }
 .settings-status {
   min-height: 18px;
   padding: 10px 1px 0;

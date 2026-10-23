@@ -24,9 +24,7 @@ function createRootTasksIpc(ctx) {
 
   function rootTaskMutationDenied(event) {
     if (!trustedMainFrame(event)) return rootTaskFailure('INVALID');
-    if (!ctx.tracker || ctx.activeSource !== ctx.tracker || ctx.replay.replayBoundaryOperations > 0) {
-      return rootTaskFailure('REPLAY');
-    }
+    if (!guards.showingLive(ctx)) return rootTaskFailure('REPLAY');
     if (!ctx.rootTaskCoordinator) return rootTaskFailure('FAILED');
     return null;
   }

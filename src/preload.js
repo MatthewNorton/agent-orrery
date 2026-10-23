@@ -30,6 +30,9 @@ contextBridge.exposeInMainWorld('AU', /** @satisfies {import('./types/contract')
   projectPathApply: (projectId, token) => (
     ipcRenderer.invoke('au:project-path-apply', projectId, token)
   ),
+  projectForget: (projectId) => ipcRenderer.invoke('au:project-forget', projectId),
+  universeExport: () => ipcRenderer.invoke('au:universe-export'),
+  universeImport: () => ipcRenderer.invoke('au:universe-import'),
   onProjectVcsStatusChanged: (cb) => (
     ipcRenderer.on('au:project-vcs-status-changed', (e, status, meta) => cb(status, meta))
   ),

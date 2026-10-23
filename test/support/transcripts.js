@@ -48,6 +48,12 @@ function appendJsonl(file, records, mtimeMs = Date.now()) {
   setMtime(file, mtimeMs);
 }
 
+// A universe-state.json left by an earlier run.
+function writeState(file, state) {
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, JSON.stringify(state));
+}
+
 function createWorld(t, { now = T0 } = {}) {
   t.mock.timers.enable({ apis: ['Date'], now });
   // onToolUse samples 12% of non-build tool calls into the feed.
@@ -194,6 +200,7 @@ module.exports = {
   iso,
   setMtime,
   appendJsonl,
+  writeState,
   createWorld,
   ofType,
   countTypes,

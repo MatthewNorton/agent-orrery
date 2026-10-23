@@ -103,6 +103,28 @@ class RootTaskStore {
     return publicRecord(record);
   }
 
+  // Many ideas in one write (a backup's). Invalid or already-queued text is skipped, and
+  // adding stops at the limit.
+  createMany(texts) {
+    const known = new Set(this.records.map((entry) => entry.text));
+    const ids = new Set(this.records.map((entry) => entry.id));
+    const timestamp = this.timestamp();
+    const added = [];
+    for (const value of texts) {
+      if (this.records.length + added.length >= MAX_RECORDS) break;
+      let text;
+      try { text = normalizeText(value); } catch { continue; }
+      if (known.has(text)) continue;
+      const id = normalizeId(this.randomUUID(), true);
+      if (ids.has(id)) throw storeError('Generated root task id already exists', 'ID_COLLISION');
+      known.add(text);
+      ids.add(id);
+      added.push({ id, text, projectId: null, phase: 'idea', createdAt: timestamp, updatedAt: timestamp });
+    }
+    if (added.length > 0) this.commit([...this.records, ...added]);
+    return added.map(publicRecord);
+  }
+
   remove(id) {
     const normalizedId = normalizeId(id, true);
     const index = this.records.findIndex((entry) => entry.id === normalizedId);

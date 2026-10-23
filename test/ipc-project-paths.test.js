@@ -9,14 +9,19 @@ const {
   deferred, fakeCtx, fakeTracker, liveProject, tempDir, trustedEvent, untrustedEvent,
 } = require('./support/main-wiring');
 
-// `next` answers each dialog; by default the user picks the search root.
+// `next` answers each folder dialog; by default the user picks the search root. `confirm`
+// answers the forget confirmation; by default the user forgets.
 function fakeElectron(documents) {
-  const electron = { dialogs: [], next: null };
+  const electron = { dialogs: [], next: null, confirm: async () => ({ response: 0 }) };
   electron.app = { getPath: (name) => (name === 'documents' ? documents : null) };
   electron.dialog = {
     async showOpenDialog(win, options) {
       electron.dialogs.push({ win, options });
       return electron.next();
+    },
+    async showMessageBox(win, options) {
+      electron.dialogs.push({ win, options });
+      return electron.confirm();
     },
   };
   return electron;
@@ -243,4 +248,43 @@ test('the dialog falls back to Documents when the old path has no usable ancesto
   electron.next = async () => ({ canceled: true, filePaths: [] });
   await paths.handleProjectPathLocate(event, 'alpha');
   assert.equal(electron.dialogs[0].options.defaultPath, documents);
+});
+
+test('forget asks first, then forgets the project and restarts the LIVE stream', async (t) => {
+  const { ctx, paths, electron, tracker, event } = pathsCtx(t);
+  ctx.replay.restartStream =() => ({ playback: { mode: 'live' }, streamEpoch: 2, snapshot: tracker.snapshot() });
+  electron.confirm = async () => ({ response: 1 });
+  assert.deepEqual(await paths.handleProjectForget(event, 'gamma'), { ok: true, canceled: true });
+  assert.deepEqual(tracker.forgotten, []);
+
+  electron.confirm = async () => ({ response: 0 });
+  const result = await paths.handleProjectForget(event, 'gamma');
+  assert.equal(result.ok, true);
+  assert.equal(result.canceled, false);
+  assert.equal(result.streamEpoch, 2);
+  assert.deepEqual(result.snapshot.projects.map((project) => project.id).sort(), ['alpha', 'beta']);
+  assert.deepEqual(tracker.forgotten, ['gamma']);
+  const { options } = electron.dialogs.at(-1);
+  assert.match(options.message, /gamma/);
+  assert.equal(options.defaultId, options.cancelId, 'Enter cancels');
+});
+
+test('forget refuses an agent at work, unknown ids, replay and other frames before asking', async (t) => {
+  const { ctx, paths, electron, tracker, event } = pathsCtx(t);
+  tracker.ships.set('ship-1', { id: 'ship-1', project: 'gamma' });
+  assert.deepEqual(await paths.handleProjectForget(event, 'gamma'), { ok: false, code: 'ACTIVE' });
+  assert.deepEqual(await paths.handleProjectForget(event, 'delta'), { ok: false, code: 'NOT_FOUND' });
+  assert.deepEqual(await paths.handleProjectForget(event, 'bad\nid'), { ok: false, code: 'INVALID' });
+  assert.deepEqual(await paths.handleProjectForget(untrustedEvent(ctx.win), 'alpha'), { ok: false, code: 'INVALID' });
+  ctx.activeSource = ctx.replaySource;
+  assert.deepEqual(await paths.handleProjectForget(event, 'alpha'), { ok: false, code: 'REPLAY' });
+  assert.equal(electron.dialogs.length, 0);
+
+  ctx.activeSource = tracker;
+  electron.confirm = async () => {
+    ctx.activeSource = ctx.replaySource;
+    return { response: 0 };
+  };
+  assert.deepEqual(await paths.handleProjectForget(event, 'alpha'), { ok: false, code: 'REPLAY' });
+  assert.deepEqual(tracker.forgotten, []);
 });

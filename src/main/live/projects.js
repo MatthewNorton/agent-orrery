@@ -7,14 +7,17 @@
 const fs = require('fs');
 const path = require('path');
 const { canonicalProjectPath, isLocalProjectPath } = require('../provider-adapters');
+const { localAbsolutePath } = require('../path-safety');
 const { hex8 } = require('../shared/hash');
 const { liveProject } = require('../universe/public-shape');
 const { queue, pushFeed, flush } = require('./events');
-const { saveState } = require('./state-file');
+const { saveState, serializeState, writeState } = require('./state-file');
+const { stillForgotten } = require('./forgotten');
+const { projectHasShips } = require('./ships');
 
 /**
  * @import { Project } from '../../types/contract'
- * @import { LiveModel, LiveProject } from '../../types/live-model'
+ * @import { LiveModel, LiveProject, PersistedProject } from '../../types/live-model'
  */
 
 function trackerPathError(code, message) {
@@ -74,6 +77,15 @@ function adoptProjectPath(model, project, projPath) {
   project.name = path.basename(projPath) || project.name;
   project.exists = isProjectDirectory(projPath);
   indexProjectPath(model, project);
+  announceProjectUpdated(model, project);
+}
+
+/**
+ * Tells the renderer a project changed and drops its cached system view.
+ * @param {LiveModel} model
+ * @param {LiveProject} project
+ */
+function announceProjectUpdated(model, project) {
   model.systemCache.delete(project.id);
   queue(model, { type: 'project-updated', project: liveProject(project) });
 }
@@ -85,14 +97,24 @@ function adoptProjectPath(model, project, projPath) {
  */
 function restoreRememberedProjects(model) {
   for (const [id, saved] of Object.entries(model.persisted.projects)) {
-    if (model.projects.has(id)) continue;
-    const projPath = preferredProjectPath(model, id, saved.path || null);
-    createProject(model, id, projPath, {
-      name: projPath ? undefined : saved.name,
-      lastActivity: saved.lastActivity || saved.firstSeen,
-      buckets: saved.buckets, totalBuilds: saved.totalBuilds, firstSeen: saved.firstSeen,
-    });
+    if (!model.projects.has(id)) restoreProject(model, id, saved);
   }
+}
+
+/**
+ * A project as the state file, or a backup, keeps it.
+ * @param {LiveModel} model
+ * @param {string} id
+ * @param {PersistedProject} saved
+ * @returns {LiveProject}
+ */
+function restoreProject(model, id, saved) {
+  const projPath = preferredProjectPath(model, id, saved.path || null);
+  return createProject(model, id, projPath, {
+    name: projPath ? undefined : saved.name,
+    lastActivity: saved.lastActivity || saved.firstSeen,
+    buckets: saved.buckets, totalBuilds: saved.totalBuilds, firstSeen: saved.firstSeen,
+  });
 }
 
 /**
@@ -104,8 +126,7 @@ function updateProjectExists(model, project) {
   const exists = isProjectDirectory(project.path);
   if (exists === project.exists) return;
   project.exists = exists;
-  model.systemCache.delete(project.id);
-  queue(model, { type: 'project-updated', project: liveProject(project) });
+  announceProjectUpdated(model, project);
 }
 
 /** @param {LiveModel} model */
@@ -125,15 +146,23 @@ function indexProjectPath(model, project) {
 }
 
 /**
+ * The project id a canonical path maps to. It can name a forgotten project (forgotten.js).
+ * @param {LiveModel} model
+ * @param {string | null} key
+ * @returns {string | null}
+ */
+function projectIdAtPath(model, key) {
+  return (key && (model.projectPathIndex.get(key) || model.pathIds[key])) || null;
+}
+
+/**
  * @param {LiveModel} model
  * @param {string} projectId
  * @param {string | null} discoveredPath
  */
 function preferredProjectPath(model, projectId, discoveredPath) {
-  const override = model.pathOverrides[projectId];
-  if (typeof override === 'string' && path.isAbsolute(override) && isLocalProjectPath(override)) {
-    return path.normalize(override);
-  }
+  const override = localAbsolutePath(model.pathOverrides[projectId]);
+  if (override) return override;
   return isLocalProjectPath(discoveredPath) ? discoveredPath : null;
 }
 
@@ -167,8 +196,8 @@ function remapProjectPath(model, projectId, nextPath) {
 
   const key = canonicalProjectPath(real);
   if (!key) throw trackerPathError('INVALID', 'project path is invalid');
-  const owner = model.projectPathIndex.get(key) || model.pathIds[key];
-  if (owner && owner !== projectId) {
+  const owner = projectIdAtPath(model, key);
+  if (owner && owner !== projectId && model.projects.has(owner)) {
     throw trackerPathError('IN_USE', 'project path is already assigned');
   }
   for (const other of model.projects.values()) {
@@ -222,6 +251,40 @@ function remapProjectPath(model, projectId, nextPath) {
 }
 
 /**
+ * Drops a project and its build history from the map and the state file, and records it as
+ * forgotten so its old transcripts don't bring it back. Refused while an agent works there.
+ * @param {LiveModel} model
+ * @param {string} projectId
+ * @param {number} [now]
+ */
+function forgetProject(model, projectId, now = Date.now()) {
+  const project = model.projects.get(projectId);
+  if (!project) throw trackerPathError('NOT_FOUND', 'project was not found');
+  if (projectHasShips(model.ships, projectId)) {
+    throw trackerPathError('ACTIVE', 'an agent is working in this project');
+  }
+  // The file is written first; memory changes only once the forgetting is saved. Path keys
+  // stay, now leading to the record.
+  const record = { at: now, path: project.path };
+  const out = serializeState(model);
+  delete out.projects[projectId];
+  delete out.pathOverrides[projectId];
+  out.forgotten[projectId] = record;
+  try {
+    writeState(model.statePath, out);
+  } catch {
+    throw trackerPathError('FAILED', 'the forgotten project could not be saved');
+  }
+  model.projects.delete(projectId);
+  delete model.pathOverrides[projectId];
+  model.forgotten[projectId] = record;
+  // Tails stop here but keep their offsets: a project that returns reads on from them.
+  for (const [fp, tail] of model.files) if (tail.project === projectId) model.files.delete(fp);
+  model.feed = model.feed.filter((entry) => entry.project !== projectId);
+  model.systemCache.delete(projectId);
+}
+
+/**
  * The project a Codex or Signal path belongs to, created on first sight.
  * @param {LiveModel} model
  * @param {string} projectPath
@@ -235,7 +298,7 @@ function ensureProjectForPath(model, projectPath, fallbackId, activity, totalByt
   if (typeof projectPath === 'string') projectPath = projectPath.trim();
   const key = canonicalProjectPath(projectPath);
   if (!key) return null;
-  let id = model.projectPathIndex.get(key) || model.pathIds[key];
+  let id = projectIdAtPath(model, key);
   if (!id) {
     const legacyClaudeId = String(projectPath).replace(/[^A-Za-z0-9]/g, '-');
     if (model.projects.has(legacyClaudeId) && !model.projects.get(legacyClaudeId).path) {
@@ -249,6 +312,7 @@ function ensureProjectForPath(model, projectPath, fallbackId, activity, totalByt
     }
   }
   let project = model.projects.get(id);
+  if (!project && stillForgotten(model, id, activity)) return null;
   const preferredPath = preferredProjectPath(model, id, projectPath);
   if (!project) {
     project = createProject(model, id, preferredPath, { lastActivity: activity, totalBytes, codexBytes: totalBytes });
@@ -266,11 +330,15 @@ module.exports = {
   isProjectDirectory,
   createProject,
   adoptProjectPath,
+  announceProjectUpdated,
   restoreRememberedProjects,
+  restoreProject,
   updateProjectExists,
   refreshProjectExistence,
   indexProjectPath,
+  projectIdAtPath,
   preferredProjectPath,
   remapProjectPath,
+  forgetProject,
   ensureProjectForPath,
 };

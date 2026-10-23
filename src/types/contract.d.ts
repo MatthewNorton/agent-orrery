@@ -361,7 +361,10 @@ export interface RootTasksChangedPush {
 // ---- moved-project recovery ----
 
 export type ProjectPathFailureCode =
-  | 'INVALID' | 'REPLAY' | 'BUSY' | 'NOT_FOUND' | 'NOT_MISSING' | 'IN_USE' | 'EXPIRED' | 'FAILED';
+  | 'INVALID' | 'REPLAY' | 'BUSY' | 'NOT_FOUND' | 'NOT_MISSING' | 'IN_USE' | 'EXPIRED'
+  /** Forget only: an agent is working in the project. */
+  | 'ACTIVE'
+  | 'FAILED';
 
 export interface ProjectPathCandidate {
   /** One-time token for `projectPathApply`. */
@@ -389,6 +392,34 @@ export interface ProjectPathRecoveryResult extends Outcome<ProjectPathFailureCod
   /** Locate only: the folder dialog was dismissed. */
   canceled?: boolean;
   project?: Project;
+}
+
+/**
+ * A forgotten project leaves the stream: success starts a new LIVE epoch and carries its
+ * snapshot, as `replay({ action: 'live' })` does.
+ */
+export interface ProjectForgetResult extends Outcome<ProjectPathFailureCode>, Partial<ReplayResult> {
+  /** The confirmation was dismissed; nothing changed. */
+  canceled?: boolean;
+}
+
+// ---- universe backup ----
+
+export type BackupFailureCode = 'INVALID' | 'REPLAY' | 'BUSY' | 'FAILED';
+
+export interface UniverseExportResult extends Outcome<BackupFailureCode> {
+  canceled?: boolean;
+  path?: string;
+  projects?: number;
+  ideas?: number;
+}
+
+/** Import merges and never removes; new projects arrive as `project-added` events. */
+export interface UniverseImportResult extends Outcome<BackupFailureCode> {
+  canceled?: boolean;
+  added?: number;
+  merged?: number;
+  ideas?: number;
 }
 
 // ---- the bridge ----
@@ -424,6 +455,11 @@ export interface AUBridge {
   projectPathsScan(): Promise<ProjectPathsScanResult>;
   projectPathLocate(projectId: string): Promise<ProjectPathRecoveryResult>;
   projectPathApply(projectId: string, token: string): Promise<ProjectPathRecoveryResult>;
+  /** LIVE only; main asks the user to confirm. */
+  projectForget(projectId: string): Promise<ProjectForgetResult>;
+  universeExport(): Promise<UniverseExportResult>;
+  /** LIVE only. */
+  universeImport(): Promise<UniverseImportResult>;
   /** LIVE only. */
   onProjectVcsStatusChanged(cb: (status: ProjectVcsStatus, meta: BatchMeta) => void): void;
 

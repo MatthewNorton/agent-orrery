@@ -37,13 +37,21 @@
 .pc-btn:hover { background: var(--plate); }
 .pc-btn.project-terminal { border-color: var(--armour); background: var(--armour); color: var(--on-armour); }
 .pc-btn.project-terminal:hover { background: var(--armour-2); border-color: var(--armour-2); }
-.pc-btn:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
+.pc-btn:focus-visible, .pc-forget:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
 .pc-btn:disabled, .pc-btn:disabled:hover { border-color: var(--hair); background: transparent; color: var(--ink-3); cursor: default; }
 .project-terminal[data-state='success'] { border-color: var(--green); }
+.pc-foot { display: flex; align-items: baseline; gap: 8px; padding: 6px var(--space-3) 8px; }
 .project-control-status {
-  min-height: 12px; margin: 0; padding: 6px var(--space-3) 8px;
+  flex: 1 1 auto; min-width: 0; min-height: 12px; margin: 0;
   color: var(--ink-3); font-family: var(--font-mono); font-size: 12px; line-height: 15px;
 }
+/* Forget sits quiet at the card's foot: rare, and main asks before anything is dropped. */
+.pc-forget {
+  flex: 0 0 auto; padding: 0; border: 0; background: transparent;
+  color: var(--ink-3); font: 500 12px/15px var(--font-sans); cursor: pointer;
+}
+.pc-forget:hover:not(:disabled) { color: var(--red); }
+.pc-forget:disabled { opacity: 0.45; cursor: default; }
 .project-control-status[data-state='success'] { color: var(--green); }
 .project-control-status[data-state='failure'] { color: var(--red); }
 .project-control-status[data-state='replay'] { color: var(--orange-ink); }

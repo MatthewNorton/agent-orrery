@@ -150,15 +150,31 @@
       actions.appendChild(terminal);
       card.appendChild(actions);
 
-      const status = AUR.el('div', 'project-control-status', presentation.note);
+      // A refused forget explains itself on that project's card until the next forget.
+      const forgetNote = S.projectForget.projectId === p.id ? S.projectForget.note : '';
+      const foot = AUR.el('div', 'pc-foot');
+      const status = AUR.el('div', 'project-control-status', forgetNote || presentation.note);
       status.id = 'project-control-status';
-      status.dataset.state = presentation.phase;
+      status.dataset.state = forgetNote ? 'failure' : presentation.phase;
       status.setAttribute('role', 'status');
       status.setAttribute('aria-live', 'polite');
       status.setAttribute('aria-atomic', 'true');
-      card.appendChild(status);
+      foot.appendChild(status);
+      if (S.current.view === 'system') foot.appendChild(forgetButton(p, ships, presentation));
+      card.appendChild(foot);
     }
   };
+
+  function forgetButton(p, ships, presentation) {
+    const working = ships.length > 0;
+    const button = AUR.button('pc-forget', 'Forget…', () => { A.forgetFromCard(p.id); });
+    button.id = 'project-forget';
+    button.disabled = working || S.projectForget.pending ||
+      presentation.phase === 'replay' || presentation.phase === 'transition';
+    button.title = working ? 'An agent is working in this project' : 'Forget this project and its build history';
+    button.setAttribute('aria-label', `Forget ${p.name}`);
+    return button;
+  }
 
   function pcRow(key, val, accent, tone) {
     const row = AUR.el('div', 'pc-row');

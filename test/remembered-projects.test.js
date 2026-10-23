@@ -9,12 +9,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { loadState } = require('../src/main/live/state-file');
 const { canonicalProjectPath } = require('../src/main/provider-adapters');
-const { createWorld } = require('./support/transcripts');
-
-function writeState(file, state) {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, JSON.stringify(state));
-}
+const { createWorld, writeState } = require('./support/transcripts');
 
 test('a version 1 file with no transcripts left still yields its projects, folder casing restored', (t) => {
   const w = createWorld(t);

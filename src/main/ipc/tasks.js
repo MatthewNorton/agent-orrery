@@ -13,7 +13,7 @@ function createTasksIpc(ctx) {
   /** @returns {TasksSnapshot | null} */
   function handleTasksGet(event, projectId) {
     if (!trustedMainFrame(event) || !validProjectId(projectId)) return null;
-    if (ctx.activeSource !== ctx.tracker || ctx.replay.replayBoundaryOperations > 0) return null;
+    if (!guards.showingLive(ctx)) return null;
     const cwd = ctx.ipc.terminal.liveProjectCwd(projectId);
     if (!cwd) return null;
     try {
@@ -29,7 +29,7 @@ function createTasksIpc(ctx) {
   /** @returns {TaskMutationResult} */
   function handleTaskAdd(event, projectId, text) {
     if (!trustedMainFrame(event) || !validProjectId(projectId) ||
-        ctx.activeSource !== ctx.tracker || ctx.replay.replayBoundaryOperations > 0) {
+        !guards.showingLive(ctx)) {
       return { ok: false, items: [] };
     }
     const cwd = ctx.ipc.terminal.liveProjectCwd(projectId);
@@ -44,7 +44,7 @@ function createTasksIpc(ctx) {
   /** @returns {TaskMutationResult} */
   function handleTaskSetDone(event, projectId, request) {
     if (!trustedMainFrame(event) || !validProjectId(projectId) ||
-        ctx.activeSource !== ctx.tracker || ctx.replay.replayBoundaryOperations > 0) {
+        !guards.showingLive(ctx)) {
       return { ok: false, items: [] };
     }
     const cwd = ctx.ipc.terminal.liveProjectCwd(projectId);
@@ -59,7 +59,7 @@ function createTasksIpc(ctx) {
   /** @returns {TaskMutationResult} */
   function handleTaskRemove(event, projectId, request) {
     if (!trustedMainFrame(event) || !validProjectId(projectId) ||
-        ctx.activeSource !== ctx.tracker || ctx.replay.replayBoundaryOperations > 0) {
+        !guards.showingLive(ctx)) {
       return { ok: false, items: [] };
     }
     const cwd = ctx.ipc.terminal.liveProjectCwd(projectId);

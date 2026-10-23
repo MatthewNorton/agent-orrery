@@ -18,9 +18,10 @@ const { classifyAttention, evaluateAttention } = require('./live/attention');
 const { saveState } = require('./live/state-file');
 const { getSystem, getPlanet } = require('./live/system-view');
 const {
-  refreshProjectExistence, preferredProjectPath, remapProjectPath, ensureProjectForPath,
+  refreshProjectExistence, preferredProjectPath, remapProjectPath, forgetProject, ensureProjectForPath,
   restoreRememberedProjects,
 } = require('./live/projects');
+const { createBackup, importProjects } = require('./live/backup');
 const { departIdleShips } = require('./live/ships');
 const { pollProviderFile, applyProviderSignals } = require('./live/provider-records');
 const { pollClaudeFile, parseLine } = require('./live/claude-records');
@@ -29,8 +30,9 @@ const { scanCodex } = require('./live/codex-source');
 const { scanSignals } = require('./live/signal-source');
 
 /**
- * @import { BuildHistogram, FeedEntry, PlanetData, Project, Ship, SystemData } from '../types/contract'
+ * @import { BuildHistogram, FeedEntry, PlanetData, Project, RootTaskItem, Ship, SystemData } from '../types/contract'
  * @import { LiveModel, LiveModelOptions } from '../types/live-model'
+ * @import { ParsedBackup } from './live/backup'
  */
 
 const SCAN_INTERVAL_MS = 3000;   // discover new projects / session files
@@ -149,6 +151,25 @@ class Tracker extends EventEmitter {
 
   remapProjectPath(projectId, nextPath) {
     return remapProjectPath(this.model, projectId, nextPath);
+  }
+
+  // Events queued so far go out first, in the stream the forget then ends.
+  forgetProject(projectId) {
+    flush(this.model);
+    forgetProject(this.model, projectId);
+  }
+
+  /** @param {RootTaskItem[]} ideas */
+  createBackup(ideas) {
+    return createBackup(this.model, ideas);
+  }
+
+  /** @param {ParsedBackup} backup */
+  importBackup(backup) {
+    const counts = importProjects(this.model, backup);
+    this.saveState();
+    flush(this.model);
+    return counts;
   }
 
   ensureProjectForPath(projectPath, fallbackId, activity, totalBytes = 0) {

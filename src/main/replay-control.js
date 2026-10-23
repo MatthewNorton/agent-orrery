@@ -167,9 +167,7 @@ function createReplayControl(ctx) {
         if (operation !== replayOperation) return replayResult(false);
         ctx.replaySource.pause();
         ctx.activeSource = ctx.replaySource;
-        ctx.streamEpoch++;
-        sendReplayState();
-        return replayResult(true);
+        return restartStream();
       } finally {
         replayBoundaryOperations = Math.max(0, replayBoundaryOperations - 1);
       }
@@ -192,6 +190,17 @@ function createReplayControl(ctx) {
     else if (action === 'pause') ctx.replaySource.pause();
     else ctx.replaySource.setSpeed(Number(command.speed));
     return replayResult(false);
+  }
+
+  /**
+   * A new stream epoch, so the renderer drops batches in flight and reseeds from the snapshot
+   * returned here: after a seek, or a LIVE change no event expresses (a forgotten project).
+   * @returns {ReplayResult}
+   */
+  function restartStream() {
+    ctx.streamEpoch++;
+    sendReplayState();
+    return replayResult(true);
   }
 
   function visibleProject(id) {
@@ -220,6 +229,7 @@ function createReplayControl(ctx) {
     sendReplayState,
     ensureReplayIndex,
     handleReplayCommand,
+    restartStream,
     reset,
   };
 }

@@ -44,7 +44,7 @@ function createTerminalIpc(ctx) {
   /** @returns {Promise<OpenTerminalResult>} */
   async function handleOpenTerminal(event, targetId) {
     if (!trustedMainFrame(event) || !validProjectId(targetId)) return terminalFailure('INVALID');
-    if (ctx.activeSource !== ctx.tracker || ctx.replay.replayBoundaryOperations > 0) return terminalFailure('REPLAY');
+    if (!guards.showingLive(ctx)) return terminalFailure('REPLAY');
     if (terminalLaunchInFlight || Date.now() < terminalLaunchCooldownUntil) {
       return terminalFailure('BUSY');
     }

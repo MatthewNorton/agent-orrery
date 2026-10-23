@@ -54,12 +54,19 @@ export interface PersistedProject {
   firstSeen?: number;
 }
 
+/** A project the user forgot: when, and the folder it showed then. */
+export interface ForgottenProject {
+  at: number;
+  path: string | null;
+}
+
 /** universe-state.json as an earlier run left it. */
 export interface PersistedState {
   version?: number;
   projects: Record<string, PersistedProject>;
   pathIds?: Record<string, string>;
   pathOverrides?: Record<string, string>;
+  forgotten?: Record<string, ForgottenProject>;
 }
 
 /**
@@ -113,6 +120,10 @@ export interface LiveModel {
   pathIds: Record<string, string>;
   /** Project id -> a path the user recovered by hand, saved across runs. */
   pathOverrides: Record<string, string>;
+  /** Project id -> when the user forgot it, saved across runs (live/forgotten.js). */
+  forgotten: Record<string, ForgottenProject>;
+  /** Claude project folder -> the forgotten project id its transcripts belong to. */
+  forgottenSlugs: Map<string, string>;
   projectPathIndex: Map<string, string>;
   codexTailsBySession: Map<string, LiveTail>;
   codexMetaCache: Map<string, { size: number; mtimeMs: number; meta: any }>;

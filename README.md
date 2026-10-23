@@ -45,6 +45,8 @@ npm start
 
 The app discovers projects and sessions by tailing your local Claude Code / Codex transcript directories. Click a system on the universe map to enter it, click a planet to get close, and use the timeline to replay history.
 
+A project stays on the map after Claude Code or Codex prune its transcripts. Settings (⚙) can export the whole universe to one file and merge it back in on a new machine or a fresh install. Settings can also forget a project you no longer want, as can the project card in its system view; it comes back only if an agent works there again.
+
 ## Development
 
 ```sh

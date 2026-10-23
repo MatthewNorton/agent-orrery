@@ -109,6 +109,11 @@
     A.renderChromeNow(CHROME.FEED);
   }
 
+  /** @param {ReplayResult} result */
+  A.adoptLiveRestart = function adoptLiveRestart(result) {
+    adoptReplayResult(result, true);
+  };
+
   A.rebuildRoute = function rebuildRoute(route) {
     if (!route || route.view === 'universe' || !route.projectId ||
         !S.store.projects.has(route.projectId)) {

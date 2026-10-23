@@ -10,6 +10,7 @@ const { createTerminalIpc } = require('../src/main/ipc/terminal');
 const { createTasksIpc } = require('../src/main/ipc/tasks');
 const { createRootTasksIpc } = require('../src/main/ipc/root-tasks');
 const { createProjectPathsIpc } = require('../src/main/ipc/project-paths');
+const { createBackupIpc } = require('../src/main/ipc/backup');
 const {
   callNames, fakeCtx, fakeTracker, liveProject, tempDir, trustedEvent, untrustedEvent,
 } = require('./support/main-wiring');
@@ -39,6 +40,9 @@ const CALLS = {
   'au:project-paths-scan': [[], INVALID],
   'au:project-path-locate': [['lost'], INVALID],
   'au:project-path-apply': [['lost', 'token'], INVALID],
+  'au:project-forget': [['alpha'], INVALID],
+  'au:universe-export': [[], INVALID],
+  'au:universe-import': [[], INVALID],
   'au:replay': [[{ action: 'seek', ts: 5_000 }], null],
 };
 
@@ -68,6 +72,14 @@ function fakeElectron(documents) {
       async showOpenDialog(...args) {
         recorded.dialogs.push(args);
         return { canceled: true, filePaths: [] };
+      },
+      async showSaveDialog(...args) {
+        recorded.dialogs.push(args);
+        return { canceled: true, filePath: '' };
+      },
+      async showMessageBox(...args) {
+        recorded.dialogs.push(args);
+        return { response: 1 };
       },
     },
   };
@@ -103,6 +115,7 @@ function wired(t, { flags = {} } = {}) {
     tasks: createTasksIpc(ctx),
     rootTasks: createRootTasksIpc(ctx),
     projectPaths: createProjectPathsIpc(ctx, electron),
+    backup: createBackupIpc(ctx, electron),
   };
   registerIpc(ctx, { replay: ctx.replay, ...ctx.ipc }, electron);
   t.after(() => ctx.replay.reset());
@@ -129,6 +142,7 @@ test('every handler rejects a call from any frame but the trusted main frame, wi
   assert.deepEqual(launches, []);
   assert.deepEqual(ctx.rootTaskCoordinator.calls, []);
   assert.deepEqual(ctx.tracker.remapped, []);
+  assert.deepEqual(ctx.tracker.forgotten, []);
   assert.deepEqual(ctx.replaySource.calls, []);
   assert.deepEqual(ctx.harness.openedProjects, []);
   assert.equal(ctx.activeSource, ctx.tracker);
@@ -143,7 +157,8 @@ test('the same calls from the trusted main frame reach their services', async (t
     if (channel !== 'au:open') assert.notDeepEqual(result, rejected, channel);
   }
   assert.deepEqual(electron.recorded.shell.map(([name]) => name), ['openPath', 'openExternal']);
-  assert.equal(electron.recorded.dialogs.length, 2);
+  // Scan, locate, forget confirmation, export and import; each dismissed.
+  assert.equal(electron.recorded.dialogs.length, 5);
   assert.deepEqual(ctx.rootTaskCoordinator.calls.map(([name]) => name), [
     'snapshot', 'create', 'remove', 'assign', 'retry',
   ]);

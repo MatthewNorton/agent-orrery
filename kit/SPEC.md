@@ -120,6 +120,22 @@ AU.onRootTasksChanged(cb)              // cb({taskId, phase})
 AU.projectPathsScan()                  -> Promise<{ok, root, matches, truncated, …}>
 AU.projectPathLocate(projectId)        -> Promise<…>
 AU.projectPathApply(projectId, token)  -> Promise<…>   // token from scan/locate
+
+// Forgetting a project (settings dialog, system-view project card), LIVE only
+AU.projectForget(projectId)            -> Promise<{ok, canceled, playback, streamEpoch, snapshot}
+                                                  | {ok:false, code}>
+   // main confirms with a native dialog; refused with ACTIVE while a ship is in the project.
+   // Success starts a new LIVE stream epoch: the renderer reseeds from `snapshot` and rebuilds
+   // its route (no project-removed event exists). The project is recorded as forgotten in
+   // universe-state.json and stays off the map while its transcripts only hold older work;
+   // newer activity brings it back as a new system. History playback still shows it.
+
+// Universe backup (settings dialog)
+AU.universeExport()                    -> Promise<{ok, canceled, path, projects, ideas}>
+AU.universeImport()                    -> Promise<{ok, canceled, added, merged, ideas}>  // LIVE only
+   // One JSON file: universe-state.json as the model stands plus the IDEAS queue's texts.
+   // Import merges (larger build counts, earlier firstSeen, later lastActivity) and never
+   // removes; new projects arrive as project-added events, imported ideas as new items.
 ```
 
 ```js
