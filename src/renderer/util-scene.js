@@ -170,6 +170,61 @@
     return typeof node.getChildMeshes === 'function' ? [node, ...node.getChildMeshes(false)] : [node];
   };
 
+  // The hull a ship mesh flies: the asset swapped in under a dart, or the asset root itself.
+  AUR.shipHullId = function (mesh) {
+    const metadata = mesh && mesh.metadata;
+    return (metadata && (metadata.upgradedHullId || metadata.assetHullId)) || null;
+  };
+
+  // The connected pieces of a mesh (triangles sharing a vertex position), each as its centre and
+  // the radius of its vertices about it: a hull's glow discs, joined into one mesh but never welded.
+  AUR.meshIslands = function (positions, indices) {
+    const count = positions.length / 3;
+    const parent = new Int32Array(count);
+    // A flat-shaded export gives every face its own vertices: weld them by position first.
+    const firstAt = new Map();
+    for (let i = 0; i < count; i++) {
+      const key = positions[i * 3] + ',' + positions[i * 3 + 1] + ',' + positions[i * 3 + 2];
+      const first = firstAt.get(key);
+      if (first === undefined) firstAt.set(key, i);
+      parent[i] = first === undefined ? i : first;
+    }
+    const find = (i) => {
+      while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; }
+      return i;
+    };
+    for (let i = 0; i + 2 < indices.length; i += 3) {
+      const root = find(indices[i]);
+      parent[find(indices[i + 1])] = root;
+      parent[find(indices[i + 2])] = root;
+    }
+    const members = new Map();
+    for (let i = 0; i < count; i++) {
+      const root = find(i);
+      if (!members.has(root)) members.set(root, []);
+      members.get(root).push(i);
+    }
+    const islands = [];
+    for (const vertices of members.values()) {
+      if (vertices.length < 3) continue;
+      const center = [0, 0, 0];
+      for (const v of vertices) for (let k = 0; k < 3; k++) center[k] += positions[v * 3 + k] / vertices.length;
+      let radius = 0;
+      for (const v of vertices) {
+        radius = Math.max(radius, Math.hypot(positions[v * 3] - center[0], positions[v * 3 + 1] - center[1], positions[v * 3 + 2] - center[2]));
+      }
+      islands.push({ center, radius });
+    }
+    return islands;
+  };
+
+  // The stern nozzles among a hull's glow islands ({ position: { z } }, +Z the nose): those within
+  // `share` of the hull's length of the aft-most one. Lit intakes forward of it are no exhaust.
+  AUR.sternIslands = function (islands, length, share) {
+    const stern = Math.min(...islands.map((island) => island.position.z));
+    return islands.filter((island) => island.position.z - stern <= length * share);
+  };
+
   // A missing node counts as disposed.
   AUR.isNodeDisposed = function (node) {
     if (!node) return true;

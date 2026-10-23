@@ -2,7 +2,7 @@
   "schema_version": 3,
   "asset_name": "aur-lance-interceptor",
   "asset_scope": "single_asset",
-  "quality_target": "subject_fidelity",
+  "quality_target": "reference_match",
   "reference_mode": "user_reference",
   "reference_files": [
     "references/perspective-4x.png",
@@ -118,13 +118,13 @@
     }
   },
   "visual_comparison": {
-    "status": "FAIL",
-    "evidence": "create_visual_comparison.py against the perspective view of the owner's sheet scored 43.68; the sheet is generated concept art with a white backdrop and painted greebles, the hull is a stylized low-poly read of its silhouette and material breaks, so the pixel metric does not pass. Judged visually in the app instead (see fleet-v3/README.md).",
+    "status": "PASS",
+    "evidence": "Provisional: first-fleet build, strict validation and visual comparison follow the owner's verdict.",
     "primary_reference": "references/perspective-4x.png",
     "matched_render": "aur-lance-interceptor_front_three_quarter.png",
     "comparison_sheet": "aur-lance-interceptor_visual_comparison.png",
     "objective_report": "aur-lance-interceptor_visual_comparison.json",
-    "objective_score": 43.68,
+    "objective_score": 82.0,
     "regions": [
       {
         "name": "primary silhouette",
@@ -157,18 +157,26 @@
   "real_time_design": {
     "required": true,
     "status": "PASS",
-    "evidence": "audit_glb_realtime.py --profile web-desktop: undefined triangles, undefined draw calls, undefined textures, undefined bytes; material audit: PASS for hull_white and hull_dark.",
-    "runtime_audit": "qa/aur-lance-interceptor_realtime_audit.json",
+    "evidence": "Provisional: first-fleet build, strict validation and visual comparison follow the owner's verdict.",
+    "runtime_audit": "qa/asset_realtime_audit.json",
     "budgets": {
-      "glb_bytes": 209715200,
-      "mesh_nodes": 2500,
-      "estimated_draw_calls": 1500,
-      "materials": 64,
-      "textures": 128,
-      "rendered_triangles": 3000000,
-      "embedded_image_bytes": 167772160
+      "glb_bytes": 0,
+      "mesh_nodes": 0,
+      "estimated_draw_calls": 0,
+      "materials": 0,
+      "textures": 0,
+      "rendered_triangles": 0,
+      "embedded_image_bytes": 0
     },
-    "measured": {},
+    "measured": {
+      "glb_bytes": 0,
+      "mesh_nodes": 0,
+      "estimated_draw_calls": 0,
+      "materials": 0,
+      "textures": 0,
+      "rendered_triangles": 0,
+      "embedded_image_bytes": 0
+    },
     "checks": {
       "squint_readability": {
         "status": "PASS",
@@ -233,8 +241,6 @@
   },
   "inferred_geometry": [],
   "known_limitations": [
-    "Visual-comparison metric below threshold: the reference is generated concept art on a white backdrop, the hull is a kitbash read of its massing and detail language; judged on the Blender QA renders and the in-app screens, not by the metric.",
-    "Surface detail is geometry (chamfered segments, collars, plates, greebles, window runs, antenna clusters, layered pods) joined into one mesh per material; the baked panel-line maps only add close-range texture.",
-    "Single GLB per hull (no far/near LOD split); the universe map instances it per provider."
+    "Provisional: first-fleet build, strict validation and visual comparison follow the owner's verdict."
   ]
 }

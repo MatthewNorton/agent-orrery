@@ -29,7 +29,7 @@
     // ---- visuals ----
     function recordVisualNodes(rec) {
       const nodes = AUR.nodeFamily(rec.mesh);
-      if (!nodes.includes(rec.trail)) nodes.push(rec.trail);
+      for (const plume of rec.plumes) nodes.push(plume.trail);
       return nodes;
     }
 

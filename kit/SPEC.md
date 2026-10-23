@@ -281,13 +281,18 @@ Design tokens (put in `:root`):
   the provider, and the universe legend lists "Local model".
   Missing provider values in legacy fixtures normalize to Claude; raw/unknown
   values normalize to Signal.
-- Fleet hulls (`assets/ships/fleet-v3`) carry authored hull maps the app never
-  repaints; the livery is the provider color on `accent_livery` and
-  `engine_glow` only, `window_light` glows cool white, and `canopy_glass` takes
-  a faint tint (`materialRole` in `ship-assets-hulls.js`). Every fleet material
-  gets a procedural studio environment for reflections; the system and planet
-  views add a viewer-relative key and rim that only ship meshes see
-  (`AUR.shipLights`).
+- Fleet hulls (`assets/ships/fleet-v3`) carry authored hull maps the app keeps
+  as baked (`hull_white`, `hull_grey`, `hull_dark`). The ship color is the
+  hull's trim lighting: `accent_livery` (stripes, chevrons, collars) and
+  `engine_glow` emit it over a dark surface (Claude terracotta, Codex pearl, a
+  local model red; linearized for the PBR slot, at 1.5x so a line outshines the
+  lit hull) and the system view's glow pass blooms them. The root's unlit evidence material
+  carries the exact hex. `window_light` is a cool lit pane and `canopy_glass`
+  keeps its authored smoke with stronger reflections (`materialRole` in
+  `ship-assets-hulls.js`). Every
+  fleet material gets a procedural studio environment for reflections; the
+  system and planet views add a viewer-relative key and rim that only ship
+  meshes see (`AUR.shipLights`).
 - Main Claude/Codex ships fly the `aur-fleet-v3` rank ladder in
   `assets/ships/manifest.json`: the hull is the highest rank whose `minBuilds`
   the ship's `builds` has reached (Scout 0, Workhorse 5, Capital 20, Flagship
@@ -400,7 +405,9 @@ Data: `AU.getSystem(projectId)`.
   annulus between two middle orbits, slow rotation.
 - Ships (only ships where `ship.project === projectId`): the hull of §4 (a dart
   until it loads) + name label (GUI, always visible, like `Claude-1` callouts in
-  the mockup) + short trail. Modes: `patrol` outside the last orbit and the
+  the mockup) + an exhaust plume from each stern nozzle (the `exhaust` part
+  reads them off the hull's `engine_glow` islands; a dart trails from its
+  tail). Modes: `patrol` outside the last orbit and the
   belt; on `build` → `flyto` (`AUR.MOTION.flyToSeconds`, arcing over the belt
   and the largest planet) to a standoff beside the `bucket` planet → `hold`
   (~2.4s, a thin emissive beam, planet pulses 1 → 1.15 → 1) → `return` to the

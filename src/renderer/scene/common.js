@@ -78,8 +78,8 @@
   };
 
   // A ship's mesh: a transmission glyph for signals, else its hull, or a dart until the hull loads
-  // (upgrade is that load's promise, null otherwise). Names start with prefix; `size` is the view's
-  // AUR.SHIP_SIZE entry, and the root carries the resulting scale (the views animate it).
+  // under it. Names start with prefix; `size` is the view's AUR.SHIP_SIZE entry, and the root
+  // carries the resulting scale (the views animate it).
   AUR.shipMesh = function (scene, ship, prefix, size) {
     const tint = AUR.shipTint(ship.id, ship.provider);
     const signal = AUR.isSignalEntity(ship);
@@ -91,8 +91,8 @@
     if (usedFallback) mesh = AUR.dartMesh(scene, prefix + 'shp_' + ship.id, tint);
     mesh.scaling.setAll(scale);
     const provider = AUR.markShipMesh(mesh, ship);
-    const upgrade = usedFallback ? AUR.ships.upgrade(scene, ship, mesh) : null;
-    return { mesh, tint, providerKey: provider.key, upgrade, scale };
+    if (usedFallback) AUR.ships.upgrade(scene, ship, mesh);
+    return { mesh, tint, providerKey: provider.key, scale };
   };
 
   // The teardown every view ends with, after its own.

@@ -108,6 +108,6 @@ CC0-1.0.
 
 The active fleet: four original hulls (Scout, Workhorse, Capital, Flagship) kitbashed in Blender from
 the owner's reference sheet, with authored panel-line maps baked into each GLB. Both Claude and
-Codex fly them; the provider colors only the livery stripes and engine glow. Sources, build scripts,
+Codex fly them; the provider color is the hull's trim lighting (livery stripes and engine glow). Sources, build scripts,
 QA renders and audits live under `fleet-v3/`; see `fleet-v3/README.md`. Design, geometry and
 textures: CC0-1.0.

@@ -57,6 +57,7 @@
   AUR.PROVIDERS = PROVIDERS;
   // A session on a local model keeps its provider identity but flies red.
   AUR.LOCAL_MODEL = Object.freeze({ key: 'local', label: 'Local model', color: '#ff3344' });
+  // The fleet's livery stripes: ink on a light hull, pearl on a dark or saturated one.
   AUR.FEED_KIND = {
     build: '#4da3ff', form: '#ffb454', spawn: '#34d399',
     depart: '#8b93a8', info: '#8b93a8', discover: '#a78bfa',

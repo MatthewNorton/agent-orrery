@@ -12,7 +12,7 @@
     "embedded_image_bytes": 167772160
   },
   "metrics": {
-    "glb_bytes": 783020,
+    "glb_bytes": 783024,
     "nodes": 8,
     "mesh_nodes": 7,
     "mesh_definitions": 7,

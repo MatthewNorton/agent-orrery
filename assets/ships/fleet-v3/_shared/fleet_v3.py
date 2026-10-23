@@ -3,9 +3,9 @@ panel-line maps, livery, glow, glass, windows), the four-view QA rig and the exp
 script defines its geometry with kitbash.py and calls run().
 
 Conventions: meters; forward is +Y, up is +Z, X is starboard (the app's manifest correction
-rotateY=pi applies). Blender owns the hull surfaces (maps baked here into the GLB); the app tints
-only `accent_livery`, `engine_glow` and faintly `canopy_glass` per provider, and lights
-`window_light` its own way (kit/SPEC.md section 4).
+rotateY=pi applies). Blender owns the hull surfaces (maps baked here into the GLB); the app makes
+`accent_livery` and `engine_glow` trim lights in the ship color, lights `window_light` its own way
+and leaves `canopy_glass` and the hull tones alone (kit/SPEC.md section 4).
 """
 
 import json

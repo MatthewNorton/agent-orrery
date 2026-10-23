@@ -116,8 +116,8 @@ def build(col, root, M):
     for side in (1, -1):
         bx = 2.45
 
-        def fp(y, h, side=side):
-            return (side * (bx + h * math.sin(cant)), y, wing_z(bx) + h * math.cos(cant))
+        def fp(y, h):
+            return (bx + h * math.sin(cant), y, wing_z(bx) + h * math.cos(cant))
 
         normal = (side * math.cos(cant) * 0.12, 0.0, -math.sin(cant) * 0.12)
 
