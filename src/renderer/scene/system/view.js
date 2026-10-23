@@ -1,17 +1,11 @@
-// One project's solar system: central sun, orbit rings,
-// textured planets and the agent-focus camera (chase or first person). The asteroid belt, the
-// ships and the focus fade are the belt, ships and focus parts in this folder.
+// One project's solar system: central sun, orbit rings and textured planets. The asteroid belt,
+// the ships and agent focus (its camera and the fade of the other ships) are the belt, ships and
+// focus parts in this folder.
 'use strict';
 
 (function () {
   const AUR = window.AUR;
   const POLISH = window.AUR_POLISH;
-  const SHIP_FOCUS_VANTAGE_YAW = Object.freeze({
-    forward: 0,
-    starboard: Math.PI / 2,
-    aft: Math.PI,
-    port: -Math.PI / 2,
-  });
 
   AUR.views.system = function (engine, data, ctx) {
     const store = ctx.store;
@@ -75,11 +69,10 @@
     const beltR = planetList.length >= 2 ? (orbitR(Math.floor(planetList.length / 2) - 1) + orbitR(Math.floor(planetList.length / 2))) / 2 : outer + 4;
     const view = {
       scene, gui, sys, projectId, orbitR, outer, beltR, beltWidth: 3.4, planets, ships,
-      shipFocus: null, buildPlanet, clearShipFocus,
+      camera, canvas, shipFocus: null, buildPlanet,
     };
     const parts = AUR.sceneParts.system;
     Object.assign(view, parts.ships(view), parts.focus(view));
-    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     scene.metadata = {
       view: 'system',
@@ -144,169 +137,36 @@
 
     const belt = parts.belt(view);
 
-    // ---- focus camera ----
-    const focusCamera = new BABYLON.UniversalCamera(
-      'ship-focus-camera', BABYLON.Vector3.Zero(), scene);
-    focusCamera.inputs.clear();
-    focusCamera.fov = 0.84;
-    focusCamera.minZ = 0.03;
-    focusCamera.maxZ = 6000;
-    const focusForward = new BABYLON.Vector3();
-    const focusUp = new BABYLON.Vector3();
-    const focusRight = new BABYLON.Vector3();
-    const focusVantageDirection = new BABYLON.Vector3();
-    const focusDesired = new BABYLON.Vector3();
-    const focusLookDesired = new BABYLON.Vector3();
-    const focusLookCurrent = new BABYLON.Vector3();
-    const focusOffset = new BABYLON.Vector3();
-    const focusChaseOffset = new BABYLON.Vector3();
-    // The chase camera in hull diagonals: how far back it stands, how high, and how far it swings
-    // off the vantage so a long hull shows its length, not its stern.
-    const CHASE = { distance: 1.2, rise: 0.45, yaw: 0.6 };
-
-    function updateShipFocusCamera(immediate, dt) {
-      const { shipFocus } = view;
-      const rec = shipFocus && ships.get(shipFocus.shipId);
-      if (!rec || !rec.mesh) return;
-      const shipPosition = rec.mesh.getAbsolutePosition();
-      rec.mesh.getDirectionToRef(BABYLON.Axis.Z, focusForward);
-      rec.mesh.getDirectionToRef(BABYLON.Axis.Y, focusUp);
-      if (focusForward.lengthSquared() < 0.0001) focusForward.set(0, 0, 1);
-      if (focusUp.lengthSquared() < 0.0001) focusUp.set(0, 1, 0);
-      focusForward.normalize();
-      focusUp.normalize();
-      BABYLON.Vector3.CrossToRef(focusUp, focusForward, focusRight);
-      if (focusRight.lengthSquared() < 0.0001) focusRight.set(1, 0, 0);
-      focusRight.normalize();
-
-      const yaw = (SHIP_FOCUS_VANTAGE_YAW[shipFocus.vantage] || 0) + (shipFocus.exterior ? CHASE.yaw : 0);
-      focusForward.scaleToRef(Math.cos(yaw), focusVantageDirection);
-      focusRight.scaleToRef(Math.sin(yaw), focusOffset);
-      focusVantageDirection.addInPlace(focusOffset).normalize();
-
-      const followRate = reducedMotion
-        ? AUR.MOTION.reducedFocusFollowRate
-        : AUR.MOTION.focusFollowRate;
-      const amount = immediate ? 1 : AUR.dampedAmount(followRate, dt);
-      if (shipFocus.exterior) {
-        // Chase camera: a three-quarter view from behind and above, looking at the hull. It rides
-        // the ship's position and eases only its offset, so a turn swings it around the hull and
-        // the ship's own motion never pulls it away.
-        const back = Math.max(0.25, hullSpan(rec) * CHASE.distance);
-        place(focusDesired, BABYLON.Vector3.ZeroReadOnly, -back, back * CHASE.rise);
-        BABYLON.Vector3.LerpToRef(focusChaseOffset, focusDesired, amount, focusChaseOffset);
-        shipPosition.addToRef(focusChaseOffset, focusCamera.position);
-        focusLookCurrent.copyFrom(shipPosition);
-      } else {
-        // First person: the eye just inside the hull, looking far ahead along the vantage.
-        place(focusDesired, shipPosition, 0.28, 0.18);
-        place(focusLookDesired, shipPosition, 18.28, 0.53);
-        BABYLON.Vector3.LerpToRef(focusCamera.position, focusDesired, amount, focusCamera.position);
-        BABYLON.Vector3.LerpToRef(focusLookCurrent, focusLookDesired, amount, focusLookCurrent);
-      }
-      focusCamera.setTarget(focusLookCurrent);
-    }
-
-    // out = the ship's position, `along` units down the vantage direction and `rise` units up.
-    function place(out, shipPosition, along, rise) {
-      out.copyFrom(shipPosition);
-      focusVantageDirection.scaleToRef(along, focusOffset);
-      out.addInPlace(focusOffset);
-      focusUp.scaleToRef(rise, focusOffset);
-      out.addInPlace(focusOffset);
-    }
-
-    // The hull's diagonal this frame: measured once per hull node (the asset root under the dart,
-    // the dart alone until its hull arrives) per unit of the ship's scaling, then scaled by the
-    // size the pixel floor gives the ship right now.
-    function hullSpan(rec) {
-      const { shipFocus } = view;
-      const node = rec.mesh.getChildren()[0] || rec.mesh;
-      if (shipFocus.measured !== node) {
-        const bounds = node.getHierarchyBoundingVectors();
-        const diagonal = bounds.max.subtract(bounds.min).length() / (rec.mesh.scaling.x || 1);
-        shipFocus.measured = node;
-        shipFocus.unitSpan = Number.isFinite(diagonal) && diagonal > 0 ? diagonal : 1.2;
-      }
-      return shipFocus.unitSpan * rec.mesh.scaling.x;
-    }
-
-    function focusShip(shipId, settings) {
-      const id = String(shipId || '');
-      const rec = ships.get(id);
-      if (!rec) return false;
-      clearShipFocus();
-      view.shipFocus = { shipId: id, vantage: 'forward', exterior: true, saved: new Map(), measured: null, unitSpan: 0 };
-      setShipFocus(settings);
-      camera.detachControl(canvas);
-      scene.activeCamera = focusCamera;
-      focusLookCurrent.copyFrom(rec.mesh.getAbsolutePosition());
-      updateShipFocusCamera(true, 0);
-      return true;
-    }
-
-    // Where the viewer sits: `vantage` (a heading in SHIP_FOCUS_VANTAGE_YAW) and `exterior` (the
-    // chase camera outside the hull, else a first-person room inside it).
-    function setShipFocus(settings) {
-      const { shipFocus } = view;
-      if (!shipFocus) return false;
-      const { vantage, exterior } = settings || {};
-      shipFocus.vantage = typeof vantage === 'string' && Object.hasOwn(SHIP_FOCUS_VANTAGE_YAW, vantage) ? vantage : 'forward';
-      shipFocus.exterior = exterior !== false;
-      for (const item of ships.values()) view.applyShipFocusVisual(item);
-      return true;
-    }
-
-    function clearShipFocus() {
-      if (!view.shipFocus) return;
-      view.restoreShipFocusVisuals();
-      view.shipFocus = null;
-      scene.activeCamera = camera;
-      camera.attachControl(canvas, true);
-    }
-
-    function shipFocusState() {
-      const { shipFocus } = view;
-      const rec = shipFocus && ships.get(shipFocus.shipId);
-      if (!rec) return null;
-      const target = rec.fly && rec.fly.planet && rec.fly.planet.mesh &&
-        rec.fly.planet.mesh.metadata ? rec.fly.planet.mesh.metadata.planetName : 'System patrol';
-      const x = rec.mesh.position.x;
-      const z = rec.mesh.position.z;
-      const mapRadius = Math.max(1, outer, rec.r);
-      return {
-        shipId: rec.id,
-        mode: rec.mode,
-        vantage: shipFocus.vantage,
-        target,
-        map: {
-          angle: Math.atan2(z, x),
-          radiusRatio: AUR.clamp(Math.hypot(x, z) / mapRadius, 0, 1),
-        },
-      };
-    }
-
     // ---- ships ----
     AUR.shipLights(scene);
     for (const s of store.ships.values()) if (s.project === projectId) view.buildShip(s);
 
     // ---- interaction ----
     let hovered = null;
+    // Takes back the hovered planet's label and cursor.
+    function leaveHover() {
+      const left = hovered && planets.get(hovered);
+      if (left && !left.persistent) left.label.isVisible = false;
+      canvas.style.cursor = 'default';
+      hovered = null;
+    }
     scene.onPointerObservable.add((pi) => {
-      if (pi.type === BABYLON.PointerEventTypes.POINTERPICK) {
+      if (view.shipFocus) {
+        leaveHover(); // the followed ship owns the pointer: no planet opens or lights up
+        view.orbitShipFocus(pi);
+      } else if (pi.type === BABYLON.PointerEventTypes.POINTERPICK) {
         const m = pi.pickInfo && pi.pickInfo.pickedMesh;
         if (m && m.metadata && m.metadata.isPlanet) ctx.openPlanet(projectId, m.metadata.planetName);
       } else if (pi.type === BABYLON.PointerEventTypes.POINTERMOVE) {
         const pick = scene.pick(scene.pointerX, scene.pointerY, (mm) => mm.metadata && mm.metadata.isPlanet);
         const hit = pick && pick.hit ? pick.pickedMesh.metadata.planetName : null;
-        canvas.style.cursor = hit ? 'pointer' : 'default';
         if (hit !== hovered) {
-          const left = hovered && planets.get(hovered);
+          leaveHover();
           const entered = hit && planets.get(hit);
-          if (left && !left.persistent) left.label.isVisible = false;
           if (entered) Object.assign(entered.label, { isVisible: true, alpha: 0.98 });
           hovered = hit;
         }
+        canvas.style.cursor = hit ? 'pointer' : 'default';
       }
     });
 
@@ -338,19 +198,19 @@
       belt.rotation.y += dt * 0.03;
 
       view.animateShips(dt, now, t);
-      if (view.shipFocus) updateShipFocusCamera(false, dt);
+      if (view.shipFocus) view.updateShipFocusCamera(false, dt);
     });
 
     return {
       scene,
       systemData: sys,
       update: view.update,
-      focusShip,
-      setShipFocus,
-      clearShipFocus,
-      shipFocusState,
+      focusShip: view.focusShip,
+      setShipFocus: view.setShipFocus,
+      clearShipFocus: view.clearShipFocus,
+      shipFocusState: view.shipFocusState,
       dispose() {
-        clearShipFocus();
+        view.clearShipFocus();
         AUR.disposeView(scene, gui);
       },
     };

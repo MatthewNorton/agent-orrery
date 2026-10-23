@@ -71,8 +71,10 @@ shared `store`, the graphics `quality` tier and the `galaxyFields` cache. Views 
 the app fills in a no-op default for any they leave out (`VIEW_DEFAULTS` in `app/boot.js`).
 Agent focus (`focusShip(id, settings)`, `setShipFocus(settings)`) takes `{ vantage, exterior }`:
 `exterior` (the default environment, a chase camera outside the hull that stands off by the hull's
-own span) or one of the first-person rooms, each a `camera: 'room'` entry in
-`C.AGENT_FOCUS_ENVIRONMENTS`.
+own span; a left drag orbits it and the wheel zooms, as in the system view, and a chosen vantage or
+environment re-seats it) or one of the first-person rooms, each a `camera: 'room'` entry in
+`C.AGENT_FOCUS_ENVIRONMENTS`. The overlay never takes the pointer itself (its button groups do):
+the scene gets it, and the view spends it on the chase camera's orbit or, in a room, ignores it.
 Three more members are optional and have no default: the `planetData` field, read through
 `A.activePlanetData()`, and the `systemData` field and `clearShipFocus()` method, which
 `app/agent-focus.js` checks for before using them.
