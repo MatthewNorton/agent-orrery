@@ -46,3 +46,13 @@ test('project actions retain their project ID and replay blocks both target type
   await request;
   assert.match(app.projectControlPresentation('project').note, /Select an agent/);
 });
+
+test('a terminal kept in the background is reported as found, not missing', async () => {
+  const { app, pending } = setup();
+  const request = app.requestProjectTerminal('project', 'ship:alpha:first');
+  pending.resolve({ ok: false, code: 'TERMINAL_BLOCKED' });
+  await request;
+  const { phase, note } = app.projectControlPresentation('project', 'ship:alpha:first');
+  assert.equal(phase, 'failure');
+  assert.match(note, /was found but stayed in the background/);
+});

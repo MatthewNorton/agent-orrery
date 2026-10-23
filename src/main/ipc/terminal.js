@@ -37,7 +37,7 @@ function createTerminalIpc(ctx) {
   /** @returns {Failure<TerminalFailureCode>} */
   function terminalFailure(code) {
     const allowed = new Set(['INVALID', 'REPLAY', 'NOT_FOUND', 'UNAVAILABLE', 'BUSY', 'FAILED',
-      'TERMINAL_NOT_FOUND', 'AMBIGUOUS']);
+      'TERMINAL_NOT_FOUND', 'TERMINAL_BLOCKED', 'AMBIGUOUS']);
     return { ok: false, code: allowed.has(code) ? code : 'FAILED' };
   }
 
