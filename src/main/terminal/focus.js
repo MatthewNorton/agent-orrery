@@ -44,6 +44,7 @@ function createTerminalFocus({ platform = process.platform, env = process.env,
         }
         if (result === 'FOCUSED') return { ok: true };
         if (result === 'AMBIGUOUS') return { ok: false, code: 'AMBIGUOUS' };
+        if (result === 'BLOCKED') return { ok: false, code: 'TERMINAL_BLOCKED' };
         return missing();
       } catch {
         return missing();

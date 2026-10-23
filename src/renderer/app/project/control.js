@@ -42,6 +42,7 @@
     ['REPLAY', 'Return to LIVE to open a terminal.'],
     ['NOT_FOUND', 'This project or agent is unavailable.'],
     ['TERMINAL_NOT_FOUND', 'The agent\u2019s existing terminal could not be found. It may be closed or running without a terminal.'],
+    ['TERMINAL_BLOCKED', 'The agent\u2019s terminal was found but stayed in the background. Switch to it from the taskbar.'],
     ['AMBIGUOUS', 'Select an agent to open its terminal.'],
     ['BUSY', 'A terminal request is already in progress.'],
     ['INVALID', 'The terminal request was rejected.'],
