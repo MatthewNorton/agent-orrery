@@ -51,10 +51,10 @@ test('Windows uses a fixed hidden helper with session data only on stdin', async
     provider: 'claude', candidates: [{ pid: 41, startedAt: 1_000 }] });
 });
 
-test('missing, ambiguous, invalid and timed-out focus results never fall back to a new terminal', async (t) => {
+test('missing, blocked, ambiguous, invalid and timed-out focus results never fall back to a new terminal', async (t) => {
   const { session } = fixture(t);
-  for (const [result, code] of [['NOT_FOUND', 'TERMINAL_NOT_FOUND'], ['AMBIGUOUS', 'AMBIGUOUS'],
-    ['private error C:\\secret', 'TERMINAL_NOT_FOUND']]) {
+  for (const [result, code] of [['NOT_FOUND', 'TERMINAL_NOT_FOUND'], ['BLOCKED', 'TERMINAL_BLOCKED'],
+    ['AMBIGUOUS', 'AMBIGUOUS'], ['private error C:\\secret', 'TERMINAL_NOT_FOUND']]) {
     const focus = createTerminalFocus({ platform: 'win32', env: { SystemRoot: 'C:\\Windows' }, run: async () => result });
     assert.deepEqual(await focus.focus(session), { ok: false, code });
   }

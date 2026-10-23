@@ -257,7 +257,7 @@ export interface Failure<Code extends string> extends Outcome<Code> {
 export type OpenExternalResult = Outcome<'INVALID_URL' | 'OPEN_FAILED'>;
 
 export type TerminalFailureCode = 'INVALID' | 'REPLAY' | 'NOT_FOUND' | 'UNAVAILABLE' | 'BUSY' | 'FAILED'
-  | 'TERMINAL_NOT_FOUND' | 'AMBIGUOUS';
+  | 'TERMINAL_NOT_FOUND' | 'TERMINAL_BLOCKED' | 'AMBIGUOUS';
 export type OpenTerminalResult = Outcome<TerminalFailureCode>;
 
 export type ReplayCommand =

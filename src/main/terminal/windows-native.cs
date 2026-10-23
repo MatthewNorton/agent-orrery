@@ -111,43 +111,42 @@ namespace Orrery {
                 new PropertyCondition(AutomationElement.HelpTextProperty, marker)));
         }
 
-        static bool SelectPane(IntPtr window, string marker, DateTime deadline) {
+        // Null when this window lacks the pane; BLOCKED when Windows keeps the window in the background.
+        static string SelectPane(IntPtr window, string marker, Func<bool> remark, DateTime deadline) {
             var root = AutomationElement.FromHandle(window);
             var tabs = root.FindAll(TreeScope.Descendants,
                 new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.TabItem));
-            AutomationElement previous = null;
-            bool selected = false;
+            AutomationElement previous = null, pane = null;
             try {
                 // Try the active pane first. A single-tab or focus-mode window may hide its tab strip.
-                var pane = FindPane(root, marker);
-                if (pane != null) {
-                    if (!Activate(window)) return false;
-                    pane.SetFocus();
-                    selected = true;
-                    return true;
+                pane = FindPane(root, marker);
+                // A busy agent redraws its own title (Claude animates a spinner) over the marker.
+                for (int i = 0; i < 3 && pane == null && remark(); i++) {
+                    Thread.Sleep(100);
+                    pane = FindPane(root, marker);
                 }
-                for (int i = 0; i < tabs.Count; i++) {
+                for (int i = 0; pane == null && i < tabs.Count; i++) {
                     object pattern;
                     if (tabs[i].TryGetCurrentPattern(SelectionItemPattern.Pattern, out pattern) &&
                         ((SelectionItemPattern)pattern).Current.IsSelected) previous = tabs[i];
                 }
                 // Inactive tab contents are absent from UIA. Select briefly to inspect pane identity;
                 // restore the original tab if this window does not contain the exact console.
-                for (int i = 0; i < Math.Min(tabs.Count, 64) && DateTime.UtcNow < deadline; i++) {
+                for (int i = 0; pane == null && i < Math.Min(tabs.Count, 64) && DateTime.UtcNow < deadline; i++) {
                     object pattern;
                     if (!tabs[i].TryGetCurrentPattern(SelectionItemPattern.Pattern, out pattern)) continue;
+                    remark();
                     ((SelectionItemPattern)pattern).Select();
                     Thread.Sleep(40);
                     pane = FindPane(root, marker);
-                    if (pane == null) continue;
-                    if (!Activate(window)) return false;
-                    pane.SetFocus();
-                    selected = true;
-                    return true;
                 }
-                return false;
+                if (pane == null) return null;
+                // The agent's tab stays selected even when Windows keeps the window behind.
+                if (!Activate(window)) return "BLOCKED";
+                pane.SetFocus();
+                return "FOCUSED";
             } finally {
-                if (!selected && previous != null) {
+                if (pane == null && previous != null) {
                     object pattern;
                     if (previous.TryGetCurrentPattern(SelectionItemPattern.Pattern, out pattern))
                         ((SelectionItemPattern)pattern).Select();
@@ -166,11 +165,17 @@ namespace Orrery {
                 if (console == IntPtr.Zero) return "NOT_FOUND";
                 var owner = GetWindow(console, 4); // GW_OWNER: modern ConPTY's hosting HWND.
                 if (owner == IntPtr.Zero && IsWindowVisible(console))
-                    return Activate(console) ? "FOCUSED" : "NOT_FOUND";
-                original = Title();
+                    return Activate(console) ? "FOCUSED" : "BLOCKED";
                 // A fresh, temporary title proves pane identity; equal project names/titles never do.
-                // No keystrokes, provider command, or input are sent to the console.
-                if (!SetConsoleTitle(marker)) return "NOT_FOUND";
+                // No keystrokes, provider command, or input are sent to the console. Marking again
+                // over a title the agent wrote keeps that newest title as the one to restore.
+                Func<bool> remark = () => {
+                    var current = Title();
+                    if (current == marker) return false;
+                    original = current;
+                    return SetConsoleTitle(marker);
+                };
+                if (!remark()) return "NOT_FOUND";
                 // Restore even if a terminal's accessibility provider stalls until the
                 // outer helper timeout. This timer touches only our unique temporary title.
                 restore = new Timer(unused => {
@@ -180,7 +185,7 @@ namespace Orrery {
                 Thread.Sleep(100);
                 if (owner != IntPtr.Zero && IsTerminal(owner)) {
                     if (IsIconic(owner)) ShowWindow(owner, 9);
-                    return SelectPane(owner, marker, deadline) ? "FOCUSED" : "NOT_FOUND";
+                    return SelectPane(owner, marker, remark, deadline) ?? "NOT_FOUND";
                 }
                 var windows = new List<IntPtr>();
                 EnumWindows((window, unused) => {
@@ -189,8 +194,10 @@ namespace Orrery {
                 }, IntPtr.Zero);
                 foreach (var window in windows) {
                     if (DateTime.UtcNow >= deadline) break;
-                    try { if (SelectPane(window, marker, deadline)) return "FOCUSED"; }
-                    catch { /* closed or inaccessible terminal */ }
+                    try {
+                        var result = SelectPane(window, marker, remark, deadline);
+                        if (result != null) return result;
+                    } catch { /* closed or inaccessible terminal */ }
                 }
                 return "NOT_FOUND";
             } finally {

@@ -226,6 +226,14 @@ test('a drone targets its parent session, and missing parents or sessions never 
   assert.equal(launcher.requests.length, 0);
 });
 
+test('a found terminal the system keeps in the background reports TERMINAL_BLOCKED, not a fresh shell', async (t) => {
+  const { ctx, terminal, launcher, dir, event } = terminalCtx(t);
+  const ship = addSession(ctx, dir, 'first');
+  ctx.terminalFocus = { focus: async () => ({ ok: false, code: 'TERMINAL_BLOCKED' }) };
+  assert.deepEqual(await terminal.handleOpenTerminal(event, ship.id), { ok: false, code: 'TERMINAL_BLOCKED' });
+  assert.equal(launcher.requests.length, 0);
+});
+
 test('stale, replay, spoofed, and unsupported session targets cannot invoke a terminal', async (t) => {
   const { ctx, terminal, launcher, dir, event } = terminalCtx(t);
   const ship = addSession(ctx, dir, 'first');
