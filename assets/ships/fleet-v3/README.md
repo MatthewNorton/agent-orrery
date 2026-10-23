@@ -44,11 +44,13 @@ Each hull's `build_<hull>.py` composes its parts from these and documents them i
   and bakes them into the GLB through the image-to-blender-asset toolkit. The maps tile every 2.4 m
   (Scout), 6 m (Workhorse), 20 m (Capital) and 60 m (Flagship); the geometry above carries the
   visible detail, the maps add close-range texture.
-- **The app owns the livery.** `src/renderer/ship-assets-hulls.js` leaves a textured hull material
-  alone and recolors only `accent_livery` (stripes, collars) and `engine_glow` (nozzles, intakes)
-  with the provider color: Claude terracotta, Codex pearl, a local model red. `window_light` glows
-  the same cool white on every provider. On the lightless universe map the hull maps light
-  themselves.
+- **The app owns the livery.** `src/renderer/ship-assets-hulls.js` keeps the three hull tones as
+  baked and makes the ship color the hull's trim lighting: `accent_livery` (stripes, chevrons,
+  collars) and `engine_glow` (nozzles, intakes) emit it (Claude terracotta, Codex pearl, a local
+  model red) over a dark surface at 1.5x, so a line outshines the lit hull, and the glow pass blooms
+  them; `window_light` is a cool lit pane on every provider and `canopy_glass` keeps its smoke. The
+  system view trails a plume from each stern glow disc. On the lightless universe map the hull maps
+  light themselves.
 - **The app owns the lighting and size.** Every fleet material gets a procedural studio
   environment for reflections, its normal map boosted 1.6x and specular anti-aliasing; the
   system and planet views add a viewer-relative key and rim that only ship meshes see
@@ -76,6 +78,6 @@ generated concept art on white, which each quality manifest records.
 
 ## Materials the app expects
 
-`hull_white`, `hull_grey`, `hull_dark` (textured, never repainted), `accent_livery`, `engine_glow`
-(tinted), `window_light` (cool white emissive), `canopy_glass` (a faint provider tint). Keep these
-names when adding a hull.
+`hull_white`, `hull_grey`, `hull_dark`, `accent_livery`, `engine_glow`, `window_light` and
+`canopy_glass`; the livery bullet above says what the app does with each. Keep these names when
+adding a hull.

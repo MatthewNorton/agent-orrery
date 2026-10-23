@@ -20,6 +20,9 @@
   // The universe map has no lights, so far hulls carry a faint tint of their
   // own; without it they read as black cut-outs behind their accent lights.
   const FAR_SELF_LIGHT = 0.1;
+  // Trim lights emit hotter than the key light leaves the hull, so a line reads as a light, not
+  // paint: its core runs toward white and the glow pass blooms the ship color around it.
+  const TRIM_LIGHT = 1.5;
   const ENV_SIZE = 64;
   const SUN_LENGTH = Math.hypot(0.45, 0.72, 0.5);
   const SUN = [0.45 / SUN_LENGTH, 0.72 / SUN_LENGTH, -0.5 / SUN_LENGTH]; // the warm spot's direction
@@ -102,7 +105,7 @@
   }
 
   // Every material name Blender gives a fleet hull falls into one role; the legacy vocabulary of
-  // the shared fleet maps onto the same roles. The livery roles alone wear the provider color.
+  // the shared fleet maps onto the same roles. The livery roles are the ship's trim lights.
   /** @type {Array<[string, RegExp]>} */
   const ROLE_PATTERNS = [
     ['window', /window/], ['glow', /engine|glow/], ['accent', /accent|energy|metalred|orange/],
@@ -116,15 +119,14 @@
     return match ? match[0] : 'hull';
   }
 
-  // The surface and emission a role wears for a ship tint (null emission: unlit).
+  // The surface and emission (null: unlit) a role wears for a ship tint, sRGB like every AUR color.
   function roleLook(role, tint) {
     switch (role) {
-      case 'accent': return [paletteTone(tint, 0.76, 0.10), tint.clone()];
-      // A nozzle is all glow: a dark surface so the lights add no white, the tint as its emission.
-      case 'glow': return [paletteTone(tint, 0.25, 0.0), tint.clone()];
-      // Lit windows glow the same cool white on every provider; the livery carries the color.
-      case 'window': return [new BABYLON.Color3(0.05, 0.06, 0.08), new BABYLON.Color3(0.62, 0.8, 1.0)];
-      case 'glass': return [paletteTone(tint, 0.16, 0.015), tint.scale(0.07)];
+      // Trim lights: the livery stripes and the nozzles are all glow, a dark surface so the lights
+      // add no white, the ship color as the emission.
+      case 'accent': case 'glow': return [paletteTone(tint, 0.25, 0.0), tint.clone()];
+      // Lit windows: the same cool pane on every provider, lit, not blown out.
+      case 'window': return [new BABYLON.Color3(0.25, 0.33, 0.42), new BABYLON.Color3(0.26, 0.4, 0.6)];
       case 'structure': return [paletteTone(tint, 0.85, 0.0), tint.scale(0.12)];
       case 'mechanical': return [paletteTone(tint, 0.06, 0.045), null];
       case 'recess': return [paletteTone(tint, 0.03, 0.02), null];
@@ -152,8 +154,8 @@
     return hull.id + '|' + paletteKey(ship);
   }
 
-  // Livery: an authored hull map keeps its own colors; every other material wears its role's look
-  // in the ship color, the livery roles emitting exactly it (the scenes' provider evidence).
+  // Livery: an authored hull map keeps its own colors; the glass keeps its authored smoke; every
+  // other material wears its role's look in the ship color, the livery roles as its trim lights.
   function fleetMaterial(scene, state, file, selfLight, ship, baseMaterial) {
     const palette = paletteKey(ship);
     const sourceName = String(baseMaterial && baseMaterial.name || 'material');
@@ -166,24 +168,36 @@
       : new BABYLON.StandardMaterial(id, scene);
     const role = materialRole(sourceName);
     const authored = material.albedoTexture || material.diffuseTexture;
-    if (authored && !LIVERY_ROLES.has(role)) {
+    if (role === 'glass') {
+      material.emissiveColor = new BABYLON.Color3(0, 0, 0);
+      finishFleetMaterial(scene, material, 1.8); // smoked glass is its reflections
+    } else if (authored && !LIVERY_ROLES.has(role)) {
       // On the lightless map the hull map lights itself.
       material.emissiveTexture = selfLight ? authored : null;
       material.emissiveColor = selfLight ? new BABYLON.Color3(0.6, 0.6, 0.6) : new BABYLON.Color3(0, 0, 0);
       finishFleetMaterial(scene, material, selfLight ? 0.6 : 1.3);
     } else {
       const [surface, emissive] = roleLook(role, AUR.color3(AUR.shipColor(ship)));
-      if (material.albedoColor) material.albedoColor = surface;
+      if (material.albedoColor) material.albedoColor = surface.toLinearSpace();
       if (material.diffuseColor) material.diffuseColor = surface;
       material.emissiveColor = emissive || (selfLight ? surface.scale(FAR_SELF_LIGHT) : new BABYLON.Color3(0, 0, 0));
       if (LIVERY_ROLES.has(role)) {
-        if (typeof material.metallic === 'number') material.metallic = 0.42;
-        if (typeof material.roughness === 'number') material.roughness = 0.22;
+        // The PBR emissive slot is linear: linearized, the frame shows the exact hex; then run hot.
+        material.emissiveColor = emissive.toLinearSpace();
+        material.emissiveIntensity = TRIM_LIGHT;
       }
       finishFleetMaterial(scene, material, selfLight ? 0.5 : 1.0);
     }
+    material.metadata = { ...(material.metadata || {}), role }; // what the exhaust part asks
     state.materials.set(key, material);
     return material;
+  }
+
+  // What the root wears as provider evidence (the scenes read its emission as the exact hex): an
+  // unlit material in the ship color, one per palette.
+  function evidenceMaterial(scene, state, ship) {
+    const key = 'evidence:' + paletteKey(ship);
+    return AUR.memo(state.materials, key, () => AUR.unlitMaterial(scene, 'ship_' + key, AUR.color3(AUR.shipColor(ship))));
   }
 
   // ---------- building a hull ----------
@@ -261,11 +275,9 @@
       logOnce('instance:' + hull.id, 'Hull ' + hull.id + ' could not be instantiated; using procedural hulls.');
       return null;
     }
-    let evidence = null;
     for (const mesh of meshes) {
       mesh.isPickable = false;
       mesh.layerMask |= AUR.SHIP_LAYER;
-      if (!evidence || LIVERY_ROLES.has(materialRole(mesh.material && mesh.material.name))) evidence = mesh.material;
       mesh.metadata = {
         ...(mesh.metadata || {}),
         providerPalette: true,
@@ -273,10 +285,7 @@
         assetHullId: hull.id,
       };
     }
-    return {
-      correction,
-      evidence: evidence || fleetMaterial(scene, state, asset.file, false, ship, null),
-    };
+    return { correction, evidence: evidenceMaterial(scene, state, ship) };
   }
 
   function hullMetadata(hull, asset, ship) {

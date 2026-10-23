@@ -66,3 +66,46 @@ test('sceneProviderStats counts ship meshes per provider and flags tint mismatch
   assert.equal(stats.ships[2].expectedColor, '#d97757');
   assert.equal(AUR.sceneProviderStats(null).shipMeshCount, 0);
 });
+
+test('meshIslands splits a mesh into its connected pieces, each with a centre and radius', () => {
+  const AUR = loadUtilLayer();
+  // Two unit squares of two triangles: one at the origin sharing its vertices, one at x = 10 with
+  // a vertex per corner per face, as a flat-shaded export has them; and a stray vertex.
+  const positions = [
+    0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0,
+    10, 0, 0, 11, 0, 0, 11, 1, 0, 10, 0, 0, 11, 1, 0, 10, 1, 0,
+    50, 50, 50,
+  ];
+  const indices = [0, 1, 2, 0, 2, 3, 4, 5, 6, 7, 8, 9];
+  const islands = AUR.meshIslands(positions, indices).sort((a, b) => a.center[0] - b.center[0]);
+
+  // Copied out of the sandbox realm: deepEqual also compares prototypes.
+  assert.deepEqual(Array.from(islands, (island) => [...island.center]), [[0.5, 0.5, 0], [10.5, 0.5, 0]], 'a vertex no triangle uses is no island');
+  for (const island of islands) assert.ok(Math.abs(island.radius - Math.SQRT1_2) < 1e-9);
+});
+
+test('sternIslands keeps the glow islands near the stern and drops lit intakes forward of it', () => {
+  const AUR = loadUtilLayer();
+  const island = (z) => ({ position: { z }, radius: 1 });
+  // A 90 m hull: nozzles at -31, -30 and -28, lit intakes at +22.
+  const kept = AUR.sternIslands([island(-30), island(-28), island(22), island(-31)], 90, 0.25);
+
+  assert.deepEqual(Array.from(kept, (found) => found.position.z), [-30, -28, -31]);
+});
+
+test('shipHullId names the hull under a dart, the asset root itself, or nothing for a bare dart', () => {
+  const AUR = loadUtilLayer();
+  assert.equal(AUR.shipHullId({ metadata: { upgradedHullId: 'scout' } }), 'scout');
+  assert.equal(AUR.shipHullId({ metadata: { assetHullId: 'capital' } }), 'capital');
+  assert.equal(AUR.shipHullId({ metadata: {} }), null);
+  assert.equal(AUR.shipHullId(null), null);
+});
+
+test('memo builds an entry once and hands the same one back after', () => {
+  const AUR = loadUtilLayer();
+  const map = new Map();
+  let builds = 0;
+  const build = () => ({ build: ++builds });
+  assert.equal(AUR.memo(map, 'k', build), AUR.memo(map, 'k', build));
+  assert.equal(builds, 1);
+});

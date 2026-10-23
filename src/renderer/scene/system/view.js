@@ -1,6 +1,6 @@
 // One project's solar system: central sun, orbit rings and textured planets. The asteroid belt,
-// the ships and agent focus (its camera and the fade of the other ships) are the belt, ships and
-// focus parts in this folder.
+// the ships, their engine plumes and agent focus (its camera and the fade of the other ships) are
+// the belt, ships, exhaust and focus parts in this folder.
 'use strict';
 
 (function () {
@@ -69,10 +69,10 @@
     const beltR = planetList.length >= 2 ? (orbitR(Math.floor(planetList.length / 2) - 1) + orbitR(Math.floor(planetList.length / 2))) / 2 : outer + 4;
     const view = {
       scene, gui, sys, projectId, orbitR, outer, beltR, beltWidth: 3.4, planets, ships,
-      camera, canvas, shipFocus: null, buildPlanet,
+      camera, canvas, glow, shipFocus: null, buildPlanet,
     };
     const parts = AUR.sceneParts.system;
-    Object.assign(view, parts.ships(view), parts.focus(view));
+    Object.assign(view, parts.exhaust(view), parts.ships(view), parts.focus(view));
 
     scene.metadata = {
       view: 'system',

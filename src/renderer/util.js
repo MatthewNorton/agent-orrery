@@ -110,6 +110,15 @@
   AUR.planetWeight = (pd) => (pd.files || 0) + (pd.builds || 0) * 5;
 
   AUR.clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+  // The entry of `map` under `key`, built by `build` and stored the first time it is asked for.
+  AUR.memo = function (map, key, build) {
+    let value = map.get(key);
+    if (value === undefined) {
+      value = build();
+      map.set(key, value);
+    }
+    return value;
+  };
   AUR.MOTION = Object.freeze({
     // Planet motion is intentionally independent from ship comfort tuning.
     // These rates keep orbital movement legible without making the camera feel

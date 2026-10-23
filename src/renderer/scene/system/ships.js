@@ -1,6 +1,5 @@
-// Ships in a solar system: build and remove, patrol
-// orbits, fly-to-planet builds with a beam, attention suffixes, and the view's
-// live update handler.
+// Ships in a solar system: build and remove, patrol orbits, fly-to-planet builds with a beam,
+// attention suffixes, and the view's live update handler. Their plumes are the exhaust part.
 'use strict';
 
 (function () {
@@ -35,28 +34,26 @@
     }
 
     function buildShip(s) {
-      const { mesh, tint, providerKey, upgrade, scale } = AUR.shipMesh(scene, s, 's', SIZE);
+      const { mesh, tint, providerKey, scale } = AUR.shipMesh(scene, s, 's', SIZE);
       const rand = AUR.mulberry32(AUR.fnv1a(s.id));
       // Outside the last orbit and the belt (one-planet systems put the belt out here).
       const r = Math.max(outer + 3, beltR + beltWidth / 2 + BELT_CLEARANCE) + rand() * 4;
       const a0 = rand() * Math.PI * 2;
       AUR.orbitPoint(a0, r, (rand() - 0.5) * 2, mesh.position);
-      const trail = new BABYLON.TrailMesh('t_' + s.id, mesh, scene, 0.08, 18, true);
-      trail.material = AUR.unlitMaterial(scene, 'tm_' + s.id, AUR.color3(tint), 0.24);
       const label = AUR.label(gui, s.name, { fontSize: 12, mono: true, mesh, offsetY: -22 });
       const suffix = AUR.label(gui, attentionSuffix(s.attention), {
         fontSize: 12, mono: true, color: AUR.attentionColor(s.attention), mesh, offsetY: -22,
       });
       const rec = {
-        id: s.id, mesh, trail, label, suffix, tint, providerKey, scale,
+        id: s.id, mesh, label, suffix, tint, providerKey, scale, hull: null, plumes: [],
         r, a: a0, speed: (AUR.MOTION.systemShipOrbitMin +
           rand() * AUR.MOTION.systemShipOrbitRange) * (rand() > 0.5 ? 1 : -1),
         bob: rand() * 6.28, mode: 'patrol', fly: null, born: performance.now(),
       };
       applyShipAttention(rec, s);
       ships.set(s.id, rec);
+      view.refreshExhaust(rec);
       view.applyShipFocusVisual(rec);
-      if (upgrade) upgrade.then(() => { if (ships.has(s.id)) view.applyShipFocusVisual(rec); });
       return rec;
     }
     function removeShip(id) {
@@ -65,7 +62,7 @@
       if (view.shipFocus && view.shipFocus.shipId === id) view.clearShipFocus();
       else if (view.shipFocus) view.shipFocus.saved.delete(id);
       if (r.fly && r.fly.beam) disposeMeshAndMaterial(r.fly.beam);
-      disposeMeshAndMaterial(r.trail);
+      view.detachExhaust(r);
       r.label.dispose();
       r.suffix.dispose();
       disposeMeshAndMaterial(r.mesh);
@@ -110,6 +107,9 @@
     function animateShips(dt, now, t) {
       const fit = AUR.shipFit(scene, SIZE.minPx);
       for (const r of ships.values()) {
+        // The plumes follow the hull (its arrival, a promotion, a local model); focus mode's fade
+        // covers the new meshes.
+        if (view.refreshExhaust(r)) view.applyShipFocusVisual(r);
         const f = r.fly;
         if (r.mode === 'patrol') {
           r.a += r.speed * dt;

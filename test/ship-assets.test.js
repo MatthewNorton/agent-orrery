@@ -22,8 +22,30 @@ const providerKey = (value) => value === 'codex' ? 'codex' :
   value === 'signal' ? 'generic' : 'claude';
 const colors = { claude: '#d97757', codex: '#f2f0ea', generic: '#94a3b8' };
 
-// The AUR helpers ship-assets reads. Each test brings its own Color class and ship marker.
-function fakeAur({ Color, markShipMesh }) {
+// Enough of BABYLON.Color3 for the livery: hex in, channels, scale, linearization, hex out.
+class Color {
+  constructor(r, g, b) {
+    if (typeof r === 'string') {
+      this.hex = r.toLowerCase();
+      this.r = parseInt(this.hex.slice(1, 3), 16) / 255;
+      this.g = parseInt(this.hex.slice(3, 5), 16) / 255;
+      this.b = parseInt(this.hex.slice(5, 7), 16) / 255;
+    } else {
+      this.r = r; this.g = g; this.b = b;
+    }
+  }
+  scale(value) { return new Color(this.r * value, this.g * value, this.b * value); }
+  clone() { return new Color(this.r, this.g, this.b); }
+  toLinearSpace() { return new Color(Math.pow(this.r, 2.2), Math.pow(this.g, 2.2), Math.pow(this.b, 2.2)); }
+  toHexString() {
+    if (this.hex) return this.hex;
+    const channel = (value) => Math.round(value * 255).toString(16).padStart(2, '0');
+    return `#${channel(this.r)}${channel(this.g)}${channel(this.b)}`;
+  }
+}
+
+// The AUR helpers ship-assets reads. Each test brings its own Color and Material classes and ship marker.
+function fakeAur({ Color, Material, markShipMesh }) {
   return {
     log() {},
     fnv1a() { return 0; },
@@ -35,6 +57,15 @@ function fakeAur({ Color, markShipMesh }) {
     shipTint(_id, provider) { return colors[providerKey(provider)]; },
     shipColor(ship) { return ship && ship.local === true ? '#ff3344' : colors[providerKey(ship && ship.provider)]; },
     color3(hex) { return new Color(hex); },
+    unlitMaterial(_scene, name, emissive) {
+      const material = new Material(name);
+      material.emissiveColor = emissive;
+      return material;
+    },
+    memo(map, key, build) {
+      if (!map.has(key)) map.set(key, build());
+      return map.get(key);
+    },
     isNodeDisposed(node) { return !node || node.isDisposed(); },
     SHIP_LAYER: 0x10000000,
     nodeFamily(node) { return !node ? [] : typeof node.getChildMeshes === 'function' ? [node, ...node.getChildMeshes(false)] : [node]; },
@@ -56,28 +87,6 @@ test('shared hulls receive fixed provider palettes; a signal loads no model and 
   class Vector {
     setAll(value) { this.x = value; this.y = value; this.z = value; }
     set(x, y, z) { this.x = x; this.y = y; this.z = z; }
-  }
-
-  class Color {
-    constructor(r, g, b) {
-      if (typeof r === 'string') {
-        this.hex = r.toLowerCase();
-        this.r = parseInt(this.hex.slice(1, 3), 16) / 255;
-        this.g = parseInt(this.hex.slice(3, 5), 16) / 255;
-        this.b = parseInt(this.hex.slice(5, 7), 16) / 255;
-      } else {
-        this.r = r;
-        this.g = g;
-        this.b = b;
-      }
-    }
-    scale(value) { return new Color(this.r * value, this.g * value, this.b * value); }
-    clone() { return new Color(this.r, this.g, this.b); }
-    toHexString() {
-      if (this.hex) return this.hex;
-      const channel = (value) => Math.round(value * 255).toString(16).padStart(2, '0');
-      return `#${channel(this.r)}${channel(this.g)}${channel(this.b)}`;
-    }
   }
 
   class Material {
@@ -138,6 +147,7 @@ test('shared hulls receive fixed provider palettes; a signal loads no model and 
   };
   const AUR = fakeAur({
     Color,
+    Material,
     markShipMesh(mesh, ship) {
       mesh.metadata = {
         ...(mesh.metadata || {}), isShip: true, shipId: ship.id,
@@ -206,30 +216,14 @@ test('shared hulls receive fixed provider palettes; a signal loads no model and 
 // ---------- rank ladder, LODs and in-place refresh ----------
 
 // A small scene graph: enough of Babylon's node, mesh and instance behaviour
-// for ship-assets.js to build, swap and dispose hulls.
-function loadShipAssets(manifest, trianglesByFile) {
+// for ship-assets.js to build, swap and dispose hulls. Every hull file carries
+// `materials`: a material name, or { name, textured, albedo } for an authored one.
+function loadShipAssets(manifest, trianglesByFile, materials = ['hull_primary', 'accent_energy']) {
   const loads = [];
   class Vector {
     constructor() { this.x = 0; this.y = 0; this.z = 0; }
     setAll(value) { this.x = value; this.y = value; this.z = value; }
     set(x, y, z) { this.x = x; this.y = y; this.z = z; }
-  }
-  class Color {
-    constructor(r, g, b) {
-      if (typeof r === 'string') {
-        this.r = parseInt(r.slice(1, 3), 16) / 255;
-        this.g = parseInt(r.slice(3, 5), 16) / 255;
-        this.b = parseInt(r.slice(5, 7), 16) / 255;
-      } else {
-        this.r = r; this.g = g; this.b = b;
-      }
-    }
-    scale(value) { return new Color(this.r * value, this.g * value, this.b * value); }
-    clone() { return new Color(this.r, this.g, this.b); }
-    toHexString() {
-      const channel = (value) => Math.round(value * 255).toString(16).padStart(2, '0');
-      return `#${channel(this.r)}${channel(this.g)}${channel(this.b)}`;
-    }
   }
   class Material {
     constructor(name) {
@@ -237,7 +231,12 @@ function loadShipAssets(manifest, trianglesByFile) {
       this.albedoColor = new Color(0, 0, 0);
       this.emissiveColor = new Color(0, 0, 0);
     }
-    clone(name) { return new Material(name); }
+    clone(name) {
+      const copy = new Material(name);
+      copy.albedoTexture = this.albedoTexture;
+      copy.albedoColor = this.albedoColor.clone();
+      return copy;
+    }
     dispose() {}
   }
   class Node {
@@ -298,15 +297,17 @@ function loadShipAssets(manifest, trianglesByFile) {
     get material() { return this.sourceMesh.material; }
     set material(value) { /* an instance draws with its source mesh's material */ }
   }
-  const materialNames = ['hull_primary', 'accent_energy'];
   const containerFor = (file) => ({
     meshes: [{ getTotalIndices: () => (trianglesByFile[file] || 1000) * 3 }],
     instantiateModelsToScene(nameFor) {
       const root = new Mesh(nameFor('__root__'));
-      for (const name of materialNames) {
+      for (const spec of materials) {
+        const { name, textured, albedo } = typeof spec === 'string' ? { name: spec } : spec;
         const part = new Mesh(nameFor(name));
         part.hasGeometry = true;
         part.material = new Material(name);
+        if (textured) part.material.albedoTexture = { name: name + '_map' };
+        if (albedo) part.material.albedoColor = new Color(albedo);
         part.parent = root;
       }
       return { rootNodes: [root] };
@@ -315,6 +316,7 @@ function loadShipAssets(manifest, trianglesByFile) {
   });
   const AUR = fakeAur({
     Color,
+    Material,
     markShipMesh(mesh, ship) {
       mesh.metadata = { ...(mesh.metadata || {}), isShip: true, shipId: ship.id };
       return { key: providerKey(ship.provider), label: '' };
@@ -361,6 +363,7 @@ const LADDER_MANIFEST = {
 };
 const ship = (id, builds, extra) => ({ id, provider: 'claude', kind: 'main', project: 'p', builds, ...extra });
 const hullId = (root) => root && root.metadata.assetHullId;
+const partMaterial = (root, name) => root.getChildMeshes(false).find((mesh) => mesh.material && mesh.material.name.includes(name)).material;
 
 test('main ships take the highest rank their build count has reached', async () => {
   const assets = loadShipAssets(LADDER_MANIFEST, {});
@@ -393,15 +396,13 @@ test('the universe instances far hulls from one template per provider; other vie
   assert.notDeepEqual(sources(first), sources(codex));
   assert.equal(first.material.emissiveColor.toHexString(), '#d97757');
   assert.equal(codex.material.emissiveColor.toHexString(), '#f2f0ea');
-  const hull = first.getChildMeshes(false).find((mesh) => mesh.material && mesh.material.name.includes('hull_primary'));
-  assert.ok(hull.material.emissiveColor.r > 0, 'far hulls carry a faint self-light on the unlit map');
+  assert.ok(partMaterial(first, 'hull_primary').emissiveColor.r > 0, 'far hulls carry a faint self-light on the unlit map');
 
   const system = assets.scene('system');
   const near = await assets.ships.upgrade(system, ship('a', 0), assets.fallback('a'));
   assert.equal(assets.loads.at(-1), 'small-near.glb');
   assert.ok(near.getChildMeshes(false).every((mesh) => !(mesh instanceof assets.InstancedMesh)));
-  const nearHull = near.getChildMeshes(false).find((mesh) => mesh.material && mesh.material.name.includes('hull_primary'));
-  assert.equal(nearHull.material.emissiveColor.toHexString(), '#000000');
+  assert.equal(partMaterial(near, 'hull_primary').emissiveColor.toHexString(), '#000000');
 });
 
 test('a scene that has not declared its view loads nothing until upgrade, which defaults to far', async () => {
@@ -497,4 +498,30 @@ test('the triangle budget steps near hulls down to far before falling back to th
   assert.equal(await assets.ships.refresh(scene, ship('b', 3)), roots[1]);
   assert.equal(hullId(roots[1]), 'mid');
   assert.equal(roots[1].metadata.assetLod, 'far');
+});
+
+test('a fleet hull keeps its baked tones and glass, and its trim lights and nozzles emit the ship color', async () => {
+  const assets = loadShipAssets(LADDER_MANIFEST, {}, [
+    { name: 'hull_white', textured: true, albedo: '#f2f2f2' }, { name: 'hull_grey', textured: true, albedo: '#f2f2f2' },
+    { name: 'canopy_glass', albedo: '#06101c' }, 'accent_livery', 'engine_glow', 'window_light',
+  ]);
+  const scene = assets.scene('system');
+  const claude = await assets.ships.upgrade(scene, ship('a', 0), assets.fallback('a'));
+  const codex = await assets.ships.upgrade(scene, ship('b', 0, { provider: 'codex' }), assets.fallback('b'));
+
+  for (const tone of ['hull_white', 'hull_grey']) {
+    assert.equal(partMaterial(claude, tone).albedoColor.toHexString(), '#f2f2f2', tone + ' stays as baked');
+  }
+  assert.equal(partMaterial(claude, 'canopy_glass').albedoColor.toHexString(), '#06101c', 'the glass keeps its smoke');
+  assert.equal(partMaterial(claude, 'canopy_glass').emissiveColor.toHexString(), '#000000');
+  for (const light of ['accent_livery', 'engine_glow']) {
+    assert.deepEqual(partMaterial(claude, light).emissiveColor, new Color('#d97757').toLinearSpace(), light + ' emits terracotta, linear, so the frame shows the hex');
+    assert.deepEqual(partMaterial(codex, light).emissiveColor, new Color('#f2f0ea').toLinearSpace(), light + ' emits pearl on Codex');
+    assert.ok(partMaterial(claude, light).albedoColor.r < 0.1, light + ' is a dark surface under its light');
+    assert.ok(partMaterial(claude, light).emissiveIntensity > 1, light + ' outshines the lit hull');
+  }
+  assert.equal(partMaterial(claude, 'window_light').emissiveIntensity, undefined, 'only the trim runs hot');
+  assert.ok(partMaterial(claude, 'window_light').emissiveColor.r < 0.3, 'a lit pane, not a white block');
+  assert.equal(partMaterial(claude, 'engine_glow').metadata.role, 'glow', 'every fleet material carries its role');
+  assert.equal(claude.material.emissiveColor.toHexString(), '#d97757', 'the root emits the exact hex as evidence');
 });
