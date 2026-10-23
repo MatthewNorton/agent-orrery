@@ -1,5 +1,6 @@
 // @ts-check
-// First-person agent focus: POV overlay, hologram, navigation map.
+// Agent focus: a chase camera outside the ship or a first-person room inside it, the overlay,
+// the hologram and the navigation map.
 'use strict';
 
 (function () {
@@ -10,9 +11,10 @@
   const S = A.state, C = A.const;
   // The overlay and the agent rows, which mark the focused ship.
   const FOCUS_CHROME = C.CHROME.FOCUS | C.CHROME.AGENTS;
+  const MODE_LABEL = Object.freeze({ exterior: 'EXTERIOR', room: 'FIRST PERSON' });
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
-  // ---------- first-person agent focus ----------
+  // ---------- agent focus ----------
   // The chrome roots focus mode makes inert; focus-rooms.css fades whatever is [inert].
   const AGENT_FOCUS_INERT_IDS = [
     'topbar', 'sidebar', 'rail-left', 'view-title', 'view-hint', 'tabbar', 'history-bar',
@@ -22,6 +24,7 @@
     S.agentFocus.els = {
       root: document.getElementById('agent-focus'),
       frame: document.getElementById('agent-focus-frame'),
+      modeLabel: document.getElementById('agent-focus-mode-label'),
       environmentLabel: document.getElementById('agent-focus-environment-label'),
       environments: document.getElementById('agent-focus-environments'),
       vantages: document.getElementById('agent-focus-vantages'),
@@ -50,7 +53,7 @@
     wireChoices(els.environments, 'environment', setAgentFocusEnvironment);
     wireChoices(els.vantages, 'vantage', setAgentFocusVantage);
     for (const item of Object.values(C.AGENT_FOCUS_ENVIRONMENTS)) {
-      if (item.asset === els.frame.getAttribute('src')) continue;
+      if (!item.asset || item.asset === els.frame.getAttribute('src')) continue;
       const preload = new Image();
       preload.src = item.asset;
     }
@@ -61,7 +64,7 @@
     });
     els.terminal.addEventListener('click', () => {
       const ship = S.store.ships.get(S.agentFocus.shipId);
-      if (ship) A.requestProjectTerminal(ship.project);
+      if (ship) A.requestProjectTerminal(ship.project, ship.id);
     });
     document.addEventListener('keydown', (event) => {
       if (event.key !== 'Escape' || !S.agentFocus.shipId) return;
@@ -86,18 +89,34 @@
     }
   }
 
+  // The view's focus settings, from the chosen environment and vantage.
+  function focusSettings() {
+    const config = C.AGENT_FOCUS_ENVIRONMENTS[S.agentFocus.environment];
+    return { vantage: S.agentFocus.vantage, exterior: config.camera === 'exterior' };
+  }
+  function syncShipFocus() {
+    if (S.activeView) S.activeView.setShipFocus(focusSettings());
+  }
+
+  // A room shows its generated foreground over the live scene; the exterior shows the hull itself.
   function setAgentFocusEnvironment(value, persist) {
     const key = typeof value === 'string' && Object.hasOwn(C.AGENT_FOCUS_ENVIRONMENTS, value)
-      ? value : 'cockpit';
+      ? value : 'exterior';
     const config = C.AGENT_FOCUS_ENVIRONMENTS[key];
     S.agentFocus.environment = key;
     const els = S.agentFocus.els;
-    if (els && els.root) els.root.dataset.environment = key;
-    if (els && els.frame && els.frame.getAttribute('src') !== config.asset) {
-      els.frame.setAttribute('src', config.asset);
+    if (els && els.root) {
+      els.root.dataset.environment = key;
+      els.root.dataset.camera = config.camera;
     }
+    if (els && els.frame) {
+      els.frame.classList.toggle('hidden', !config.asset);
+      if (config.asset && els.frame.getAttribute('src') !== config.asset) els.frame.setAttribute('src', config.asset);
+    }
+    if (els && els.modeLabel) els.modeLabel.textContent = MODE_LABEL[config.camera];
     if (els && els.environmentLabel) els.environmentLabel.textContent = config.label;
     if (els) pressChoice(els.environments, 'environment', key);
+    syncShipFocus();
     if (persist) AUR.storeText(C.AGENT_FOCUS_ENVIRONMENT_STORAGE_KEY, key);
   }
 
@@ -108,7 +127,7 @@
     const els = S.agentFocus.els;
     if (els && els.root) els.root.dataset.vantage = key;
     if (els) pressChoice(els.vantages, 'vantage', key);
-    if (S.activeView) S.activeView.setShipFocusVantage(key);
+    syncShipFocus();
     if (persist) AUR.storeText(C.AGENT_FOCUS_VANTAGE_STORAGE_KEY, key);
   }
 
@@ -139,14 +158,13 @@
 
     const ship = S.store.ships.get(id);
     const canFocus = ship && S.current.view === 'system' && S.current.projectId === ship.project &&
-      S.activeView && S.activeView.focusShip(id);
+      S.activeView && S.activeView.focusShip(id, focusSettings());
     S.agentFocus.pendingShipId = null;
     if (!canFocus) {
       A.renderAgents();
       return;
     }
 
-    setAgentFocusVantage(S.agentFocus.vantage, false);
     S.agentFocus.shipId = id;
     document.body.classList.add('agent-focus-active');
     setAgentFocusInert(true);
@@ -206,7 +224,7 @@
     els.project.textContent = A.projectName(ship.project);
     els.folder.disabled = !project || project.exists === false;
 
-    const presentation = A.projectControlPresentation(ship.project);
+    const presentation = A.projectControlPresentation(ship.project, ship.id);
     els.terminal.textContent = presentation.buttonText;
     els.terminal.disabled = presentation.disabled;
     els.terminal.setAttribute('aria-busy', String(presentation.busy));
@@ -297,7 +315,8 @@
     const els = S.agentFocus.els;
     if (!S.agentFocus.shipId || !els || !els.target || !S.activeView) return;
     const flight = S.activeView.shipFocusState();
-    renderAgentFocusNavigationMap(flight);
+    // The hologram map is a room fixture; the exterior hides it, so it is not animated there.
+    if (C.AGENT_FOCUS_ENVIRONMENTS[S.agentFocus.environment].camera === 'room') renderAgentFocusNavigationMap(flight);
     const target = flight && flight.target
       ? String(flight.target).toUpperCase() : 'SYSTEM PATROL';
     if (els.target.textContent !== target) els.target.textContent = target;

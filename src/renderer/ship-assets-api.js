@@ -37,7 +37,7 @@
     return entry ? entry.root : null;
   }
 
-  function upgrade(scene, ship, fallback, displayScale) {
+  function upgrade(scene, ship, fallback) {
     const state = stateFor(scene);
     return manifestPromise.then((manifest) => {
       if (!manifest || isSceneDisposed(scene, state)) return null;
@@ -49,12 +49,10 @@
         if (!entry) return null;
         const assetRoot = entry.root;
         entry.fallback = fallback;
+        // The dart root keeps the view's display scale; the hull sits inside it at unit scale.
         assetRoot.parent = fallback;
-        assetRoot.position.setAll(0);
-        assetRoot.scaling.setAll(Number(displayScale) || 1);
-        fallback.scaling.setAll(1);
         fallback.isPickable = false;
-        if (fallback.material) fallback.material.alpha = 0;
+        fallback.isVisible = false; // children keep drawing; the dart itself leaves the render queues
         AUR.markShipMesh(assetRoot, ship);
         fallback.metadata = {
           ...(fallback.metadata || {}),
@@ -69,7 +67,7 @@
   // Focus mode in the system view saves and restores each mesh's visibility;
   // a hull swapped in meanwhile would escape that, so it waits.
   function isFaded(entry) {
-    const nodes = [entry.root, ...entry.root.getChildMeshes(false)];
+    const nodes = AUR.nodeFamily(entry.root);
     if (entry.fallback) nodes.push(entry.fallback);
     return nodes.some((node) => typeof node.visibility === 'number' && node.visibility < 1);
   }

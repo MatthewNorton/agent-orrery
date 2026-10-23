@@ -43,12 +43,12 @@
     const meta = AUR.attentionMeta(ship.attention);
     const row = AUR.button('needs-row', null, () => A.enterAgentFocus(ship.id));
     row.style.setProperty('--tint', meta ? meta.color : '');
-    row.setAttribute('aria-label', 'Open ' + ship.name + ' in first-person view');
+    row.setAttribute('aria-label', 'Open ' + ship.name + ' in agent focus');
     const name = AUR.el('span', 'needs-name', ship.name + ' · ');
     name.appendChild(AUR.el('em', null, meta ? meta.label : ''));
     row.append(
       name,
-      AUR.el('span', 'needs-wait', AUR.relTime(ship.lastActivity, A.playbackReferenceTs())),
+      AUR.el('span', 'needs-wait', AUR.relTime(ship.attentionSince ?? ship.lastEvent, A.playbackReferenceTs())),
       AUR.el('span', 'needs-sub', A.projectName(ship.project) + ' · ' + ship.status)
     );
     return row;

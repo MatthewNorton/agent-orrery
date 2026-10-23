@@ -256,7 +256,8 @@ export interface Failure<Code extends string> extends Outcome<Code> {
 
 export type OpenExternalResult = Outcome<'INVALID_URL' | 'OPEN_FAILED'>;
 
-export type TerminalFailureCode = 'INVALID' | 'REPLAY' | 'NOT_FOUND' | 'UNAVAILABLE' | 'BUSY' | 'FAILED';
+export type TerminalFailureCode = 'INVALID' | 'REPLAY' | 'NOT_FOUND' | 'UNAVAILABLE' | 'BUSY' | 'FAILED'
+  | 'TERMINAL_NOT_FOUND' | 'AMBIGUOUS';
 export type OpenTerminalResult = Outcome<TerminalFailureCode>;
 
 export type ReplayCommand =
@@ -404,7 +405,8 @@ export interface AUBridge {
   openProject(projectId: string): Promise<string>;
   /** Only `https://github.com/<owner>/<repo>` URLs open. */
   openExternal(url: string): Promise<OpenExternalResult>;
-  openTerminal(projectId: string): Promise<OpenTerminalResult>;
+  /** LIVE project ID or exact live ship ID; main resolves the session and its terminal. */
+  openTerminal(targetId: string): Promise<OpenTerminalResult>;
 
   tasksGet(projectId: string): Promise<TasksSnapshot | null>;
   taskAdd(projectId: string, text: string): Promise<TaskMutationResult>;

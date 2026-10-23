@@ -57,13 +57,14 @@ since macOS 15, right-click → Open no longer gets past the block.
 | Feature | Windows | macOS | Linux |
 |---|---|---|---|
 | Transcript tailing, universe, replay | yes | yes | yes |
-| Open Terminal | Windows Terminal (`wt.exe` app alias) | Terminal.app via `/usr/bin/open -a Terminal` | unavailable |
+| Open Terminal | focus the agent's Windows Terminal pane or classic console; dormant projects use `wt.exe` | focus the agent's Terminal.app tab by TTY; dormant projects use `/usr/bin/open -a Terminal` | unavailable |
 | Start Codex on an IDEAS task | native `codex.exe` on `PATH` or the npm package | native `codex` on `PATH` (Homebrew or npm global) | native `codex` on `PATH` (npm global) |
 | Desktop shortcut | `scripts/windows-shortcuts.ps1` | `scripts/macos-shortcuts.sh` | none |
 
-Both controls resolve a fixed executable, never search for shells, never
-accept a command from the renderer, and detach immediately. A host without the
-required executable reports the control as unavailable inside the project card.
+Both controls resolve fixed executables and never accept a command from the
+renderer. Session focusing uses bounded helpers and never launches another agent.
+Dormant-project shells and IDEAS agents detach immediately. A host without a
+supported terminal reports the control as unavailable inside the project card.
 
 ## Portability notes
 

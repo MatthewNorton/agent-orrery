@@ -55,7 +55,7 @@ async function runControlMode(ctx, driver, metrics) {
     await wait(50);
     const pendingLaunchCount = ctx.terminalLauncher.calls.length;
     const launchedControl = await waitForControl((value) => ctx.terminalLauncher.calls.length === 1 &&
-      value.note === 'Terminal launch requested' && value.disabled === false,
+      value.note === 'Terminal opened' && value.disabled === false,
     'first terminal launch');
     result.steps.push({ action: 'system-terminal', actualInput: true });
     result.metrics.initialLaunchCount = ctx.terminalLauncher.calls.length;
@@ -93,7 +93,7 @@ async function runControlMode(ctx, driver, metrics) {
     if (!restoredButton) throw new Error('restored terminal action was not visible');
     clickPoint(restoredButton);
     await waitForControl((value) => ctx.terminalLauncher.calls.length === 2 &&
-      value.note === 'Terminal launch requested', 'second terminal launch');
+      value.note === 'Terminal opened', 'second terminal launch');
     result.steps.push({ action: 'live-return', actualInput: true });
     result.metrics.finalLaunchCount = ctx.terminalLauncher.calls.length;
 
@@ -123,12 +123,16 @@ async function runControlMode(ctx, driver, metrics) {
       planetControl.terminalCount === 1 && ctx.terminalLauncher.calls.length === 2;
     result.metrics.noProcessOwnership = ctx.terminalLauncher.unrefs === ctx.terminalLauncher.calls.length &&
       ctx.terminalLauncher.calls.length === 2;
+    result.metrics.exactSessionTargeted = ctx.terminalLauncher.focusRequests.length === 2 &&
+      ctx.terminalLauncher.focusRequests.every((request) => request.cwd === canonicalCwd &&
+        [...ctx.tracker.files].some(([file, tail]) => file === request.transcriptPath &&
+          tail.session === request.sessionId && tail.project === project.id));
 
     result.passed = result.metrics.initialLaunchCount === 1 &&
       replayCountAfterInput === 1 && result.metrics.replayLaunchCount === 1 &&
       result.metrics.finalLaunchCount === 2 && result.metrics.safeWindowsSpec &&
       result.metrics.sameCanonicalCwd && result.metrics.replayMainRejected &&
-      result.metrics.planetRendered && result.metrics.noProcessOwnership &&
+      result.metrics.planetRendered && result.metrics.noProcessOwnership && result.metrics.exactSessionTargeted &&
       result.metrics.pendingRerenderPreserved &&
       result.controls.liveEnabled && result.controls.replayDisabled &&
       result.controls.replayNote === 'Return to LIVE to open a terminal.' &&

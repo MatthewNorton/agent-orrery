@@ -60,13 +60,8 @@ try {
 if (manifest) {
   if (manifest.schemaVersion !== 1) bad('S3', 'schemaVersion must be 1');
   const hulls = Array.isArray(manifest.hulls) ? manifest.hulls : [];
-  const modelFreeProviders = new Set(Array.isArray(manifest.nonModelProviders)
-    ? manifest.nonModelProviders : []);
-  const modelFreeKinds = new Set(Array.isArray(manifest.nonModelKinds)
-    ? manifest.nonModelKinds : []);
-  const sharedFleetContract = modelFreeProviders.has('signal') && modelFreeKinds.has('drone');
-  const minimumHulls = sharedFleetContract ? 6 : 8;
-  if (hulls.length < minimumHulls) bad('S3', `need >= ${minimumHulls} hulls, found ${hulls.length}`);
+  // The manifest carries no model-free lists: signals are markers and drones fly the first rank (renderer rules).
+  if (hulls.length < 6) bad('S3', `need >= 6 hulls (the shared six), found ${hulls.length}`);
   const familyIds = new Set(hulls.map((h) => h.family));
   let droneCount = 0;
   for (const h of hulls) {
@@ -82,25 +77,23 @@ if (manifest) {
         continue;
       }
       const size = fs.statSync(f).size;
-      if (size > 2 * 1024 * 1024) bad('S3', `hull ${h.id}: ${file} ${Math.round(size / 1024)}KB exceeds 2MB cap`);
+      // Fleet v3 hero hulls carry their detail as geometry (the Flagship is 58k triangles), so the cap is 6 MB.
+      if (size > 6 * 1024 * 1024) bad('S3', `hull ${h.id}: ${file} ${Math.round(size / 1024)}KB exceeds 6MB cap`);
     }
     if (missing) continue;
     if (h.license !== 'CC0') bad('S3', `hull ${h.id}: license must be "CC0", found ${JSON.stringify(h.license)}`);
     if (!h.source) bad('S3', `hull ${h.id}: source missing`);
     if (h.role === 'drone') droneCount++;
   }
-  if (sharedFleetContract && droneCount !== 0) bad('S3', 'model-free drone contract must not assign a drone hull');
-  else if (!sharedFleetContract && droneCount < 1) bad('S3', 'no hull with role "drone"');
+  if (droneCount !== 0) bad('S3', `${droneCount} hull(s) carry role "drone"; the renderer flies drones on the first rank and would never select them`);
   const pf = manifest.providerFamilies || {};
-  const modeledProviders = sharedFleetContract ? ['claude', 'codex'] : ['claude', 'codex', 'signal'];
-  for (const p of modeledProviders) {
+  for (const p of ['claude', 'codex']) {
     if (!pf[p]) bad('S3', `providerFamilies.${p} unmapped`);
     else if (!familyIds.has(pf[p])) bad('S3', `providerFamilies.${p} -> "${pf[p]}" matches no hull family`);
   }
-  if (sharedFleetContract && pf.signal) bad('S3', 'model-free Signal provider must not map to a hull family');
+  if (pf.signal) bad('S3', 'Signal agents are markers, not hulls; providerFamilies must not map them');
   if (failures.length === 0) {
-    const droneSummary = sharedFleetContract ? 'model-free Signal/drone markers' : `${droneCount} drone hull(s)`;
-    ok('S3', `${hulls.length} hulls, ${familyIds.size} families, ${droneSummary}, all CC0`);
+    ok('S3', `${hulls.length} hulls, ${familyIds.size} families, Signal markers, drones on the first rank, all CC0`);
   }
 }
 

@@ -1,9 +1,47 @@
 {
   "schemaVersion": 1,
-  "providerFamilies": { "claude": "aur-fleet-v2", "codex": "aur-fleet-v2" },
-  "nonModelProviders": ["signal"],
-  "nonModelKinds": ["drone"],
+  "providerFamilies": { "claude": "aur-fleet-v3", "codex": "aur-fleet-v3" },
   "hulls": [
+    {
+      "id": "aur-lance-interceptor-v3",
+      "file": "fleet-v3/aur-lance-interceptor/aur-lance-interceptor.glb",
+      "family": "aur-fleet-v3",
+      "role": "main",
+      "minBuilds": 0,
+      "correction": { "rotateY": 3.14159265, "scale": 0.0693, "offset": [0, 0, 0] },
+      "source": "Agent Universe original fleet v3 Scout (fleet-v3/aur-lance-interceptor), built from the owner reference sheet; authored hull maps baked in the GLB",
+      "license": "CC0"
+    },
+    {
+      "id": "aur-bastion-corvette-v3",
+      "file": "fleet-v3/aur-bastion-corvette/aur-bastion-corvette.glb",
+      "family": "aur-fleet-v3",
+      "role": "main",
+      "minBuilds": 5,
+      "correction": { "rotateY": 3.14159265, "scale": 0.014009, "offset": [0, 0, 0] },
+      "source": "Agent Universe original fleet v3 Workhorse (fleet-v3/aur-bastion-corvette), built from the owner reference sheet; authored hull maps baked in the GLB",
+      "license": "CC0"
+    },
+    {
+      "id": "aur-helix-destroyer-v3",
+      "file": "fleet-v3/aur-helix-destroyer/aur-helix-destroyer.glb",
+      "family": "aur-fleet-v3",
+      "role": "main",
+      "minBuilds": 20,
+      "correction": { "rotateY": 3.14159265, "scale": 0.0034186, "offset": [0, 0, 0] },
+      "source": "Agent Universe original fleet v3 Capital (fleet-v3/aur-helix-destroyer), built from the owner reference sheet; authored hull maps baked in the GLB",
+      "license": "CC0"
+    },
+    {
+      "id": "aur-ark-carrier-v3",
+      "file": "fleet-v3/aur-ark-carrier/aur-ark-carrier.glb",
+      "family": "aur-fleet-v3",
+      "role": "main",
+      "minBuilds": 60,
+      "correction": { "rotateY": 3.14159265, "scale": 0.00075039, "offset": [0, 0, 0] },
+      "source": "Agent Universe original fleet v3 Flagship (fleet-v3/aur-ark-carrier), built from the owner reference sheet; authored hull maps baked in the GLB",
+      "license": "CC0"
+    },
     {
       "id": "aur-wisp-drone",
       "file": "fleet-v2/aur-wisp-drone-near.glb",

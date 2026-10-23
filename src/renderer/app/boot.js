@@ -202,7 +202,7 @@
   // ---------- view switching ----------
   // The extras a view may leave out (kit/SPEC.md view contract), as no-ops.
   const VIEW_DEFAULTS = {
-    resize() {}, setQuality() {}, setSearchMatches() {}, setShipFocusVantage() {},
+    resize() {}, setQuality() {}, setSearchMatches() {}, setShipFocus() {},
     focusShip: () => false, shipFocusState: () => null,
   };
 
@@ -306,7 +306,7 @@
   }
 
   // Direct project links (feed, recent, task views) jump to the system. Agent
-  // rows use the first-person focus flow below.
+  // rows use the agent-focus flow below.
   A.jumpToProject = function jumpToProject(projectId) {
     if (!projectId || !S.store.projects.has(projectId)) return;
     if (S.current.view === 'system' && S.current.projectId === projectId) return;

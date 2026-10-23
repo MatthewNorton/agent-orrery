@@ -38,13 +38,13 @@ test('the legacy shared fleet keeps six original textured hulls and no Kenney or
   const manifest = readManifest();
   const legacy = manifest.hulls.filter((hull) => hull.family === 'aur-shared-fleet');
 
-  assert.deepEqual(manifest.nonModelProviders, ['signal']);
-  assert.deepEqual(manifest.nonModelKinds, ['drone']);
+  assert.equal(manifest.nonModelProviders, undefined, 'who flies a hull is the renderer\'s rule, not manifest data');
+  assert.equal(manifest.nonModelKinds, undefined);
   assert.equal(legacy.length, 6);
   assert.equal(legacy.filter((hull) => hull.role === 'main-s').length, 2);
   assert.equal(legacy.filter((hull) => hull.role === 'main-m').length, 2);
   assert.equal(legacy.filter((hull) => hull.role === 'main-l').length, 2);
-  assert.equal(manifest.hulls.filter((hull) => hull.role === 'drone').length, 0);
+  assert.deepEqual(manifest.hulls.filter((hull) => hull.role === 'drone').map((hull) => hull.id), [], 'drones fly the first rank, scaled by the renderer');
   assert.equal(manifest.hulls.filter((hull) => /kenney/i.test(hull.id + hull.file + hull.source)).length, 0);
   assert.equal(fs.readdirSync(SHIP_ROOT).filter((file) => /^kenney-.*\.glb$/i.test(file)).length, 0);
 
@@ -61,16 +61,22 @@ test('the legacy shared fleet keeps six original textured hulls and no Kenney or
   }
 });
 
-test('Claude and Codex fly the fleet-v2 rank ladder, promoted by build count', () => {
+test('Claude and Codex fly the fleet v3 ladder; the fleet-v2 ranks stay listed', () => {
   const manifest = readManifest();
   const family = manifest.hulls.filter((hull) => hull.family === 'aur-fleet-v2');
   const ranks = family.filter((hull) => Number.isFinite(hull.minBuilds))
     .sort((a, b) => a.minBuilds - b.minBuilds);
 
-  assert.equal(manifest.providerFamilies.claude, 'aur-fleet-v2');
-  assert.equal(manifest.providerFamilies.codex, 'aur-fleet-v2');
+  assert.equal(manifest.providerFamilies.claude, 'aur-fleet-v3');
+  assert.equal(manifest.providerFamilies.codex, 'aur-fleet-v3');
+  const v3 = manifest.hulls.filter((hull) => hull.family === 'aur-fleet-v3');
+  assert.deepEqual(v3.map((hull) => [hull.id, hull.role, hull.minBuilds]), [
+    ['aur-lance-interceptor-v3', 'main', 0], ['aur-bastion-corvette-v3', 'main', 5],
+    ['aur-helix-destroyer-v3', 'main', 20], ['aur-ark-carrier-v3', 'main', 60],
+  ], 'Scout, Workhorse, Capital, Flagship, promoted by a session\'s build count');
+  assert.ok(v3.every((hull) => hull.file.startsWith('fleet-v3/') && !hull.lods), 'v3 hulls are one textured file');
   assert.deepEqual(family.filter((hull) => !ranks.includes(hull)).map((hull) => [hull.id, hull.role]),
-    [['aur-wisp-drone', 'escort']], 'the drone is reserved for subagents, not a rank');
+    [['aur-wisp-drone', 'escort']], 'the wisp escort is listed but is not a rank');
   assert.deepEqual(ranks.map((hull) => [hull.id, hull.minBuilds]), [
     ['aur-lance-interceptor', 0], ['aur-wayfarer-shuttle', 3], ['aur-bastion-corvette', 10],
     ['aur-vigil-frigate', 25], ['aur-helix-destroyer', 50], ['aur-atlas-cruiser', 100],
@@ -106,6 +112,16 @@ test('every fleet-v2 hull ships a far and a near runtime file within budget', ()
   }
 });
 
+test('fleet-v3 display size grows 1.9x over the ladder from a unit Scout', () => {
+  const manifest = readManifest();
+  const ranks = manifest.hulls.filter((hull) => hull.family === manifest.providerFamilies.claude && Number.isFinite(hull.minBuilds))
+    .sort((a, b) => a.minBuilds - b.minBuilds);
+  const lengths = ranks.map((hull) =>
+    hull.correction.scale * glbLength(readGlbJson(path.join(SHIP_ROOT, hull.file)).model));
+  assert.ok(Math.abs(lengths[0] - 1) < 0.01, `the Scout displays ${lengths[0]} long: the fleet's unit`);
+  assert.deepEqual(lengths.map((l) => Math.round(l * 100) / 100), [1, 1.25, 1.55, 1.9], 'Scout, Workhorse, Capital, Flagship');
+});
+
 test('fleet-v2 display size grows gently with rank, from today\'s hull size', () => {
   const manifest = readManifest();
   const ranks = manifest.hulls.filter((hull) => hull.family === 'aur-fleet-v2' && Number.isFinite(hull.minBuilds))
@@ -120,11 +136,11 @@ test('fleet-v2 display size grows gently with rank, from today\'s hull size', ()
 
 test('provider colors are fixed fleet identities in renderer source; a local model flies red', () => {
   const source = fs.readFileSync(path.join(ROOT, 'src', 'renderer', 'util.js'), 'utf8');
-  assert.match(source, /key: 'claude', label: 'Claude', color: '#b026ff'/);
-  assert.match(source, /key: 'codex', label: 'Codex', color: '#2f7dff'/);
+  assert.match(source, /key: 'claude', label: 'Claude', color: '#d97757'/);
+  assert.match(source, /key: 'codex', label: 'Codex', color: '#f2f0ea'/);
   assert.match(source, /LOCAL_MODEL = Object\.freeze\(\{ key: 'local', label: 'Local model', color: '#ff3344' \}\)/);
   assert.match(source, /AUR\.shipTint = \(shipId, provider\) =>/);
   assert.match(source, /ship\.local === true/);
-  assert.match(source, /kind === 'drone'/);
+  assert.doesNotMatch(source, /kind === 'drone'/, 'drones fly hulls; only a generic provider is a signal marker');
   assert.match(source, /providerKey\(ship\.provider\) === 'generic'/);
 });

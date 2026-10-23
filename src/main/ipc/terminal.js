@@ -6,6 +6,7 @@ const fs = require('fs');
 const { isLocalProjectPath } = require('../provider-adapters');
 const guards = require('./guards');
 const { validProjectId } = guards;
+const { resolveTerminalTarget } = require('../terminal/target');
 
 /** @import { Failure, OpenTerminalResult, TerminalFailureCode } from '../../types/contract' */
 
@@ -35,13 +36,14 @@ function createTerminalIpc(ctx) {
 
   /** @returns {Failure<TerminalFailureCode>} */
   function terminalFailure(code) {
-    const allowed = new Set(['INVALID', 'REPLAY', 'NOT_FOUND', 'UNAVAILABLE', 'BUSY', 'FAILED']);
+    const allowed = new Set(['INVALID', 'REPLAY', 'NOT_FOUND', 'UNAVAILABLE', 'BUSY', 'FAILED',
+      'TERMINAL_NOT_FOUND', 'AMBIGUOUS']);
     return { ok: false, code: allowed.has(code) ? code : 'FAILED' };
   }
 
   /** @returns {Promise<OpenTerminalResult>} */
-  async function handleOpenTerminal(event, projectId) {
-    if (!trustedMainFrame(event) || !validProjectId(projectId)) return terminalFailure('INVALID');
+  async function handleOpenTerminal(event, targetId) {
+    if (!trustedMainFrame(event) || !validProjectId(targetId)) return terminalFailure('INVALID');
     if (ctx.activeSource !== ctx.tracker || ctx.replay.replayBoundaryOperations > 0) return terminalFailure('REPLAY');
     if (terminalLaunchInFlight || Date.now() < terminalLaunchCooldownUntil) {
       return terminalFailure('BUSY');
@@ -49,15 +51,19 @@ function createTerminalIpc(ctx) {
     if (process.platform !== 'win32' && process.platform !== 'darwin' && !ctx.flags.controlTest) {
       return terminalFailure('UNAVAILABLE');
     }
-    const cwd = liveProjectCwd(projectId);
+    const target = resolveTerminalTarget(ctx.tracker, targetId);
+    if (target.code) return terminalFailure(target.code);
+    const cwd = liveProjectCwd(target.projectId);
     if (!cwd) return terminalFailure('NOT_FOUND');
-    if (!ctx.terminalLauncher || typeof ctx.terminalLauncher.open !== 'function') {
+    const adapter = target.session ? ctx.terminalFocus : ctx.terminalLauncher;
+    const method = target.session ? 'focus' : 'open';
+    if (!adapter || typeof adapter[method] !== 'function') {
       return terminalFailure('UNAVAILABLE');
     }
 
     terminalLaunchInFlight = true;
     try {
-      const outcome = await ctx.terminalLauncher.open({ cwd });
+      const outcome = await adapter[method](target.session ? { ...target.session, cwd } : { cwd });
       if (outcome && outcome.ok === true) {
         terminalLaunchCooldownUntil = Date.now() + 750;
         return { ok: true };

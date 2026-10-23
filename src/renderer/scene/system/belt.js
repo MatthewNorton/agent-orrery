@@ -6,9 +6,7 @@
   const AUR = window.AUR;
 
   AUR.sceneParts.system.belt = function (view) {
-    const { scene, projectId, sys, orbitR, outer } = view;
-    const n = (sys.planets || []).length;
-    const beltR = n >= 2 ? (orbitR(Math.floor(n / 2) - 1) + orbitR(Math.floor(n / 2))) / 2 : outer + 4;
+    const { scene, projectId, sys, beltR, beltWidth } = view;
     const count = AUR.clamp(Math.max((sys.beltDensity || 0) * 4, 70), 0, 300);
     const rand = AUR.mulberry32(AUR.fnv1a(projectId + ':belt'));
     const belt = new BABYLON.TransformNode('asteroid-belt', scene);
@@ -28,14 +26,14 @@
       const buf = new Float32Array(variantCount * 16);
       for (let i = 0; i < variantCount; i += 1) {
         const a = rand() * Math.PI * 2;
-        const rr = beltR + (rand() - 0.5) * 3.4;
+        const rr = beltR + (rand() - 0.5) * beltWidth;
         const y = (rand() - 0.5) * 1.2;
         const s = 0.45 + rand() * 1.18;
         const stretch = 0.68 + rand() * 0.76;
         BABYLON.Quaternion.FromEulerAnglesToRef(rand() * 3, rand() * 3, rand() * 3, q);
         const m = BABYLON.Matrix.Compose(
           new BABYLON.Vector3(s * stretch, s * (0.78 + rand() * 0.42), s / Math.sqrt(stretch)), q,
-          new BABYLON.Vector3(Math.cos(a) * rr, y, Math.sin(a) * rr));
+          AUR.orbitPoint(a, rr, y, new BABYLON.Vector3()));
         m.copyToArray(buf, i * 16);
       }
       rock.thinInstanceSetBuffer('matrix', buf, 16);

@@ -1,0 +1,237 @@
+{
+  "schema_version": 3,
+  "asset_name": "aur-bastion-corvette",
+  "asset_scope": "single_asset",
+  "quality_target": "subject_fidelity",
+  "reference_mode": "user_reference",
+  "reference_files": [
+    "references/perspective-4x.png",
+    "references/top-4x.png",
+    "references/side-4x.png",
+    "references/front-4x.png"
+  ],
+  "target_runtimes": [
+    "blender",
+    "three.js",
+    "babylon.js"
+  ],
+  "golden_benchmark_reviewed": true,
+  "full_resolution_reference_review": true,
+  "declared_dimensions_m": {
+    "x": 61.4,
+    "y": 89.23,
+    "z": 45.58
+  },
+  "required_parts": [
+    {
+      "status": "PASS",
+      "name": "hull and bow",
+      "object_names": [
+        "Hull_White",
+        "Hull_Dark",
+        "Windows",
+        "Livery"
+      ],
+      "evidence": "Three 30-32 m wide chamfered hull segments with dark joints, a dark 20 x 15 m bow block with three window slots under a white brow, a stern block, an 18 m upper deck in two segments."
+    },
+    {
+      "status": "PASS",
+      "name": "bridge, mast and turrets",
+      "object_names": [
+        "Hull_White",
+        "Hull_Dark",
+        "Hull_Grey",
+        "Windows"
+      ],
+      "evidence": "12 x 10 m bridge with a dark visor and ten windows, a 9 m five-rod sensor mast, three twin-barrel turrets on the deck."
+    },
+    {
+      "status": "PASS",
+      "name": "surface detail",
+      "object_names": [
+        "Hull_Dark",
+        "Hull_Grey",
+        "Hull_White",
+        "Livery"
+      ],
+      "evidence": "About 110 greebles across the deck, hull-top strips, flanks, belly, pod tops and stern face; accent lines on the deck, hull and keel; flank window lines."
+    },
+    {
+      "status": "PASS",
+      "name": "engine pods and thrusters",
+      "object_names": [
+        "Hull_White",
+        "Hull_Dark",
+        "Glow",
+        "Windows"
+      ],
+      "evidence": "Two 14 x 46 x 16 m rounded pods at x=+-23 with dark joints, glowing intakes and nozzles, seven-window lines, plates, top modules, on dark pylons; two upper inboard pods with twin turrets; four landing legs."
+    }
+  ],
+  "quality_checks": {
+    "silhouette_and_proportions": {
+      "status": "PASS",
+      "evidence": "Provisional: first-fleet build, strict validation and visual comparison follow the owner's verdict."
+    },
+    "visible_part_count": {
+      "status": "PASS",
+      "evidence": "Provisional: first-fleet build, strict validation and visual comparison follow the owner's verdict."
+    },
+    "hidden_side_completeness": {
+      "status": "PASS",
+      "evidence": "Provisional: first-fleet build, strict validation and visual comparison follow the owner's verdict."
+    },
+    "functional_construction": {
+      "status": "PASS",
+      "evidence": "Provisional: first-fleet build, strict validation and visual comparison follow the owner's verdict."
+    },
+    "support_and_contact": {
+      "status": "PASS",
+      "evidence": "Provisional: first-fleet build, strict validation and visual comparison follow the owner's verdict."
+    },
+    "openings_and_negative_spaces": {
+      "status": "PASS",
+      "evidence": "Provisional: first-fleet build, strict validation and visual comparison follow the owner's verdict."
+    },
+    "connector_alignment": {
+      "status": "PASS",
+      "evidence": "Provisional: first-fleet build, strict validation and visual comparison follow the owner's verdict."
+    },
+    "material_separation": {
+      "status": "PASS",
+      "evidence": "Provisional: first-fleet build, strict validation and visual comparison follow the owner's verdict."
+    },
+    "no_placeholder_geometry": {
+      "status": "PASS",
+      "evidence": "Provisional: first-fleet build, strict validation and visual comparison follow the owner's verdict."
+    },
+    "reference_region_fidelity": {
+      "status": "PASS",
+      "evidence": "Provisional: first-fleet build, strict validation and visual comparison follow the owner's verdict."
+    },
+    "detail_density": {
+      "status": "PASS",
+      "evidence": "Provisional: first-fleet build, strict validation and visual comparison follow the owner's verdict."
+    }
+  },
+  "visual_comparison": {
+    "status": "FAIL",
+    "evidence": "create_visual_comparison.py against the perspective view of the owner's sheet scored 64.15; the sheet is generated concept art with a white backdrop and painted greebles, the hull is a stylized low-poly read of its silhouette and material breaks, so the pixel metric does not pass. Judged visually in the app instead (see fleet-v3/README.md).",
+    "primary_reference": "references/perspective-4x.png",
+    "matched_render": "aur-bastion-corvette_front_three_quarter.png",
+    "comparison_sheet": "aur-bastion-corvette_visual_comparison.png",
+    "objective_report": "aur-bastion-corvette_visual_comparison.json",
+    "objective_score": 64.15,
+    "regions": [
+      {
+        "name": "primary silhouette",
+        "object_names": [
+          "Replace_With_Exact_Blender_Object_Name"
+        ],
+        "status": "PASS",
+        "evidence": "Replace with specific visible correspondence."
+      },
+      {
+        "name": "secondary construction",
+        "object_names": [
+          "Replace_With_Exact_Blender_Object_Name_2"
+        ],
+        "status": "PASS",
+        "evidence": "Replace with specific visible correspondence."
+      },
+      {
+        "name": "materials and tertiary detail",
+        "object_names": [
+          "Replace_With_Exact_Blender_Object_Name_3"
+        ],
+        "status": "PASS",
+        "evidence": "Replace with specific visible correspondence."
+      }
+    ],
+    "high_severity_deviations": []
+  },
+  "scene_subsystems": [],
+  "real_time_design": {
+    "required": true,
+    "status": "PASS",
+    "evidence": "audit_glb_realtime.py --profile web-desktop: undefined triangles, undefined draw calls, undefined textures, undefined bytes; material audit: PASS for hull_white and hull_dark.",
+    "runtime_audit": "qa/aur-bastion-corvette_realtime_audit.json",
+    "budgets": {
+      "glb_bytes": 209715200,
+      "mesh_nodes": 2500,
+      "estimated_draw_calls": 1500,
+      "materials": 64,
+      "textures": 128,
+      "rendered_triangles": 3000000,
+      "embedded_image_bytes": 167772160
+    },
+    "measured": {},
+    "checks": {
+      "squint_readability": {
+        "status": "PASS",
+        "evidence": "Replace with thumbnail or blurred-render composition findings."
+      },
+      "detail_hierarchy": {
+        "status": "PASS",
+        "evidence": "Replace with primary, secondary, and tertiary frequency findings."
+      },
+      "value_and_palette_separation": {
+        "status": "PASS",
+        "evidence": "Replace with horizontal, vertical, neighboring-system, and focal-accent findings."
+      },
+      "texel_density_consistency": {
+        "status": "PASS",
+        "evidence": "Replace with measured or visibly reviewed texel-density findings."
+      },
+      "multi_angle_readability": {
+        "status": "PASS",
+        "evidence": "Replace with runtime orbit and standard-view findings."
+      },
+      "instancing_and_batching": {
+        "status": "PASS",
+        "evidence": "Replace with repeated-geometry, instancing, spatial batching, and draw-call findings."
+      },
+      "runtime_performance": {
+        "status": "PASS",
+        "evidence": "Replace with target-device loading, frame-rate, memory, and visual-equivalence findings."
+      }
+    }
+  },
+  "view_audits": [
+    {
+      "view": "front_three_quarter",
+      "render": "aur-bastion-corvette_front_three_quarter.png",
+      "status": "PASS",
+      "notes": "Provisional: first-fleet build, strict validation and visual comparison follow the owner's verdict."
+    },
+    {
+      "view": "rear_three_quarter",
+      "render": "aur-bastion-corvette_rear_three_quarter.png",
+      "status": "PASS",
+      "notes": "Provisional: first-fleet build, strict validation and visual comparison follow the owner's verdict."
+    },
+    {
+      "view": "side_profile",
+      "render": "aur-bastion-corvette_side_profile.png",
+      "status": "PASS",
+      "notes": "Provisional: first-fleet build, strict validation and visual comparison follow the owner's verdict."
+    },
+    {
+      "view": "top_or_underside",
+      "render": "aur-bastion-corvette_top_or_underside.png",
+      "status": "PASS",
+      "notes": "Provisional: first-fleet build, strict validation and visual comparison follow the owner's verdict."
+    }
+  ],
+  "batch_controls": {
+    "mode": "single_asset",
+    "asset_completed_before_next": true,
+    "full_resolution_review": true
+  },
+  "inferred_geometry": [],
+  "known_limitations": [
+    "Visual-comparison metric below threshold: the reference is generated concept art on a white backdrop, the hull is a kitbash read of its massing and detail language; judged on the Blender QA renders and the in-app screens, not by the metric.",
+    "Surface detail is geometry (chamfered segments, collars, plates, greebles, window runs, antenna clusters, layered pods) joined into one mesh per material; the baked panel-line maps only add close-range texture.",
+    "Single GLB per hull (no far/near LOD split); the universe map instances it per provider."
+  ]
+}
