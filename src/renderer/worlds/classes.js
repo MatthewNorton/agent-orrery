@@ -1,9 +1,5 @@
 // @ts-check
-// World maps, part 2 of 3: the five world classes. createSampler(cls, seed, palette) returns
-// sample(x, y, z, out), which shades one point of the unit sphere into `out`: albedo RGB (0–2),
-// height (3), emission RGB (4–6), specular/water mask (7) and cloud density (8). Rocky, gas,
-// volcanic and oceanic are the approved preview's maths unchanged (kit 15 checks parity); ice
-// swaps the preview's noise iso-line cracks for Europa-style lineae. Pure, like noise.js.
+// World maps, part 2 of 3: the five world classes (kit 15 CONTRACT.md, W2). Pure, like noise.js.
 'use strict';
 
 (function (root) {
@@ -13,7 +9,8 @@
   const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
   const normalize = (a) => { const n = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / n, a[1] / n, a[2] / n]; };
 
-  function write(out, color, height, er, eg, eb, specular, cloud) {
+  // out: albedo RGB, height, emission RGB, specular/water mask, cloud density.
+  function write(out, color, height, er = 0, eg = 0, eb = 0, specular = 0, cloud = 0) {
     out[0] = color[0]; out[1] = color[1]; out[2] = color[2]; out[3] = height;
     out[4] = er; out[5] = eg; out[6] = eb; out[7] = specular; out[8] = cloud;
   }
@@ -47,12 +44,12 @@
       crater.axis[1] + crater.reach >= i / 32 - 1 && crater.axis[1] - crater.reach <= (i + 1) / 32 - 1));
   }
 
-  // Each factory takes the planet's noise, palette and seeded random numbers once and returns
-  // shade(x, y, z, wx, wy, wz, broad, detail, out); (wx, wy, wz) is the domain-warped point.
+  // Each class turns the planet's noise and palette into shade(x, y, z, broad, detail, out).
+  // Rocky, gas, volcanic and oceanic are the approved preview's maths, unchanged.
   const CLASSES = {
-    rocky({ fbm, P, seed }) { // sidereal "morrow": banded crater field
+    rocky: { sampler({ fbm, P, seed }) { // sidereal "morrow": banded crater field
       const craters = craterBands(seed);
-      return (x, y, z, wx, wy, wz, broad, detail, out) => {
+      return (x, y, z, broad, detail, out) => {
         let relief = 0, ejecta = 0, floor = 0;
         for (const crater of craters[Math.min(63, Math.floor((y + 1) * 32))]) {
           const d2 = Math.max(0, 2 - 2 * (x * crater.axis[0] + y * crater.axis[1] + z * crater.axis[2]));
@@ -67,16 +64,17 @@
         const maria = smooth(-0.05, 0.22, fbm(x * 1.7 + 3.3, y * 1.7 - 1.1, z * 1.7 + 7.7, 4));
         const tone = clamp(0.56 + broad * 0.55 + detail * 0.22 - floor * 0.28 - maria * 0.32);
         const color = blend(ramp(P, tone), scale(P[2], 1.08), ejecta * 0.45);
-        write(out, color, 0.52 + broad * 0.12 + detail * 0.018 + relief - maria * 0.03, 0, 0, 0, 0, 0);
+        write(out, color, 0.52 + broad * 0.12 + detail * 0.018 + relief - maria * 0.03);
       };
-    },
+    } },
 
-    gas({ fbm, P, random }) { // sidereal "zephra": vortex-curled belts
+    gas: { sampler({ fbm, P, seed }) { // sidereal "zephra": vortex-curled belts
+      const random = lcg((seed ^ 0x9e3779b9) >>> 0);
       const storms = [unitVector(random, -0.5, -0.15), unitVector(random, 0.12, 0.45)];
       const bandFreq = 19 + random() * 8;
       const belts = blend(P[0], P[1], 0.45);
       const polarHaze = blend(P[0], P[1], 0.3);
-      return (x, y, z, wx, wy, wz, broad, detail, out) => {
+      return (x, y, z, broad, detail, out) => {
         const first = vortex(x, y, z, storms[0], 18, 4.8);
         const s = vortex(first[0], first[1], first[2], storms[1], 25, -3.2);
         const turbulence = fbm(s[0] * 12 + broad, s[1] * 17, s[2] * 12, 6);
@@ -89,14 +87,61 @@
         const filaments = 0.5 + 0.5 * Math.sin(belt * 3.7 + turbulence * 6);
         color = lift(scale(color, 0.78 + stream * 0.17 + filaments * 0.07), detail * 0.035);
         color = blend(color, polarHaze, smooth(0.74, 0.98, Math.abs(y)) * 0.55);
-        write(out, color, 0.5, 0, 0, 0, 0, 0);
+        write(out, color, 0.5);
       };
-    },
+    } },
 
-    ice: iceLineae, // sidereal "nivalis" plates, dust and frost, with Europa-style lineae
+    // Sidereal "nivalis" plates, dust and frost, with Europa-style lineae for its iso-line cracks:
+    // 5–8 seeded small circles of 43–86° radius warped by low-frequency noise, faded along their
+    // length into long arcs, each a dark core in stained margins flanked by a ridged double band.
+    ice: { sampler({ noise, fbm, P, seed }) {
+      const random = lcg((seed ^ 0x6c8e9cf5) >>> 0);
+      const count = 5 + Math.floor(random() * 4);
+      const REACH = 0.1; // widest band (rad) any linea paints, warp included
+      const lineae = [];
+      for (let i = 0; i < count; i++) {
+        const axis = unitVector(random, -1, 1);
+        const radius = 0.75 + random() * 0.75;
+        const u = normalize(cross(axis, Math.abs(axis[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0])), v = cross(axis, u);
+        lineae.push({ axis, radius, u, v, width: 0.004 + random() * 0.008, phase: random() * 97,
+          lo: Math.cos(Math.min(Math.PI, radius + REACH)), hi: Math.cos(Math.max(0, radius - REACH)) });
+      }
+      return (x, y, z, broad, detail, out) => {
+        const bend = noise(x * 1.9 + 21.3, y * 1.9 - 4.7, z * 1.9 + 9.1);
+        let line = 0, core = 0, margin = 0, ridge = 0, near = 0;
+        for (const l of lineae) {
+          const dot = x * l.axis[0] + y * l.axis[1] + z * l.axis[2];
+          if (dot < l.lo || dot > l.hi) continue;
+          const d = Math.abs(Math.acos(dot) - l.radius + 0.04 * bend);
+          if (d >= REACH) continue;
+          const along = Math.atan2(x * l.v[0] + y * l.v[1] + z * l.v[2], x * l.u[0] + y * l.u[1] + z * l.u[2]);
+          const keep = smooth(-0.12, 0.22, noise(Math.cos(along) * 1.3 + l.phase, Math.sin(along) * 1.3, l.phase * 0.31));
+          if (keep <= 0) continue;
+          const w = l.width;
+          line = Math.max(line, (1 - smooth(w * 0.5, w * 1.5, d)) * keep);
+          core = Math.max(core, (1 - smooth(0, w * 0.6, d)) * keep);
+          margin = Math.max(margin, (1 - smooth(w * 1.5, w * 6.5, d)) * keep);
+          ridge = Math.max(ridge, Math.exp(-(((d - w * 2) / (w * 0.75)) ** 2)) * keep);
+          near = Math.max(near, (1 - smooth(w * 4, REACH, d)) * keep);
+        }
+        if (ridge > 0.002) ridge *= (1 - Math.abs(fbm(x * 31 + 3, y * 31, z * 31, 3))) ** 3;
+        const oldIce = smooth(-0.12, 0.22, broad);
+        let color = blend(scale(P[2], 0.87), P[1], oldIce * 0.64);
+        const dust = smooth(0.12, 0.28, fbm(x * 12, y * 12, z * 12, 4));
+        color = blend(color, [0.48, 0.39, 0.28], dust * (0.45 + 0.55 * near) * 0.42);
+        color = blend(color, [0.56, 0.43, 0.34], margin * 0.5); // stained lineae margins
+        color = blend(color, [0.4, 0.25, 0.18], line * 0.66);
+        color = blend(color, [0.22, 0.13, 0.1], core * 0.5); // the darker core
+        color = lift(color, ridge * 0.2 + detail * 0.11);
+        color = blend(color, [0.88, 0.93, 0.95], smooth(0.72, 0.93, Math.abs(y) + broad * 0.1) * 0.6);
+        write(out, color, 0.62 + detail * 0.24 - line * 0.2 + ridge * 0.09 - margin * 0.04 + broad * 0.13,
+          0, 0, 0, 0.12 * (1 - line));
+      };
+    } },
 
-    volcanic({ fbm, P }) { // sidereal "pyra": basalt plates and molten fissures
-      return (x, y, z, wx, wy, wz, broad, detail, out) => {
+    volcanic: { sampler({ fbm, warp, P }) { // sidereal "pyra": basalt plates and molten fissures
+      return (x, y, z, broad, detail, out) => {
+        const w = warp(x, y, z), wx = w[0], wy = w[1], wz = w[2];
         const plates = Math.abs(fbm(wx * 7.5, wy * 7.5, wz * 7.5, 6));
         const active = smooth(-0.08, 0.24, broad);
         const fissure = (1 - smooth(0.009, 0.055, plates)) * active;
@@ -105,12 +150,13 @@
         let color = blend(scale(P[0], 2.3), P[1], clamp(0.3 + detail * 0.9 + broad * 0.7) * 0.75);
         color = blend(color, [0.46, 0.13, 0.025], smooth(0.015, 0.32, heat));
         write(out, color, 0.42 + detail * 0.32 + broad * 0.24 - heat * 0.19,
-          heat * 0.62, heat * heat * 0.2, heat ** 4 * 0.02, 0, 0);
+          heat * 0.62, heat * heat * 0.2, heat ** 4 * 0.02);
       };
-    },
+    } },
 
-    oceanic({ noise, fbm, P }) { // sidereal "nerai": archipelagos, weather, glint, night lights
-      return (x, y, z, wx, wy, wz, broad, detail, out) => {
+    oceanic: { clouds: true, sampler({ noise, fbm, warp, P }) { // sidereal "nerai": archipelagos, weather, glint, night lights
+      return (x, y, z, broad, detail, out) => {
+        const w = warp(x, y, z), wx = w[0], wy = w[1], wz = w[2];
         const terrain = fbm(wx * 4.1 + 2, wy * 4.1, wz * 4.1) + broad * 0.24 - 0.09;
         const land = smooth(0.015, 0.037, terrain);
         const shallows = smooth(-0.11, 0.025, terrain);
@@ -136,81 +182,25 @@
           lights, lights * 0.72, lights * 0.42, (1 - land) * (1 - seaIce),
           smooth(0.015, 0.38, weather * cells + (cells - 0.75) * 0.1) * 0.88);
       };
-    },
+    } },
   };
 
-  // Ice: 5–8 seeded small circles (an axis and an angular radius of 43–86°, so each crosses much
-  // of the globe), warped by low-frequency noise. Strength is 1 − smoothstep(w0, w1, |angle(p, axis)
-  // − radius + 0.04·warp|), maxed over the circles; a noise fade along each circle leaves long arcs
-  // rather than closed loops. Each linea is a dark core in reddish-brown stained margins, with a
-  // ridged double band (1 − |fbm|, sharpened) flanking it.
-  function iceLineae({ noise, fbm, P, seed }) {
-    const random = lcg((seed ^ 0x6c8e9cf5) >>> 0);
-    const count = 5 + Math.floor(random() * 4);
-    const REACH = 0.1; // widest band (rad) any linea paints, warp included
-    const lineae = [];
-    for (let i = 0; i < count; i++) {
-      const axis = unitVector(random, -1, 1);
-      const radius = 0.75 + random() * 0.75;
-      // Two axes across the circle's plane, for the angle along it.
-      const helper = Math.abs(axis[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0];
-      const u = normalize(cross(axis, helper)), v = cross(axis, u);
-      lineae.push({ axis, radius, u, v, width: 0.004 + random() * 0.008, phase: random() * 97,
-        lo: Math.cos(Math.min(Math.PI, radius + REACH)), hi: Math.cos(Math.max(0, radius - REACH)) });
-    }
-    return (x, y, z, wx, wy, wz, broad, detail, out) => {
-      const bend = noise(x * 1.9 + 21.3, y * 1.9 - 4.7, z * 1.9 + 9.1);
-      let line = 0, core = 0, margin = 0, ridge = 0, near = 0;
-      for (const l of lineae) {
-        const dot = x * l.axis[0] + y * l.axis[1] + z * l.axis[2];
-        if (dot < l.lo || dot > l.hi) continue;
-        const d = Math.abs(Math.acos(dot) - l.radius + 0.04 * bend);
-        if (d >= REACH) continue;
-        const along = Math.atan2(x * l.v[0] + y * l.v[1] + z * l.v[2], x * l.u[0] + y * l.u[1] + z * l.u[2]);
-        const keep = smooth(-0.12, 0.22, noise(Math.cos(along) * 1.3 + l.phase, Math.sin(along) * 1.3, l.phase * 0.31));
-        if (keep <= 0) continue;
-        const w = l.width;
-        line = Math.max(line, (1 - smooth(w * 0.5, w * 1.5, d)) * keep);
-        core = Math.max(core, (1 - smooth(0, w * 0.6, d)) * keep);
-        margin = Math.max(margin, (1 - smooth(w * 1.5, w * 6.5, d)) * keep);
-        ridge = Math.max(ridge, Math.exp(-(((d - w * 2) / (w * 0.75)) ** 2)) * keep);
-        near = Math.max(near, (1 - smooth(w * 4, REACH, d)) * keep);
-      }
-      if (ridge > 0.002) ridge *= (1 - Math.abs(fbm(x * 31 + 3, y * 31, z * 31, 3))) ** 3;
-      const oldIce = smooth(-0.12, 0.22, broad);
-      let color = blend(scale(P[2], 0.87), P[1], oldIce * 0.64);
-      const dust = smooth(0.12, 0.28, fbm(x * 12, y * 12, z * 12, 4));
-      color = blend(color, [0.48, 0.39, 0.28], dust * (0.45 + 0.55 * near) * 0.42);
-      color = blend(color, [0.56, 0.43, 0.34], margin * 0.5); // stained lineae margins
-      color = blend(color, [0.4, 0.25, 0.18], line * 0.66);
-      color = blend(color, [0.22, 0.13, 0.1], core * 0.5); // the darker core
-      color = lift(color, ridge * 0.2 + detail * 0.11);
-      color = blend(color, [0.88, 0.93, 0.95], smooth(0.72, 0.93, Math.abs(y) + broad * 0.1) * 0.6);
-      write(out, color, 0.62 + detail * 0.24 - line * 0.2 + ridge * 0.09 - margin * 0.04 + broad * 0.13,
-        0, 0, 0, 0.12 * (1 - line), 0);
-    };
-  }
-
+  // sample(x, y, z, out) shades one point of the unit sphere; `clouds` says the class has a cloud layer.
   function createSampler(cls, seed, palette) {
-    const factory = Object.prototype.hasOwnProperty.call(CLASSES, cls) ? CLASSES[cls] : null;
-    if (!factory) throw new RangeError('Unknown world class: ' + String(cls));
+    if (!Object.hasOwn(CLASSES, cls)) throw new RangeError('Unknown world class: ' + String(cls));
     const { noise, fbm } = worlds.noiseField(seed);
-    const P = palette.map(hex);
-    const shade = factory({ noise, fbm, P, seed, random: lcg((seed ^ 0x9e3779b9) >>> 0) });
-    const warp = cls === 'volcanic' || cls === 'oceanic'; // the classes that read (wx, wy, wz)
-    return function sample(x, y, z, out) {
-      const broad = fbm(x * 2.8 + 4.1, y * 2.8 + 8.7, z * 2.8 - 2.4);
-      const detail = fbm(x * 42 + 1.2, y * 42, z * 42, 4);
-      let wx = x, wy = y, wz = z;
-      if (warp) {
-        wx = x + 0.24 * noise(x * 3 + 8, y * 3, z * 3);
-        wy = y + 0.24 * noise(x * 3, y * 3 + 6, z * 3);
-        wz = z + 0.24 * noise(x * 3, y * 3, z * 3 + 3);
-      }
-      shade(x, y, z, wx, wy, wz, broad, detail, out);
+    const warped = new Float64Array(3);
+    const warp = (x, y, z) => { // domain warp, for the classes that ask for it
+      warped[0] = x + 0.24 * noise(x * 3 + 8, y * 3, z * 3);
+      warped[1] = y + 0.24 * noise(x * 3, y * 3 + 6, z * 3);
+      warped[2] = z + 0.24 * noise(x * 3, y * 3, z * 3 + 3);
+      return warped;
     };
+    const shade = CLASSES[cls].sampler({ noise, fbm, warp, seed, P: palette.map(hex) });
+    const sample = (x, y, z, out) => shade(x, y, z,
+      fbm(x * 2.8 + 4.1, y * 2.8 + 8.7, z * 2.8 - 2.4), fbm(x * 42 + 1.2, y * 42, z * 42, 4), out);
+    return { sample, clouds: CLASSES[cls].clouds === true };
   }
 
-  worlds.CLASS_KEYS = Object.freeze(Object.keys(CLASSES));
   worlds.createSampler = createSampler;
 })(self);

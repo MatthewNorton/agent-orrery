@@ -4,17 +4,15 @@
 // loaded the way the page and worlds/worker.js load them: classic scripts extending self.AUR.worlds.
 
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
+const { readRenderer } = require('./support/renderer-source');
 
-const WORLDS = path.join(__dirname, '..', 'src', 'renderer', 'worlds');
 const PURE = ['noise.js', 'classes.js', 'maps.js'];
 
+// In this realm, so typed arrays compare with assert; window and document are absent, as in a worker.
 function load(scope, file) {
-  const code = fs.readFileSync(path.join(WORLDS, file), 'utf8');
-  vm.runInThisContext(`(function (self, window, document) {\n${code}\n})`, { filename: file })(scope, undefined, undefined);
+  vm.runInThisContext(`(function (self, window, document) {\n${readRenderer(`worlds/${file}`)}\n})`, { filename: file })(scope, undefined, undefined);
 }
 function loadWorlds() {
   const scope = {};
@@ -53,10 +51,9 @@ function neighbourRatios({ width: w, height: h, surface: s }) {
 }
 
 function coverage(out) {
-  const pixels = out.width * out.height;
+  const pixels = out.width * out.height, e = out.emission;
   let lit = 0, water = 0;
   for (let i = 0; i < pixels; i++) {
-    const e = out.emission;
     if (e[i * 4] || e[i * 4 + 1] || e[i * 4 + 2]) lit++;
     if (e[i * 4 + 3] > 128) water++;
   }
@@ -104,11 +101,11 @@ test('each class carries only its own layers', () => {
     }
   }
   const rings = maps256.get('gas').rings;
-  assert.equal(rings.length, worlds.RING_TEXELS * 4);
+  assert.equal(rings.length, 1024 * 4);
   let gap = 255;
-  for (let i = Math.round(worlds.RING_TEXELS * 0.3); i < Math.round(worlds.RING_TEXELS * 0.7); i++) gap = Math.min(gap, rings[i * 4 + 3]);
-  assert.ok(gap < 10, 'the rings have a gap');
-  assert.equal(worlds.generate(job('rocky', 16, 8, { rings: true })).rings.length, worlds.RING_TEXELS * 4);
+  for (let i = 307; i < 717; i++) gap = Math.min(gap, rings[i * 4 + 3]);
+  assert.ok(gap < 10, 'the rings have a gap between 30 % and 70 % of their width');
+  assert.equal(worlds.generate(job('rocky', 16, 8, { rings: true })).rings.length, 1024 * 4);
 });
 
 test('the worker builds a job and transfers its buffers back', () => {
@@ -124,7 +121,9 @@ test('the worker builds a job and transfers its buffers back', () => {
   assert.equal(done.message.key, 'oceanic:1:32');
   assert.equal(done.message.ok, true);
   assert.deepEqual(done.message.surface, worlds.generate(job('oceanic', 32, 16)).surface);
-  assert.deepEqual(done.transfer, [done.message.surface.buffer, done.message.emission.buffer, done.message.clouds.buffer]);
-  assert.deepEqual({ key: failed.message.key, ok: failed.message.ok }, { key: 'too-wide', ok: false });
+  const buffers = [done.message.surface, done.message.emission, done.message.clouds].map((layer) => layer.buffer);
+  assert.equal(done.transfer.length, buffers.length);
+  for (const buffer of buffers) assert.ok(done.transfer.includes(buffer), 'every layer is transferred');
+  assert.deepEqual({ key: failed.message.key, ok: failed.message.ok, transfer: failed.transfer }, { key: 'too-wide', ok: false, transfer: [] });
   assert.match(failed.message.error, /2048/);
 });

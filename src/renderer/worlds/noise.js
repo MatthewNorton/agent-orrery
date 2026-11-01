@@ -1,8 +1,7 @@
 // @ts-check
-// World maps, part 1 of 3: colour maths, seeded random numbers and 3D Perlin noise sampled on
-// the unit sphere, so the maps have no seam and no pole pinch. Pure: the page, worlds/worker.js
-// and Node load this same file, so it never touches Babylon, window or document. Ports the
-// owner's MIT sandbox-animations-v2 PR #31 (experiments/sidereal-v2/world-generator.mjs).
+// World maps, part 1 of 3: colour maths, seeded random numbers and 3D Perlin noise, sampled on the
+// unit sphere so maps have no seam or pole pinch. Pure (the page, worlds/worker.js and Node load
+// it): no Babylon, window or document. Ports the owner's MIT sandbox-animations-v2 PR #31.
 'use strict';
 
 (function (root) {
@@ -63,6 +62,6 @@
     return { noise, fbm };
   }
 
-  worlds.math = Object.freeze({ clamp, mix, smooth, blend, scale, lift, ramp, byte, hex, lcg, unitVector });
+  worlds.math = Object.freeze({ clamp, smooth, blend, scale, lift, ramp, byte, hex, lcg, unitVector });
   worlds.noiseField = noiseField;
 })(self);
