@@ -1,34 +1,20 @@
 // @ts-check
-// Deterministic runtime planet surfaces and asteroid forms.
+// Planet world profiles (class, seed, palette: what worlds/ generates a surface from) and the
+// deterministic asteroid forms.
 'use strict';
 
 (function () {
   const AUR = window.AUR;
 
-  const WORLD_TYPES = Object.freeze([
-    Object.freeze({
-      key: 'rocky', colors: ['#171a20', '#55504a', '#a89072'],
-      roughness: 0.92, bumpLevel: 0.68, atmosphere: 'thin',
-    }),
-    Object.freeze({
-      key: 'gas', colors: ['#30253f', '#b66d51', '#e8c99f'],
-      roughness: 0.56, bumpLevel: 0.16, atmosphere: 'deep',
-    }),
-    Object.freeze({
-      key: 'ice', colors: ['#15283a', '#6595ac', '#d9eef1'],
-      roughness: 0.72, bumpLevel: 0.42, atmosphere: 'cold',
-    }),
-    Object.freeze({
-      key: 'volcanic', colors: ['#100e0d', '#4b2920', '#f06b32'],
-      roughness: 0.88, bumpLevel: 0.76, atmosphere: 'haze',
-    }),
-    Object.freeze({
-      key: 'oceanic', colors: ['#071b35', '#17617a', '#b7cab8'],
-      roughness: 0.46, bumpLevel: 0.3, atmosphere: 'deep',
-    }),
-  ]);
-  const WORLD_CACHE = new Map();
-  const WORLD_CACHE_LIMIT = 48;
+  // Each class's palette, dark to light.
+  const PALETTES = Object.freeze({
+    rocky: Object.freeze(['#171a20', '#55504a', '#a89072']),
+    gas: Object.freeze(['#30253f', '#b66d51', '#e8c99f']),
+    ice: Object.freeze(['#15283a', '#6595ac', '#d9eef1']),
+    volcanic: Object.freeze(['#100e0d', '#4b2920', '#f06b32']),
+    oceanic: Object.freeze(['#071b35', '#17617a', '#b7cab8']),
+  });
+  // A planet's class by AUR.planetTextureIndex, the hash that once picked its PNG.
   const TEXTURE_WORLD_TYPES = Object.freeze([
     'rocky', 'rocky', 'ice', 'ice', 'volcanic', 'volcanic',
     'oceanic', 'oceanic', 'gas', 'gas', 'rocky', 'rocky',
@@ -36,20 +22,6 @@
     'ice', 'ice', 'volcanic', 'volcanic', 'rocky', 'rocky',
     'oceanic', 'oceanic', 'ice', 'ice', 'oceanic', 'oceanic', 'rocky',
   ]);
-
-  function hexRgb(hex) {
-    const value = parseInt(hex.slice(1), 16);
-    return [(value >> 16) & 255, (value >> 8) & 255, value & 255];
-  }
-
-  function mixColor(a, b, amount) {
-    const t = AUR.clamp(amount, 0, 1);
-    return [
-      Math.round(a[0] + (b[0] - a[0]) * t),
-      Math.round(a[1] + (b[1] - a[1]) * t),
-      Math.round(a[2] + (b[2] - a[2]) * t),
-    ];
-  }
 
   function fade(t) { return t * t * (3 - 2 * t); }
 
@@ -90,180 +62,9 @@
 
   AUR.worldProfile = function worldProfile(projectId, planetName) {
     const seed = AUR.fnv1a(projectId + ':world:' + planetName);
-    const textureIndex = AUR.planetTextureIndex(projectId, planetName);
-    const key = TEXTURE_WORLD_TYPES[textureIndex - 1];
-    const base = WORLD_TYPES.find((candidate) => candidate.key === key) || WORLD_TYPES[0];
+    const key = TEXTURE_WORLD_TYPES[AUR.planetTextureIndex(projectId, planetName) - 1];
     const hueShift = ((seed >>> 8) % 25 - 12) / 100;
-    return Object.freeze({
-      key: base.key,
-      colors: base.colors,
-      roughness: base.roughness,
-      bumpLevel: base.bumpLevel,
-      atmosphere: base.atmosphere,
-      hueShift,
-      seed,
-    });
-  };
-
-  function craterField(u, v, craters) {
-    let depth = 0;
-    for (const crater of craters) {
-      const rawDx = Math.abs(u - crater.u);
-      const dx = Math.min(rawDx, 1 - rawDx) * Math.cos((v - 0.5) * 1.15);
-      const dy = (v - crater.v) * 0.62;
-      const d = Math.sqrt(dx * dx + dy * dy) / crater.radius;
-      if (d < 1) {
-        const bowl = (1 - d) * (1 - d);
-        const rim = Math.max(0, 1 - Math.abs(d - 0.82) / 0.16);
-        depth += rim * 0.34 - bowl * 0.62;
-      }
-    }
-    return depth;
-  }
-
-  function makeCraters(seed, count) {
-    const rand = AUR.mulberry32(seed ^ 0xa511e9b3);
-    const craters = [];
-    for (let i = 0; i < count; i += 1) {
-      craters.push({ u: rand(), v: 0.08 + rand() * 0.84, radius: 0.018 + rand() * 0.055 });
-    }
-    return craters;
-  }
-
-  function normalPixels(heights, width, height, strength) {
-    const pixels = new Uint8Array(width * height * 4);
-    for (let y = 0; y < height; y += 1) {
-      const up = Math.max(0, y - 1);
-      const down = Math.min(height - 1, y + 1);
-      for (let x = 0; x < width; x += 1) {
-        const left = (x + width - 1) % width;
-        const right = (x + 1) % width;
-        const dx = ((heights[y * width + right] - heights[y * width + left]) / 255) * strength;
-        const dy = ((heights[down * width + x] - heights[up * width + x]) / 255) * strength;
-        const length = Math.hypot(dx, dy, 1);
-        const offset = (y * width + x) * 4;
-        pixels[offset] = Math.round((-dx / length * 0.5 + 0.5) * 255);
-        pixels[offset + 1] = Math.round((-dy / length * 0.5 + 0.5) * 255);
-        pixels[offset + 2] = Math.round((1 / length * 0.5 + 0.5) * 255);
-        pixels[offset + 3] = 255;
-      }
-    }
-    return pixels;
-  }
-
-  AUR.proceduralPlanetData = function proceduralPlanetData(projectId, planetName, size) {
-    const width = AUR.clamp(Math.round(size || 256), 64, 512);
-    const height = width;
-    const cacheKey = projectId + ':' + planetName + ':' + width;
-    if (WORLD_CACHE.has(cacheKey)) return WORLD_CACHE.get(cacheKey);
-    const profile = AUR.worldProfile(projectId, planetName);
-    const colors = profile.colors.map(hexRgb);
-    const pixels = new Uint8Array(width * height * 4);
-    const heights = new Uint8Array(width * height);
-    const craters = makeCraters(profile.seed, profile.key === 'rocky' ? 18 : 8);
-
-    for (let y = 0; y < height; y += 1) {
-      const v = y / height;
-      for (let x = 0; x < width; x += 1) {
-        const u = x / width;
-        const broad = fractalNoise(u, v, profile.seed, 4);
-        const detail = fractalNoise(u, v, profile.seed ^ 0x9e3779b9, 5);
-        let elevation = broad * 0.72 + detail * 0.28;
-        let color;
-
-        if (profile.key === 'gas') {
-          const latitude = (v - 0.5) * Math.PI;
-          const warp = (broad - 0.5) * 0.22;
-          const bands = 0.5 + 0.5 * Math.sin(latitude * 18 + warp * 12);
-          const storm = Math.max(0, 1 - Math.hypot((u - 0.72) * 4.6, (v - 0.57) * 10));
-          elevation = 0.42 + bands * 0.22 + detail * 0.16 + storm * 0.2;
-          color = mixColor(mixColor(colors[0], colors[1], bands), colors[2], detail * 0.46 + storm * 0.58);
-        } else if (profile.key === 'ice') {
-          const fissures = Math.pow(Math.abs(detail - 0.5) * 2, 4);
-          elevation = broad * 0.62 + fissures * 0.38;
-          color = mixColor(colors[0], mixColor(colors[1], colors[2], broad), 0.55 + fissures * 0.35);
-        } else if (profile.key === 'volcanic') {
-          const cracks = Math.pow(Math.max(0, 0.18 - Math.abs(detail - 0.5)), 2) * 22;
-          elevation = broad * 0.76 + detail * 0.2 - cracks * 0.18;
-          color = mixColor(mixColor(colors[0], colors[1], broad), colors[2], cracks);
-        } else if (profile.key === 'oceanic') {
-          const land = AUR.clamp((broad - 0.58) * 5, 0, 1);
-          const cloud = AUR.clamp((detail - 0.68) * 3.2, 0, 0.42);
-          elevation = 0.28 + land * 0.5 + detail * 0.08;
-          color = mixColor(mixColor(colors[0], colors[1], detail), colors[2], land + cloud);
-        } else {
-          elevation += craterField(u, v, craters);
-          color = elevation < 0.47
-            ? mixColor(colors[0], colors[1], elevation * 1.8)
-            : mixColor(colors[1], colors[2], (elevation - 0.47) * 1.65);
-        }
-
-        elevation = AUR.clamp(elevation, 0, 1);
-        const offset = (y * width + x) * 4;
-        pixels[offset] = AUR.clamp(color[0] * (1 + profile.hueShift), 0, 255);
-        pixels[offset + 1] = AUR.clamp(color[1] * (1 - profile.hueShift * 0.35), 0, 255);
-        pixels[offset + 2] = AUR.clamp(color[2] * (1 - profile.hueShift), 0, 255);
-        pixels[offset + 3] = 255;
-        heights[y * width + x] = Math.round(elevation * 255);
-      }
-    }
-
-    const normals = normalPixels(heights, width, height, 2.2);
-    const result = Object.freeze({ profile, width, height, pixels, heights, normals });
-    WORLD_CACHE.set(cacheKey, result);
-    if (WORLD_CACHE.size > WORLD_CACHE_LIMIT) {
-      WORLD_CACHE.delete(WORLD_CACHE.keys().next().value);
-    }
-    return result;
-  };
-
-  AUR.applyPlanetSurface = function applyPlanetSurface(scene, material, projectId, planetName, options) {
-    const opts = options || {};
-    const textureIndex = AUR.planetTextureIndex(projectId, planetName);
-    const profile = AUR.worldProfile(projectId, planetName);
-    const authoredBump = textureIndex === 31;
-    if (!opts.generate || authoredBump) {
-      const diffuse = new BABYLON.Texture(AUR.planetTexPath(projectId, planetName), scene);
-      diffuse.uScale = 2; diffuse.vScale = 2;
-      diffuse.anisotropicFilteringLevel = 8;
-      material.diffuseTexture = diffuse;
-      const normalData = authoredBump ? null
-        : AUR.proceduralPlanetData(projectId, planetName, opts.detail ? 256 : 128);
-      const bump = authoredBump
-        ? new BABYLON.Texture('../../assets/planets/planet-031-normal.png', scene)
-        : BABYLON.RawTexture.CreateRGBATexture(
-          normalData.normals, normalData.width, normalData.height,
-          scene, true, false, BABYLON.Texture.TRILINEAR_SAMPLINGMODE);
-      bump.uScale = 2; bump.vScale = 2;
-      bump.wrapU = BABYLON.Texture.WRAP_ADDRESSMODE;
-      bump.wrapV = BABYLON.Texture.WRAP_ADDRESSMODE;
-      bump.level = profile.bumpLevel * (opts.detail ? 0.72 : 0.34);
-      bump.anisotropicFilteringLevel = 8;
-      bump.gammaSpace = false;
-      material.bumpTexture = bump;
-      return Object.freeze({ ...profile, authored: true, bumpLevel: bump.level });
-    }
-
-    const data = AUR.proceduralPlanetData(projectId, planetName, opts.detail ? 256 : 64);
-    const sampling = BABYLON.Texture.TRILINEAR_SAMPLINGMODE;
-    const diffuse = BABYLON.RawTexture.CreateRGBATexture(
-      data.pixels, data.width, data.height, scene, true, false, sampling);
-    diffuse.name = 'generated-world:' + projectId + ':' + planetName;
-    diffuse.wrapU = BABYLON.Texture.WRAP_ADDRESSMODE;
-    diffuse.wrapV = BABYLON.Texture.WRAP_ADDRESSMODE;
-    diffuse.uScale = 2; diffuse.vScale = 2;
-    diffuse.anisotropicFilteringLevel = opts.detail ? 8 : 4;
-    material.diffuseTexture = diffuse;
-    const bump = BABYLON.RawTexture.CreateRGBATexture(
-      data.normals, data.width, data.height, scene, true, false, sampling);
-    bump.name = 'generated-relief:' + projectId + ':' + planetName;
-    bump.wrapU = BABYLON.Texture.WRAP_ADDRESSMODE;
-    bump.wrapV = BABYLON.Texture.WRAP_ADDRESSMODE;
-    bump.uScale = 2; bump.vScale = 2;
-    bump.level = data.profile.bumpLevel * (opts.detail ? 0.76 : 0.36);
-    bump.gammaSpace = false;
-    material.bumpTexture = bump;
-    return data.profile;
+    return Object.freeze({ key, colors: PALETTES[key], hueShift, seed });
   };
 
   AUR.applyAsteroidSurface = function applyAsteroidSurface(scene, material, variant) {

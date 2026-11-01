@@ -185,6 +185,8 @@
     } },
   };
 
+  const hasClouds = (cls) => Object.hasOwn(CLASSES, cls) && CLASSES[cls].clouds === true;
+
   // sample(x, y, z, out) shades one point of the unit sphere; `clouds` says the class has a cloud layer.
   function createSampler(cls, seed, palette) {
     if (!Object.hasOwn(CLASSES, cls)) throw new RangeError('Unknown world class: ' + String(cls));
@@ -199,8 +201,8 @@
     const shade = CLASSES[cls].sampler({ noise, fbm, warp, seed, P: palette.map(hex) });
     const sample = (x, y, z, out) => shade(x, y, z,
       fbm(x * 2.8 + 4.1, y * 2.8 + 8.7, z * 2.8 - 2.4), fbm(x * 42 + 1.2, y * 42, z * 42, 4), out);
-    return { sample, clouds: CLASSES[cls].clouds === true };
+    return { sample, clouds: hasClouds(cls) };
   }
 
-  worlds.createSampler = createSampler;
+  Object.assign(worlds, { createSampler, hasClouds });
 })(self);

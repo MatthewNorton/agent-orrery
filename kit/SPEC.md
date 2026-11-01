@@ -66,7 +66,9 @@ loaders), then:
 View contract: each `scene/<view>/view.js` registers
 `AUR.views.<name> = (engine, data, ctx) => ({ scene, update(eventBatch), dispose() })`
 where `ctx` provides `openSystem(projectId)`, `openPlanet(projectId, name)`, the
-shared `store`, the graphics `quality` tier and the `galaxyFields` cache. Views may also implement `resize`,
+shared `store`, the graphics `quality` tier, the `galaxyFields` cache and `worldMaps`, the generated
+planet maps (`worlds/textures.js`: a view opens an epoch, requests maps in it and closes it on dispose).
+Views may also implement `resize`,
 `setQuality`, `setSearchMatches`, `setShipFocus`, `focusShip` and `shipFocusState`;
 the app fills in a no-op default for any they leave out (`VIEW_DEFAULTS` in `app/boot.js`).
 Agent focus (`focusShip(id, settings)`, `setShipFocus(settings)`) takes `{ vantage, exterior }`:

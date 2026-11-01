@@ -1,5 +1,6 @@
-// Planet close-up: one large textured planet, atmosphere
-// rim, moons, this project's ships orbiting with name labels.
+// Planet close-up: one large generated world (worlds/material.js) with its air, clouds and
+// rings, generated moons, and this project's ships orbiting with name labels. The detail map
+// lands after the view opens; readiness is held until it does (kit 15 D3).
 'use strict';
 
 (function () {
@@ -33,45 +34,57 @@
     AUR.addSkybox(scene, project.seed, 1600, 0.055);
     AUR.addStarfield(scene, 3400, 760);
     const gui = AUR.guiLayer(scene);
-    const atmosphere = AUR.atmosphereProfile(projectId, name);
+
+    // ---- planet ----
+    const W = AUR.worlds;
+    const { SIZES, PLACEHOLDER } = W.textures;
+    const maps = ctx.worldMaps;
+    const epoch = maps.open(scene);
+    let tier = ctx.quality;
+    const sunHex = AUR.sunColor(project.seed);
+    const sunPosition = key.direction.scale(-1e5); // the shaders' sun agrees with the key light the ships use
+    const worldOpts = { segments: 64, clouds: true, glow, maps, epoch };
+    const world = W.createWorld(scene, W.worldSpec(projectId, name, sunHex), { ...worldOpts, name: 'planet', radius: PDIA / 2 });
+    const planet = world.globe;
+    planet.metadata = { worldType: world.spec.cls };
+    // Tilted from a parent node, so the globe spins about its own axis.
+    const tilt = new BABYLON.TransformNode('planet-tilt', scene);
+    tilt.rotation.z = 0.35;
+    planet.parent = tilt;
+    world.setSun(sunPosition);
+    world.setClouds(tier.key === 'high');
+
+    // D3 (world.show): the best cached map now, 512 soon if nothing that good is cached, then the
+    // detail map. The scene stays unready (shots and polish harnesses wait on it) until the
+    // detail map is bound or 6 s pass.
+    const opened = performance.now();
+    const detail = { swapMs: null, heldReady: false };
+    let hold = {};
+    scene.addPendingData(hold);
+    const release = () => {
+      if (!hold) return;
+      scene.removePendingData(hold);
+      hold = null;
+      clearTimeout(holdTimer);
+    };
+    const holdTimer = setTimeout(release, 6000);
+    const showDetail = () => world.show(SIZES[tier.key].detail, 3, PLACEHOLDER.planet).then((bound) => {
+      if (bound && detail.swapMs == null) Object.assign(detail, { swapMs: Math.round(performance.now() - opened), heldReady: hold !== null });
+    });
+    showDetail().then(release, release);
+
     scene.metadata = {
       view: 'planet',
       providerStats() {
         return AUR.sceneProviderStats(scene);
       },
+      worldStats() {
+        return {
+          view: 'planet', ...W.sceneStats(scene, maps, epoch, tier.key), planets: [], sun: null,
+          detail: { name, mapWidth: world.mapWidth, swapMs: detail.swapMs, heldReady: detail.heldReady, source: world.source },
+        };
+      },
     };
-
-    // ---- planet ----
-    const planet = BABYLON.MeshBuilder.CreateSphere('planet', { diameter: PDIA, segments: 64 }, scene);
-    const pmat = new BABYLON.StandardMaterial('pmat', scene);
-    const world = AUR.applyPlanetSurface(scene, pmat, projectId, name, {
-      detail: true, generate: Boolean(pd.procedural),
-    });
-    const shine = world.key === 'gas' || world.key === 'oceanic' ? 0.2 : 0.075;
-    pmat.specularColor = new BABYLON.Color3(shine, shine, shine * 1.12);
-    pmat.specularPower = world.key === 'oceanic' ? 64 : 24;
-    pmat.emissiveColor = new BABYLON.Color3(0.05, 0.055, 0.07);
-    planet.material = pmat;
-    planet.metadata = { worldType: world.key };
-    planet.rotation.z = 0.35;
-
-    // Planet-specific shells stay close to the surface instead of reading as
-    // the same oversized blue bubble around every world.
-    const atmo = BABYLON.MeshBuilder.CreateSphere('atmo', {
-      diameter: PDIA * atmosphere.scale, segments: 64,
-    }, scene);
-    const amat = AUR.unlitMaterial(scene, 'amat', new BABYLON.Color3(0, 0, 0), atmosphere.alpha * 0.55);
-    const atmosphereColor = AUR.color3(atmosphere.color);
-    amat.backFaceCulling = false;
-    amat.disableLighting = true;
-    const emissiveFresnel = new BABYLON.FresnelParameters();
-    emissiveFresnel.bias = 0;
-    emissiveFresnel.power = atmosphere.power;
-    emissiveFresnel.leftColor = atmosphereColor.scale(0.58);
-    emissiveFresnel.rightColor = BABYLON.Color3.Black();
-    amat.emissiveFresnelParameters = emissiveFresnel;
-    atmo.material = amat;
-    atmo.isPickable = false;
 
     // ---- moons ----
     const moons = [];
@@ -81,15 +94,12 @@
       const nm = 1 + Math.floor(rand() * 2);
       for (let i = 0; i < nm; i++) {
         const md = 0.8 + rand() * 1.1;
-        const moon = BABYLON.MeshBuilder.CreateSphere('moon' + i, { diameter: md, segments: 24 }, scene);
-        const mm = new BABYLON.StandardMaterial('moonm' + i, scene);
-        mm.diffuseColor = new BABYLON.Color3(0.55, 0.55, 0.6);
-        mm.emissiveColor = new BABYLON.Color3(0.05, 0.05, 0.06);
-        mm.specularColor = new BABYLON.Color3(0, 0, 0);
-        moon.material = mm;
-        moon.isPickable = false;
+        const moon = W.createWorld(scene, W.moonSpec(projectId, name, i, sunHex), { ...worldOpts, name: 'moon' + i, radius: md / 2, segments: 48 });
+        moon.globe.isPickable = false;
+        moon.setSun(sunPosition);
+        moon.show(512, 1, PLACEHOLDER.planet);
         moons.push({
-          mesh: moon, r: PDIA * (MOON_ORBIT.min + rand() * (MOON_ORBIT.max - MOON_ORBIT.min)), a: rand() * 6.28,
+          world: moon, mesh: moon.globe, r: PDIA * (MOON_ORBIT.min + rand() * (MOON_ORBIT.max - MOON_ORBIT.min)), a: rand() * 6.28,
           speed: (0.006 + rand() * 0.006) * (rand() > 0.5 ? 1 : -1),
           tilt: (rand() - 0.5) * 0.8, yoff: (rand() - 0.5) * PDIA * 0.4,
         });
@@ -129,14 +139,11 @@
     scene.onBeforeRenderObservable.add(() => {
       const dt = engine.getDeltaTime() / 1000;
       planet.rotation.y += dt * AUR.MOTION.planetDetailAxialRotation;
-      if (world.key === 'gas' && pmat.diffuseTexture) {
-        const drift = dt * 0.007;
-        pmat.diffuseTexture.uOffset += drift;
-        if (pmat.bumpTexture) pmat.bumpTexture.uOffset += drift;
-      }
+      world.update(dt);
       for (const m of moons) {
         m.a += m.speed * dt;
         AUR.orbitPoint(m.a, m.r, m.yoff + Math.sin(m.a) * m.r * m.tilt, m.mesh.position);
+        m.world.update(dt);
       }
       const fit = AUR.shipFit(scene, SIZE.minPx);
       for (const r of ships.values()) {
@@ -162,7 +169,13 @@
       scene,
       planetData: pd,
       update,
+      setQuality(next) {
+        tier = next;
+        world.setClouds(tier.key === 'high');
+        showDetail();
+      },
       dispose() {
+        release();
         AUR.disposeView(scene, gui);
       },
     };
