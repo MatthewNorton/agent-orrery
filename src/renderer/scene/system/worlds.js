@@ -2,14 +2,15 @@
 // The system view's generated worlds (kit 15 W4): each planet's globe is a world from
 // worlds/material.js lit from the sun at the origin. Its maps go placeholder, then system size
 // (the three biggest planets first), and the hovered planet's detail map is prefetched for the
-// planet view. Also the view's worldStats() (W6).
+// planet view. Also the sun's photosphere and billboards (worlds/sun.js, W5) and the view's
+// worldStats() (W6).
 'use strict';
 
 (function () {
   const AUR = window.AUR;
 
   AUR.sceneParts.system.worlds = function (view) {
-    const { scene, projectId, planets, glow, sun, sunHex } = view;
+    const { scene, projectId, planets, glow, sun, sunHex, sunDia } = view;
     const W = AUR.worlds;
     const { SIZES, PLACEHOLDER } = W.textures;
     const maps = view.worldMaps;
@@ -17,6 +18,7 @@
     const origin = BABYLON.Vector3.Zero();
     let tier = view.quality;
     let prefetch = { name: '', epoch: 0 }; // only the latest hovered planet's detail map is wanted
+    const sunFx = W.createSun(scene, sun, { diameter: sunDia, glow, tier: tier.key });
 
     const showSystemMaps = (world, first) => world.show(SIZES[tier.key].system, first ? 2 : 1, PLACEHOLDER.system);
 
@@ -40,6 +42,7 @@
 
     function setWorldsQuality(next) {
       tier = next;
+      sunFx.setTier(next.key);
       for (const p of planets.values()) showSystemMaps(p.world, p.persistent);
     }
 
@@ -69,6 +72,6 @@
       };
     }
 
-    return { makeWorld, prefetchDetail, setWorldsQuality, worldStats };
+    return { makeWorld, prefetchDetail, setWorldsQuality, worldStats, sunFx };
   };
 })();

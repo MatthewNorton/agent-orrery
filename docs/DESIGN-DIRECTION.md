@@ -76,4 +76,12 @@ dark palette with one orange accent, Archivo and IBM Plex Mono shipped locally, 
 modules in two rails, and every colour and size held in `design/tricolor/tokens.json`
 (renderer CSS is generated from it, so the scheme can change in one place). The source,
 boards and rationale live in `design/tricolor/README.md`; planet close-ups keep their
-realistic materials on purpose.
+realistic look on purpose.
+
+## Update, 2026-11-01: generated worlds
+
+Planets and moons are no longer textured from the PNG library: each is a realistic world
+generated from its project and name (`src/renderer/worlds/`, kit 15), with relief, an
+atmosphere, clouds and city lights on oceanic worlds, lava that glows at night on volcanic
+ones, and rings on some gas giants. The system sun is a live photosphere with a soft corona
+that keeps the star's colour instead of a glowing white disc.

@@ -33,13 +33,13 @@ Soft (note, don't fail): ships/trails visible between systems; online systems vi
 
 Hard fail if any of:
 
-- [ ] No central sun with glow
+- [ ] No central sun with a soft corona, or its core is clipped white instead of keeping the star's colour
 - [ ] Fewer than 2 planets, or planets are untextured flat-color spheres
 - [ ] No orbit ring lines
 - [ ] No project card (top-left) and no back control
 - [ ] Sidebar/summary chrome missing
 
-Soft: asteroid belt visible; ship(s) with name labels; planet name labels on largest planets.
+Soft: asteroid belt visible; ship(s) with name labels; planet name labels on largest planets; planets read as small realistic worlds lit from the sun (a lit side and a dark side, rings on ringed gas giants); the sun shows a darker, redder limb and, up close, granulation.
 
 ## Visual — planet shot vs `1.planet-view.png`
 
@@ -49,6 +49,8 @@ Hard fail if any of:
 - [ ] Left panel stack missing (need at least PLANET card + PLANET STATUS bars)
 - [ ] No bottom tab bar (`Overview … Scans`)
 - [ ] Sidebar/summary chrome missing
+
+Soft: the planet is a generated world of its class with relief and a soft terminator, an atmosphere rim where it has air, no visible seam, and no neon: oceanic shows glint, and on high clouds and city lights on the night side; volcanic lava glows on the night side; ice shows long arcs, not loops.
 
 Soft: moons; atmosphere rim; orbiting labeled ships.
 
