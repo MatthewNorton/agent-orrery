@@ -23,6 +23,7 @@ const GATES = [
   { name: 'multi-provider', script: 'kit/done/multi-provider/grade-providers.mjs' },
   { name: 'history-playback', script: 'kit/done/history-playback/grade-history.mjs' },
   { name: 'agent-control', script: 'kit/done/agent-control/grade-control.mjs' },
+  { name: 'procedural-worlds', script: 'kit/done/procedural-worlds/grade-worlds.mjs' },
   { name: 'unit-tests', command: 'npm test', static: true },
   { name: 'attention', script: 'kit/done/attention/grade-attention.mjs', args: ['--fixtures-only'], static: true },
   { name: 'project-search', script: 'kit/done/project-search/grade-search.mjs', args: ['--fixtures-only'], static: true },

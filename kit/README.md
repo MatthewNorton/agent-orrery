@@ -27,10 +27,10 @@ kit/
     ship-assets-pack/   PASS 2026-07-26 — manifest-backed CC0 provider hulls
     structural-cleanup/ PASS 2026-09-28 — app.js split into AUR.app modules, path-safety.js
     main-split/         PASS 2026-10-01 — main.js split into bootstrap + modules, no module-level state
+    procedural-worlds/  PASS 2026-11-01 — generated planet maps in workers, ported planet shaders, photosphere sun (gate + reference generator)
   todo/                pending work, in intended order (see todo/README.md)
     09-ship-assets-gen.md stub — ready to distill from the landed manifest
     12-standalone-installer.md declined — developers install with npm run setup
-    15-procedural-worlds/  kit — generated planet maps, ported shaders, photosphere sun (CONTRACT.md + grade-worlds.mjs)
     16-idle-cap-and-glyphs.md stub — idle frame cap, glyph consolidation, Ultra tier
 ```
 
@@ -53,7 +53,7 @@ kit/
 | 12 Standalone installer | **DECLINED** 2026-10-13 — the users are developers; `npm run setup` is the install path. Notes kept in `todo/12-standalone-installer.md` | none |
 | 13 Structural cleanup | **DONE** — PASS 2026-09-28; `app.js` split into `AUR.app` modules, shared `src/main/path-safety.js`; §2.6 (observable-driven dispose) withdrawn, poll documented; archived in `done/structural-cleanup/` (Phase 5 of `docs/PUBLIC-RELEASE-TASKS.md`) | `node kit/done/structural-cleanup/grade-structure.mjs` (sweep: `node kit/run-gates.mjs`) |
 | 14 Main-process split | **DONE** — PASS 2026-10-01; `main.js` (2217 lines) is a 47-line bootstrap over `app-context.js`, `window.js`, `replay-control.js`, `ipc/*`, `harness/*`; zero module-level `let` in `src/main`; `main.js` unfrozen; project-tasks gate widened to the `src/main` layer (owner-authorized); archived in `done/main-split/` | `node kit/done/main-split/grade-main-split.mjs` (sweep: `node kit/run-gates.mjs`) |
-| 15 Procedural worlds | **READY** — distilled 2026-11-01 after the owner approved the browser preview (D1–D4 in the contract): generated equirect planet maps in workers, ported planet shaders, a photosphere plugin on the system sun; `todo/15-procedural-worlds/CONTRACT.md` | `node kit/todo/15-procedural-worlds/grade-worlds.mjs` (`--killswitch` first) |
+| 15 Procedural worlds | **DONE** — PASS 2026-11-01, three stacked PRs; distilled the same day after the owner approved the browser preview (D1–D4): generated equirect planet maps in workers (the PNG planet library no longer feeds the renderer), the preview's planet shaders ported, a photosphere plugin on the system sun with corona and glow billboards; archived in `done/procedural-worlds/` with the reference generator its parity check needs | `node kit/done/procedural-worlds/grade-worlds.mjs` (sweep: `node kit/run-gates.mjs`) |
 | 16 Idle cap and glyphs | **STUB** — split from the old kit-15 stub 2026-11-01: idle frame cap, universe glyph consolidation, Ultra tier, with the 2026-10-18 measurements; `todo/16-idle-cap-and-glyphs.md` | none yet |
 
 ## How the app works (context for any executor)

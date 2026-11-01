@@ -1,7 +1,7 @@
 # Stub — idle frame cap, universe glyph consolidation, Ultra tier
 
 Split out of the old `15-visual-quality.md` stub on 2026-11-01, when its planet and sun work became
-the kit in `15-procedural-worlds/`. These three items are performance work, independent of the new
+kit 15 (shipped; its gate lives in `kit/done/procedural-worlds/`). These three items are performance work, independent of the new
 look. Each waits for the owner's word; run /distill on this file to activate one.
 
 ## Measurements (2026-10-18, owner's machine: Radeon 890M iGPU, 4K at 125%)
