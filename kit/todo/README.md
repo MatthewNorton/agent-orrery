@@ -6,7 +6,8 @@
 |---|---|---|
 | 09 | `09-ship-assets-gen.md` — locally generated hulls (ComfyUI image-to-3D) | stub — Kit 08's manifest contract has landed; ready to distill |
 | 12 | `12-standalone-installer.md` — packaged exe/installer independent of the checkout | declined 2026-10-13 — the users are developers, `npm run setup` is the install path; don't distill unless matt asks |
-| 15 | `15-visual-quality.md` — procedural worlds, lighting shaders, sun, idle frame cap, glyph consolidation, Ultra tier | stub — parked 2026-10-18; ~12–15 session hours in three PRs; decisions D1–D3 need the owner |
+| 15 | `15-procedural-worlds/CONTRACT.md` — generated planet maps, ported planet shaders, photosphere sun | **ready** — distilled 2026-11-01; owner approved the preview (D1–D4); three stacked PRs; gate `grade-worlds.mjs` (run `--killswitch` first) |
+| 16 | `16-idle-cap-and-glyphs.md` — idle frame cap, universe glyph consolidation, Ultra tier | stub — split from the old kit-15 stub 2026-11-01 |
 
 Feed a ready kit to an executor via `kit/EXECUTOR-HANDOFF.md` with its
 CONTRACT.md path.
