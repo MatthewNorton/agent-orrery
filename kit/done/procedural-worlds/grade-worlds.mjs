@@ -196,6 +196,7 @@ function checkLayout() {
     else if (pos > at('scene/system/view.js') || pos > at('scene/planet/view.js')) fail('W1', `worlds/${f} loads after a view`);
   }
   if (at('worlds/worker.js') >= 0) fail('W1', 'worlds/worker.js must not be a page script');
+  if (path.basename(path.dirname(kitDir)) === 'done') { notes.push('frozen-file check skipped: archived gate (it guarded the executor)'); return; }
   const base = frozenBase();
   if (!base) { notes.push('frozen-file check skipped: no base commit found'); return; }
   const changed = [
