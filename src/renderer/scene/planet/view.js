@@ -94,16 +94,16 @@
 
     // ---- moons ----
     const moons = [];
-    const MOON_SIZE = { min: 0.8, range: 1.1 }; // diameter
-    // In planet diameters; ships orbit beyond it. A ringed world's moons orbit past the rings by
+    const MOON_SIZE = { min: 0.8, max: 1.9 }; // diameter
+    // In planet diameters; ships orbit beyond it. Moons keep clear of the world's rings and air by
     // more than their own radius, so none passes through them.
-    const ringClear = world.spec.rings ? (W.RINGS.outer * PDIA / 2 + (MOON_SIZE.min + MOON_SIZE.range) / 2) / PDIA + 0.02 : 0;
-    const MOON_ORBIT = ringClear ? { min: ringClear, max: ringClear + 0.2 } : { min: 0.9, max: 1.4 };
+    const clear = (world.outerRadius + MOON_SIZE.max / 2) / PDIA + 0.02;
+    const MOON_ORBIT = { min: Math.max(0.9, clear), max: Math.max(1.4, clear + 0.2) };
     (function buildMoons() {
       const rand = AUR.mulberry32(AUR.fnv1a(projectId + ':moons:' + name));
       const nm = 1 + Math.floor(rand() * 2);
       for (let i = 0; i < nm; i++) {
-        const md = MOON_SIZE.min + rand() * MOON_SIZE.range;
+        const md = MOON_SIZE.min + rand() * (MOON_SIZE.max - MOON_SIZE.min);
         const moon = W.createWorld(scene, W.moonSpec(projectId, name, i, sunHex), { ...worldOpts, name: 'moon' + i, radius: md / 2, segments: 48 });
         moon.globe.isPickable = false;
         moon.setSun(sunPosition);

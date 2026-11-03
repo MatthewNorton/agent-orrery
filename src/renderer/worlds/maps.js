@@ -1,6 +1,6 @@
 // @ts-check
 // World maps, part 3 of 3: generate(job) and run(job), the equirectangular buffers of the kit 15
-// contract (W2). Pure, like noise.js; worlds/worker.js and the main-thread fallback call run().
+// contract (W2). Pure, like noise.js; worlds/worker.js and the map service (worlds/textures.js) call run().
 'use strict';
 
 (function (root) {
@@ -63,9 +63,10 @@
     return true;
   };
 
-  // The reply both the worker and the main-thread fallback give: { key, ok: true, ms, ...maps } or
-  // { key, ok: false, error }. An emission layer that is all zero (rocky and gas worlds, the moons)
-  // is null, so it is never transferred, cached or uploaded.
+  // Every map the app makes, in a worker, on the main thread or as a placeholder: { key, ok: true,
+  // ms, ...maps } or { key, ok: false, error }. An emission layer that is all zero (rocky and gas
+  // worlds, the moons) is null, so it is never transferred, cached or uploaded. generate() keeps
+  // every layer, as the reference generator that the kit 15 gate compares it with does.
   function run(job) {
     try {
       const started = performance.now();
