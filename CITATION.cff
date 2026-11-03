@@ -1,0 +1,8 @@
+cff-version: 1.2.0
+message: "If you use or build on Agent Orrery, please credit it as below."
+title: "Agent Orrery"
+authors:
+  - given-names: Matt
+    family-names: Norton
+repository-code: "https://github.com/MatthewNorton/agent-orrery"
+license: MIT

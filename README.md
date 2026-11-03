@@ -73,4 +73,6 @@ Features here are developed as self-contained "kits": a contract, a rubric, and 
 
 ## License
 
-MIT
+MIT © Matt Norton. See [LICENSE](LICENSE).
+
+If you build on Agent Orrery, a credit and a link back to [github.com/MatthewNorton/agent-orrery](https://github.com/MatthewNorton/agent-orrery) are appreciated.
