@@ -125,6 +125,12 @@ test('the ice lineae prefilter skips no pixel a linea paints', () => {
   }
 });
 
+test('run() leaves out an emission layer that is all zero', () => {
+  const reply = (cls) => worlds.run({ ...job(cls, 64, 32), key: cls });
+  for (const cls of ['rocky', 'gas']) assert.equal(reply(cls).emission, null, `${cls} has no emission layer`);
+  for (const cls of ['ice', 'volcanic', 'oceanic']) assert.ok(reply(cls).emission, `${cls} keeps its emission layer`);
+});
+
 test('the worker builds a job and transfers its buffers back', () => {
   const posted = [];
   const scope = {

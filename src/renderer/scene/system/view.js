@@ -144,6 +144,7 @@
       if (left && !left.persistent) left.label.isVisible = false;
       canvas.style.cursor = 'default';
       hovered = null;
+      view.prefetchDetail(null); // a planet the pointer only crossed is not prefetched
     }
     scene.onPointerObservable.add((pi) => {
       if (view.shipFocus) {
