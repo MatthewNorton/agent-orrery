@@ -2,7 +2,8 @@
 // The world-map service (kit 15 W3): classic workers fill an LRU of generated buffers that
 // outlives every scene, and each scene uploads what it shows as its own RawTextures. One service
 // lives on AUR.app.state.worldMaps; views get it as ctx.worldMaps and request maps in an epoch
-// opened on their scene, which closes when the scene is disposed. Workers start with the first request.
+// opened on their scene, which closes when the scene is disposed. The workers start with the first
+// request or widthFor() call.
 'use strict';
 
 (function () {
@@ -65,7 +66,8 @@
       for (let i = 0; i < size && spawn(); i++);
       if (!pool.alive) AUR.log('[worlds] map workers unavailable; maps are made on the main thread at up to 1024 × 512');
     }
-    // The widest map up to `width` that can be made now: the main thread stops at 1024.
+    // The widest map up to `width` that can be made now: the main thread stops at 1024. It starts
+    // the pool, so the answer is known.
     function widthFor(width) {
       startPool();
       return pool.alive ? width : Math.min(width, MAIN_MAX_WIDTH);
@@ -140,8 +142,7 @@
       pump();
     }
     // A worker that errors or runs past the timeout is retired, and replaced while RESPAWNS last.
-    // Its job moves to the main thread if anyone still waits for it, and is dropped if not; every
-    // queued job moves there too once no worker is left.
+    // Its job moves to the main thread, and every queued job follows once no worker is left.
     function retire(worker) {
       const busy = pool.busy.get(worker);
       const idle = pool.idle.indexOf(worker);
@@ -153,12 +154,17 @@
       const replaced = pool.respawns > 0 && spawn();
       if (replaced) pool.respawns -= 1;
       AUR.log(replaced ? '[worlds] a map worker stopped and was replaced' : '[worlds] a map worker stopped; its maps continue on the main thread');
-      if (busy && busy.job.waiters.length) toMain(busy.job);
-      else if (busy) jobs.delete(busy.job.payload.key);
+      if (busy) toMain(busy.job);
       if (!pool.alive) while (queue.length) toMain(queue.shift());
       pump();
     }
-    function toMain(job) { job.running = false; mainQueue.push(job); }
+    // Only a job with a foreground waiter moves to the main thread. A job that nobody, or only a
+    // prefetch, waits for is dropped.
+    function toMain(job) {
+      if (job.waiters.every((waiter) => waiter.background)) { settle(job, null, 'main'); return; }
+      job.running = false;
+      mainQueue.push(job);
+    }
     // One job per task, so a run of fallbacks never holds the page for more than one map.
     function runMain() {
       mainTimer = 0;
@@ -197,11 +203,12 @@
         return epoch;
       },
       close, // early, for a request that is no longer wanted (a superseded prefetch)
-      // A Promise of { maps, source: 'worker' | 'main' | 'cache' }, or null. It never rejects.
-      request(spec, width, priority, epoch) {
+      // A Promise of { maps, source: 'worker' | 'main' | 'cache' }, or null. It never rejects. A
+      // background request (a prefetch) is never made on the main thread: it gets null instead.
+      request(spec, width, priority, epoch, { background = false } = {}) {
         const open = epochs.get(epoch);
-        if (!open) return Promise.resolve(null);
         const payload = jobFor(spec, widthFor(width));
+        if (!open || (background && !pool.alive)) return Promise.resolve(null);
         const hit = lookup(payload.key);
         if (hit) return Promise.resolve({ maps: hit.maps, source: 'cache' });
         let job = jobs.get(payload.key);
@@ -212,18 +219,24 @@
         }
         job.priority = Math.max(job.priority, priority);
         open.pending += 1;
-        const reply = new Promise((resolve) => job.waiters.push({ epoch, resolve }));
+        const reply = new Promise((resolve) => job.waiters.push({ epoch, resolve, background }));
         pump();
         return reply;
       },
-      // At once: the widest cached maps up to maxWidth, else a placeholder made here and now.
+      // At once: the widest cached maps up to maxWidth, else a placeholder made here and now, by
+      // run() as every map is.
       best(spec, maxWidth, placeholderWidth) {
         for (const width of WIDTHS) {
           const entry = width <= maxWidth ? lookup(mapKey(spec, width)) : null;
           if (entry && !entry.placeholder) return { maps: entry.maps, source: 'cache' };
         }
         const job = jobFor(spec, placeholderWidth);
-        const entry = lookup(job.key) || store(mapsOf(job.key, worlds.generate(job)), true);
+        let entry = lookup(job.key);
+        if (!entry) {
+          const made = worlds.run(job);
+          if (!made.ok) throw new Error(made.error);
+          entry = store(mapsOf(job.key, made), true);
+        }
         return { maps: entry.maps, source: 'placeholder' };
       },
       widthFor,

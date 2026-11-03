@@ -154,17 +154,21 @@
       world.mapWidth = next.width;
       world.source = result.source;
     }
+    // True once a map as wide as the result is bound: this one, or one bound before it.
     function land(result) {
-      if (!result || scene.isDisposed || !closer(result.maps.width)) return false;
+      if (!result || scene.isDisposed) return false;
+      if (result.maps.width === world.mapWidth) return true;
+      if (!closer(result.maps.width)) return false;
       bind(result);
       return true;
     }
 
     const world = {
       spec, globe, mapWidth: 0, source: null,
+      outerRadius: radius * (spec.rings ? RING_OUT : spec.shell), // how far the world reaches: its rings, else its air
       // Binds the best cached map up to `width` (or as wide as the service can make, 1024 without
       // workers) now, 512 on the way to a wider map when nothing that good is cached, then that
-      // map when it lands. Resolves true once it is bound.
+      // map when it lands. Resolves true once a map that wide is bound.
       show(width, priority, placeholderWidth) {
         target = service.widthFor(width);
         land(service.best(spec, target, placeholderWidth));
@@ -206,5 +210,5 @@
     return { tier, pending, workers, pngPlanetTextures };
   }
 
-  Object.assign(worlds, { worldSpec, moonSpec, createWorld, sceneStats, shader, RINGS: Object.freeze({ inner: RING_IN, outer: RING_OUT }) });
+  Object.assign(worlds, { worldSpec, moonSpec, createWorld, sceneStats, shader });
 })();

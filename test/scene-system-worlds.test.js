@@ -5,17 +5,19 @@
 
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const vm = require('node:vm');
-const { readRenderer } = require('./support/renderer-source');
+const { runRenderer } = require('./support/renderer-source');
 
-function loadPart({ workers = 1 } = {}) {
-  const requests = [], closed = [];
+function loadPart() {
+  const requests = [], closed = [], foreground = [];
   let nextEpoch = 1;
   const service = {
     open: () => nextEpoch++,
     close: (epoch) => closed.push(epoch),
-    request: (spec, width, priority, epoch) => { requests.push(`${spec.name}:${width}`); return Promise.resolve(null); },
-    stats: () => ({ workers, pending: 0, bytes: 0 }),
+    request: (spec, width, priority, epoch, { background = false } = {}) => {
+      requests.push(`${spec.name}:${width}`);
+      if (!background) foreground.push(spec.name);
+      return Promise.resolve(null);
+    },
   };
   const AUR = {
     sceneParts: { system: {} },
@@ -25,19 +27,19 @@ function loadPart({ workers = 1 } = {}) {
     },
   };
   const BABYLON = { Vector3: { Zero: () => ({ x: 0, y: 0, z: 0 }) } };
-  vm.runInThisContext(`(function (window, BABYLON) {\n${readRenderer('scene/system/worlds.js')}\n})`, { filename: 'scene/system/worlds.js' })({ AUR }, BABYLON);
+  runRenderer('scene/system/worlds.js', { window: { AUR }, BABYLON });
   const scene = { isDisposed: false };
   const part = AUR.sceneParts.system.worlds({
     scene, projectId: 'p', planets: new Map(), glow: {}, sun: { material: {} }, sunHex: '#ffffff', sunDia: 6,
     worldMaps: service, quality: { key: 'high' },
   });
   const planet = (name) => ({ name, world: { spec: { name } } });
-  return { part, requests, closed, scene, planet };
+  return { part, requests, closed, foreground, scene, planet };
 }
 
 test('the hover prefetch waits for the pointer to rest, once per planet and tier', (t) => {
   t.mock.timers.enable({ apis: ['setTimeout'] });
-  const { part, requests, closed, planet } = loadPart();
+  const { part, requests, closed, foreground, planet } = loadPart();
   part.prefetchDetail(planet('a'));
   part.prefetchDetail(null); // the pointer only crossed a
   part.prefetchDetail(planet('b'));
@@ -54,17 +56,14 @@ test('the hover prefetch waits for the pointer to rest, once per planet and tier
   t.mock.timers.tick(250);
   assert.deepEqual(requests, ['b:2048', 'b:1024']);
   assert.deepEqual(closed.filter(Boolean), [2], 'the superseded prefetch closed its epoch (1 is the view\'s own)');
+  assert.deepEqual(foreground, [], 'prefetches ask in the background, so the service never makes them on the main thread');
 });
 
-test('no prefetch without workers or after the scene is gone', (t) => {
+test('no prefetch once the scene is gone', (t) => {
   t.mock.timers.enable({ apis: ['setTimeout'] });
-  const idle = loadPart({ workers: 0 });
-  idle.part.prefetchDetail(idle.planet('a'));
+  const { part, requests, scene, planet } = loadPart();
+  part.prefetchDetail(planet('a'));
+  scene.isDisposed = true;
   t.mock.timers.tick(1000);
-  assert.deepEqual(idle.requests, [], 'a main-thread map for a planet that may never open');
-  const gone = loadPart();
-  gone.part.prefetchDetail(gone.planet('a'));
-  gone.scene.isDisposed = true;
-  t.mock.timers.tick(1000);
-  assert.deepEqual(gone.requests, []);
+  assert.deepEqual(requests, []);
 });

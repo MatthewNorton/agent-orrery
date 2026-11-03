@@ -5,8 +5,7 @@
 
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const vm = require('node:vm');
-const { readRenderer } = require('./support/renderer-source');
+const { runRenderer } = require('./support/renderer-source');
 
 const MB = 1024 * 1024;
 const WRAP = 1, CLAMP = 0;
@@ -21,13 +20,9 @@ const reply = (job) => ({
   surface: new Uint8Array(job.width * job.height * 4), emission: new Uint8Array(job.width * job.height * 4),
 });
 
-function load(file, names, values) {
-  const filename = `src/renderer/${file}`;
-  vm.runInThisContext(`(function (${names.join(', ')}) {\n${readRenderer(file)}\n})`, { filename })(...values);
-}
 function loadService({ workers = 1, blocked = false } = {}) {
   const self = {};
-  for (const file of ['noise.js', 'classes.js', 'maps.js']) load(`worlds/${file}`, ['self'], [self]);
+  for (const file of ['noise.js', 'classes.js', 'maps.js']) runRenderer(`worlds/${file}`, { self });
   const logs = [], posted = [], started = [];
   class FakeWorker {
     constructor() {
@@ -40,9 +35,15 @@ function loadService({ workers = 1, blocked = false } = {}) {
     terminate() { this.terminated = true; }
   }
   self.AUR.log = (...args) => logs.push(args.join(' '));
-  load('worlds/textures.js', ['window', 'navigator', 'Worker', 'BABYLON'],
-    [{ AUR: self.AUR }, { hardwareConcurrency: workers + 2 }, FakeWorker, BABYLON]);
-  return { service: self.AUR.worlds.textures.create(), workers: started, posted, logs };
+  runRenderer('worlds/textures.js', { window: { AUR: self.AUR }, navigator: { hardwareConcurrency: workers + 2 }, Worker: FakeWorker, BABYLON });
+  const service = self.AUR.worlds.textures.create();
+  // The 2048 maps of spec(seed), made by the first worker.
+  const made = async (seed, epoch) => {
+    const pending = service.request(spec(seed), 2048, 1, epoch);
+    started[0].answer();
+    return (await pending).maps;
+  };
+  return { service, workers: started, posted, logs, made };
 }
 function fakeScene() {
   const disposers = [];
@@ -124,50 +125,51 @@ test('past the respawn budget the pool shrinks, and its queued jobs move to the 
   assert.equal(service.stats(epoch).workers, 1);
   const running = service.request(spec(40), 64, 1, epoch);
   const queued = service.request(spec(41), 64, 1, epoch);
+  const prefetch = service.request(spec(42), 64, 0, epoch, { background: true });
   workers[workers.length - 1].fail();
   assert.equal(service.stats(epoch).workers, 0);
   assert.equal(workers.length, 5, 'four replacements, then none');
-  assert.deepEqual((await Promise.all([running, queued])).map((result) => result.source), ['main', 'main']);
+  const results = await Promise.all([running, queued, prefetch]);
+  assert.deepEqual(results.map((result) => result && result.source), ['main', 'main', null], 'the prefetch is dropped');
   assert.equal(service.widthFor(2048), 1024);
 });
 
-test('a failed job nobody waits for is dropped, not rebuilt on the main thread', async () => {
+test('a failed job nobody waits for in the foreground is dropped, not rebuilt on the main thread', async () => {
   const { service, workers } = loadService();
   const scene = fakeScene();
-  const prefetch = service.open(scene);
-  const pending = service.request(spec(50), 512, 0, prefetch);
-  service.close(prefetch); // superseded while its job runs
-  assert.equal(await pending, null);
+  const superseded = service.open(scene);
+  const orphan = service.request(spec(50), 512, 0, superseded);
+  service.close(superseded); // superseded while its job runs
+  assert.equal(await orphan, null);
   workers[0].fail();
+  const prefetch = service.request(spec(51), 512, 0, service.open(scene), { background: true });
+  workers[1].fail(); // the replacement fails too, with only a prefetch waiting
+  assert.equal(await prefetch, null);
   await new Promise((resolve) => setTimeout(resolve, 50)); // past the main thread's next turn
-  assert.equal(service.best(spec(50), 512, 64).source, 'placeholder', 'nothing was built');
+  for (const seed of [50, 51]) assert.equal(service.best(spec(seed), 512, 64).source, 'placeholder', `spec ${seed} was not built`);
   assert.equal(service.stats(service.open(scene)).workers, 1);
 });
 
-test('without workers the main thread makes maps of at most 1024 × 512', async () => {
+test('without workers the main thread makes maps of at most 1024 × 512, and no prefetches', async () => {
   const { service } = loadService({ blocked: true });
   const epoch = service.open(fakeScene());
   assert.equal(service.widthFor(2048), 1024);
+  assert.equal(await service.request(spec(7), 2048, 0, epoch, { background: true }), null);
   const result = await service.request(spec(6), 2048, 1, epoch);
   assert.deepEqual([result.source, result.maps.width, result.maps.height], ['main', 1024, 512]);
   assert.equal((await service.request(spec(6), 2048, 1, epoch)).source, 'cache');
+  assert.equal(service.best(spec(7), 1024, 64).source, 'placeholder', 'the prefetch built nothing');
 });
 
 test('uploads wrap around the globe, best() keeps to its cap, and the LRU spares maps in use', async () => {
-  const { service, workers } = loadService();
+  const { service, made } = loadService();
   const scene = fakeScene();
   const epoch = service.open(scene);
   assert.equal(service.widthFor(2048), 2048);
-  const first = service.request(spec(10), 2048, 1, epoch);
-  workers[0].answer();
-  const textures = service.upload(scene, (await first).maps);
+  const textures = service.upload(scene, await made(10, epoch));
   assert.deepEqual([textures.surface.wrapU, textures.surface.wrapV, textures.surface.anisotropicFilteringLevel], [WRAP, CLAMP, 8]);
   assert.equal(textures.clouds(), null);
-  for (let seed = 11; seed < 22; seed++) { // eleven more 16 MB maps: past the 160 MB budget
-    const next = service.request(spec(seed), 2048, 1, epoch);
-    workers[0].answer();
-    await next;
-  }
+  for (let seed = 11; seed < 22; seed++) await made(seed, epoch); // eleven more 16 MB maps: past the 160 MB budget
   assert.ok(service.stats(epoch).bytes <= 160 * MB);
   assert.equal(service.best(spec(10), 2048, 64).source, 'cache', 'the map in use stays');
   assert.equal(service.best(spec(11), 2048, 64).source, 'placeholder', 'the oldest unused map went');
@@ -178,17 +180,16 @@ test('uploads wrap around the globe, best() keeps to its cap, and the LRU spares
 });
 
 test('a map stays pinned only while textures made from it are alive', async () => {
-  const { service, workers } = loadService();
+  const { service, made } = loadService();
   const scene = fakeScene();
   const epoch = service.open(scene);
-  const make = async (seed) => { const pending = service.request(spec(seed), 2048, 1, epoch); workers[0].answer(); return (await pending).maps; };
-  const replaced = service.upload(scene, await make(60));
-  const shared = await make(61); // shown by two worlds, say a planet and its prefetch
+  const replaced = service.upload(scene, await made(60, epoch));
+  const shared = await made(61, epoch); // shown by two worlds, say a planet and its prefetch
   const bound = service.upload(scene, shared);
   const twice = service.upload(scene, shared);
   replaced.dispose(); // what bind() does once the next map is up
   twice.dispose();    // one of the two uploads of map 61 goes; the other still pins it
-  for (let seed = 62; seed < 73; seed++) await make(seed); // past the 160 MB budget
+  for (let seed = 62; seed < 73; seed++) await made(seed, epoch); // past the 160 MB budget
   assert.equal(service.best(spec(60), 2048, 64).source, 'placeholder', 'the replaced map was evicted');
   assert.equal(service.best(spec(61), 2048, 64).source, 'cache', 'the bound map stays');
   bound.dispose();
@@ -210,4 +211,5 @@ test('the cloud layer goes up on first use, and maps without emission share a bl
   assert.ok(clouds.disposed && oceanic.surface.disposed);
   assert.ok(!oceanic.emission.disposed, 'the blank texture belongs to the scene');
   assert.notEqual(service.upload(fakeScene(), { key: 'r', width: 64, height: 32, surface: layer(), emission: null }).emission, rocky.emission);
+  assert.equal(service.best(spec(1), 512, 64).maps.emission, null, 'a placeholder leaves out an empty emission layer too');
 });

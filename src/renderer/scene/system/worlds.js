@@ -18,7 +18,9 @@
     const origin = BABYLON.Vector3.Zero();
     let tier = view.quality;
     const DWELL_MS = 250; // how long the pointer rests on a planet before its detail map is fetched
-    let prefetch = { key: '', epoch: 0, timer: 0 }; // the latest hovered planet's, keyed by name and width
+    const NO_PREFETCH = Object.freeze({ key: '', epoch: 0, timer: 0 });
+    /** @type {{ key: string, epoch: number, timer: number }} */
+    let prefetch = NO_PREFETCH; // the latest hovered planet's, keyed by name and width
     const sunFx = W.createSun(scene, sun, { diameter: sunDia, glow, tier: tier.key });
 
     const showSystemMaps = (world, first) => world.show(SIZES[tier.key].system, first ? 2 : 1, PLACEHOLDER.system);
@@ -33,23 +35,22 @@
       return world;
     }
 
-    // The detail map of the planet under the pointer (p, or null once it leaves), requested after
-    // the pointer rests there and only from a worker: on the main thread it would stall the page
-    // for a planet that may never be opened. A superseded prefetch is dropped unless its map is
-    // already being made.
+    // The detail map of the planet under the pointer (p, or null once it leaves), requested once
+    // the pointer rests there, in the background: the service makes it only in a worker, since on
+    // the main thread it would stall the page for a planet that may never be opened. A superseded
+    // prefetch is dropped unless its map is already being made.
     function prefetchDetail(p) {
-      if (prefetch.timer) { clearTimeout(prefetch.timer); prefetch = { key: '', epoch: 0, timer: 0 }; }
+      if (prefetch.timer) { clearTimeout(prefetch.timer); prefetch = NO_PREFETCH; }
       if (!p) return;
       const width = SIZES[tier.key].detail, key = p.name + ':' + width;
       if (prefetch.key === key) return;
       maps.close(prefetch.epoch);
       const next = prefetch = { key, epoch: 0, timer: 0 };
-      if (!maps.stats(epoch).workers) return;
       next.timer = setTimeout(() => {
         next.timer = 0;
         if (scene.isDisposed) return;
         next.epoch = maps.open(scene);
-        maps.request(p.world.spec, width, 0, next.epoch);
+        maps.request(p.world.spec, width, 0, next.epoch, { background: true });
       }, DWELL_MS);
     }
 
