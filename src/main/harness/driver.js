@@ -61,6 +61,45 @@ function createDriver(ctx) {
     })()`);
   }
 
+  async function readWorldStats() {
+    return rendererEval(`(() => {
+      const scene = BABYLON.EngineStore.LastCreatedScene;
+      if (!scene || !scene.metadata || typeof scene.metadata.worldStats !== 'function') return null;
+      return scene.metadata.worldStats();
+    })()`);
+  }
+
+  // The view's worldStats() (kit 15 W6) once `done` holds, else the last reading at the timeout.
+  async function waitForWorlds(view, done, timeoutMs = 8000) {
+    const until = Date.now() + timeoutMs;
+    let last = null;
+    while (Date.now() < until) {
+      try { last = await readWorldStats(); } catch { /* the scene is switching */ }
+      if (last && last.view === view && done(last)) return last;
+      await wait(100);
+    }
+    return last;
+  }
+
+  // Mean RGB of the size × size patch of a capture around a point in CSS pixels.
+  async function patchMean(image, point, size = 7) {
+    const { width, height } = image.getSize();
+    const scale = width / await rendererEval('window.innerWidth');
+    const bitmap = image.toBitmap(); // BGRA
+    const cx = Math.round(point.x * scale), cy = Math.round(point.y * scale), half = size >> 1;
+    const sum = [0, 0, 0];
+    let count = 0;
+    for (let y = cy - half; y <= cy + half; y++) {
+      for (let x = cx - half; x <= cx + half; x++) {
+        if (x < 0 || y < 0 || x >= width || y >= height) continue;
+        const offset = (y * width + x) * 4;
+        sum[0] += bitmap[offset + 2]; sum[1] += bitmap[offset + 1]; sum[2] += bitmap[offset];
+        count++;
+      }
+    }
+    return count ? sum.map((value) => Math.round(value / count)) : null;
+  }
+
   async function findCanvasTarget(kind, preferHidden, requiredId) {
     return rendererEval(`(() => {
       const kind = ${JSON.stringify(kind)};
@@ -245,6 +284,9 @@ function createDriver(ctx) {
     readViewState,
     waitForView,
     readPolishStats,
+    readWorldStats,
+    waitForWorlds,
+    patchMean,
     findCanvasTarget,
     validatePointerPick,
     acquirePointerTarget,

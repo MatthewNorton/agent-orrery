@@ -1,6 +1,6 @@
-// One project's solar system: central sun, orbit rings and textured planets. The asteroid belt,
-// the ships, their engine plumes and agent focus (its camera and the fade of the other ships) are
-// the belt, ships, exhaust and focus parts in this folder.
+// One project's solar system: central sun, orbit rings and generated planets. The asteroid belt,
+// the ships, their engine plumes, agent focus (its camera and the fade of the other ships) and
+// the planets' worlds are the belt, ships, exhaust, focus and worlds parts in this folder.
 'use strict';
 
 (function () {
@@ -42,9 +42,10 @@
 
     // ---- sun ----
     const sunDia = AUR.clamp(4.5 + Math.log10((project.totalBytes || 0) + 1), 5, 9);
-    const sun = BABYLON.MeshBuilder.CreateSphere('sun', { diameter: sunDia, segments: 28 }, scene);
+    const sun = BABYLON.MeshBuilder.CreateSphere('sun', { diameter: sunDia, segments: 64 }, scene);
     const sunMat = new BABYLON.StandardMaterial('sunm', scene);
-    const sunCol = AUR.color3(AUR.sunColor(project.seed));
+    const sunHex = AUR.sunColor(project.seed);
+    const sunCol = AUR.color3(sunHex);
     const sunColInitial = sunCol.clone();
     // The material is pulsed in place every frame, so it must never alias the
     // immutable base color. Otherwise each scale becomes the next frame's base
@@ -53,12 +54,16 @@
     sunMat.diffuseColor = new BABYLON.Color3(0, 0, 0);
     sunMat.specularColor = new BABYLON.Color3(0, 0, 0);
     sun.material = sunMat;
-    // corona shell
-    const corona = BABYLON.MeshBuilder.CreateSphere('corona', { diameter: sunDia * 1.5, segments: 20 }, scene);
-    const coronaMat = AUR.unlitMaterial(scene, 'coronam', sunCol.clone().scaleInPlace(0.5), 0.18);
-    coronaMat.backFaceCulling = false;
-    corona.material = coronaMat;
-    corona.isPickable = false;
+    // The photosphere (worlds/sun.js, from the worlds part) is the sun's own light; glow stacked
+    // on it bleached the core white. So in the glow pass the sun takes the neutral colour, like
+    // the globes: it hides the glow of ships behind it and adds none. Every other mesh keeps
+    // Babylon's own choice: emissive colour by texture level and intensity, at the material's alpha.
+    glow.customEmissiveColorSelector = (mesh, subMesh, material, result) => {
+      const emissive = mesh !== sun && material && material.emissiveColor;
+      if (!emissive) { result.copyFrom(glow.neutralColor); return; }
+      const level = (material.emissiveTexture ? material.emissiveTexture.level : 1) * (material.emissiveIntensity ?? 1);
+      result.set(emissive.r * level, emissive.g * level, emissive.b * level, material.alpha);
+    };
     let lastPulseFactor = 1;
 
     // State shared with the parts in scene/system/.
@@ -70,19 +75,21 @@
     const view = {
       scene, gui, sys, projectId, orbitR, outer, beltR, beltWidth: 3.4, planets, ships,
       camera, canvas, glow, shipFocus: null, buildPlanet,
+      sun, sunHex, sunDia, worldMaps: ctx.worldMaps, quality: ctx.quality,
     };
     const parts = AUR.sceneParts.system;
-    Object.assign(view, parts.exhaust(view), parts.ships(view), parts.focus(view));
+    Object.assign(view, parts.exhaust(view), parts.ships(view), parts.focus(view), parts.worlds(view));
 
     scene.metadata = {
       view: 'system',
+      worldStats: view.worldStats,
       providerStats() {
         return AUR.sceneProviderStats(scene);
       },
       polishStats() {
         return {
           materialOwnsColor: sunMat.emissiveColor !== sunCol,
-          coronaOwnsColor: coronaMat.emissiveColor !== sunCol,
+          coronaOwnsColor: view.sunFx.tint !== sunCol,
           baseStable: sunCol.equalsWithEpsilon(sunColInitial, 0),
           lastPulseFactor,
         };
@@ -99,30 +106,22 @@
       const r = orbitR(i);
       const ring = AUR.orbitRing(scene, r, '#9fb0e0', 0.16, 0);
       const dia = AUR.clamp(AUR.PLANET_DIA.min + Math.sqrt(AUR.planetWeight(pd)) * 0.18, AUR.PLANET_DIA.min, AUR.PLANET_DIA.max);
-      const mesh = BABYLON.MeshBuilder.CreateSphere('pl_' + pd.name, { diameter: dia, segments: 24 }, scene);
-      const mat = new BABYLON.StandardMaterial('plm_' + pd.name, scene);
-      const world = AUR.applyPlanetSurface(scene, mat, projectId, pd.name, {
-        detail: false, generate: Boolean(pd.procedural),
-      });
-      const shine = world.key === 'gas' || world.key === 'oceanic' ? 0.16 : 0.045;
-      mat.specularColor = new BABYLON.Color3(shine, shine, shine * 1.08);
-      mat.specularPower = world.key === 'oceanic' ? 48 : 18;
-      mat.emissiveColor = new BABYLON.Color3(0.07, 0.07, 0.09);
-      mesh.material = mat;
-      mesh.metadata = { planetName: pd.name, isPlanet: true, worldType: world.key };
+      const persistent = topNames.indexOf(pd.name) >= 0;
+      const world = view.makeWorld(pd.name, dia, persistent);
+      const mesh = world.globe;
+      mesh.metadata = { planetName: pd.name, isPlanet: true, worldType: world.spec.cls };
       const a0 = rand() * Math.PI * 2;
       AUR.orbitPoint(a0, r, 0, mesh.position);
 
       const label = AUR.label(gui, pd.name, {
         fontSize: 12.5, weight: '600', mesh, offsetY: -(18 + dia * 5),
       });
-      const persistent = topNames.indexOf(pd.name) >= 0;
       // Hidden, not transparent: Babylon GUI still projects and draws a linked label at alpha 0.
       label.alpha = 0.95;
       label.isVisible = persistent;
 
       const rec = {
-        name: pd.name, mesh, mat, ring, world, r, a: a0,
+        name: pd.name, mesh, ring, world, r, a: a0,
         speed: AUR.MOTION.systemPlanetOrbitMin +
           rand() * AUR.MOTION.systemPlanetOrbitRange,
         axialSpeed: AUR.MOTION.systemPlanetAxialMin +
@@ -149,6 +148,7 @@
       if (left && !left.persistent) left.label.isVisible = false;
       canvas.style.cursor = 'default';
       hovered = null;
+      view.prefetchDetail(null); // a planet the pointer only crossed is not prefetched
     }
     scene.onPointerObservable.add((pi) => {
       if (view.shipFocus) {
@@ -163,7 +163,10 @@
         if (hit !== hovered) {
           leaveHover();
           const entered = hit && planets.get(hit);
-          if (entered) Object.assign(entered.label, { isVisible: true, alpha: 0.98 });
+          if (entered) {
+            Object.assign(entered.label, { isVisible: true, alpha: 0.98 });
+            view.prefetchDetail(entered);
+          }
           hovered = hit;
         }
         canvas.style.cursor = hit ? 'pointer' : 'default';
@@ -177,16 +180,12 @@
       const t = now / 1000;
       lastPulseFactor = POLISH.applySunPulse(sunMat.emissiveColor, sunCol, t);
       sun.rotation.y += dt * 0.05;
+      view.sunFx.update(dt);
 
       for (const p of planets.values()) {
         p.a += p.speed * dt;
         AUR.orbitPoint(p.a, p.r, 0, p.mesh.position);
         p.mesh.rotation.y += dt * p.axialSpeed;
-        if (p.world.key === 'gas' && p.mat.diffuseTexture) {
-          const drift = dt * 0.0035;
-          p.mat.diffuseTexture.uOffset += drift;
-          if (p.mat.bumpTexture) p.mat.bumpTexture.uOffset += drift;
-        }
         if (p.appear < 1) { p.appear = Math.min(1, p.appear + dt * 1.6); }
         let sc = p.appear;
         if (now < p.pulseUntil) {
@@ -194,6 +193,7 @@
           sc *= 1 + 0.15 * Math.sin((1 - f) * Math.PI);
         }
         p.mesh.scaling.setAll(sc);
+        p.world.update(dt);
       }
       belt.rotation.y += dt * 0.03;
 
@@ -209,6 +209,7 @@
       setShipFocus: view.setShipFocus,
       clearShipFocus: view.clearShipFocus,
       shipFocusState: view.shipFocusState,
+      setQuality: view.setWorldsQuality,
       dispose() {
         view.clearShipFocus();
         AUR.disposeView(scene, gui);
