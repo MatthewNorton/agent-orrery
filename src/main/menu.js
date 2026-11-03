@@ -1,13 +1,24 @@
 // @ts-check
 'use strict';
 
-// The application menu. It stays hidden (autoHideMenuBar) and exists for its accelerators:
-// Electron's default zoom-in binding is Ctrl+Plus, which Windows keyboards never produce, so
-// zoom in is bound to the keys people actually press.
+// The application menu. It stays hidden (autoHideMenuBar) and exists for its accelerators and
+// Help > About. Electron's default zoom-in binding is Ctrl+Plus, which Windows keyboards never
+// produce, so zoom in is bound to the keys people actually press.
 
-/** @param {Pick<typeof import('electron'), 'Menu'>} [electron] */
+const REPO_URL = 'https://github.com/MatthewNorton/agent-orrery';
+
+/** @param {Pick<typeof import('electron'), 'Menu' | 'app'>} [electron] */
 function installAppMenu(electron = require('electron')) {
-  const { Menu } = electron;
+  const { Menu, app } = electron;
+  // Named explicitly: unpackaged, the panel would show the package name, or Electron's on macOS.
+  // The credits line shows on macOS and Windows, the website on Linux.
+  app.setAboutPanelOptions({
+    applicationName: 'Agent Orrery',
+    applicationVersion: app.getVersion(),
+    copyright: 'Copyright (c) 2026 Matt Norton',
+    credits: REPO_URL,
+    website: REPO_URL,
+  });
   const hidden = (role, accelerator) => ({ role, accelerator, visible: false });
   /** @type {import('electron').MenuItemConstructorOptions[]} */
   const template = [
@@ -33,6 +44,7 @@ function installAppMenu(electron = require('electron')) {
       ],
     },
     { role: 'windowMenu' },
+    { label: 'Help', submenu: [{ role: 'about', label: 'About Agent Orrery' }] },
   ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
