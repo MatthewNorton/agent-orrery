@@ -208,7 +208,7 @@
 
   function makeCtx() {
     return {
-      store: S.store, galaxyFields: S.galaxyFields, quality: S.renderQuality,
+      store: S.store, galaxyFields: S.galaxyFields, worldMaps: S.worldMaps, quality: S.renderQuality,
       openSystem: A.openSystem, openPlanet: A.openPlanet,
     };
   }

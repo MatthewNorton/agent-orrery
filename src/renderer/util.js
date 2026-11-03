@@ -191,12 +191,6 @@
     `../../assets/skyboxes/skybox-${AUR.pad3(1 + (seed % 12))}.png`;
   AUR.planetTextureIndex = (projectId, name) =>
     1 + (AUR.fnv1a(projectId + ':' + name) % 31);
-  AUR.planetTexPath = (projectId, name) =>
-    `../../assets/planets/planet-${AUR.pad3(AUR.planetTextureIndex(projectId, name))}.png`;
-  AUR.planetBumpPath = (projectId, name) =>
-    AUR.planetTextureIndex(projectId, name) === 31
-      ? '../../assets/planets/planet-031-bump.png'
-      : null;
 
   // ---- relative time ----
   AUR.relTime = function relTime(ts, referenceTs) {

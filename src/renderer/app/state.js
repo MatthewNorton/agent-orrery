@@ -68,6 +68,7 @@
     notificationByShip: new Map(),
     liveProjectEvents: new Map(),
     galaxyFields: new Map(), // per galaxy key: its emission atlas and star samples (scene/universe/stars.js)
+    worldMaps: AUR.worlds.textures.create(), // generated planet maps: their LRU and the workers that fill it (worlds/textures.js)
     renderQuality: C.RENDER_QUALITIES[C.RENDER_QUALITIES.length - 1], // the viewer's graphics tier
     lastNotificationAt: -Infinity,
 

@@ -5,15 +5,12 @@
 
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const vm = require('node:vm');
-const { readRenderer } = require('./support/renderer-source');
+const { runRenderer } = require('./support/renderer-source');
 
 const PURE = ['noise.js', 'classes.js', 'maps.js'];
 
-// In this realm, so typed arrays compare with assert; window and document are absent, as in a worker.
-function load(scope, file, edit = (code) => code) {
-  vm.runInThisContext(`(function (self, window, document) {\n${edit(readRenderer(`worlds/${file}`))}\n})`, { filename: file })(scope, undefined, undefined);
-}
+// window and document are absent, as in a worker.
+const load = (scope, file, edit) => runRenderer(`worlds/${file}`, { self: scope, window: undefined, document: undefined }, edit);
 function loadWorlds(edits = {}) {
   const scope = {};
   for (const file of PURE) load(scope, file, edits[file]);
@@ -123,6 +120,12 @@ test('the ice lineae prefilter skips no pixel a linea paints', () => {
     for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) differing++;
     assert.equal(differing, 0, `seed ${seed}: the warp carries lineae past the prefilter window`);
   }
+});
+
+test('run() leaves out an emission layer that is all zero', () => {
+  const reply = (cls) => worlds.run({ ...job(cls, 64, 32), key: cls });
+  for (const cls of ['rocky', 'gas']) assert.equal(reply(cls).emission, null, `${cls} has no emission layer`);
+  for (const cls of ['ice', 'volcanic', 'oceanic']) assert.ok(reply(cls).emission, `${cls} keeps its emission layer`);
 });
 
 test('the worker builds a job and transfers its buffers back', () => {

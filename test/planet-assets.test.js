@@ -30,38 +30,24 @@ test('planet 31 exposes its albedo and bump assets', () => {
   assert.ok(fs.existsSync(path.join(root, 'assets/planets', asset.normalFile)));
 });
 
-test('planet texture selection activates bump mapping only for planet 31', () => {
+test('world profiles are deterministic and span every world class', () => {
   const AUR = loadAUR();
-  let selectedName = null;
-
-  for (let i = 0; i < 500; i += 1) {
-    const name = `test-planet-${i}`;
-    if (AUR.planetTextureIndex('test-project', name) === 31) {
-      selectedName = name;
-      break;
-    }
-  }
-
-  assert.ok(selectedName, 'expected a deterministic name that selects planet 31');
-  assert.match(AUR.planetTexPath('test-project', selectedName), /planet-031\.png$/);
-  assert.match(AUR.planetBumpPath('test-project', selectedName), /planet-031-bump\.png$/);
-  assert.equal(AUR.planetBumpPath('test-project', 'ordinary-planet'), null);
-});
-
-test('runtime planet generation is deterministic and spans distinct world classes', () => {
-  const AUR = loadAUR();
-  const first = AUR.proceduralPlanetData('runtime-project', 'alpha', 96);
-  const repeat = AUR.proceduralPlanetData('runtime-project', 'alpha', 96);
   const types = new Set();
 
-  assert.equal(first.width, 96);
-  assert.equal(first.height, 96);
-  assert.deepEqual(Array.from(first.pixels), Array.from(repeat.pixels));
-  assert.deepEqual(Array.from(first.heights), Array.from(repeat.heights));
+  const profile = (aur) => JSON.stringify(aur.worldProfile('runtime-project', 'alpha')); // two vm realms
+  assert.equal(profile(AUR), profile(loadAUR()));
   for (let i = 0; i < 80; i += 1) {
     types.add(AUR.worldProfile('runtime-project', `world-${i}`).key);
   }
   assert.deepEqual([...types].sort(), ['gas', 'ice', 'oceanic', 'rocky', 'volcanic']);
+});
+
+test('planets no longer load the PNG surfaces (kit 15 D1)', () => {
+  const AUR = loadAUR();
+  for (const name of ['applyPlanetSurface', 'proceduralPlanetData', 'planetTexPath', 'planetBumpPath']) {
+    assert.equal(AUR[name], undefined, `AUR.${name}`);
+  }
+  assert.doesNotMatch(rendererSource('.', (file) => /\.(js|html)$/.test(file)), /assets\/planets/);
 });
 
 test('solar systems build three deformed asteroid forms with nonuniform instances', () => {

@@ -9,7 +9,7 @@ const { wait } = require('../driver');
 async function runPolishMode(ctx, driver) {
   const {
     waitForView, readPolishStats, acquirePointerTarget, clickPoint, elementCenter, capture,
-    backdropLuma, exerciseCamera,
+    backdropLuma, exerciseCamera, waitForWorlds, patchMean,
   } = driver;
   fs.mkdirSync(ctx.flags.outputs.polish, { recursive: true });
   const result = {
@@ -23,6 +23,7 @@ async function runPolishMode(ctx, driver) {
     labelMetrics: null,
     galaxyMetrics: null,
     backdropMetrics: null,
+    worldMetrics: { system: null, sunCore: null, planet: null }, // kit 15 W6
   };
   try {
     const universe = await waitForView('universe');
@@ -79,7 +80,10 @@ async function runPolishMode(ctx, driver) {
     result.views.push('system');
     result.steps.push({ action: 'canvas-sun-click', input: sunInput, pickValidated: true, from: 'universe', to: 'system', id: sunTarget.id });
     result.systemColorMetrics = await readPolishStats();
-    await capture(ctx.flags.outputs.polish, 'system');
+    const worlds = result.worldMetrics;
+    worlds.system = await waitForWorlds('system', (stats) => stats.pending === 0);
+    const systemImage = await capture(ctx.flags.outputs.polish, 'system');
+    if (worlds.system && worlds.system.sun) worlds.sunCore = await patchMean(systemImage, worlds.system.sun.screen);
 
     const openFolder = await elementCenter('#project-card .pc-btn');
     if (!openFolder) throw new Error('Open Folder button missing');
@@ -98,6 +102,7 @@ async function runPolishMode(ctx, driver) {
     }
     result.views.push('planet');
     result.steps.push({ action: 'canvas-planet-click', input: planetInput, pickValidated: true, from: 'system', to: 'planet', id: planetTarget.id });
+    worlds.planet = await waitForWorlds('planet', (stats) => stats.pending === 0 && Boolean(stats.detail && stats.detail.swapMs != null));
     await capture(ctx.flags.outputs.polish, 'planet');
 
     const backToSystem = await elementCenter('#back-btn');
