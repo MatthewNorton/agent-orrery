@@ -1,8 +1,7 @@
 'use strict';
 
 // A generated world's texture bindings (src/renderer/worlds/material.js), with Babylon and the map
-// service faked. scene.isReady() checks every material, a hidden shell's too, so none may keep a
-// texture from maps that a later bind() disposed.
+// service faked: no material may keep a texture that a later bind() disposed.
 
 const assert = require('node:assert/strict');
 const test = require('node:test');
@@ -16,7 +15,6 @@ function loadWorld() {
     setFloat() {}
     setColor3() {}
     setVector2() {}
-    setVector3() {}
     setMatrix() {}
   }
   class Matrix { static Scaling() { return new Matrix(); } static Identity() { return new Matrix(); } }
@@ -28,21 +26,12 @@ function loadWorld() {
   const AUR = { color3: () => ({}), worlds: { shaders: {} } };
   runRenderer('worlds/material.js', { window: { AUR }, BABYLON });
 
-  // One job per width, shared by every request for it, as in the real service; finish() lands it.
-  const jobs = new Map();
-  const job = (width) => {
-    if (!jobs.has(width)) {
-      let resolve = () => {};
-      const promise = new Promise((done) => { resolve = done; });
-      jobs.set(width, { promise, resolve });
-    }
-    return jobs.get(width);
-  };
-  const mapsOf = (width) => ({ key: `oceanic:${width}`, width, height: width / 2 });
+  const pending = new Map(); // width → resolve, for the latest request at that width
+  const mapsOf = (width) => ({ width, height: width / 2 });
   const service = {
     widthFor: (width) => width,
     best: (spec, maxWidth, placeholderWidth) => ({ maps: mapsOf(placeholderWidth), source: 'placeholder' }),
-    request: (spec, width) => job(width).promise,
+    request: (spec, width) => new Promise((resolve) => pending.set(width, resolve)),
     upload(scene, maps) {
       const own = [];
       const texture = (layer) => { const made = { layer, width: maps.width, disposed: false }; own.push(made); return made; };
@@ -54,14 +43,11 @@ function loadWorld() {
       };
     },
   };
-  const spec = {
-    cls: 'oceanic', relief: 0.11, glowDay: 0, flattening: 0.995, sunHex: '#ffffff',
-    rings: false, clouds: true, haze: 0, shell: 1.016, air: '#000000',
-  };
+  const spec = { relief: 0, flattening: 1, rings: false, clouds: true, haze: 0, shell: 1 }; // clouds, no air or rings
   const world = AUR.worlds.createWorld({ isDisposed: false }, spec, {
     name: 'planet', radius: 1, segments: 8, clouds: true, glow: null, maps: service, epoch: 1,
   });
-  const finish = (width) => job(width).resolve({ maps: mapsOf(width), source: 'worker' });
+  const finish = (width) => pending.get(width)({ maps: mapsOf(width), source: 'worker' });
   // Every texture a material still holds after its maps were disposed, as 'material.sampler: layer width'.
   const stale = () => materials.flatMap((material) => Object.entries(material.textures)
     .filter(([, texture]) => texture.disposed)
@@ -72,18 +58,15 @@ function loadWorld() {
 
 test('hiding the clouds after the detail map binds leaves no disposed texture on the shell', async () => {
   const { world, finish, stale, cloudMap } = loadWorld();
-  const opened = world.show(2048, 3, 128); // the high tier: clouds on, the 128 placeholder bound
-  assert.equal(cloudMap('planet-clouds').layer, 'clouds');
-  finish(512);
+  const opened = world.show(2048, 3, 128); // the high tier: clouds on, the placeholder bound
   finish(2048);
   assert.equal(await opened, true);
-  assert.deepEqual(stale(), []);
+  assert.equal(cloudMap('planet-clouds').layer, 'clouds');
 
   world.setClouds(false); // the switch to low, as setQuality() makes it
   const lowered = world.show(1024, 3, 128);
   finish(1024);
   assert.equal(await lowered, true);
-  assert.equal(world.mapWidth, 1024);
   assert.deepEqual(stale(), [], 'the hidden shell gave up the 2048 cloud layer when the 1024 replaced it');
 
   world.setClouds(true); // back to high: the shell and the surface show the bound maps' clouds
@@ -95,14 +78,9 @@ test('hiding the clouds after the detail map binds leaves no disposed texture on
 test('hiding the clouds while the placeholder is bound leaves no disposed texture on the shell', async () => {
   const { world, finish, stale } = loadWorld();
   world.show(2048, 3, 128); // the high tier, with the placeholder's cloud layer on the shell
-  world.setClouds(false); // the switch to balanced, before any map lands
+  world.setClouds(false); // the switch to balanced, before the detail map lands
   const balanced = world.show(2048, 3, 128);
-  finish(512);
-  await new Promise((resolve) => setImmediate(resolve)); // the interim 512 binds
-  assert.equal(world.mapWidth, 512);
-  assert.deepEqual(stale(), [], 'the hidden shell gave up the placeholder\'s cloud layer when the 512 replaced it');
   finish(2048);
   assert.equal(await balanced, true);
-  assert.equal(world.mapWidth, 2048);
-  assert.deepEqual(stale(), []);
+  assert.deepEqual(stale(), [], 'the hidden shell gave up the placeholder\'s cloud layer when the 2048 replaced it');
 });

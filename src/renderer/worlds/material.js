@@ -126,10 +126,8 @@
     let textures = null, target = 0, cloudOffset = 0, cloudsOn = false;
     // Nearer the wanted width in octaves: a late 512 never replaces a 2048 that landed first.
     const closer = (width) => !world.mapWidth || Math.abs(Math.log2(width / target)) < Math.abs(Math.log2(world.mapWidth / target));
-    // The cloud layer goes up the first time the clouds show. While they are hidden, the surface
-    // (unread while showClouds is 0) and the disabled shell take the bound maps' emission texture:
-    // scene.isReady() checks disabled meshes too, so the shell must not keep a texture that bind()
-    // has disposed.
+    // While the clouds are hidden, the surface and the disabled shell take the emission texture.
+    // scene.isReady() checks disabled meshes too, so the shell must not keep a disposed one.
     function bindClouds() {
       if (!textures) return;
       const map = (cloudsOn && textures.clouds()) || textures.emission;
