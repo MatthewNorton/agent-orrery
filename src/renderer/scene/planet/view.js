@@ -56,7 +56,7 @@
 
     // D3 (world.show): the best cached map now, 512 soon if nothing that good is cached, then the
     // detail map. The scene stays unready (shots and polish harnesses wait on it) until the
-    // detail map is bound or 6 s pass.
+    // detail map of the latest tier is bound or 6 s pass; a tier change replaces the one waited for.
     const opened = performance.now();
     const detail = { swapMs: null, heldReady: false };
     let hold = {};
@@ -68,10 +68,16 @@
       clearTimeout(holdTimer);
     };
     const holdTimer = setTimeout(release, 6000);
-    const showDetail = () => world.show(SIZES[tier.key].detail, 3, PLACEHOLDER.planet).then((bound) => {
-      if (bound && detail.swapMs == null) Object.assign(detail, { swapMs: Math.round(performance.now() - opened), heldReady: hold !== null });
-    });
-    showDetail().then(release, release);
+    let latest = null;
+    const showDetail = () => {
+      const shown = latest = world.show(SIZES[tier.key].detail, 3, PLACEHOLDER.planet);
+      shown.then((bound) => {
+        if (!bound || shown !== latest) return;
+        if (detail.swapMs == null) Object.assign(detail, { swapMs: Math.round(performance.now() - opened), heldReady: hold !== null });
+        release();
+      });
+    };
+    showDetail();
 
     scene.metadata = {
       view: 'planet',
@@ -88,12 +94,16 @@
 
     // ---- moons ----
     const moons = [];
-    const MOON_ORBIT = { min: 0.9, max: 1.4 }; // in planet diameters; ships orbit beyond it
+    const MOON_SIZE = { min: 0.8, range: 1.1 }; // diameter
+    // In planet diameters; ships orbit beyond it. A ringed world's moons orbit past the rings by
+    // more than their own radius, so none passes through them.
+    const ringClear = world.spec.rings ? (W.RINGS.outer * PDIA / 2 + (MOON_SIZE.min + MOON_SIZE.range) / 2) / PDIA + 0.02 : 0;
+    const MOON_ORBIT = ringClear ? { min: ringClear, max: ringClear + 0.2 } : { min: 0.9, max: 1.4 };
     (function buildMoons() {
       const rand = AUR.mulberry32(AUR.fnv1a(projectId + ':moons:' + name));
       const nm = 1 + Math.floor(rand() * 2);
       for (let i = 0; i < nm; i++) {
-        const md = 0.8 + rand() * 1.1;
+        const md = MOON_SIZE.min + rand() * MOON_SIZE.range;
         const moon = W.createWorld(scene, W.moonSpec(projectId, name, i, sunHex), { ...worldOpts, name: 'moon' + i, radius: md / 2, segments: 48 });
         moon.globe.isPickable = false;
         moon.setSun(sunPosition);

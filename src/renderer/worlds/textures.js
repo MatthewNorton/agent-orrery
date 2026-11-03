@@ -9,6 +9,7 @@
   const AUR = window.AUR;
   const worlds = AUR.worlds;
   const TIMEOUT_MS = 15000;
+  const RESPAWNS = 4; // workers replaced over the service's life; past that the pool shrinks
   const MAIN_MAX_WIDTH = 1024; // the main thread never builds more than 1024 × 512
   const BUDGET_BYTES = 160 * 1024 * 1024;
   const WIDTHS = [2048, 1024, 512, 256, 128, 64];
@@ -42,23 +43,41 @@
     const queue = [];         // jobs waiting for a worker
     const mainQueue = [];     // jobs for the main-thread fallback
     const epochs = new Map(); // open epoch → { pending } requests not yet settled
-    const users = new Map();  // live scene → keys of the maps it uploaded (never evicted)
-    const pool = { idle: [], busy: new Map(), alive: 0, started: false };
+    // Live scene → { keys: map key → its textures not yet disposed (those maps are never evicted),
+    // blank: the scene's 1 × 1 clear texture for a missing emission layer }.
+    const users = new Map();
+    const pool = { idle: [], busy: new Map(), alive: 0, started: false, respawns: RESPAWNS };
     let bytes = 0, nextEpoch = 1, mainTimer = 0;
 
+    function spawn() {
+      let worker;
+      try { worker = new Worker('worlds/worker.js'); } catch (error) { return false; }
+      worker.onmessage = (event) => finish(worker, event.data);
+      worker.onerror = (event) => { event.preventDefault(); retire(worker); };
+      pool.idle.push(worker);
+      pool.alive += 1;
+      return true;
+    }
     function startPool() {
       if (pool.started) return;
       pool.started = true;
       const size = Math.max(1, Math.min(3, (navigator.hardwareConcurrency || 4) - 2));
-      for (let i = 0; i < size; i++) {
-        let worker;
-        try { worker = new Worker('worlds/worker.js'); } catch (error) { break; }
-        worker.onmessage = (event) => finish(worker, event.data);
-        worker.onerror = (event) => { event.preventDefault(); retire(worker); };
-        pool.idle.push(worker);
-        pool.alive += 1;
-      }
+      for (let i = 0; i < size && spawn(); i++);
       if (!pool.alive) AUR.log('[worlds] map workers unavailable; maps are made on the main thread at up to 1024 × 512');
+    }
+    // The widest map up to `width` that can be made now: the main thread stops at 1024.
+    function widthFor(width) {
+      startPool();
+      return pool.alive ? width : Math.min(width, MAIN_MAX_WIDTH);
+    }
+    function userOf(scene) {
+      let user = users.get(scene);
+      if (!user) {
+        user = { keys: new Map(), blank: null };
+        users.set(scene, user);
+        scene.onDisposeObservable.addOnce(() => users.delete(scene));
+      }
+      return user;
     }
 
     function lookup(key) {
@@ -66,7 +85,7 @@
       if (entry) { cache.delete(key); cache.set(key, entry); }
       return entry || null;
     }
-    const inUse = (key) => { for (const keys of users.values()) if (keys.has(key)) return true; return false; };
+    const inUse = (key) => { for (const user of users.values()) if (user.keys.has(key)) return true; return false; };
     function store(maps, placeholder) {
       const old = cache.get(maps.key);
       if (old) { bytes -= old.bytes; cache.delete(maps.key); }
@@ -120,8 +139,9 @@
       complete(busy.job, reply, 'worker');
       pump();
     }
-    // A worker that errors or runs past the timeout is retired; its job, and every queued job
-    // once no worker is left, moves to the main thread.
+    // A worker that errors or runs past the timeout is retired, and replaced while RESPAWNS last.
+    // Its job moves to the main thread if anyone still waits for it, and is dropped if not; every
+    // queued job moves there too once no worker is left.
     function retire(worker) {
       const busy = pool.busy.get(worker);
       const idle = pool.idle.indexOf(worker);
@@ -130,8 +150,11 @@
       if (idle >= 0) pool.idle.splice(idle, 1);
       try { worker.terminate(); } catch (error) { /* already gone */ }
       pool.alive -= 1;
-      AUR.log('[worlds] a map worker stopped; its maps continue on the main thread');
-      if (busy) toMain(busy.job);
+      const replaced = pool.respawns > 0 && spawn();
+      if (replaced) pool.respawns -= 1;
+      AUR.log(replaced ? '[worlds] a map worker stopped and was replaced' : '[worlds] a map worker stopped; its maps continue on the main thread');
+      if (busy && busy.job.waiters.length) toMain(busy.job);
+      else if (busy) jobs.delete(busy.job.payload.key);
       if (!pool.alive) while (queue.length) toMain(queue.shift());
       pump();
     }
@@ -178,8 +201,7 @@
       request(spec, width, priority, epoch) {
         const open = epochs.get(epoch);
         if (!open) return Promise.resolve(null);
-        startPool();
-        const payload = jobFor(spec, pool.alive ? width : Math.min(width, MAIN_MAX_WIDTH));
+        const payload = jobFor(spec, widthFor(width));
         const hit = lookup(payload.key);
         if (hit) return Promise.resolve({ maps: hit.maps, source: 'cache' });
         let job = jobs.get(payload.key);
@@ -204,17 +226,15 @@
         const entry = lookup(job.key) || store(mapsOf(job.key, worlds.generate(job)), true);
         return { maps: entry.maps, source: 'placeholder' };
       },
+      widthFor,
       // This scene's textures for the maps: mipmapped, wrapping around the globe, clamped at the
-      // poles. The cloud layer only when the world shows clouds.
-      upload(scene, maps, withClouds) {
-        let keys = users.get(scene);
-        if (!keys) {
-          keys = new Set();
-          users.set(scene, keys);
-          scene.onDisposeObservable.addOnce(() => users.delete(scene));
-        }
-        keys.add(maps.key);
+      // poles. Maps without an emission layer share the scene's blank texture, and the cloud layer
+      // goes up the first time clouds() asks for it. The maps stay in the cache until dispose().
+      upload(scene, maps) {
+        const user = userOf(scene);
+        user.keys.set(maps.key, (user.keys.get(maps.key) || 0) + 1);
         const aniso = Math.min(8, scene.getEngine().getCaps().maxAnisotropy || 1);
+        const own = [];
         const texture = (pixels, width, height, wrap) => {
           const map = BABYLON.RawTexture.CreateRGBATexture(pixels, width, height, scene, true, false, BABYLON.Texture.TRILINEAR_SAMPLINGMODE);
           map.wrapU = wrap ? BABYLON.Texture.WRAP_ADDRESSMODE : BABYLON.Texture.CLAMP_ADDRESSMODE;
@@ -222,16 +242,28 @@
           map.anisotropicFilteringLevel = aniso;
           return map;
         };
+        const layer = (pixels, width, height, wrap) => { const map = texture(pixels, width, height, wrap); own.push(map); return map; };
+        if (!maps.emission && !user.blank) user.blank = texture(new Uint8Array(4), 1, 1, true);
         const { width, height } = maps;
-        const textures = {
+        let clouds = null, disposed = false;
+        return {
           width, height,
-          surface: texture(maps.surface, width, height, true),
-          emission: texture(maps.emission, width, height, true),
-          clouds: withClouds && maps.clouds ? texture(maps.clouds, width, height, true) : null,
-          rings: maps.rings ? texture(maps.rings, maps.rings.length / 4, 1, false) : null,
-          dispose() { for (const layer of LAYERS) if (textures[layer]) textures[layer].dispose(); },
+          surface: layer(maps.surface, width, height, true),
+          emission: maps.emission ? layer(maps.emission, width, height, true) : user.blank,
+          rings: maps.rings ? layer(maps.rings, maps.rings.length / 4, 1, false) : null,
+          clouds() {
+            if (!clouds && maps.clouds && !disposed) clouds = layer(maps.clouds, width, height, true);
+            return clouds;
+          },
+          dispose() {
+            if (disposed) return;
+            disposed = true;
+            for (const map of own) map.dispose();
+            const left = user.keys.get(maps.key) - 1;
+            if (left > 0) user.keys.set(maps.key, left);
+            else user.keys.delete(maps.key);
+          },
         };
-        return textures;
       },
       stats(epoch) {
         const open = epochs.get(epoch);

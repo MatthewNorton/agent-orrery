@@ -1,8 +1,9 @@
 // @ts-check
-// GLSL for the world materials (kit 15 W4), ported unchanged from the approved preview, itself
-// sidereal-v2 shaders.js (owner's MIT sandbox-animations-v2 PR #31). Every fragment tone maps
-// with the same ACES curve (displayColor), so worlds keep their colour without scene-level tone
-// mapping, which would restyle the ships, glyphs and gold samples.
+// GLSL for the world materials (kit 15 W4), ported from the approved preview, itself sidereal-v2
+// shaders.js (owner's MIT sandbox-animations-v2 PR #31), with two fixes: pow() never gets a base
+// below zero, and the ring shadow samples outside per-pixel branches, so its mip level is defined.
+// Every fragment tone maps with the same ACES curve (displayColor), so worlds keep their colour
+// without scene-level tone mapping, which would restyle the ships, glyphs and gold samples.
 'use strict';
 
 (function () {
@@ -123,26 +124,23 @@ void main() {
   if (showRings > 0.5) {
     vec3 p = (ringSpace * vec4(vPosition, 1.0)).xyz;
     vec3 rl = normalize(mat3(ringSpace[0].xyz, ringSpace[1].xyz, ringSpace[2].xyz) * l);
-    if (abs(rl.y) > 0.001) {
-      float t = -p.y / rl.y;
-      float radius = length((p + rl * t).xz);
-      if (t > 0.0 && radius > ringRange.x && radius < ringRange.y) {
-        float opacity = texture2D(ringMap, vec2((radius - ringRange.x) / (ringRange.y - ringRange.x), 0.5)).a;
-        shade *= 1.0 - opacity * 0.88;
-      }
-    }
+    bool crosses = abs(rl.y) > 0.001;
+    float t = -p.y / (crosses ? rl.y : 1.0);
+    float radius = length((p + rl * t).xz);
+    float opacity = texture2D(ringMap, vec2((radius - ringRange.x) / (ringRange.y - ringRange.x), 0.5)).a;
+    shade *= 1.0 - opacity * 0.88 * float(crosses && t > 0.0 && radius > ringRange.x && radius < ringRange.y);
   }
   vec3 color = albedo * (ambient + 1.25 * lighting * shade * sunColor);
   vec4 night = texture2D(nightMap, mapUV);
   if (night.a > 0.0) {
     vec3 halfway = normalize(l + v);
     float glint = pow(max(dot(n, halfway), 0.0), 110.0);
-    float fresnel = 0.025 + 0.25 * pow(1.0 - max(dot(n, v), 0.0), 5.0);
+    float fresnel = 0.025 + 0.25 * pow(1.0 - clamp(dot(n, v), 0.0, 1.0), 5.0);
     color += vec3(1.0, 0.91, 0.78) * sunColor * glint * night.a * fresnel * 3.0 * lighting * shade;
   }
   float dark = 1.0 - smoothstep(-0.22, 0.08, daylight);
   color += night.rgb * 2.4 * mix(glowDay, 1.0, dark);
-  float limb = pow(1.0 - max(dot(n, v), 0.0), 4.0);
+  float limb = pow(1.0 - clamp(dot(n, v), 0.0, 1.0), 4.0);
   color += atmosphereColor * limb * haze * smoothstep(-0.18, 0.35, daylight) * 0.4;
   gl_FragColor = vec4(displayColor(color), 1.0);
 }`;
@@ -182,7 +180,7 @@ void main() {
   vec3 n = normalize(vNormal);
   vec3 v = normalize(cameraPosition - vPosition);
   vec3 l = normalize(sunPosition - vPosition);
-  float rim = pow(1.0 - max(dot(n, v), 0.0), 5.0);
+  float rim = pow(1.0 - clamp(dot(n, v), 0.0, 1.0), 5.0);
   float daylight = smoothstep(-0.25, 0.5, dot(n, l));
   gl_FragColor = vec4(displayColor(atmosphereColor * 1.6), rim * haze * daylight * 0.8);
 }`;

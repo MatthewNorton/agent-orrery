@@ -57,12 +57,20 @@
     return { width, height, surface, emission, clouds, rings: rings ? ringStrip(seed, palette) : null };
   }
 
+  const allZero = (bytes) => {
+    const words = new Uint32Array(bytes.buffer, bytes.byteOffset, bytes.byteLength >> 2);
+    for (let i = 0; i < words.length; i++) if (words[i]) return false;
+    return true;
+  };
+
   // The reply both the worker and the main-thread fallback give: { key, ok: true, ms, ...maps } or
-  // { key, ok: false, error }.
+  // { key, ok: false, error }. An emission layer that is all zero (rocky and gas worlds, the moons)
+  // is null, so it is never transferred, cached or uploaded.
   function run(job) {
     try {
       const started = performance.now();
       const maps = generate(job);
+      if (allZero(maps.emission)) maps.emission = null;
       return { key: job.key, ok: true, ms: performance.now() - started, ...maps };
     } catch (error) {
       return { key: job.key, ok: false, error: String((error && error.message) || error) };

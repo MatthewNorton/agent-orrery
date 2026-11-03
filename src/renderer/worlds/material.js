@@ -129,21 +129,28 @@
 
     const toUnit = BABYLON.Matrix.Scaling(1 / radius, 1 / radius, 1 / radius);
     const inverse = new BABYLON.Matrix(), ringSpace = new BABYLON.Matrix();
-    let textures = null, target = 0, cloudOffset = 0;
+    let textures = null, target = 0, cloudOffset = 0, cloudsOn = false;
     // Nearer the wanted width in octaves: a late 512 never replaces a 2048 that landed first.
     const closer = (width) => !world.mapWidth || Math.abs(Math.log2(width / target)) < Math.abs(Math.log2(world.mapWidth / target));
+    // The cloud layer goes up the first time the clouds show; until then the surface's cloudMap,
+    // unread while showClouds is 0, is the emission texture.
+    function bindClouds() {
+      if (!textures) return;
+      const map = cloudsOn ? textures.clouds() : null;
+      surface.setTexture('cloudMap', map || textures.emission);
+      if (map) cloudMat.setTexture('cloudMap', map);
+    }
     function bind(result) {
-      const next = service.upload(scene, result.maps, Boolean(cloudMat));
+      const next = service.upload(scene, result.maps);
       surface.setTexture('surfaceMap', next.surface);
       surface.setTexture('nightMap', next.emission);
-      surface.setTexture('cloudMap', next.clouds || next.emission); // unread unless showClouds/showRings
-      surface.setTexture('ringMap', next.rings || next.emission);
+      surface.setTexture('ringMap', next.rings || next.emission); // unread unless showRings
       surface.setVector2('mapStep', new BABYLON.Vector2(1 / next.width, 1 / next.height));
       surface.setFloat('relief', spec.relief * next.width / 2048);
-      if (cloudMat && next.clouds) cloudMat.setTexture('cloudMap', next.clouds);
       if (ringMat && next.rings) ringMat.setTexture('ringMap', next.rings);
       if (textures) textures.dispose();
       textures = next;
+      bindClouds();
       world.mapWidth = next.width;
       world.source = result.source;
     }
@@ -155,18 +162,21 @@
 
     const world = {
       spec, globe, mapWidth: 0, source: null,
-      // Binds the best cached map up to `width` now, 512 on the way to a wider map when nothing
-      // that good is cached, then the map `width` wide when it lands. Resolves true once that is bound.
+      // Binds the best cached map up to `width` (or as wide as the service can make, 1024 without
+      // workers) now, 512 on the way to a wider map when nothing that good is cached, then that
+      // map when it lands. Resolves true once it is bound.
       show(width, priority, placeholderWidth) {
-        target = width;
-        land(service.best(spec, width, placeholderWidth));
-        if (world.mapWidth === width) return Promise.resolve(true);
-        if (width > INTERIM_WIDTH && world.mapWidth < INTERIM_WIDTH) service.request(spec, INTERIM_WIDTH, priority + 1, epoch).then(land);
-        return service.request(spec, width, priority, epoch).then(land);
+        target = service.widthFor(width);
+        land(service.best(spec, target, placeholderWidth));
+        if (world.mapWidth === target) return Promise.resolve(true);
+        if (target > INTERIM_WIDTH && world.mapWidth < INTERIM_WIDTH) service.request(spec, INTERIM_WIDTH, priority + 1, epoch).then(land);
+        return service.request(spec, target, priority, epoch).then(land);
       },
       setClouds(on) {
+        cloudsOn = Boolean(clouds) && on;
         if (clouds) clouds.setEnabled(on);
-        surface.setFloat('showClouds', clouds && on ? 1 : 0);
+        surface.setFloat('showClouds', cloudsOn ? 1 : 0);
+        bindClouds();
       },
       setSun(position) { for (const m of mats) m.setVector3('sunPosition', position); },
       update(dt) {
@@ -196,5 +206,5 @@
     return { tier, pending, workers, pngPlanetTextures };
   }
 
-  Object.assign(worlds, { worldSpec, moonSpec, createWorld, sceneStats, shader });
+  Object.assign(worlds, { worldSpec, moonSpec, createWorld, sceneStats, shader, RINGS: Object.freeze({ inner: RING_IN, outer: RING_OUT }) });
 })();

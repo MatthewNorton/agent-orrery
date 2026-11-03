@@ -97,14 +97,16 @@
     ice: { sampler({ noise, fbm, P, seed }) {
       const random = lcg((seed ^ 0x6c8e9cf5) >>> 0);
       const count = 5 + Math.floor(random() * 4);
-      const REACH = 0.1; // widest band (rad) any linea paints, warp included
+      const REACH = 0.1; // widest band (rad) any linea paints about its warped circle
+      const WARP = 0.04; // the most (rad) the warp moves a linea off its circle: noise stays within ±1
       const lineae = [];
       for (let i = 0; i < count; i++) {
         const axis = unitVector(random, -1, 1);
         const radius = 0.75 + random() * 0.75;
         const u = normalize(cross(axis, Math.abs(axis[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0])), v = cross(axis, u);
+        // Points outside lo..hi (as dot products with the axis) are out of reach, warp included.
         lineae.push({ axis, radius, u, v, width: 0.004 + random() * 0.008, phase: random() * 97,
-          lo: Math.cos(Math.min(Math.PI, radius + REACH)), hi: Math.cos(Math.max(0, radius - REACH)) });
+          lo: Math.cos(Math.min(Math.PI, radius + REACH + WARP)), hi: Math.cos(Math.max(0, radius - REACH - WARP)) });
       }
       return (x, y, z, broad, detail, out) => {
         const bend = noise(x * 1.9 + 21.3, y * 1.9 - 4.7, z * 1.9 + 9.1);
@@ -112,7 +114,7 @@
         for (const l of lineae) {
           const dot = x * l.axis[0] + y * l.axis[1] + z * l.axis[2];
           if (dot < l.lo || dot > l.hi) continue;
-          const d = Math.abs(Math.acos(dot) - l.radius + 0.04 * bend);
+          const d = Math.abs(Math.acos(dot) - l.radius + WARP * bend);
           if (d >= REACH) continue;
           const along = Math.atan2(x * l.v[0] + y * l.v[1] + z * l.v[2], x * l.u[0] + y * l.u[1] + z * l.u[2]);
           const keep = smooth(-0.12, 0.22, noise(Math.cos(along) * 1.3 + l.phase, Math.sin(along) * 1.3, l.phase * 0.31));
