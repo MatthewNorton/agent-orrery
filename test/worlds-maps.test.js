@@ -11,12 +11,12 @@ const { readRenderer } = require('./support/renderer-source');
 const PURE = ['noise.js', 'classes.js', 'maps.js'];
 
 // In this realm, so typed arrays compare with assert; window and document are absent, as in a worker.
-function load(scope, file) {
-  vm.runInThisContext(`(function (self, window, document) {\n${readRenderer(`worlds/${file}`)}\n})`, { filename: file })(scope, undefined, undefined);
+function load(scope, file, edit = (code) => code) {
+  vm.runInThisContext(`(function (self, window, document) {\n${edit(readRenderer(`worlds/${file}`))}\n})`, { filename: file })(scope, undefined, undefined);
 }
-function loadWorlds() {
+function loadWorlds(edits = {}) {
   const scope = {};
-  for (const file of PURE) load(scope, file);
+  for (const file of PURE) load(scope, file, edits[file]);
   return scope.AUR.worlds;
 }
 
@@ -106,6 +106,23 @@ test('each class carries only its own layers', () => {
   for (let i = 307; i < 717; i++) gap = Math.min(gap, rings[i * 4 + 3]);
   assert.ok(gap < 10, 'the rings have a gap between 30 % and 70 % of their width');
   assert.equal(worlds.generate(job('rocky', 16, 8, { rings: true })).rings.length, 1024 * 4);
+});
+
+test('the ice lineae prefilter skips no pixel a linea paints', () => {
+  const PREFILTER = 'if (dot < l.lo || dot > l.hi) continue;';
+  const unfiltered = loadWorlds({
+    'classes.js': (code) => {
+      assert.ok(code.includes(PREFILTER), 'the prefilter line changed; update this test');
+      return code.replace(PREFILTER, '');
+    },
+  });
+  for (const seed of [PLANETS.ice.seed, 1, 3]) {
+    const ice = job('ice', 512, 256, { seed });
+    const a = worlds.generate(ice).surface, b = unfiltered.generate(ice).surface;
+    let differing = 0;
+    for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) differing++;
+    assert.equal(differing, 0, `seed ${seed}: the warp carries lineae past the prefilter window`);
+  }
 });
 
 test('the worker builds a job and transfers its buffers back', () => {
