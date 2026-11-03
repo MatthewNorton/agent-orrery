@@ -25,6 +25,6 @@
   "dependencies": {
     "babylonjs": "^9.33.1",
     "babylonjs-gui": "^9.33.1",
-    "babylonjs-loaders": "9.33.0"
+    "babylonjs-loaders": "9.33.1"
   }
 }
