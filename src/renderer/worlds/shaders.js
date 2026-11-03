@@ -209,5 +209,64 @@ void main() {
   gl_FragColor = vec4(displayColor(color), ring.a * 0.92);
 }`;
 
-  AUR.worlds.shaders = Object.freeze({ TONE, NOISE, WORLD_VERTEX, SURFACE_FRAGMENT, CLOUD_FRAGMENT, ATMO_FRAGMENT, RING_FRAGMENT });
+  // The sun's corona and glow, additive billboards around the photosphere (worlds/sun.js).
+  const BILLBOARD_VERTEX = `
+precision highp float;
+attribute vec3 position;
+attribute vec2 uv;
+uniform mat4 worldViewProjection;
+varying vec2 vUV;
+void main() {
+  vUV = uv;
+  gl_Position = worldViewProjection * vec4(position, 1.0);
+}`;
+
+  const CORONA_FRAGMENT = `
+precision highp float;
+varying vec2 vUV;
+uniform vec3 sunTint;
+uniform float exposure;
+uniform float rs;
+uniform float time;
+uniform float strength;
+${TONE}
+float hash12(vec2 p) {
+  vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.x + p3.y) * p3.z);
+}
+float vnoise2(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash12(i), hash12(i + vec2(1.0, 0.0)), u.x), mix(hash12(i + vec2(0.0, 1.0)), hash12(i + vec2(1.0, 1.0)), u.x), u.y);
+}
+void main() {
+  vec2 q = vUV * 2.0 - 1.0;
+  float r = length(q);
+  float h = max(r - rs, 0.0) / max(1.0 - rs, 0.001);
+  float a = atan(q.y, q.x);
+  vec2 around = vec2(cos(a), sin(a));
+  float streak = vnoise2(around * 3.0 + vec2(time * 0.02, 0.0)) * 0.6 + vnoise2(around * 9.0 + 4.0) * 0.4;
+  float inner = exp(-h * 10.0);
+  float outer = exp(-h * 3.0) * (0.45 + 0.55 * streak);
+  float fade = 1.0 - smoothstep(0.8, 1.0, r);
+  gl_FragColor = vec4(displayColor(sunTint * (inner * 0.75 + outer * 0.22) * fade * strength), 1.0);
+}`;
+
+  const GLOW_FRAGMENT = `
+precision highp float;
+varying vec2 vUV;
+uniform vec3 sunTint;
+uniform float strength;
+void main() {
+  float r = length(vUV * 2.0 - 1.0);
+  float glow = (exp(-r * 7.0) * 0.6 + exp(-r * 2.5) * 0.25) * (1.0 - smoothstep(0.85, 1.0, r));
+  gl_FragColor = vec4(sunTint * glow * strength, 1.0);
+}`;
+
+  AUR.worlds.shaders = Object.freeze({
+    TONE, NOISE, WORLD_VERTEX, SURFACE_FRAGMENT, CLOUD_FRAGMENT, ATMO_FRAGMENT, RING_FRAGMENT,
+    BILLBOARD_VERTEX, CORONA_FRAGMENT, GLOW_FRAGMENT,
+  });
 })();

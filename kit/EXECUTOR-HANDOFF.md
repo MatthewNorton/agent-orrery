@@ -59,12 +59,9 @@ you (or a Claude kit-runner session):
 
 ## Current state (update when it changes)
 
-Feedable: kit 15, `<KIT_CONTRACT_PATH>` =
-`kit/todo/15-procedural-worlds/CONTRACT.md` (distilled 2026-11-01; its W0 runs
-`npm ci` and the `--killswitch` gate before any app code; Opus 5.5 at high
-effort throughout, no fallback model). Kits 01–08, 10,
-11, 13 and 14 are done (see `kit/README.md`); `kit/todo/09-ship-assets-gen.md`
-and `kit/todo/16-idle-cap-and-glyphs.md` are stubs and
+Nothing is feedable right now. Kits 01–08, 10, 11 and 13–15 are done (see
+`kit/README.md`); `kit/todo/09-ship-assets-gen.md` and
+`kit/todo/16-idle-cap-and-glyphs.md` are stubs and
 `kit/todo/12-standalone-installer.md` is declined. To make another feedable
 kit, run `/distill` on a stub to produce its contract and grader, then use
 this handoff.

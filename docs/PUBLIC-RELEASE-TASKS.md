@@ -176,8 +176,9 @@ None of these block release. Each is a kit-sized job.
 ## Phase 6 — Visual quality before public · ~6–8 h · three PRs
 
 Added 2026-10-18 and rescoped the same day. Two investigations that day
-(measurements, the planet design and the parked items are in
-`kit/todo/15-visual-quality.md`) found that every view holds a vsync-locked
+(the measurements and the parked items are now in
+`kit/todo/16-idle-cap-and-glyphs.md`; the planet work shipped as kit 15, in
+`kit/done/procedural-worlds/`) found that every view holds a vsync-locked
 60 fps at every quality tier on the owner's machine, even at 40 projects and
 an emulated 4K viewport, so what precedes the flip is narrow: repair the
 gates, remove dead per-frame cost, and let viewers set quality. The
@@ -254,5 +255,6 @@ Critical path to a public repo: **about 4–5 hours of agent time across three
 PRs and one manual GitHub session.**
 
 2026-10-18: Phase 6 precedes the flip, rescoped to gate repair, engine fixes and quality
-settings (6–8 h, three PRs). The planet pipeline and the other visual work are parked in
-`kit/todo/15-visual-quality.md`.
+settings (6–8 h, three PRs). The planet pipeline and the other visual work were parked; the
+planets and the sun later became kit 15 (`kit/done/procedural-worlds/`), and the rest waits in
+`kit/todo/16-idle-cap-and-glyphs.md`.

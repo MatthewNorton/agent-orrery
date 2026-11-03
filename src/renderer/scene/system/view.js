@@ -42,7 +42,7 @@
 
     // ---- sun ----
     const sunDia = AUR.clamp(4.5 + Math.log10((project.totalBytes || 0) + 1), 5, 9);
-    const sun = BABYLON.MeshBuilder.CreateSphere('sun', { diameter: sunDia, segments: 28 }, scene);
+    const sun = BABYLON.MeshBuilder.CreateSphere('sun', { diameter: sunDia, segments: 64 }, scene);
     const sunMat = new BABYLON.StandardMaterial('sunm', scene);
     const sunHex = AUR.sunColor(project.seed);
     const sunCol = AUR.color3(sunHex);
@@ -54,12 +54,16 @@
     sunMat.diffuseColor = new BABYLON.Color3(0, 0, 0);
     sunMat.specularColor = new BABYLON.Color3(0, 0, 0);
     sun.material = sunMat;
-    // corona shell
-    const corona = BABYLON.MeshBuilder.CreateSphere('corona', { diameter: sunDia * 1.5, segments: 20 }, scene);
-    const coronaMat = AUR.unlitMaterial(scene, 'coronam', sunCol.clone().scaleInPlace(0.5), 0.18);
-    coronaMat.backFaceCulling = false;
-    corona.material = coronaMat;
-    corona.isPickable = false;
+    // The photosphere (worlds/sun.js, from the worlds part) is the sun's own light; glow stacked
+    // on it bleached the core white. So in the glow pass the sun takes the neutral colour, like
+    // the globes: it hides the glow of ships behind it and adds none. Every other mesh keeps
+    // Babylon's own choice: emissive colour by texture level and intensity, at the material's alpha.
+    glow.customEmissiveColorSelector = (mesh, subMesh, material, result) => {
+      const emissive = mesh !== sun && material && material.emissiveColor;
+      if (!emissive) { result.copyFrom(glow.neutralColor); return; }
+      const level = (material.emissiveTexture ? material.emissiveTexture.level : 1) * (material.emissiveIntensity ?? 1);
+      result.set(emissive.r * level, emissive.g * level, emissive.b * level, material.alpha);
+    };
     let lastPulseFactor = 1;
 
     // State shared with the parts in scene/system/.
@@ -71,7 +75,7 @@
     const view = {
       scene, gui, sys, projectId, orbitR, outer, beltR, beltWidth: 3.4, planets, ships,
       camera, canvas, glow, shipFocus: null, buildPlanet,
-      sun, sunHex, worldMaps: ctx.worldMaps, quality: ctx.quality,
+      sun, sunHex, sunDia, worldMaps: ctx.worldMaps, quality: ctx.quality,
     };
     const parts = AUR.sceneParts.system;
     Object.assign(view, parts.exhaust(view), parts.ships(view), parts.focus(view), parts.worlds(view));
@@ -85,7 +89,7 @@
       polishStats() {
         return {
           materialOwnsColor: sunMat.emissiveColor !== sunCol,
-          coronaOwnsColor: coronaMat.emissiveColor !== sunCol,
+          coronaOwnsColor: view.sunFx.tint !== sunCol,
           baseStable: sunCol.equalsWithEpsilon(sunColInitial, 0),
           lastPulseFactor,
         };
@@ -176,6 +180,7 @@
       const t = now / 1000;
       lastPulseFactor = POLISH.applySunPulse(sunMat.emissiveColor, sunCol, t);
       sun.rotation.y += dt * 0.05;
+      view.sunFx.update(dt);
 
       for (const p of planets.values()) {
         p.a += p.speed * dt;

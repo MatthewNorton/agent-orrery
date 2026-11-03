@@ -57,7 +57,7 @@ loaders), then:
 
 | Layer | Files |
 |---|---|
-| Shared libraries | `util.js` (creates `window.AUR`; `fnv1a`/`mulberry32` copied from `src/main/shared/hash.js` so seeds agree), `util-scene.js` (Babylon helpers), `procedural-worlds.js`, `ship-assets.js` + `ship-assets-hulls.js` + `ship-assets-api.js` (`AUR.ships`), `polish-math.js`, `galaxy-layout.js` and `galaxy-field.js` (pure UMD; the field is a galaxy's emission/dust atlas and the stars drawn from it), `search-core.js`, `components/project-vcs-status.js` |
+| Shared libraries | `util.js` (creates `window.AUR`; `fnv1a`/`mulberry32` copied from `src/main/shared/hash.js` so seeds agree), `util-scene.js` (Babylon helpers), `procedural-worlds.js` (world profiles: class, palette, hue, seed; asteroids), `worlds/` (kit 15: the pure map generator `noise.js` + `classes.js` + `maps.js`, run by `worker.js`, a worker file and not a page script; `textures.js`, the map service on `AUR.app.state.worldMaps`; `shaders.js`; `material.js`, a world's globe and shells; `sun.js`, the system sun's photosphere plugin and billboards), `ship-assets.js` + `ship-assets-hulls.js` + `ship-assets-api.js` (`AUR.ships`), `polish-math.js`, `galaxy-layout.js` and `galaxy-field.js` (pure UMD; the field is a galaxy's emission/dust atlas and the stars drawn from it), `search-core.js`, `components/project-vcs-status.js` |
 | Views | `scene/common.js` (`AUR.sceneParts`), then for each view in `scene/<view>/` (universe, system, planet) its parts before its `view.js` |
 | App state | `app/state.js` — the only file that assigns `AUR.app` (`state`, `const`) |
 | App modules | every other file in `app/` and `app/project/`, in `index.html` order |
@@ -67,7 +67,7 @@ View contract: each `scene/<view>/view.js` registers
 `AUR.views.<name> = (engine, data, ctx) => ({ scene, update(eventBatch), dispose() })`
 where `ctx` provides `openSystem(projectId)`, `openPlanet(projectId, name)`, the
 shared `store`, the graphics `quality` tier, the `galaxyFields` cache and `worldMaps`, the generated
-planet maps (`worlds/textures.js`: a view opens an epoch, requests maps in it and closes it on dispose).
+planet maps (`worlds/textures.js`: a view opens an epoch on its scene and requests maps in it; disposing the scene closes the epoch).
 Views may also implement `resize`,
 `setQuality`, `setSearchMatches`, `setShipFocus`, `focusShip` and `shipFocusState`;
 the app fills in a no-op default for any they leave out (`VIEW_DEFAULTS` in `app/boot.js`).
@@ -393,13 +393,26 @@ Data: `AU.getSystem(projectId)`.
 
 - Backdrop: skybox `assets/skyboxes/skybox-XXX.png` where
   `XXX = String(1 + seed % 12).padStart(3, '0')`, plus starfield.
-- Central sun: emissive sphere + `BABYLON.GlowLayer`, subtle pulse.
+- Central sun: the emissive `StandardMaterial` sphere `sunMat`, with the
+  photosphere from `worlds/sun.js` injected by a material plugin: granulation
+  (fading in as the sun grows past 60 px on screen; none on the low tier),
+  sunspot belts, faculae, limb darkening and reddening, and a soft ACES clip
+  that keeps the star's colour (30 % of the way to a hue-preserving clip, so pale
+  suns keep their tint). It is tinted by `sunMat.emissiveColor`, which the subtle
+  pulse drives. In the glow layer the sun is dark: the view's
+  `customEmissiveColorSelector` gives it the neutral colour, so it adds no glow
+  but hides the glow of ships behind it. A corona and a wider glow billboard
+  (additive, sorted by distance with the planets' shells) surround it.
 - Planets: one per `planets[]` entry, on concentric orbit rings
   (LinesMesh circles, like the mockup's grid rings). Orbit radius by index
   (e.g. `10 + i*6`); diameter `1.1 + sqrt(files + builds*5) * 0.18` clamped
-  [1.1, 4.5]. Texture: `assets/planets/planet-XXX.png` where
-  `XXX = String(1 + fnv1a(project.id + ':' + name) % 31).padStart(3,'0')` —
-  tileable albedo, set `uScale=vScale=2`. Slow orbital motion, varied speeds
+  [1.1, 4.5]. Surface: a generated world (`worlds/material.js`) whose class,
+  seed, palette and hue come from `AUR.worldProfile` (the class by
+  `1 + fnv1a(project.id + ':' + name) % 31`, the index that once picked a PNG).
+  Its equirectangular maps come from the `worlds/` workers: a placeholder at
+  once, then 256 (low) or 512 wide, the three biggest planets first. Lit from
+  the sun; rings on about half the gas giants; no cloud shell here. The hovered
+  planet's detail map is prefetched for the planet view. Slow orbital motion, varied speeds
   (0.02–0.08 rad/s, deterministic per planet). Planet label (name) appears on
   hover; keep labels for 2–3 largest planets always on, like the mockup.
 - Asteroid belt: ring of instanced small rocks (one low-poly mesh +
@@ -454,9 +467,11 @@ Data: `AU.getSystem(projectId)`.
 
 Data: `AU.getPlanet(projectId, name)`.
 
-- Large textured planet (same texture-pick rule) filling ~60% of view height,
-  slow rotation, subtle atmosphere rim (Fresnel emissive or a slightly larger
-  additive-alpha shell). 1–2 small moons orbiting. Skybox + starfield backdrop.
+- Large generated world (same class rule) filling ~60% of view height, slow
+  rotation about a tilted axis, the atmosphere shell, clouds on oceanic worlds on
+  the high tier, rings on ringed giants. Its detail map (1024 or 2048 wide by
+  tier) lands after the view opens; the scene stays unready until it is bound or
+  6 s pass. 1–2 small rocky moons with their own maps. Skybox + starfield backdrop.
 - This project's ships orbit the planet with name labels.
 - Left panels (stacked, like the mockup):
   1. `PROJECT: <NAME>` mini-card (state + builds and the same folder/terminal
@@ -541,15 +556,12 @@ targeting and safe Windows Terminal fallback arguments, and writes two screensho
 
 ## 10. Assets manifest
 
-- `assets/planets/planet-001.png` … `planet-031.png` — 1024×1024 seamless
-  tileable albedo (flat texture, not equirect; tile it on spheres).
-- `assets/planets/planet-031-bump.png` — optional 1024×1024 grayscale height map
-  used as a bump texture by the Testbed Delta surface.
-- Authored planet albedo remains the default. Deterministic runtime height maps
-  supply bump variation, while explicitly procedural `Sector-*` worlds generate
-  both albedo and height data for rocky, gas, ice, volcanic, and oceanic classes.
-  Generated maps are square and use the same `uScale=vScale=2` contract as the
-  authored library; a bounded 48-surface cache keeps revisits fast.
+- `assets/planets/planet-001.png` … `planet-031.png` and `planet-031-bump.png` —
+  the authored planet library. It no longer feeds the renderer: since kit 15
+  every planet and moon is generated by `src/renderer/worlds/` (equirectangular
+  surface, emission, cloud and ring maps for the rocky, gas, ice, volcanic and
+  oceanic classes, in a 160 MB LRU that outlives scenes), and no renderer source
+  names `assets/planets`.
 - `assets/asteroids/asteroid-001.png` … `asteroid-003.png` with matching
   grayscale `-bump.png` source heights and Babylon-ready `-normal.png` maps —
   dedicated 512×512 cratered rock surfaces for the three deformed asteroid

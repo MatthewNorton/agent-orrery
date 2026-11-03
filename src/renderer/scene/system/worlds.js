@@ -2,14 +2,15 @@
 // The system view's generated worlds (kit 15 W4): each planet's globe is a world from
 // worlds/material.js lit from the sun at the origin. Its maps go placeholder, then system size
 // (the three biggest planets first), and the hovered planet's detail map is prefetched for the
-// planet view. Also the view's worldStats() (W6).
+// planet view. Also the sun's photosphere and billboards (worlds/sun.js, W5) and the view's
+// worldStats() (W6).
 'use strict';
 
 (function () {
   const AUR = window.AUR;
 
   AUR.sceneParts.system.worlds = function (view) {
-    const { scene, projectId, planets, glow, sun, sunHex } = view;
+    const { scene, projectId, planets, glow, sun, sunHex, sunDia } = view;
     const W = AUR.worlds;
     const { SIZES, PLACEHOLDER } = W.textures;
     const maps = view.worldMaps;
@@ -20,6 +21,7 @@
     const NO_PREFETCH = Object.freeze({ key: '', epoch: 0, timer: 0 });
     /** @type {{ key: string, epoch: number, timer: number }} */
     let prefetch = NO_PREFETCH; // the latest hovered planet's, keyed by name and width
+    const sunFx = W.createSun(scene, sun, { diameter: sunDia, glow, tier: tier.key });
 
     const showSystemMaps = (world, first) => world.show(SIZES[tier.key].system, first ? 2 : 1, PLACEHOLDER.system);
 
@@ -54,6 +56,7 @@
 
     function setWorldsQuality(next) {
       tier = next;
+      sunFx.setTier(next.key);
       for (const p of planets.values()) showSystemMaps(p.world, p.persistent);
     }
 
@@ -69,6 +72,8 @@
 
     function worldStats() {
       const sunMat = sun.material;
+      const inGlow = new BABYLON.Color4(1, 1, 1, 1); // what the sun writes in the glow pass
+      if (glow.customEmissiveColorSelector) glow.customEmissiveColorSelector(sun, null, sunMat, inGlow);
       return {
         view: 'system', ...W.sceneStats(scene, maps, epoch, tier.key),
         planets: Array.from(planets.values(), (p) => ({
@@ -77,12 +82,12 @@
         })),
         sun: {
           plugin: Boolean(sunMat && sunMat.pluginManager && sunMat.pluginManager.getPlugin('photosphere')),
-          excludedFromGlow: !glow.hasMesh(sun), color: sunHex, screen: screenPoint(sun),
+          darkInGlow: glow.hasMesh(sun) && inGlow.r + inGlow.g + inGlow.b === 0, color: sunHex, screen: screenPoint(sun),
         },
         detail: null,
       };
     }
 
-    return { makeWorld, prefetchDetail, setWorldsQuality, worldStats };
+    return { makeWorld, prefetchDetail, setWorldsQuality, worldStats, sunFx };
   };
 })();

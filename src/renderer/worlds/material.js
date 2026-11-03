@@ -49,13 +49,20 @@
 
   // The star's light on its worlds: white, tinted 28 % toward the star's colour.
   const lightColor = (hex) => BABYLON.Color3.Lerp(BABYLON.Color3.White(), AUR.color3(hex), 0.28);
-  // cameraPosition, world and worldViewProjection are bound by ShaderMaterial itself.
-  function shader(scene, name, fragmentSource, samplers, alpha) {
-    const material = new BABYLON.ShaderMaterial(name, scene, { vertexSource: worlds.shaders.WORLD_VERTEX, fragmentSource }, {
-      attributes: ['position', 'normal', 'uv'], uniforms: UNIFORMS, samplers, needAlphaBlending: alpha,
+  // The preview's shader(): the world vertex shader and uniforms unless opts say otherwise, and
+  // translucent materials blend (or add) without writing depth. cameraPosition, world and
+  // worldViewProjection are bound by ShaderMaterial itself.
+  function shader(scene, name, fragmentSource, opts) {
+    const {
+      vertex = worlds.shaders.WORLD_VERTEX, attributes = ['position', 'normal', 'uv'], uniforms = UNIFORMS, samplers = [],
+      alpha = false, add = false, doubleSided = false,
+    } = opts;
+    const material = new BABYLON.ShaderMaterial(name, scene, { vertexSource: vertex, fragmentSource }, {
+      attributes, uniforms, samplers, needAlphaBlending: alpha,
     });
-    if (alpha) { material.alphaMode = BABYLON.Constants.ALPHA_COMBINE; material.disableDepthWrite = true; }
-    material.setFloat('exposure', EXPOSURE);
+    if (alpha) { material.alphaMode = add ? BABYLON.Constants.ALPHA_ADD : BABYLON.Constants.ALPHA_COMBINE; material.disableDepthWrite = true; }
+    if (doubleSided) material.backFaceCulling = false;
+    if (uniforms.includes('exposure')) material.setFloat('exposure', EXPOSURE);
     return material;
   }
   // A flat annulus from RING_IN to RING_OUT radii; u runs outward, which is all the ring map varies by.
@@ -82,7 +89,7 @@
     }, scene);
     const sunColor = lightColor(spec.sunHex);
     const globe = sphere(opts.name, 1);
-    const surface = shader(scene, opts.name + '-surface', worlds.shaders.SURFACE_FRAGMENT, ['surfaceMap', 'nightMap', 'cloudMap', 'ringMap'], false);
+    const surface = shader(scene, opts.name + '-surface', worlds.shaders.SURFACE_FRAGMENT, { samplers: ['surfaceMap', 'nightMap', 'cloudMap', 'ringMap'] });
     surface.setColor3('sunColor', sunColor);
     surface.setColor3('atmosphereColor', AUR.color3(spec.air));
     surface.setFloat('haze', spec.haze);
@@ -104,19 +111,18 @@
     }
     let clouds = null, cloudMat = null, ringMat = null;
     if (spec.clouds && opts.clouds) {
-      cloudMat = shader(scene, opts.name + '-clouds', worlds.shaders.CLOUD_FRAGMENT, ['cloudMap'], true);
+      cloudMat = shader(scene, opts.name + '-clouds', worlds.shaders.CLOUD_FRAGMENT, { samplers: ['cloudMap'], alpha: true });
       cloudMat.setColor3('sunColor', sunColor);
       clouds = shell(sphere(opts.name + '-clouds', CLOUD_SHELL), cloudMat);
     }
     if (spec.haze > 0.005) {
-      const atmoMat = shader(scene, opts.name + '-atmo', worlds.shaders.ATMO_FRAGMENT, [], true);
+      const atmoMat = shader(scene, opts.name + '-atmo', worlds.shaders.ATMO_FRAGMENT, { alpha: true });
       atmoMat.setColor3('atmosphereColor', AUR.color3(spec.air));
       atmoMat.setFloat('haze', spec.haze);
       shell(sphere(opts.name + '-atmo', spec.shell), atmoMat);
     }
     if (spec.rings) {
-      ringMat = shader(scene, opts.name + '-ring', worlds.shaders.RING_FRAGMENT, ['ringMap'], true);
-      ringMat.backFaceCulling = false;
+      ringMat = shader(scene, opts.name + '-ring', worlds.shaders.RING_FRAGMENT, { samplers: ['ringMap'], alpha: true, doubleSided: true });
       ringMat.setColor3('sunColor', sunColor);
       shell(ringMesh(scene, opts.name + '-ring', radius), ringMat);
     }
@@ -204,5 +210,5 @@
     return { tier, pending, workers, pngPlanetTextures };
   }
 
-  Object.assign(worlds, { worldSpec, moonSpec, createWorld, sceneStats });
+  Object.assign(worlds, { worldSpec, moonSpec, createWorld, sceneStats, shader });
 })();
