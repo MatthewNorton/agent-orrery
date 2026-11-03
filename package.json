@@ -16,7 +16,7 @@
     "typecheck": "tsc -p tsconfig.json && tsc -p src/renderer/tsconfig.json",
     "postinstall": "install-electron"
   },
-  "author": "matt",
+  "author": "Matt Norton (https://github.com/MatthewNorton)",
   "license": "MIT",
   "devDependencies": {
     "electron": "^45.1.0",
