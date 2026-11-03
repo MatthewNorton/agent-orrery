@@ -16,7 +16,7 @@ function fakeElectron() {
     getVersion: () => '9.9.9',
     setAboutPanelOptions(options) { calls.about = options; },
   };
-  return { Menu, app, calls };
+  return { electron: { Menu, app }, calls };
 }
 
 function accelerators(template, role) {
@@ -29,8 +29,8 @@ function accelerators(template, role) {
 }
 
 test('zoom keys: in on Ctrl+= and the keypad, out on Ctrl+-, reset on Ctrl+0', () => {
-  const { Menu, app, calls } = fakeElectron();
-  installAppMenu({ Menu, app });
+  const { electron, calls } = fakeElectron();
+  installAppMenu(electron);
   assert.ok(calls.set && calls.set.template === calls.template);
   const zoomIn = accelerators(calls.template, 'zoomIn');
   assert.ok(zoomIn.includes('CommandOrControl+='));
@@ -40,11 +40,11 @@ test('zoom keys: in on Ctrl+= and the keypad, out on Ctrl+-, reset on Ctrl+0', (
 });
 
 test('Help > About credits the author and the repository, as LICENSE does', () => {
-  const { Menu, app, calls } = fakeElectron();
-  installAppMenu({ Menu, app });
-  const help = calls.template.find((item) => item.label === 'Help');
-  assert.deepEqual(help.submenu.map((item) => item.role), ['about']);
-  assert.equal(calls.about.applicationName, 'Agent Orrery');
+  const { electron, calls } = fakeElectron();
+  installAppMenu(electron);
+  const [about] = calls.template.find((item) => item.label === 'Help').submenu;
+  assert.equal(about.role, 'about');
+  assert.equal(about.label, `About ${calls.about.applicationName}`);
   assert.equal(calls.about.applicationVersion, '9.9.9');
   const license = fs.readFileSync(path.join(__dirname, '..', 'LICENSE'), 'utf8');
   assert.ok(license.includes(calls.about.copyright), 'the About copyright matches LICENSE');

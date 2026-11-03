@@ -5,6 +5,7 @@
 // Help > About. Electron's default zoom-in binding is Ctrl+Plus, which Windows keyboards never
 // produce, so zoom in is bound to the keys people actually press.
 
+const APP_NAME = 'Agent Orrery';
 const REPO_URL = 'https://github.com/MatthewNorton/agent-orrery';
 
 /** @param {Pick<typeof import('electron'), 'Menu' | 'app'>} [electron] */
@@ -13,7 +14,7 @@ function installAppMenu(electron = require('electron')) {
   // Named explicitly: unpackaged, the panel would show the package name, or Electron's on macOS.
   // The credits line shows on macOS and Windows, the website on Linux.
   app.setAboutPanelOptions({
-    applicationName: 'Agent Orrery',
+    applicationName: APP_NAME,
     applicationVersion: app.getVersion(),
     copyright: 'Copyright (c) 2026 Matt Norton',
     credits: REPO_URL,
@@ -44,7 +45,7 @@ function installAppMenu(electron = require('electron')) {
       ],
     },
     { role: 'windowMenu' },
-    { label: 'Help', submenu: [{ role: 'about', label: 'About Agent Orrery' }] },
+    { label: 'Help', submenu: [{ role: 'about', label: `About ${APP_NAME}` }] },
   ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
