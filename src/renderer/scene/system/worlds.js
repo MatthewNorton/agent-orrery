@@ -71,6 +71,8 @@
 
     function worldStats() {
       const sunMat = sun.material;
+      const inGlow = new BABYLON.Color4(1, 1, 1, 1); // what the sun writes in the glow pass
+      if (glow.customEmissiveColorSelector) glow.customEmissiveColorSelector(sun, null, sunMat, inGlow);
       return {
         view: 'system', ...W.sceneStats(scene, maps, epoch, tier.key),
         planets: Array.from(planets.values(), (p) => ({
@@ -79,7 +81,7 @@
         })),
         sun: {
           plugin: Boolean(sunMat && sunMat.pluginManager && sunMat.pluginManager.getPlugin('photosphere')),
-          excludedFromGlow: !glow.hasMesh(sun), color: sunHex, screen: screenPoint(sun),
+          darkInGlow: glow.hasMesh(sun) && inGlow.r + inGlow.g + inGlow.b === 0, color: sunHex, screen: screenPoint(sun),
         },
         detail: null,
       };

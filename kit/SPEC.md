@@ -399,8 +399,10 @@ Data: `AU.getSystem(projectId)`.
   sunspot belts, faculae, limb darkening and reddening, and a soft ACES clip
   that keeps the star's colour (30 % of the way to a hue-preserving clip, so pale
   suns keep their tint). It is tinted by `sunMat.emissiveColor`, which the subtle
-  pulse drives. The sun is out of the glow layer; a corona and a wider glow
-  billboard (additive) surround it.
+  pulse drives. In the glow layer the sun is dark: the view's
+  `customEmissiveColorSelector` gives it the neutral colour, so it adds no glow
+  but hides the glow of ships behind it. A corona and a wider glow billboard
+  (additive, sorted by distance with the planets' shells) surround it.
 - Planets: one per `planets[]` entry, on concentric orbit rings
   (LinesMesh circles, like the mockup's grid rings). Orbit radius by index
   (e.g. `10 + i*6`); diameter `1.1 + sqrt(files + builds*5) * 0.18` clamped

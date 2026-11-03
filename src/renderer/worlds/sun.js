@@ -99,7 +99,8 @@ vec2 cells(vec3 p, float t) {
   }
 
   // opts = { diameter, glow, tier }. The caller keeps the sun mesh, its material and its pulse, and
-  // takes the sun out of the glow pass. The billboards keep their own copy of the sun's colour.
+  // keeps the sun dark in the glow pass. The billboards keep their own copy of the sun's colour;
+  // they sort by distance with the worlds' shells, so a planet's shells behind the sun go under them.
   function createSun(scene, sun, opts) {
     const { diameter, glow } = opts;
     const plugin = new PhotospherePlugin(sun.material);
@@ -109,7 +110,6 @@ vec2 cells(vec3 p, float t) {
       plane.position.copyFrom(sun.position);
       plane.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
       plane.isPickable = false;
-      plane.alphaIndex = 10; // before the worlds' shells, as in the preview
       const material = worlds.shader(scene, name, fragmentSource, {
         vertex: BILLBOARD_VERTEX, attributes: ['position', 'uv'], uniforms, alpha: true, add: true, doubleSided: true,
       });

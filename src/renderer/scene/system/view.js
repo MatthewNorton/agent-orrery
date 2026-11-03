@@ -55,8 +55,15 @@
     sunMat.specularColor = new BABYLON.Color3(0, 0, 0);
     sun.material = sunMat;
     // The photosphere (worlds/sun.js, from the worlds part) is the sun's own light; glow stacked
-    // on it bleached the core white.
-    glow.addExcludedMesh(sun);
+    // on it bleached the core white. So in the glow pass the sun takes the neutral colour, like
+    // the globes: it hides the glow of ships behind it and adds none. Every other mesh keeps
+    // Babylon's own choice: emissive colour by texture level and intensity, at the material's alpha.
+    glow.customEmissiveColorSelector = (mesh, subMesh, material, result) => {
+      const emissive = mesh !== sun && material && material.emissiveColor;
+      if (!emissive) { result.copyFrom(glow.neutralColor); return; }
+      const level = (material.emissiveTexture ? material.emissiveTexture.level : 1) * (material.emissiveIntensity ?? 1);
+      result.set(emissive.r * level, emissive.g * level, emissive.b * level, material.alpha);
+    };
     let lastPulseFactor = 1;
 
     // State shared with the parts in scene/system/.

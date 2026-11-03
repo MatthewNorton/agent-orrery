@@ -1,6 +1,6 @@
 // Kit 15 grader: procedural worlds and the photosphere sun (CONTRACT.md W0–W6).
-//   node kit/todo/15-procedural-worlds/grade-worlds.mjs               every check
-//   node kit/todo/15-procedural-worlds/grade-worlds.mjs --killswitch  W0 only; run it first
+//   node kit/done/procedural-worlds/grade-worlds.mjs               every check
+//   node kit/done/procedural-worlds/grade-worlds.mjs --killswitch  W0 only; run it first
 // Exit 0 = PASS, 1 = FAIL. Writes only under .shots/worlds and .shots/worlds-killswitch.
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -13,7 +13,8 @@ const kitDir = import.meta.dirname;
 const root = path.resolve(kitDir, '..', '..', '..');
 const require = createRequire(import.meta.url);
 const KILLSWITCH_ONLY = process.argv.includes('--killswitch');
-const ERROR_RE = /Uncaught|ReferenceError|TypeError|SyntaxError|is not defined|Failed to load resource|boot-failure/i;
+// Babylon reports a shader that fails to compile as 'Unable to compile effect' and 'FRAGMENT SHADER ERROR'.
+const ERROR_RE = /Uncaught|ReferenceError|TypeError|SyntaxError|is not defined|Failed to load resource|boot-failure|Unable to compile effect|SHADER ERROR/i;
 const CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; " +
   "connect-src 'self'; font-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:";
 const SIZES = { low: { system: 256, detail: 1024 }, balanced: { system: 512, detail: 2048 }, high: { system: 512, detail: 2048 } };
@@ -326,7 +327,9 @@ function checkSources() {
   if (/assets\/planets/.test(all)) fail('W4', 'src/renderer still references assets/planets');
   const system = source('scene/system/'), planet = source('scene/planet/'), worlds = source('worlds/');
   if (!/sunMat\.emissiveColor\s*=\s*sunCol\.clone\(\)/.test(system)) fail('W5', 'scene/system lost sunMat.emissiveColor = sunCol.clone() (polish P3)');
-  if (!/addExcludedMesh\(\s*sun\s*\)/.test(system)) fail('W5', 'the sun is still in the glow pass');
+  if (/addExcludedMesh\(\s*sun\s*\)/.test(system) || !/customEmissiveColorSelector/.test(system)) {
+    fail('W5', 'the sun must stay in the glow pass as a dark occluder (customEmissiveColorSelector), not leave it');
+  }
   if (!/extends\s+BABYLON\.MaterialPluginBase/.test(worlds)) fail('W5', 'no BABYLON.MaterialPluginBase subclass under worlds/');
   if (!/addPendingData/.test(planet) || !/removePendingData/.test(planet)) fail('W4', 'the planet view does not hold readiness for the detail map');
   if (!/new Worker\(\s*['"]worlds\/worker\.js['"]/.test(worlds)) fail('W3', "worlds/ never creates new Worker('worlds/worker.js')");
@@ -361,7 +364,7 @@ function checkStats(stats, view, tier) {
       if (p.mapWidth !== size.system) fail('W6', `system: ${p.name} map is ${p.mapWidth} wide (want ${size.system})`);
       if (!['worker', 'cache'].includes(p.source)) fail('W6', `system: ${p.name} map came from ${p.source}`);
     }
-    if (!stats.sun || stats.sun.plugin !== true || stats.sun.excludedFromGlow !== true) fail('W6', 'system: sun plugin or glow exclusion missing');
+    if (!stats.sun || stats.sun.plugin !== true || stats.sun.darkInGlow !== true) fail('W6', 'system: sun plugin missing, or the sun is not dark in the glow pass');
   } else {
     const d = stats.detail || {};
     if (d.mapWidth !== size.detail) fail('W6', `planet: detail map is ${d.mapWidth} wide (want ${size.detail})`);
