@@ -48,6 +48,13 @@ To turn a recording into a README-sized GIF:
 ffmpeg -i demo.mp4 -vf "fps=12,scale=1200:-1:flags=lanczos" -loop 0 docs/screenshots/demo.gif
 ```
 
+The README's video is a GitHub upload, not a file in the repository: a README plays
+video only from GitHub's own upload links (`https://github.com/user-attachments/assets/…`).
+The current one is attached to a comment on pull request #81; leave that comment in
+place. To replace it, drag the new MP4 (H.264, under 10 MB on a free plan) into a
+comment box on github.com, post the comment, and put the link GitHub inserts on its
+own line in the README.
+
 ## Rules for anything published
 
 - Never capture the app against your real profile for anything that leaves your machine.
