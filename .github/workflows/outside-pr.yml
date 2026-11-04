@@ -1,0 +1,37 @@
+name: outside PR guard
+
+# Runs main's copy of this file and of scripts/outside-pr.mjs, never the pull request's code: the
+# checkout is that one script from the base branch, and the changed files come from the API.
+# pull_request_target runs before an outside contributor's CI is approved, with a token that can
+# post the check; issue_comment runs it again when the owner approves a commit or takes that back.
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, reopened, synchronize, edited]
+  issue_comment:
+    types: [created, edited, deleted]
+
+permissions:
+  contents: read
+  pull-requests: write
+  statuses: write
+
+jobs:
+  check:
+    name: check files
+    # The script decides which events count. This only keeps plain issues and other people's
+    # comments from starting a runner, so it must stay looser than the script. No concurrency group,
+    # since a skipped run in one could cancel a pending one. Instead each run stops if the pull
+    # request moved, and reads the comments again after it posts a pass.
+    if: github.event_name == 'pull_request_target' || (github.event.issue.pull_request && github.event.comment.user.login == 'MatthewNorton')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/outside-pr.mjs
+          sparse-checkout-cone-mode: false
+      - run: node scripts/outside-pr.mjs --ci
+        env:
+          GH_TOKEN: ${{ github.token }}

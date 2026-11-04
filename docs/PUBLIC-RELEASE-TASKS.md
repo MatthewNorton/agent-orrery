@@ -136,7 +136,13 @@ free.
       and the outside pull request rule in AGENTS.md. Settings: CI on every
       outside contributor's pull request waits for approval, CodeQL default
       setup scans pull requests, pushes and weekly, the ruleset also requires
-      `static gates`, and the Wiki and Projects tabs are off.
+      `static gates`, and the Wiki and Projects tabs are off. The
+      `tooling review` check (`.github/workflows/outside-pr.yml`, with the
+      file rule in `scripts/outside-pr.mjs`) stays red on an outside pull
+      request that changes tooling files until the owner comments
+      `/tooling-reviewed <full SHA>`. The ruleset requires that commit status
+      from the GitHub Actions app, not the job's own check run, which passes
+      when skipped.
 
 ## Phase 5 — Structural cleanup · after going public · separate PRs
 
