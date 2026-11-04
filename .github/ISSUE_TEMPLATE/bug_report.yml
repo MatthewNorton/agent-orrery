@@ -6,8 +6,6 @@ body:
     attributes:
       value: |
         Agent Orrery shows your project names, folder paths and what your agents are doing. Before you attach a screenshot or paste a log, crop or redact anything private, and don't paste transcript contents.
-
-        Report security problems privately through [a security advisory](https://github.com/MatthewNorton/agent-orrery/security/advisories/new), not here.
   - type: textarea
     id: what-happened
     attributes:
@@ -36,8 +34,8 @@ body:
     id: version
     attributes:
       label: "Version"
-      description: "The commit you run (`git rev-parse --short HEAD`) and your OS version."
-      placeholder: "3d78acf on Windows 11 24H2"
+      description: "The commit you run (`git rev-parse --short HEAD`), your OS version and `node --version`."
+      placeholder: "3d78acf, Windows 11 24H2, Node 24.15.0"
     validations:
       required: true
   - type: checkboxes
@@ -52,4 +50,4 @@ body:
     id: logs
     attributes:
       label: "Logs or screenshots"
-      description: "Redact project names, folder paths and anything else private first."
+      description: "Output from the terminal running `npm start`, or the DevTools console (View > Toggle Developer Tools; press Alt to show the menu on Windows and Linux). Redact private details first."
