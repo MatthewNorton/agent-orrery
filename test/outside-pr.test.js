@@ -67,21 +67,36 @@ test('pull request events count, but not edits that keep the base; owner comment
   assert.equal(relevant(comment('MatthewNorton', `/tooling-reviewed ${SHA}`)), true);
   assert.equal(relevant(comment('MatthewNorton', 'Thanks!')), false);
   assert.equal(relevant(comment('MatthewNorton', 'Not yet.', `/tooling-reviewed ${SHA}`)), true, 'an approval edited away');
+  assert.equal(relevant(comment('MatthewNorton', `/TOOLING-REVIEWED ${SHA}`)), false, 'only the lowercase command approves');
   assert.equal(relevant(comment('someone', `/tooling-reviewed ${SHA}`)), false);
   assert.equal(relevant({ ...comment('MatthewNorton', `/tooling-reviewed ${SHA}`), issue: {} }), false, 'an issue, not a pull request');
 });
 
-test('only an owner comment naming a full SHA on a line of its own approves that commit', async () => {
+test('only an owner comment that is just the command and a full SHA approves that commit', async () => {
   const { approvals } = await load();
   const by = (login, body) => ({ user: { login }, body });
   const approved = approvals([
-    by('MatthewNorton', `Reviewed the hooks change.\r\n/tooling-reviewed ${SHA}\r\n`),
+    by('MatthewNorton', `\r\n/tooling-reviewed ${SHA}\r\n`),
+    by('MatthewNorton', `Reviewed the hooks change.\n/tooling-reviewed ${OLD}`),
     by('MatthewNorton', `/tooling-reviewed ${OLD.slice(0, 12)}`),
     by('MatthewNorton', `> /tooling-reviewed ${OLD}`),
+    by('MatthewNorton', `> quoted\u2028/tooling-reviewed ${OLD}`),
+    by('MatthewNorton', `/TOOLING-REVIEWED ${OLD}`),
+    by('MatthewNorton', `/tooling-reviewed ${OLD.toUpperCase()}`),
     by('someone', `/tooling-reviewed ${OLD}`),
-    by('github-actions[bot]', `<!-- outside-pr-guard -->\n/tooling-reviewed ${OLD}`),
+    by('github-actions[bot]', `/tooling-reviewed ${OLD}`),
   ]);
   assert.deepEqual([...approved], [SHA]);
+});
+
+test('the comment an event is about counts as the event has it, so a list that lags behind it changes nothing', async () => {
+  const { approvals, withEvent } = await load();
+  const listed = [{ id: 1, user: { login: 'MatthewNorton' }, body: `/tooling-reviewed ${SHA}` }];
+  const event = (action, body) => ({ action, comment: { id: 1, user: { login: 'MatthewNorton' }, body } });
+  assert.deepEqual([...approvals(withEvent(listed, event('deleted', `/tooling-reviewed ${SHA}`)))], [], 'deleted');
+  assert.deepEqual([...approvals(withEvent(listed, event('edited', 'Not yet.')))], [], 'edited away');
+  assert.deepEqual([...approvals(withEvent([], event('created', `/tooling-reviewed ${SHA}`)))], [SHA], 'not listed yet');
+  assert.equal(withEvent(listed, { action: 'synchronize' }), listed);
 });
 
 test('an outside change that needs review passes only once the owner approves its head commit', async () => {
@@ -97,14 +112,16 @@ test('an outside change that needs review passes only once the owner approves it
   }
 });
 
-test('the comment neutralizes and shortens file names, caps its list, and names the commit to approve', async () => {
+test('the comment neutralizes and shortens file names, caps its list, and names no commit to approve', async () => {
   const { commentBody } = await load();
-  const body = commentBody(['a`b\n\u202e\u200b.md', 'x'.repeat(300)], SHA);
+  const body = commentBody(['a`b\n\u202e\u200b.md', 'x\u00ad\u{e0041}.md', 'x'.repeat(300)]);
   assert.match(body, /^<!-- outside-pr-guard -->\n/);
   assert.ok(body.includes('- `a?b???.md`'), body);
+  assert.ok(body.includes('- `x??.md`'), 'a soft hyphen and a tag character');
   assert.ok(body.includes(`- \`${'x'.repeat(200)}...\``), 'long names are cut');
-  assert.ok(body.endsWith(`\`\`\`\n/tooling-reviewed ${SHA}\n\`\`\``), body);
-  const long = commentBody(Array.from({ length: 60 }, (_, i) => `test/${i}.js`), SHA);
+  assert.ok(body.includes('`/tooling-reviewed <full SHA>`'), body);
+  assert.doesNotMatch(body, /[0-9a-f]{40}/, 'the head can move during a review, so the SHA comes from the commit the owner read');
+  const long = commentBody(Array.from({ length: 60 }, (_, i) => `test/${i}.js`));
   assert.equal(long.match(/^- `/gm)?.length, 50);
   assert.match(long, /^- and 10 more$/m);
 });

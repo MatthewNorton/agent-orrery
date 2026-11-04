@@ -19,8 +19,9 @@ permissions:
 jobs:
   check:
     name: check files
-    # The script skips the same events; this only saves a runner. No concurrency group: a skipped
-    # run would cancel a pending one, and each run stops if the pull request moved.
+    # The script skips the same events; this only saves a runner. No concurrency group, since a
+    # skipped run in one could cancel a pending one. Instead each run stops if the pull request
+    # moved, and reads the comments again after it posts a pass.
     if: >-
       (github.event_name == 'pull_request_target' && (github.event.action != 'edited' || github.event.changes.base)) ||
       (github.event_name == 'issue_comment' && github.event.issue.pull_request && github.event.comment.author_association == 'OWNER' &&
