@@ -4,7 +4,7 @@ A desktop app that turns your Claude Code and Codex sessions into a living unive
 
 Every project you work on becomes a solar system, grouped into galaxies. Live agent sessions appear as starships orbiting the system; subagents launch as drones; and every verified file edit grows a planet. The app is purely an observer — it tails the providers' transcript files and visualizes what your agents are doing, without owning or interfering with them.
 
-<!-- demo video: replace this comment with the video's user-attachments URL -->
+https://github.com/user-attachments/assets/b0b15d0d-97cf-4d06-8581-4f843ed11940
 
 | Universe | Solar system | Planet |
 | --- | --- | --- |
