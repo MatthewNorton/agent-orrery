@@ -71,6 +71,10 @@ Plain JavaScript throughout — no `.ts` files (types are JSDoc, checked by `npm
 
 Features here are developed as self-contained "kits": a contract, a rubric, and a mechanical grading script, executed end-to-end by agents. That keeps hard decisions (what to build, how it's judged) separate from volume work (building it), and every finished kit leaves behind a regression gate that must stay green.
 
+## Contributing
+
+Bug reports, ideas and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## License
 
 MIT © Matt Norton. See [LICENSE](LICENSE).
