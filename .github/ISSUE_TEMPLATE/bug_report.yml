@@ -1,0 +1,53 @@
+name: Bug report
+description: "Something in Agent Orrery doesn't work as it should."
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Agent Orrery shows your project names, folder paths and what your agents are doing. Before you attach a screenshot or paste a log, crop or redact anything private, and don't paste transcript contents.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: "What happened?"
+      description: "What you did, what you expected, and what you saw instead."
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: "Steps to reproduce"
+      placeholder: |
+        1. Open a system from the universe map
+        2. ...
+  - type: dropdown
+    id: os
+    attributes:
+      label: "Operating system"
+      options:
+        - "Windows"
+        - "macOS"
+        - "Linux"
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: "Version"
+      description: "The commit you run (`git rev-parse --short HEAD`), your OS version and `node --version`."
+      placeholder: "3d78acf, Windows 11 24H2, Node 24.15.0"
+    validations:
+      required: true
+  - type: checkboxes
+    id: agents
+    attributes:
+      label: "Agents involved"
+      options:
+        - label: "Claude Code"
+        - label: "Codex"
+        - label: "Another local tool (shown as a Signal ship)"
+  - type: textarea
+    id: logs
+    attributes:
+      label: "Logs or screenshots"
+      description: "Output from the terminal running `npm start`, or the DevTools console (View > Toggle Developer Tools; press Alt to show the menu on Windows and Linux). Redact private details first."

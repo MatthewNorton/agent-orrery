@@ -128,10 +128,15 @@ free.
       repo: delete-branch-on-merge, auto-merge, update-branch, the
       "main protection" ruleset with both `test (…)` checks and admin bypass.
       Settings do not travel with the code; CI and Dependabot files do.
-- [ ] **4.8 Flip to public.** Then enable secret scanning + push protection
-      and private vulnerability reporting (both unavailable while private on
-      this plan). Turn on "Block command line pushes that expose my email" in
-      GitHub account settings.
+- [x] **4.8 Flip to public.** Done 2026-10-19 at c0e0cbd, then secret
+      scanning + push protection and private vulnerability reporting were
+      enabled. "Block command line pushes that expose my email" is a GitHub
+      account setting that only the owner can turn on.
+- [x] **4.9 Open to contributors** (2026-11-03): issue forms, CONTRIBUTING.md
+      and the outside pull request rule in AGENTS.md. Settings: CI on every
+      outside contributor's pull request waits for approval, CodeQL default
+      setup scans pull requests, pushes and weekly, the ruleset also requires
+      `static gates`, and the Wiki and Projects tabs are off.
 
 ## Phase 5 — Structural cleanup · after going public · separate PRs
 
@@ -235,9 +240,9 @@ green on a committed tree, `npm test` and `npm run typecheck` green.
 
 ### Release tail
 
-- [ ] **6.3 Merge PR #49** (universe cluster, carries #50) then **PR #51**
-      (README screenshots), on the owner's word.
-- [ ] **4.8** flip public and the four post-flip settings (above).
+- [x] **6.3 Merge PR #49** (universe cluster, carries #50) then **PR #51**
+      (README screenshots), on the owner's word. #49 merged; #56 replaced #51.
+- [x] **4.8** flip public and the post-flip settings (above).
 - [ ] **5.4** mapped drives stays optional and may follow public.
 
 ## Totals
