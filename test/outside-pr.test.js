@@ -1,7 +1,8 @@
 'use strict';
 
 // The outside pull request check: who is outside, which files need the owner's review, which events
-// count, the verdict and comment, and a workflow that never runs the pull request's code.
+// count, what approves a commit, the verdict and comment, and a workflow that never runs the pull
+// request's code.
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -11,9 +12,11 @@ const path = require('node:path');
 const load = () => import('../scripts/outside-pr.mjs');
 const REPO = 'MatthewNorton/agent-orrery';
 const FORK = 'someone/agent-orrery';
+const SHA = '0123456789abcdef0123456789abcdef01234567';
+const OLD = 'fedcba9876543210fedcba9876543210fedcba98';
 const pr = (login, headRepo = REPO) => ({
   user: { login },
-  head: { sha: '0123456789abcdef', repo: headRepo && { full_name: headRepo } },
+  head: { sha: SHA, repo: headRepo && { full_name: headRepo } },
   base: { ref: 'main', repo: { full_name: REPO } },
 });
 
@@ -39,9 +42,9 @@ test('source, docs and assets change freely; agent and tool files anywhere, and 
     'docs/AGENTS-notes.md', 'docs/kit/a.md', 'src/scripts.js', 'assets/a.png'];
   for (const file of review) assert.equal(needsReview(file), true, file);
   for (const file of free) assert.equal(needsReview(file), false, file);
-  for (const file of ['src/a\\AGENTS.md', 'src/CLAUDE.md.', 'src/AGENTS.md ', 'src/Package.JSON', 'src/AGENT\u017f.md', 'src/.../a.js']) {
-    assert.equal(needsReview(file), true, `${file} can land on a listed file in a Windows or macOS checkout`);
-  }
+  const windows = ['src/a\\AGENTS.md', 'src/CLAUDE.md.', 'src/AGENTS.md ', 'src/Package.JSON', 'CLAUDE~1/settings.json',
+    'src/NODE_M~1/a.js', 'src/AGENT\u017f.md', 'src/caf\u00e9.js', 'src/.../a.js'];
+  for (const file of windows) assert.equal(needsReview(file), true, `${file} can land on a listed file in a Windows or macOS checkout`);
 });
 
 test('renamed-from paths count, and a file list the API cut short needs review', async () => {
@@ -52,41 +55,56 @@ test('renamed-from paths count, and a file list the API cut short needs review',
   assert.equal(filesToReview(Array.from({ length: 3000 }, (_, i) => ({ filename: `src/${i}.js` })), 3000).length, 1);
 });
 
-test('among label and edit events, only the review label and a new base branch count', async () => {
-  const { relevant, REVIEWED } = await load();
+test('pull request events count, but not edits that keep the base; owner comments count when they add or drop an approval', async () => {
+  const { relevant } = await load();
+  const comment = (login, body, from) => ({
+    action: from === undefined ? 'created' : 'edited', issue: { pull_request: {} }, comment: { user: { login }, body },
+    ...(from === undefined ? {} : { changes: { body: { from } } }),
+  });
   assert.equal(relevant({ action: 'synchronize' }), true);
-  assert.equal(relevant({ action: 'labeled', label: { name: REVIEWED } }), true);
-  assert.equal(relevant({ action: 'unlabeled', label: { name: REVIEWED } }), true);
-  assert.equal(relevant({ action: 'labeled', label: { name: 'bug' } }), false);
   assert.equal(relevant({ action: 'edited', changes: { title: { from: 'a' } } }), false);
   assert.equal(relevant({ action: 'edited', changes: { base: { ref: { from: 'dev' } } } }), true);
+  assert.equal(relevant(comment('MatthewNorton', `/tooling-reviewed ${SHA}`)), true);
+  assert.equal(relevant(comment('MatthewNorton', 'Thanks!')), false);
+  assert.equal(relevant(comment('MatthewNorton', 'Not yet.', `/tooling-reviewed ${SHA}`)), true, 'an approval edited away');
+  assert.equal(relevant(comment('someone', `/tooling-reviewed ${SHA}`)), false);
+  assert.equal(relevant({ ...comment('MatthewNorton', `/tooling-reviewed ${SHA}`), issue: {} }), false, 'an issue, not a pull request');
 });
 
-test('an outside change that needs review passes only on the owner adding the review label', async () => {
-  const { decide, REVIEWED } = await load();
-  const flagged = ['package.json'];
-  const on = new Set([REVIEWED]);
+test('only an owner comment naming a full SHA on a line of its own approves that commit', async () => {
+  const { approvals } = await load();
+  const by = (login, body) => ({ user: { login }, body });
+  const approved = approvals([
+    by('MatthewNorton', `Reviewed the hooks change.\r\n/tooling-reviewed ${SHA}\r\n`),
+    by('MatthewNorton', `/tooling-reviewed ${OLD.slice(0, 12)}`),
+    by('MatthewNorton', `> /tooling-reviewed ${OLD}`),
+    by('someone', `/tooling-reviewed ${OLD}`),
+    by('github-actions[bot]', `<!-- outside-pr-guard -->\n/tooling-reviewed ${OLD}`),
+  ]);
+  assert.deepEqual([...approved], [SHA]);
+});
+
+test('an outside change that needs review passes only once the owner approves its head commit', async () => {
+  const { decide } = await load();
   const outside = pr('someone', FORK);
-  const approve = { action: 'labeled', label: { name: REVIEWED }, sender: { login: 'MatthewNorton' }, pull_request: outside };
-  const state = (event, files = flagged, labels = on) => decide(event, files, labels).state;
-  assert.equal(state({ pull_request: pr('dependabot[bot]') }), 'success');
-  assert.equal(state({ action: 'opened', pull_request: outside }, []), 'success');
-  assert.equal(state({ action: 'opened', pull_request: outside }), 'failure');
-  assert.equal(state(approve), 'success');
-  assert.equal(state({ ...approve, sender: { login: 'someone' } }), 'failure');
-  assert.equal(state(approve, flagged, new Set()), 'failure', 'the label came off');
-  assert.equal(state({ action: 'synchronize', sender: { login: 'someone' }, pull_request: outside }), 'failure', 'a push needs a new review');
-  for (const event of [{ pull_request: pr('dependabot[bot]') }, { action: 'opened', pull_request: outside }, approve]) {
-    assert.ok(decide(event, flagged, on).description.length <= 140, 'GitHub caps a status description at 140 characters');
+  assert.equal(decide(pr('dependabot[bot]'), ['package.json']).state, 'success');
+  assert.equal(decide(outside, []).state, 'success');
+  assert.equal(decide(outside, ['package.json']).state, 'failure');
+  assert.equal(decide(outside, ['package.json'], new Set([OLD])).state, 'failure', 'an earlier commit was approved');
+  assert.equal(decide(outside, ['package.json'], new Set([SHA])).state, 'success');
+  for (const verdict of [decide(outside, ['package.json']), decide(outside, ['package.json'], new Set([SHA]))]) {
+    assert.ok(verdict.description.length <= 140, 'GitHub caps a status description at 140 characters');
   }
 });
 
-test('the comment neutralizes file names and caps its list', async () => {
+test('the comment neutralizes and shortens file names, caps its list, and names the commit to approve', async () => {
   const { commentBody } = await load();
-  const body = commentBody(['a`b\n\u202e.md']);
+  const body = commentBody(['a`b\n\u202e\u200b.md', 'x'.repeat(300)], SHA);
   assert.match(body, /^<!-- outside-pr-guard -->\n/);
-  assert.ok(body.includes('- `a?b??.md`'), body);
-  const long = commentBody(Array.from({ length: 60 }, (_, i) => `test/${i}.js`));
+  assert.ok(body.includes('- `a?b???.md`'), body);
+  assert.ok(body.includes(`- \`${'x'.repeat(200)}...\``), 'long names are cut');
+  assert.ok(body.endsWith(`\`\`\`\n/tooling-reviewed ${SHA}\n\`\`\``), body);
+  const long = commentBody(Array.from({ length: 60 }, (_, i) => `test/${i}.js`), SHA);
   assert.equal(long.match(/^- `/gm)?.length, 50);
   assert.match(long, /^- and 10 more$/m);
 });

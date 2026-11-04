@@ -140,10 +140,10 @@ free.
       `tooling review` check (`.github/workflows/outside-pr.yml`) labels an
       outside pull request `touches-tooling` when it changes files outside
       `src/`, `docs/` and `assets/`, or agent instructions, dot files or
-      package manifests anywhere, and stays red until the owner adds
-      `tooling-reviewed`. The ruleset requires that commit status from the
-      GitHub Actions app, not the job's own check run, which passes when
-      skipped.
+      package manifests anywhere, and stays red until the owner comments
+      `/tooling-reviewed <full SHA>` for the commit they reviewed. The ruleset
+      requires that commit status from the GitHub Actions app, not the job's
+      own check run, which passes when skipped.
 
 ## Phase 5 — Structural cleanup · after going public · separate PRs
 

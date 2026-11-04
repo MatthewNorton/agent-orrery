@@ -3,10 +3,13 @@ name: outside PR guard
 # Runs main's copy of this file and of scripts/outside-pr.mjs, never the pull request's code: the
 # checkout is that one script from the base branch, and the changed files come from the API.
 # pull_request_target runs before an outside contributor's CI is approved, with a token that can
-# post the check.
+# post the check; issue_comment runs it again when the owner approves a commit or takes that back.
 on:
   pull_request_target:
-    types: [opened, reopened, synchronize, edited, labeled, unlabeled]
+    branches: [main]
+    types: [opened, reopened, synchronize, edited]
+  issue_comment:
+    types: [created, edited, deleted]
 
 permissions:
   contents: read
@@ -19,8 +22,9 @@ jobs:
     # The script skips the same events; this only saves a runner. No concurrency group: a skipped
     # run would cancel a pending one, and each run stops if the pull request moved.
     if: >-
-      ((github.event.action != 'labeled' && github.event.action != 'unlabeled') || github.event.label.name == 'tooling-reviewed') &&
-      (github.event.action != 'edited' || github.event.changes.base)
+      (github.event_name == 'pull_request_target' && (github.event.action != 'edited' || github.event.changes.base)) ||
+      (github.event_name == 'issue_comment' && github.event.issue.pull_request && github.event.comment.author_association == 'OWNER' &&
+      (contains(github.event.comment.body, '/tooling-reviewed') || contains(github.event.changes.body.from, '/tooling-reviewed')))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
