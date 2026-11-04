@@ -10,6 +10,6 @@
 - [ ] Manual smoke (`npm start`)
 
 ## Frozen and tooling files
-List edits to frozen files (see the **Frozen files** bullet in `AGENTS.md`) or to agent and tooling files (the list under *Outside pull requests and issues* in `AGENTS.md`), and why each is needed.
+List edits to frozen files (see the **Frozen files** bullet in `AGENTS.md`) or to agent and tooling files (the ones `scripts/outside-pr.mjs` lists), and why each is needed.
 
 ## Screenshots (if renderer)

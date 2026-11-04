@@ -23,7 +23,7 @@ Setup is in the [README](README.md#getting-started). Before you open a pull requ
 
 - Keep each pull request to one topic, fill in the template, and add screenshots for anything visual.
 - CI on an outside pull request runs once the maintainer approves it.
-- Changes to agent instructions, or to code that runs during install, tests or gates (the list is in AGENTS.md under *Outside pull requests and issues*), get a closer review, so say why they're needed.
+- Changes to agent instructions, or to code that runs during install, tests, gates or CI (`scripts/outside-pr.mjs` lists them), get a closer review, so say why they're needed. On an outside pull request, the `tooling review` check stays red until the maintainer has reviewed them.
 - AI-assisted contributions are welcome. You're responsible for what you submit, so say what you ran and what you checked.
 
 By contributing, you agree that your contribution is licensed under the [MIT License](LICENSE).
