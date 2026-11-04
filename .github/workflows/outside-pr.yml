@@ -1,8 +1,9 @@
 name: outside PR guard
 
 # Runs main's copy of this file and of scripts/outside-pr.mjs, never the pull request's code: the
-# checkout is the base branch, and the changed files come from the API. pull_request_target runs
-# before an outside contributor's CI is approved, with a token that can post the check.
+# checkout is that one script from the base branch, and the changed files come from the API.
+# pull_request_target runs before an outside contributor's CI is approved, with a token that can
+# post the check.
 on:
   pull_request_target:
     types: [opened, reopened, synchronize, edited, labeled, unlabeled]
@@ -15,8 +16,8 @@ permissions:
 jobs:
   check:
     name: check files
-    # Label events only for tooling-reviewed, edits only of the base branch. No concurrency group:
-    # a skipped run would cancel a pending one, and each run stops if the pull request moved.
+    # The script skips the same events; this only saves a runner. No concurrency group: a skipped
+    # run would cancel a pending one, and each run stops if the pull request moved.
     if: >-
       ((github.event.action != 'labeled' && github.event.action != 'unlabeled') || github.event.label.name == 'tooling-reviewed') &&
       (github.event.action != 'edited' || github.event.changes.base)
@@ -25,9 +26,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 24
+          sparse-checkout: scripts/outside-pr.mjs
+          sparse-checkout-cone-mode: false
       - run: node scripts/outside-pr.mjs --ci
         env:
           GH_TOKEN: ${{ github.token }}

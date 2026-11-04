@@ -1,101 +1,86 @@
-// Outside pull requests (AGENTS.md, "Outside pull requests and issues"): one from a fork, or by
-// anyone other than the owner or Dependabot. TOOLING lists the files such a pull request must not
-// change unreviewed: text coding agents follow, and code that runs at install, test, gate, or
-// editor and agent startup. The `tooling review` check (.github/workflows/outside-pr.yml) runs
-// main's copy of this file and never the pull request's code.
+// The `tooling review` check on outside pull requests: ones from a fork, or by anyone other than
+// the owner or Dependabot (AGENTS.md, "Outside pull requests and issues"). needsReview() decides
+// which files the owner reviews before anyone checks out or runs such a pull request.
 //
-//   node scripts/outside-pr.mjs <n>               is pull request <n> outside, and which listed files it changes
-//   node scripts/outside-pr.mjs --ci [--dry-run]  the check itself; --dry-run prints its writes instead
+//   node scripts/outside-pr.mjs <n>               is pull request <n> outside, and which files need review
+//   node scripts/outside-pr.mjs --ci [--dry-run]  the check (.github/workflows/outside-pr.yml); --dry-run prints its writes
 
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export const OWNER = 'MatthewNorton';
+const OWNER = 'MatthewNorton';
 const TRUSTED = new Set([OWNER, 'dependabot[bot]']);
-export const CONTEXT = 'tooling review';
-export const TOUCHES = 'touches-tooling';
+const CONTEXT = 'tooling review';
+const TOUCHES = 'touches-tooling';
 export const REVIEWED = 'tooling-reviewed';
 const MARKER = '<!-- outside-pr-guard -->';
 const API_FILE_CAP = 3000;
 const LISTED = 50;
 
-// Lowercase. An entry ending in `/` is a folder and everything in it; any other entry is a file.
-export const TOOLING = [
-  {
-    why: 'agent instructions',
-    root: ['kit/', 'goals.md'],
-    anyDepth: ['agents.md', 'agents.override.md', 'claude.md', 'claude.local.md', '.claude/', '.codex/'],
-  },
-  {
-    why: 'tooling',
-    root: ['scripts/', 'test/', '.github/', 'install agent orrery.cmd', 'install agent orrery.command'],
-    anyDepth: ['package.json', 'package-lock.json', 'npm-shrinkwrap.json', '.npmrc', '.yarnrc', '.yarnrc.yml',
-      '.pnpmfile.cjs', 'node_modules/', '.mcp.json', '.vscode/', '.devcontainer/', '.devcontainer.json'],
-  },
-];
+// The app's source, docs and assets, and the root docs, change without a review. Agent instructions,
+// package manifests, dot files and folders, and VS Code workspaces need one wherever they are.
+const FREE_ROOTS = ['src', 'docs', 'assets'];
+const FREE_FILES = ['readme.md', 'license', 'citation.cff', 'contributing.md', 'security.md'];
+const ALWAYS = ['agents.md', 'agents.override.md', 'agent.md', 'claude.md', 'claude.local.md', 'gemini.md',
+  'package.json', 'package-lock.json', 'npm-shrinkwrap.json', 'node_modules'];
 
-// Windows and macOS checkouts ignore case, and Windows drops trailing dots and spaces.
-const normalize = (file) => file.replace(/\\/g, '/').split('/').map((part) => part.replace(/[. ]+$/, '')).join('/').toLowerCase();
-
-function matches(file, entry, anyDepth) {
-  if (entry.endsWith('/')) return anyDepth ? `/${file}`.includes(`/${entry}`) : file.startsWith(entry);
-  return anyDepth ? `/${file}`.endsWith(`/${entry}`) : file === entry;
-}
-
-/** @param {string} file @returns {string | null} why the file needs the owner's review, if it does */
-export function toolingReason(file) {
-  const name = normalize(file);
-  const group = TOOLING.find((g) => g.root.some((e) => matches(name, e, false)) || g.anyDepth.some((e) => matches(name, e, true)));
-  return group ? group.why : null;
+/** @param {string} file @returns {boolean} whether the owner reviews it before anyone runs the pull request */
+export function needsReview(file) {
+  // Windows and macOS checkouts ignore case, and Windows drops trailing dots and spaces.
+  const parts = file.replace(/\\/g, '/').toUpperCase().toLowerCase().split('/').map((part) => part.replace(/[. ]+$/, ''));
+  if (parts.some((part) => part === '' || part.startsWith('.') || ALWAYS.includes(part) || part.endsWith('.code-workspace'))) return true;
+  return parts.length === 1 ? !FREE_FILES.includes(parts[0]) : !FREE_ROOTS.includes(parts[0]);
 }
 
 /**
- * The listed files a pull request changes, renamed-from paths included. A list the API cut short
- * counts as one more file to review.
+ * The files in a pull request that need the owner's review, renamed-from paths included. A list the
+ * API cut short counts as one more.
  * @param {{ filename: string, previous_filename?: string }[]} files  GET /pulls/{n}/files
  * @param {number} changedFiles  the pull request's changed_files
  */
-export function toolingFiles(files, changedFiles) {
-  const found = files.flatMap((f) => [f.filename, f.previous_filename]).filter(Boolean)
-    .map((file) => ({ file, why: toolingReason(file) })).filter((f) => f.why);
-  if (files.length < changedFiles || files.length >= API_FILE_CAP) found.push({ file: `${changedFiles} files`, why: 'the API did not list them all' });
+export function filesToReview(files, changedFiles) {
+  const found = files.flatMap((f) => [f.filename, f.previous_filename]).filter((file) => file && needsReview(file));
+  if (files.length < changedFiles || files.length >= API_FILE_CAP) found.push('(files the API did not list)');
   return found;
 }
 
+const fromFork = (pr) => pr.head?.repo?.full_name !== pr.base?.repo?.full_name;
+
 /** @param {any} pr  a pull request from the API or an event; a deleted fork has no head repo */
-export function isOutside(pr) {
-  return pr.head?.repo?.full_name !== pr.base?.repo?.full_name || !TRUSTED.has(pr.user?.login);
-}
+export const isOutside = (pr) => fromFork(pr) || !TRUSTED.has(pr.user?.login);
+
+/** Label events other than the review label, and edits that keep the base branch, change nothing. */
+export const relevant = (event) => (!['labeled', 'unlabeled'].includes(event.action) || event.label?.name === REVIEWED) &&
+  (event.action !== 'edited' || Boolean(event.changes?.base));
 
 /**
  * The check's state. Only the owner's own `labeled` event approves, and only while the label is on.
  * @param {{ action?: string, label?: { name: string }, sender?: { login: string }, pull_request: any }} event
- * @param {{ file: string, why: string }[]} flagged  toolingFiles() of the pull request
+ * @param {string[]} flagged  filesToReview() of the pull request
+ * @param {Set<string>} [labels]  the pull request's labels now
  */
-export function decide(event, flagged) {
-  const pr = event.pull_request;
-  if (!isOutside(pr)) return { state: 'success', description: 'Owner or Dependabot pull request' };
-  if (!flagged.length) return { state: 'success', description: 'No agent or tooling files changed' };
-  const reviewed = event.action === 'labeled' && event.label?.name === REVIEWED && event.sender?.login === OWNER &&
-    pr.labels?.some((label) => label.name === REVIEWED);
-  return reviewed
-    ? { state: 'success', description: `The owner reviewed the tooling changes at ${pr.head.sha.slice(0, 7)}` }
-    : { state: 'failure', description: `Changes agent or tooling files; the owner reviews them, then adds ${REVIEWED}` };
+export function decide(event, flagged, labels = new Set()) {
+  if (!isOutside(event.pull_request)) return { state: 'success', description: 'Owner or Dependabot pull request' };
+  if (!flagged.length) return { state: 'success', description: 'No files that need the owner\'s review' };
+  if (event.action === 'labeled' && event.label?.name === REVIEWED && event.sender?.login === OWNER && labels.has(REVIEWED)) {
+    return { state: 'success', description: `The owner reviewed ${event.pull_request.head.sha.slice(0, 7)}`, reviewed: true };
+  }
+  return { state: 'failure', description: `Changes files the owner reviews first; the ${REVIEWED} label clears it` };
 }
 
 // File names come from the pull request: no backticks, control or direction characters reach output.
-const safe = (text) => String(text).replace(/[\u0000-\u001f\u007f`‎‏‪-‮⁦-⁩]/g, '?');
+const safe = (text) => text.replace(/[\u0000-\u001f\u007f`\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, '?');
 
-/** @param {{ file: string, why: string }[]} flagged */
+/** @param {string[]} flagged */
 export function commentBody(flagged) {
-  if (!flagged.length) return `${MARKER}\nThis pull request no longer changes agent or tooling files, so \`${CONTEXT}\` passes.`;
-  const lines = flagged.slice(0, LISTED).map(({ file, why }) => `- \`${safe(file)}\` (${why})`);
+  if (!flagged.length) return `${MARKER}\nThis pull request no longer changes files that need the owner's review, so \`${CONTEXT}\` passes.`;
+  const lines = flagged.slice(0, LISTED).map((file) => `- \`${safe(file)}\``);
   if (flagged.length > LISTED) lines.push(`- and ${flagged.length - LISTED} more`);
   return [
     MARKER,
-    'This pull request changes files that coding agents follow, or that run at install, test, gate, CI, or editor and agent startup:',
+    'This pull request changes agent instructions, tooling or configuration, or files outside `src/`, `docs/` and `assets/`:',
     '',
     ...lines,
     '',
@@ -113,8 +98,9 @@ function gh(route, { method = 'GET', body = undefined, pages = false } = {}) {
 const listFiles = (repo, number) => gh(`repos/${repo}/pulls/${number}/files?per_page=100`, { pages: true });
 
 function runCheck(dryRun) {
-  const event = JSON.parse(fs.readFileSync(String(process.env.GITHUB_EVENT_PATH), 'utf8'));
-  const repo = String(process.env.GITHUB_REPOSITORY);
+  const event = JSON.parse(fs.readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'));
+  if (!relevant(event)) return console.log(`Nothing to check on this ${event.action} event.`);
+  const repo = process.env.GITHUB_REPOSITORY;
   const { number, head, base } = event.pull_request;
   const issue = `repos/${repo}/issues/${number}`;
   const send = dryRun ? (route, { method, body }) => console.log(method, route, body ? JSON.stringify(body) : '') : gh;
@@ -127,10 +113,10 @@ function runCheck(dryRun) {
     const files = listFiles(repo, number);
     const now = gh(`repos/${repo}/pulls/${number}`);
     if (now.head.sha !== head.sha || now.base.ref !== base.ref) return console.log('The pull request moved; the run for its new state decides.');
-    const flagged = toolingFiles(files, now.changed_files);
-    const verdict = decide({ ...event, pull_request: { ...event.pull_request, labels: now.labels } }, flagged);
+    const flagged = filesToReview(files, now.changed_files);
     const labels = new Set(now.labels.map((label) => label.name));
-    if (labels.has(REVIEWED) && !(flagged.length && verdict.state === 'success')) send(`${issue}/labels/${REVIEWED}`, { method: 'DELETE' });
+    const verdict = decide(event, flagged, labels);
+    if (labels.has(REVIEWED) && !verdict.reviewed) send(`${issue}/labels/${REVIEWED}`, { method: 'DELETE' });
     if (flagged.length && !labels.has(TOUCHES)) send(`${issue}/labels`, { method: 'POST', body: { labels: [TOUCHES] } });
     if (!flagged.length && labels.has(TOUCHES)) send(`${issue}/labels/${TOUCHES}`, { method: 'DELETE' });
     const body = commentBody(flagged);
@@ -149,11 +135,10 @@ function runCheck(dryRun) {
 function report(number) {
   const repo = process.env.GITHUB_REPOSITORY || `${OWNER}/agent-orrery`;
   const pr = gh(`repos/${repo}/pulls/${number}`);
-  const flagged = toolingFiles(listFiles(repo, number), pr.changed_files);
-  const fork = pr.head?.repo?.full_name === pr.base.repo.full_name ? '' : ' from a fork';
-  console.log(`#${number} by ${safe(pr.user.login)}${fork}: ${isOutside(pr) ? 'OUTSIDE' : 'not outside'}`);
-  for (const { file, why } of flagged) console.log(`  ${safe(file)}  (${why})`);
-  if (!flagged.length) console.log('  changes no agent or tooling files');
+  const flagged = filesToReview(listFiles(repo, number), pr.changed_files);
+  console.log(`#${number} by ${pr.user.login}${fromFork(pr) ? ' from a fork' : ''}: ${isOutside(pr) ? 'OUTSIDE' : 'not outside'}`);
+  for (const file of flagged) console.log(`  ${safe(file)}`);
+  if (!flagged.length) console.log('  no files that need the owner\'s review');
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
