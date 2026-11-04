@@ -10,7 +10,7 @@ https://github.com/user-attachments/assets/b0b15d0d-97cf-4d06-8581-4f843ed11940
 | --- | --- | --- |
 | ![Universe map](docs/screenshots/universe.png) | ![Solar system view](docs/screenshots/system.png) | ![Planet view](docs/screenshots/planet.png) |
 
-The video and screenshots are captured from the app running against a synthetic demo universe (fictional projects and sessions). The screenshots come from `node scripts/demo-shots.mjs`; see `docs/DEMO-MEDIA.md`.
+The video and screenshots show the app running against a synthetic demo universe (fictional projects and sessions); see `docs/DEMO-MEDIA.md`.
 
 ## How it works
 

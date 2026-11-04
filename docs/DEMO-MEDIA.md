@@ -42,18 +42,24 @@ pointed at the kept profile. In that window, record with Win+Alt+R (Windows Game
 or OBS, fly around, then delete the printed profile folder. On macOS use
 `HOME=<profile> npm start` and the built-in screen recorder.
 
-To turn a recording into a README-sized GIF:
+To encode a recording for the README (720p H.264; raise `-crf` until the file is under
+10 MB):
+
+```sh
+ffmpeg -i demo.mp4 -vf scale=-2:720 -c:v libx264 -preset slow -crf 23 -pix_fmt yuv420p -c:a aac -b:a 128k -movflags +faststart readme.mp4
+```
+
+A README plays video only from GitHub's upload links
+(`https://github.com/user-attachments/assets/…`), not from a file in the repository. In
+the pull request that changes the README's video, drag the MP4 into a comment, post it,
+and put the link GitHub inserts on its own line in the README. Leave that comment in
+place: it holds the video.
+
+For a GIF instead:
 
 ```sh
 ffmpeg -i demo.mp4 -vf "fps=12,scale=1200:-1:flags=lanczos" -loop 0 docs/screenshots/demo.gif
 ```
-
-The README's video is a GitHub upload, not a file in the repository: a README plays
-video only from GitHub's own upload links (`https://github.com/user-attachments/assets/…`).
-The current one is attached to a comment on pull request #81; leave that comment in
-place. To replace it, drag the new MP4 (H.264, under 10 MB on a free plan) into a
-comment box on github.com, post the comment, and put the link GitHub inserts on its
-own line in the README.
 
 ## Rules for anything published
 
