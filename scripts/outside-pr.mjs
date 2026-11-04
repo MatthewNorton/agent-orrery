@@ -75,7 +75,8 @@ export const approvals = (comments) => new Set(comments.filter((c) => c.user?.lo
   .flatMap((c) => APPROVAL.exec(c.body ?? '')?.[1] ?? []));
 
 /**
- * The check's state for a pull request at its head commit.
+ * The check's state for a pull request at its head commit; `approved` marks a pass that rests on the
+ * owner's approval.
  * @param {any} pr
  * @param {string[]} flagged  filesToReview() of it
  * @param {Set<string>} [approved]  approvals() of its comments
@@ -83,7 +84,7 @@ export const approvals = (comments) => new Set(comments.filter((c) => c.user?.lo
 export function decide(pr, flagged, approved = new Set()) {
   if (!isOutside(pr)) return { state: 'success', description: 'Owner or Dependabot pull request' };
   if (!flagged.length) return { state: 'success', description: 'No files that need the owner\'s review' };
-  if (approved.has(pr.head.sha)) return { state: 'success', description: `The owner reviewed ${pr.head.sha.slice(0, 7)}` };
+  if (approved.has(pr.head.sha)) return { state: 'success', description: `The owner reviewed ${pr.head.sha.slice(0, 7)}`, approved: true };
   return { state: 'failure', description: 'Changes files the owner reviews first; the comment on the pull request says how to approve' };
 }
 
@@ -105,8 +106,7 @@ export function commentBody(flagged) {
     ...lines,
     '',
     'The owner reviews them on GitHub before anyone checks out this branch or opens it in a coding agent.',
-    `To approve, the owner comments only \`${COMMAND} <full SHA>\`, with the SHA of the commit they read.`,
-    'This comment names none, since the head can change during a review, and a new push needs a new approval.',
+    `To approve, the owner comments only \`${COMMAND} <full SHA>\`, with the SHA of the commit they read. A new push needs a new approval.`,
   ].join('\n');
 }
 
@@ -117,6 +117,7 @@ function gh(route, { method = 'GET', body = undefined, pages = false } = {}) {
   return pages ? data.flat() : data;
 }
 
+const getPull = (repo, number) => gh(`repos/${repo}/pulls/${number}`);
 const listFiles = (repo, number) => gh(`repos/${repo}/pulls/${number}/files?per_page=100`, { pages: true });
 
 function runCheck(dryRun) {
@@ -124,7 +125,7 @@ function runCheck(dryRun) {
   if (!relevant(event)) return console.log('Nothing to check for this event.');
   const repo = process.env.GITHUB_REPOSITORY;
   const number = event.pull_request?.number ?? event.issue.number;
-  const first = event.pull_request ?? gh(`repos/${repo}/pulls/${number}`);
+  const first = event.pull_request ?? getPull(repo, number);
   if (first.base.ref !== event.repository?.default_branch) return console.log('Not a pull request into the default branch.');
   const issue = `repos/${repo}/issues/${number}`;
   const listComments = () => gh(`${issue}/comments?per_page=100`, { pages: true });
@@ -137,7 +138,7 @@ function runCheck(dryRun) {
     if (!isOutside(first)) return status(decide(first, []));
     const files = listFiles(repo, number);
     const comments = listComments();
-    const now = gh(`repos/${repo}/pulls/${number}`);
+    const now = getPull(repo, number);
     if (now.head.sha !== first.head.sha || now.base.ref !== first.base.ref) return console.log('The pull request moved; the run for its new state decides.');
     const flagged = filesToReview(files, now.changed_files);
     const labelled = now.labels.some((label) => label.name === LABEL);
@@ -149,9 +150,9 @@ function runCheck(dryRun) {
     if (!mine && flagged.length) send(`${issue}/comments`, { method: 'POST', body: { body } });
     const verdict = decide(first, flagged, approvals(withEvent(comments, event)));
     status(verdict);
-    // A run that read an approval can post after the run for the comment that took it back, so read
-    // the comments again; by now the list is newer than the event's copy.
-    if (flagged.length && verdict.state === 'success' && !approvals(listComments()).has(first.head.sha)) status(decide(first, flagged));
+    // Runs can finish out of order, so check a pass from an approval against a fresh read, without the
+    // event's copy (it may be older by now). Only the list's own lag can still slip through.
+    if (verdict.approved && !approvals(listComments()).has(first.head.sha)) status(decide(first, flagged));
   } catch (error) {
     console.error(error);
     status({ state: 'failure', description: 'The check could not finish; re-run it' });
@@ -161,7 +162,7 @@ function runCheck(dryRun) {
 
 function report(number) {
   const repo = process.env.GITHUB_REPOSITORY || `${OWNER}/agent-orrery`;
-  const pr = gh(`repos/${repo}/pulls/${number}`);
+  const pr = getPull(repo, number);
   const flagged = filesToReview(listFiles(repo, number), pr.changed_files);
   console.log(`#${number} by ${pr.user.login}${fromFork(pr) ? ' from a fork' : ''} at ${pr.head.sha}: ${isOutside(pr) ? 'OUTSIDE' : 'not outside'}`);
   for (const file of flagged) console.log(`  ${safe(file)}`);
