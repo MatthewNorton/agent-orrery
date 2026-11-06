@@ -1,4 +1,5 @@
-/* base.css — Design tokens, base element rules, the shared panel. Split from style.css on 2026-10-14; rules unchanged. */
+/* base.css — Design tokens, base element rules, the shared panel, and how Settings › Panels
+   changes the panels. Split from style.css on 2026-10-14. */
 /* The chrome's original variables now resolve to the Tricolor tokens in tokens.css. */
 :root {
   --bg: var(--space);
@@ -15,6 +16,10 @@
   --sidebar-effective-w: var(--sidebar-w);
   --pad: var(--space-3);
   --history-h: var(--dock-h);
+  /* Settings › Panels (app/panels/look.js): the fill of the rail modules, the compact rail buttons
+     and the timeline, and the zoom of the chrome around the star chart */
+  --panel-fill: var(--paper);
+  --ui-zoom: 1;
   font-family: var(--font-sans);
 }
 
@@ -54,6 +59,15 @@ html, body {
   backdrop-filter: blur(10px);
   box-shadow: var(--shadow-plate);
 }
+
+/* ---- Settings › Panels: the panels' fill and the chrome's text size ---- */
+/* A solid fill hides the blur behind it, so the blur stops. */
+.panels-solid .mod, .panels-solid .compact-rail-button { backdrop-filter: none; }
+/* Text size zooms the chrome; the star chart keeps its size. A zoomed element scales its own
+   offsets too, so the layout grows evenly, but viewport units grow with it: a size taken from
+   100vw or 100vh divides it by --ui-zoom (settings.css, directory.css). */
+.topbar, .rail, .sidebar, .view-title, .view-hint, .history-bar, .tabbar, .project-directory,
+.settings-dialog { zoom: var(--ui-zoom); }
 
 /* ---- shared range slider: a hairline track and a round ink thumb ---- */
 .range {

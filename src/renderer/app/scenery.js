@@ -19,13 +19,14 @@
     const value = document.getElementById('sky-look-value');
     const toggle = document.getElementById('orbit-rings');
     if (!group || !value || !toggle) return;
-    const buttons = C.SKY_LOOKS.map((l) => group.appendChild(AUR.button('settings-locate', l.label, () => {
-      if (l.key === S.skyLook) return;
-      S.skyLook = l.key;
-      AUR.storeJson(C.SKY_LOOK_STORAGE_KEY, l.key);
+    const pairs = C.SKY_LOOKS.map((l) => [group.appendChild(AUR.button('settings-locate', l.label)), l.key]);
+    const pressLook = AUR.choiceButtons(pairs, (key) => {
+      if (key === S.skyLook) return;
+      S.skyLook = key;
+      AUR.storeJson(C.SKY_LOOK_STORAGE_KEY, key);
       show();
-      if (S.activeView) S.activeView.setSkyLook(l.key);
-    })));
+      if (S.activeView) S.activeView.setSkyLook(key);
+    });
     toggle.addEventListener('click', () => {
       S.orbitRings = !S.orbitRings;
       AUR.storeJson(C.ORBIT_RINGS_STORAGE_KEY, S.orbitRings);
@@ -34,10 +35,8 @@
     });
 
     function show() {
-      C.SKY_LOOKS.forEach((l, i) => {
-        buttons[i].setAttribute('aria-pressed', String(l.key === S.skyLook));
-        if (l.key === S.skyLook) value.textContent = l.label;
-      });
+      pressLook(S.skyLook);
+      for (const l of C.SKY_LOOKS) if (l.key === S.skyLook) value.textContent = l.label;
       toggle.setAttribute('aria-pressed', String(S.orbitRings));
       toggle.textContent = S.orbitRings ? 'On' : 'Off';
     }

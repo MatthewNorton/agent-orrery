@@ -8,7 +8,7 @@ body { counter-reset: mod; }
   flex-direction: column;
   flex: none;
   min-height: 0;
-  background: var(--paper);
+  background: var(--panel-fill);
   border: 1px solid var(--hair);
   border-radius: var(--radius-0);
   box-shadow: var(--shadow-plate);
