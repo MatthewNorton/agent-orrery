@@ -85,6 +85,7 @@
       A.saveLaunchLayout(L.fromFolded(AUR.storedJson(C.MODULES_STORAGE_KEY, null)));
     }
     A.applyPanelLayout(A.launchLayout());
+    A.wirePanelSizes();
     A.wirePanelsMenu();
     A.wireLaunchLayout();
   };
