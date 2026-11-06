@@ -24,10 +24,9 @@ Hard fail if any of:
 - [ ] Project labels visibly overlap one another or bleed beneath fixed chrome
       in a dense universe profile
 - [ ] Right sidebar missing either ACTIVE AGENTS or EVENT FEED section
-- [ ] No bottom-left UNIVERSE SUMMARY card with 3 numeric stats
 - [ ] Background is flat black (no starfield/skybox) or washed-out bright
 
-Soft (note, don't fail): ships/trails visible between systems; online systems visibly brighter than dormant; top-bar badge reads `MULTI-PROVIDER`; visible ships keep distinct provider hue families and sidebar tags.
+Soft (note, don't fail): the Summary card starts hidden (Settings › Panels › At launch), so its absence is not a fail; shown, it holds 3 numeric stats. Ships/trails visible between systems; online systems visibly brighter than dormant; top-bar badge reads `MULTI-PROVIDER`; visible ships keep distinct provider hue families and sidebar tags.
 
 ## Visual — system shot vs `2.solar-system-view.png`
 
@@ -37,7 +36,7 @@ Hard fail if any of:
 - [ ] Fewer than 2 planets, or planets are untextured flat-color spheres
 - [ ] No orbit ring lines
 - [ ] No project card (top-left) and no back control
-- [ ] Sidebar/summary chrome missing
+- [ ] Right rail chrome (Fleet, Event feed) missing
 
 Soft: asteroid belt visible; ship(s) with name labels; planet name labels on largest planets; planets read as small realistic worlds lit from the sun (a lit side and a dark side, rings on ringed gas giants); the sun shows a darker, redder limb and, up close, granulation.
 
@@ -48,7 +47,7 @@ Hard fail if any of:
 - [ ] No single dominant textured planet (should fill roughly half the view height)
 - [ ] Left panel stack missing (need at least PLANET card + PLANET STATUS bars)
 - [ ] No bottom tab bar (`Overview … Scans`)
-- [ ] Sidebar/summary chrome missing
+- [ ] Right rail chrome (Fleet, Event feed) missing
 
 Soft: the planet is a generated world of its class with relief and a soft terminator, an atmosphere rim where it has air, no visible seam, and no neon: oceanic shows glint, and on high clouds and city lights on the night side; volcanic lava glows on the night side; ice shows long arcs, not loops.
 

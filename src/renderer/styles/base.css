@@ -66,7 +66,7 @@ html, body {
 /* Text size zooms the chrome; the star chart keeps its size. A zoomed element scales its own
    offsets too, so the layout grows evenly, but viewport units grow with it: a size taken from
    100vw or 100vh divides it by --ui-zoom (settings.css, directory.css). */
-.topbar, .rail, .sidebar, .view-title, .view-hint, .history-bar, .tabbar, .project-directory,
+.topbar, .rail, .sidebar, .view-title, .view-hint, .history-bar, .tabbar, .project-directory, .panels-menu, .toast,
 .settings-dialog { zoom: var(--ui-zoom); }
 
 /* ---- shared range slider: a hairline track and a round ink thumb ---- */

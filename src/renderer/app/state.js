@@ -15,7 +15,10 @@
     HISTORY_SLIDER_MAX: 10_000,
     HISTORY_MARKER_LIMIT: 24,
     SEARCH_DEBOUNCE_MS: 120,
+    // The folded modules before launch layouts (app/panels/layout.js reads it once, to carry them over).
     MODULES_STORAGE_KEY: 'agent-universe.modules.v1',
+    PANEL_LAUNCH_STORAGE_KEY: 'agent-universe.panels.launch.v1', // the At launch layout
+    TOAST_MS: 4500,
     AGENT_FOCUS_ENVIRONMENT_STORAGE_KEY: 'agent-universe.focus-environment.v2', // v2: exterior is the default
     AGENT_FOCUS_VANTAGE_STORAGE_KEY: 'agent-universe.focus-vantage.v1',
     RENDER_QUALITY_STORAGE_KEY: 'agent-universe.render-quality.v1',
@@ -179,6 +182,7 @@
       els: null,
     },
     modules: { collapsed: new Set() }, // data-module keys of the modules folded to their header
+    panels: { hidden: new Set() }, // keys of the panels hidden in this run (app/panels/layout.js)
     commandRail: { els: null },
     agentFocus: {
       shipId: null,
