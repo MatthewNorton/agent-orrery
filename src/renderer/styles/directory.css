@@ -139,14 +139,6 @@
   font-size: 12px;
 }
 .project-directory-footer span { display: flex; align-items: center; gap: 4px; }
-.project-directory-footer kbd {
-  display: inline-flex; align-items: center; justify-content: center;
-  min-width: 18px; height: 18px; padding: 0 4px;
-  border: 1px solid var(--hair); border-radius: var(--radius-0);
-  background: var(--plate);
-  color: var(--ink-2);
-  font: 12px/1 var(--font-mono);
-}
 
 @media (max-width: 1260px) {
   .project-directory-button span:not(.project-directory-button-icon):not(.project-directory-button-count) { display: none; }

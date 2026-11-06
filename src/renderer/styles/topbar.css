@@ -43,6 +43,8 @@
   clip: rect(0 0 0 0); white-space: nowrap;
 }
 .search-control { position: relative; width: 100%; }
+.search-kbd { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); pointer-events: none; }
+.search-control:is(:focus-within, :has(.search-input:not(:placeholder-shown))) .search-kbd { display: none; }
 .search-control > svg {
   position: absolute; left: 10px; top: 50%;
   width: 16px; height: 16px; transform: translateY(-50%);
@@ -225,6 +227,9 @@
 .panels-menu-item[aria-disabled="true"] { color: var(--ink-3); cursor: default; }
 .panels-menu-name { flex: 1 1 auto; }
 .panels-menu-note { color: var(--ink-3); font-size: 12px; }
+/* a panel's row keeps a column for its key, so the notes line up where a panel has none */
+.panels-menu-item[data-panel] { display: grid; grid-template-columns: 12px minmax(0, 1fr) auto 20px; }
+.panels-menu-item[data-panel] .key-hint { grid-column: 4; justify-self: end; }
 .panels-menu-check { position: relative; flex: none; width: 12px; height: 12px; border: 1px solid var(--ink-3); }
 .panels-menu-item[aria-checked="true"] .panels-menu-check { border-color: var(--ink); background: var(--ink); }
 .panels-menu-item[aria-checked="true"] .panels-menu-check::after {

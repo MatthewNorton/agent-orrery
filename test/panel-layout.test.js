@@ -60,6 +60,12 @@ test('panelsOn lists the panels on a rail in order, and rail finds a rail by its
   assert.equal(LAYOUT.rail('top'), null);
 });
 
+test('showsIn says which views show a panel', () => {
+  assert.equal(LAYOUT.showsIn(LAYOUT.panel('agents'), 'universe'), true);
+  assert.equal(LAYOUT.showsIn(LAYOUT.panel('tasks'), 'universe'), false);
+  assert.equal(LAYOUT.showsIn(LAYOUT.panel('tasks'), 'system'), true);
+});
+
 test('every panel sits on a listed rail, and a state it cannot take says why', () => {
   const sides = LAYOUT.RAILS.map((rail) => rail.side);
   for (const panel of LAYOUT.PANELS) {

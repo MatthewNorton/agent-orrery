@@ -58,6 +58,7 @@
     A.wireProjectSearch();
     A.wireProjectDirectory();
     A.wireProjectSettings();
+    A.wireKeys();
 
     // Subscribe before taking the snapshot. Every tracker event has a
     // monotonic sequence within its stream epoch, so batches racing the
