@@ -36,7 +36,19 @@
       document.getElementById(id)?.classList.toggle('is-dismissed', hide);
     }
     if (!hide && LAZY[panel.key]) A.renderChromeNow(C.CHROME[LAZY[panel.key]]);
+    A.panelsChanged(panel.key, false);
   }
+
+  /**
+   * After a panel or a rail folds, opens, hides or shows: what follows the panels catches up.
+   * `opened` is true when it was set open.
+   * @param {string} key @param {boolean} opened
+   */
+  A.panelsChanged = function panelsChanged(key, opened) {
+    A.syncPanelsToggle();
+    A.syncPanelsMenu();
+    A.syncFeedExpanded(key, opened);
+  };
 
   /** @param {string} key @param {string} state */
   A.setPanelState = function setPanelState(key, state) {
@@ -44,7 +56,6 @@
     if (!panel || !L.allowed(key, state)) return;
     setHidden(panel, state === 'hidden');
     if (state !== 'hidden' && panel.never !== 'folded') A.setModuleCollapsed(key, state === 'folded');
-    A.syncPanelsMenu();
   };
 
   /** Hides a panel, with Undo, or shows it again as it was. @param {string} key */
@@ -61,10 +72,9 @@
     } else {
       A.dismissToast();
       // A panel shown on a folded rail opens the rail, so it comes into sight.
-      const rail = L.RAILS.find((/** @type {{ side: string }} */ r) => r.side === panel.rail);
+      const rail = L.rail(panel.rail);
       if (rail && S.modules.collapsed.has(rail.module)) A.setModuleCollapsed(rail.module, false);
     }
-    A.syncPanelsMenu();
   };
 
   /** The layout every run starts from. */
@@ -86,6 +96,7 @@
     }
     A.applyPanelLayout(A.launchLayout());
     A.wirePanelSizes();
+    A.wireFeed();
     A.wirePanelsMenu();
     A.wireLaunchLayout();
   };

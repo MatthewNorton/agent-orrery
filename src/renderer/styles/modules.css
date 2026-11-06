@@ -58,7 +58,7 @@ body { counter-reset: mod; }
 .mod-m { min-width: 0; overflow: hidden; color: var(--ink-3); font-size: 12px; font-weight: 500; white-space: nowrap; text-overflow: ellipsis; }
 .mod-n, .count { margin-left: auto; color: var(--ink); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .mod-h > :not(.mod-n) + .mod-x, .mod-h > .mod-end { margin-left: auto; }
-.mod-x {
+.mod-x, .mod-btn {
   display: inline-grid;
   place-items: center;
   flex: none;
@@ -70,8 +70,9 @@ body { counter-reset: mod; }
   cursor: pointer;
   transition: background var(--dur-fast) var(--ease);
 }
-.mod-x:hover { background: var(--plate); color: var(--ink); }
-.mod-x:focus-visible { outline: 2px solid var(--orange); outline-offset: -2px; }
+.mod-x:hover, .mod-btn:hover { background: var(--plate); color: var(--ink); }
+.mod-x:focus-visible, .mod-btn:focus-visible { outline: 2px solid var(--orange); outline-offset: -2px; }
+.mod-btn[aria-pressed="true"] { color: var(--ink); }
 .mod-x::before {
   content: "";
   width: 7px; height: 7px;
@@ -109,6 +110,9 @@ body { counter-reset: mod; }
 .btn:hover:not(:disabled) { background: var(--armour-2); border-color: var(--armour-2); }
 .btn--line { border-color: var(--hair-2); background: transparent; color: var(--ink); }
 .btn--line:hover:not(:disabled) { background: var(--plate); border-color: var(--hair-2); }
+/* a choice that is on fills like the primary button */
+:is(.btn--line, .settings-locate)[aria-pressed='true'] { border-color: var(--armour); background: var(--armour); color: var(--on-armour); }
+:is(.btn--line, .settings-locate)[aria-pressed='true']:hover:not(:disabled) { border-color: var(--armour-2); background: var(--armour-2); }
 .btn--sq { width: var(--control-h); padding: 0; }
 .btn.is-on { border-color: var(--green); }
 .btn:disabled { border-color: var(--hair); background: transparent; color: var(--ink-3); cursor: default; }
@@ -136,7 +140,8 @@ body { counter-reset: mod; }
   cursor: pointer;
 }
 .icon-btn:hover { background: var(--plate); }
-.icon-btn svg, .btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; }
+.icon-btn svg, .btn svg, .mod-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; }
+.mod-btn svg { width: 14px; height: 14px; }
 .field {
   display: flex;
   align-items: center;

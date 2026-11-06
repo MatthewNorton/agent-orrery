@@ -53,6 +53,13 @@ test('every panel names an element in index.html, and every rail module is a pan
   assert.deepEqual(modules.filter((key) => !LAYOUT.panel(key)), []);
 });
 
+test('panelsOn lists the panels on a rail in order, and rail finds a rail by its side', () => {
+  assert.deepEqual(LAYOUT.panelsOn('right').map((p) => p.key), ['agents', 'galaxies', 'feed', 'ideas']);
+  assert.deepEqual(LAYOUT.panelsOn('bottom').map((p) => p.key), ['timeline']);
+  assert.equal(LAYOUT.rail('right').module, 'rail-right');
+  assert.equal(LAYOUT.rail('top'), null);
+});
+
 test('every panel sits on a listed rail, and a state it cannot take says why', () => {
   const sides = LAYOUT.RAILS.map((rail) => rail.side);
   for (const panel of LAYOUT.PANELS) {
@@ -80,10 +87,18 @@ test('a rail stops 24 px short of the other rail, and the side that yields gives
 
 test('stored sizes keep whole numbers at or above their floor', () => {
   const sizes = LAYOUT.normalizeSizes({
-    rails: { left: 300.4, right: 100, other: 500 },
+    rails: { left: 300.4, right: 100, rightExpanded: 700, other: 500 },
     panels: { feed: 200, agents: 100, project: 300, nowhere: 500, ideas: '400' },
   });
-  assert.deepEqual(sizes, { rails: { left: 300 }, panels: { feed: 200 } });
+  assert.deepEqual(sizes, { rails: { left: 300, rightExpanded: 700 }, panels: { feed: 200 } });
   assert.deepEqual(LAYOUT.normalizeSizes(null), { rails: {}, panels: {} });
   assert.equal(LAYOUT.clamp(500, 240, 100), 240);
+});
+
+test('the expanded feed takes 46% of the window up to 640 px, or the width kept for it', () => {
+  assert.equal(LAYOUT.expandedWidth(1440, 312), 640);
+  assert.equal(LAYOUT.expandedWidth(1000, 312), 460);
+  // Never narrower than the rail already is, unless the viewer sized it so.
+  assert.equal(LAYOUT.expandedWidth(1440, 700), 700);
+  assert.equal(LAYOUT.expandedWidth(1440, 700, 500), 500);
 });

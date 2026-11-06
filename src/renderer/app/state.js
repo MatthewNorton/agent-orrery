@@ -185,7 +185,7 @@
     modules: { collapsed: new Set() }, // data-module keys of the modules folded to their header
     // the panels hidden in this run (app/panels/layout.js) and the sizes the viewer dragged
     // (app/panels/resize.js, panel-layout.js normalizeSizes)
-    panels: { hidden: new Set(), sizes: { rails: {}, panels: {} } },
+    panels: { hidden: new Set(), sizes: { rails: {}, panels: {} }, feedExpanded: false },
     commandRail: { els: null },
     agentFocus: {
       shipId: null,
