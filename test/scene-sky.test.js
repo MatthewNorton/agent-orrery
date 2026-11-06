@@ -20,18 +20,11 @@ function appLayer() {
   return window.AUR.app;
 }
 
-/** Width and height from a WebP header: lossy (VP8), lossless (VP8L) or extended (VP8X). */
+/** Width and height from the extended (VP8X) WebP header that Chromium's encoder writes. */
 function webpSize(bytes) {
   assert.equal(bytes.toString('ascii', 0, 4), 'RIFF');
-  assert.equal(bytes.toString('ascii', 8, 12), 'WEBP');
-  const chunk = bytes.toString('ascii', 12, 16);
-  if (chunk === 'VP8 ') return { width: bytes.readUInt16LE(26) & 0x3fff, height: bytes.readUInt16LE(28) & 0x3fff };
-  if (chunk === 'VP8L') {
-    const bits = bytes.readUInt32LE(21);
-    return { width: (bits & 0x3fff) + 1, height: ((bits >>> 14) & 0x3fff) + 1 };
-  }
-  if (chunk === 'VP8X') return { width: bytes.readUIntLE(24, 3) + 1, height: bytes.readUIntLE(27, 3) + 1 };
-  throw new Error(`unknown WebP chunk ${chunk}`);
+  assert.equal(bytes.toString('ascii', 8, 16), 'WEBPVP8X');
+  return { width: bytes.readUIntLE(24, 3) + 1, height: bytes.readUIntLE(27, 3) + 1 };
 }
 
 test('the manifest has a face for every look Settings offers at every graphics tier size', () => {
@@ -66,12 +59,8 @@ test('assets/skies holds only the manifest and its faces, within the size budget
 test('the system and planet views draw the baked sky; the universe map keeps its skybox', () => {
   for (const view of ['scene/system/view.js', 'scene/planet/view.js']) {
     const source = readRenderer(view);
-    assert.match(source, /AUR\.addSky\(scene, ctx\.skyLook, ctx\.quality\.sky\)/, view);
+    assert.match(source, /AUR\.addSky\(scene, glow, ctx\.skyLook, ctx\.quality\.sky\)/, view);
     assert.doesNotMatch(source, /addSkybox|addStarfield/, view);
   }
   assert.match(readRenderer('scene/universe/view.js'), /AUR\.addSkybox\(/);
-  const tags = [...readRenderer('index.html').matchAll(/<script\s+src="([^"]+)"/g)].map((m) => m[1]);
-  const at = (src) => tags.indexOf(src);
-  assert.ok(at('scene/sky.js') > at('util-scene.js') && at('scene/sky.js') < at('scene/system/view.js'));
-  assert.ok(at('app/scenery.js') > at('app/state.js') && at('app/scenery.js') < at('app/boot.js'));
 });

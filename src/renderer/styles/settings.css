@@ -155,8 +155,5 @@
 .settings-choice { display: flex; gap: 6px; }
 .settings-choice .settings-locate { flex: 1 1 0; }
 .settings-toggle { min-width: 56px; }
-.settings-choice .settings-locate[aria-pressed='true'], .settings-locate.settings-toggle[aria-pressed='true'] {
-  border-color: var(--armour); background: var(--armour); color: var(--on-armour);
-}
-.settings-choice .settings-locate[aria-pressed='true']:hover,
-.settings-locate.settings-toggle[aria-pressed='true']:hover { border-color: var(--armour-2); background: var(--armour-2); }
+.settings-locate[aria-pressed='true'] { border-color: var(--armour); background: var(--armour); color: var(--on-armour); }
+.settings-locate[aria-pressed='true']:hover:not(:disabled) { border-color: var(--armour-2); background: var(--armour-2); }

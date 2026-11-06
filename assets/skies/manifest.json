@@ -2,7 +2,6 @@
   "about": "The sky behind the system and planet views (src/renderer/scene/sky.js). Do not edit: run the generator.",
   "generator": "scripts/bake-sky.js",
   "field": "Sidereal Deep Field by the author (MIT), region The Veil: scripts/lib/sky-field.js",
-  "encoding": "WebP, quality 0.95",
   "faces": [
     "px",
     "py",

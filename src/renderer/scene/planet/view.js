@@ -31,7 +31,7 @@
     const glow = new BABYLON.GlowLayer('pglow', scene, { blurKernelSize: 64 });
     glow.intensity = 0.5;
 
-    const sky = AUR.addSky(scene, ctx.skyLook, ctx.quality.sky);
+    const sky = AUR.addSky(scene, glow, ctx.skyLook, ctx.quality.sky);
     const gui = AUR.guiLayer(scene);
 
     // ---- planet ----

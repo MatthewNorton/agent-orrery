@@ -276,14 +276,8 @@ void main() {
     const canvas = document.createElement('canvas');
     canvas.width = canvas.height = n;
     canvas.getContext('2d').putImageData(image, 0, 0);
-    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/webp', p.quality));
-    if (!blob || blob.type !== 'image/webp') throw new Error('this Chromium has no WebP encoder');
-    const url = await new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result));
-      reader.onerror = () => reject(reader.error);
-      reader.readAsDataURL(blob);
-    });
+    const url = canvas.toDataURL('image/webp', p.quality);
+    if (!url.startsWith('data:image/webp')) throw new Error('this Chromium has no WebP encoder');
     return url.slice(url.indexOf(',') + 1);
   };
 })();

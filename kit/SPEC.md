@@ -400,9 +400,11 @@ Data: `AU.getSystem(projectId)`.
   author's Sidereal Deep Field shader (region The Veil): nebula gas, dust and stars in one
   `assets/skies/<look>/<size>/` set of six WebP faces, in the Settings look at the graphics tier's
   face size (`RENDER_QUALITIES[].sky`: 1024 · 1536 · 2048). A new look or size loads beside the
-  one shown and replaces it once ready. The stars are baked in, so the view adds no runtime
+  one shown and replaces it once ready, one load at a time: a change asked for mid-load starts
+  when that load ends. The stars are baked in, so the view adds no runtime
   starfield, unless no faces load at all; then `AUR.addStarfield` stands in.
-- Orbit rings: one `AUR.orbitRing` per planet, hidden while Settings has them off.
+- Orbit rings: one `AUR.orbitRing` per planet, all under one node that is disabled while
+  Settings has them off.
 - Central sun: the emissive `StandardMaterial` sphere `sunMat`, with the
   photosphere from `worlds/sun.js` injected by a material plugin: granulation
   (fading in as the sun grows past 60 px on screen; none on the low tier),
@@ -540,7 +542,8 @@ targeting and safe Windows Terminal fallback arguments, and writes two screensho
 
 - Target 60fps idle on integrated graphics: ≤3000 starfield points (the universe map; the
   system and planet views draw one baked sky cube instead, about 34, 75 or 134 MB of GPU memory
-  with mipmaps at 1024, 1536 or 2048), belt via
+  with mipmaps at 1024, 1536 or 2048, and two of them while a new look or size replaces the
+  one shown), belt via
   thin instances only, one GlowLayer per scene max, no per-frame allocations in
   observables (reuse Vector3s), dispose scenes fully on view switch
   (`scene.dispose()` and drop references).
