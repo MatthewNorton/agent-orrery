@@ -49,7 +49,7 @@
   };
 
   /**
-   * A panel's row: its name and where it shows, then Open, Folded or Hidden.
+   * A panel's row: its name and where it shows, its key, then Open, Folded or Hidden.
    * @param {{ key: string, name: string, where: string, never: string, neverWhy?: string }} panel
    */
   function row(panel) {
@@ -57,6 +57,7 @@
     const name = el.appendChild(AUR.el('div', 'panel-launch-name'));
     name.appendChild(AUR.el('span', 'panel-launch-title', panel.name));
     if (panel.where) name.appendChild(AUR.el('span', 'panel-launch-where', panel.where));
+    el.append(A.keyChips(`panel-${panel.key}`) || '');
     const choice = el.appendChild(AUR.el('div', 'settings-choice panel-launch-choice'));
     choice.setAttribute('role', 'group');
     choice.setAttribute('aria-label', `${panel.name} at launch`);

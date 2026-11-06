@@ -172,12 +172,18 @@ body { counter-reset: mod; }
 .kbd {
   display: inline-flex;
   align-items: center;
-  height: 20px;
+  justify-content: center;
+  min-width: 20px; height: 20px;
   padding: 0 5px;
   border: 1px solid var(--hair);
   background: var(--plate);
   color: var(--ink-2);
+  font: 500 12px/1 var(--font-mono);
 }
+.kbd--sm { min-width: 18px; height: 18px; padding: 0 4px; }
+/* a shortcut's keys (app/keys.js) */
+.key-hint { display: inline-flex; flex: none; align-items: center; gap: 4px; }
+:root.keys-off .key-single { display: none; }
 .dot { flex: none; width: 7px; height: 7px; border-radius: var(--radius-dot); }
 .live { display: inline-flex; align-items: center; gap: 6px; }
 .live i, .live-dot { width: 7px; height: 7px; border-radius: var(--radius-dot); background: var(--green); box-shadow: 0 0 0 3px var(--green-ring); }

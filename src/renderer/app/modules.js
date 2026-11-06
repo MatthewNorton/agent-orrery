@@ -40,8 +40,9 @@
     const button = document.getElementById('panels-toggle');
     if (!button) return;
     button.setAttribute('aria-pressed', String(allFolded()));
-    button.title = A.foldAllLabel();
-    button.setAttribute('aria-label', button.title);
+    const label = A.foldAllLabel();
+    button.setAttribute('aria-label', label);
+    A.titleWithKey(button, label, 'rails');
   };
 
   /** @param {string} key @param {boolean} collapsed */
