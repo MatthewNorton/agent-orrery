@@ -16,6 +16,7 @@ Electron + Babylon.js desktop app that passively visualizes Claude Code / Codex 
 - `node kit/run-gates.mjs` — every gate, one line each, plus `npm test` (launches Electron); `--static` runs only the quick file checks that CI runs
 - `npm run shots` — headless screenshot mode; writes `.shots/*.png` for visual comparison against the three mockup PNGs in the repo root (gold samples: `3.universe-map-view.png` → universe, `2.solar-system-view.png` → system, `1.planet-view.png` → planet)
 - `npm run ships:generate` — regenerate procedural ship GLB assets
+- `node scripts/demo-shots.mjs` — the README screenshots, from the synthetic profile; `--keep` keeps that profile for recording the README video. `docs/DEMO-MEDIA.md` has the steps for both; uploading the video needs a person at github.com
 - `npm run typecheck` — type-checks the JSDoc in `src/` (`tsconfig.json`: main + preload; `src/renderer/tsconfig.json`: renderer; shared shapes in `src/types/`). Only files whose first line is `// @ts-check` are checked: every `src/` JS file except the older renderer code that predates it (the `scene/` files, `util.js` and `util-scene.js`, `galaxy-layout.js`, `polish-math.js`), and every new file. Runs in CI; there is no lint tooling.
 
 ## Hard constraints (from kit/SPEC.md — read it before renderer work)

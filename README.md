@@ -57,7 +57,7 @@ npm run typecheck        # check the JSDoc types (files that start with // @ts-c
 node kit/grade.mjs       # renderer regression gate — must stay green after any renderer change
 npm run shots            # headless screenshots into .shots/ for visual comparison
 npm run ships:generate   # regenerate procedural ship GLB assets
-node scripts/demo-shots.mjs   # README screenshots from a synthetic universe (docs/DEMO-MEDIA.md)
+node scripts/demo-shots.mjs   # README screenshots from a synthetic universe; --keep for the video (docs/DEMO-MEDIA.md)
 ```
 
 Plain JavaScript throughout — no `.ts` files (types are JSDoc, checked by `npm run typecheck`), no bundler, no lint tooling. The renderer uses classic `<script>` tags attached to a single `window.AUR` namespace (no ES modules, since it runs from `file://`).

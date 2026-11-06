@@ -33,34 +33,36 @@ to change the fictional projects; `node kit/grade.mjs` grades the app against th
 
 A README plays video only from GitHub's upload links
 (`https://github.com/user-attachments/assets/…`), not from a file in the repository or a
-release asset. Only a person can make one, by dragging the file into a comment box on
-github.com; there is no API. To replace the video:
+release asset. There is no API for these links: step 6 needs a person signed in at
+github.com, so an agent stops there and hands over. To replace the video:
 
-1. **Run the app on the synthetic universe.**
+1. Run the app on the synthetic universe:
 
    ```sh
    node scripts/demo-shots.mjs --keep
    ```
 
    The script keeps the profile and prints the PowerShell line that starts `npm start`
-   against it. On macOS use `HOME=<profile> npm start`.
-2. **Record** with Win+Alt+R (Windows Game Bar), OBS, or the macOS screen recorder, then
-   delete the printed profile folder.
-3. **Check every frame for real names** (see the rules below).
-4. **Encode** to 720p H.264 under 10 MB, GitHub's video limit on free plans. If the file
-   is over, raise `-crf` by one and encode again.
+   against it. On macOS use `HOME=<profile> npm start`. It also rewrites
+   `docs/screenshots/`; run `git checkout -- docs/screenshots` unless you meant to update
+   them.
+2. Record with Win+Alt+R (Windows Game Bar), OBS, or the macOS screen recorder.
+3. Check every frame for real names (see the rules below). Once the take is good, delete
+   the folder the script printed after `demo profile:`.
+4. Encode to 720p H.264 under 10 MB, GitHub's video limit on free plans (`demo.mp4` is
+   your recording). If the file is over, raise `-crf`: each +6 roughly halves the size.
 
    ```sh
    ffmpeg -i demo.mp4 -vf scale=-2:720 -c:v libx264 -preset slow -crf 23 -pix_fmt yuv420p -c:a aac -b:a 128k -movflags +faststart readme.mp4
    ```
 
-5. **Open a draft pull request** that puts a placeholder comment in place of the video
-   link in `README.md`.
-6. **Upload:** drag `readme.mp4` into a comment on that pull request and post it.
-7. **Link it:** replace the placeholder with the link GitHub inserted, alone on its line
-   with a blank line above and below. GitHub renders it as a player that starts muted.
-8. **Keep the comment:** it holds the video. Leave the old video's comment on its own
-   pull request too.
+5. Open a draft pull request that replaces the video link in `README.md` with
+   `<!-- demo video -->`.
+6. Drag `readme.mp4` into a comment on that pull request and post it.
+7. Replace `<!-- demo video -->` with the link GitHub inserted, alone on its line with a
+   blank line above and below. Push, and mark the pull request ready.
+8. Leave the comment in place: it holds the video. Leave the old video's comment too,
+   because older revisions of the README still link to it.
 
 For a GIF instead of a video:
 
@@ -71,7 +73,7 @@ ffmpeg -i demo.mp4 -vf "fps=12,scale=1200:-1:flags=lanczos" -loop 0 docs/screens
 ## Rules for anything published
 
 - Never capture the app against your real profile for anything that leaves your machine.
-- Check every frame for real names before committing: project names, folder paths in
-  the event feed, GitHub identities in the project card.
+- Check every frame for real names before committing or uploading: project names, folder
+  paths in the event feed, GitHub identities in the project card.
 - The three mockup PNGs in the repository root are the kit rubric's gold samples, not
   screenshots; leave them where they are.
