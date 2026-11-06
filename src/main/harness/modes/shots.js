@@ -34,9 +34,9 @@ async function runShotMode(ctx, driver) {
       if (framed) await capture('shot-galaxy-close', 300);
     }
     if (view === 'planet') {
-      // Every left-rail module folds to its header from its chevron, and unfolds again.
+      // Every left-rail module on screen folds to its header from its chevron, and unfolds again.
       const folded = await rendererEval(`(() => {
-        const sections = Array.from(document.querySelectorAll('.rail--l .mod[data-module]:not(.hidden)'));
+        const sections = Array.from(document.querySelectorAll('.rail--l .mod[data-module]:not(.hidden):not(.is-dismissed)'));
         for (const section of sections) section.querySelector('.mod-h .mod-x')?.click();
         const headerH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--header-h'));
         return {

@@ -9,14 +9,15 @@
   const S = A.state, C = A.const;
 
   // ---------- command rail: the rail and its sections fold through app/modules.js ----------
-  const RAIL_SECTIONS = ['ideas', 'agents', 'feed', 'galaxies'];
+  /** @type {{ key: string, id: string }[]} the right rail's panels (panel-layout.js) */
+  const RAIL_SECTIONS = window.AUR_PANEL_LAYOUT.PANELS.filter((/** @type {{ rail: string }} */ p) => p.rail === 'right');
 
   A.wireCommandRail = function wireCommandRail() {
     /** @type {Record<string, { panel: HTMLElement | null, count: HTMLElement | null }>} */
     const els = {};
-    for (const key of RAIL_SECTIONS) {
+    for (const { key, id } of RAIL_SECTIONS) {
       els[key] = {
-        panel: document.getElementById(`${key}-panel`),
+        panel: document.getElementById(id),
         count: document.getElementById(`compact-${key}-count`),
       };
       // A compact-rail button opens the rail on that section, unfolded.
