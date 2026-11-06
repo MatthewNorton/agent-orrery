@@ -190,3 +190,35 @@ body:has(#sidebar.is-collapsed) { --sidebar-effective-w: var(--sidebar-compact-w
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
 .feed-time { margin-top: 2px; font-family: var(--font-mono); font-size: 12px; line-height: 15px; color: var(--ink-3); }
+
+/* Resizing (app/panels/resize.js): a rail's inner edge and the gap under a panel are separators. A
+   hairline shows on hover, orange while one is dragged or has focus, with the size beside it. */
+.rail-grip { position: absolute; top: 0; bottom: 0; z-index: 2; width: 10px; cursor: ew-resize; touch-action: none; }
+.rail--l > .rail-grip { right: -11px; }
+.sidebar > .rail-grip { left: -11px; }
+.panel-grip {
+  position: relative; z-index: 2; flex: none;
+  height: var(--space-2); margin: calc(-1 * var(--space-2)) 0;
+  cursor: ns-resize; touch-action: none;
+}
+.mod:is(.hidden, .is-dismissed, .is-collapsed) + .panel-grip { display: none; }
+.rail-grip::before, .panel-grip::before { content: ""; position: absolute; transition: background var(--dur-fast) var(--ease); }
+.rail-grip::before { top: 0; bottom: 0; left: 4px; width: 2px; }
+.panel-grip::before { left: 0; right: 0; top: 3px; height: 2px; }
+.rail-grip:hover::before, .panel-grip:hover::before { background: var(--ink-3); }
+:is(.rail-grip, .panel-grip):is(.is-dragging, :focus-visible)::before { background: var(--orange); }
+:is(.rail-grip, .panel-grip):focus-visible { outline: none; }
+.grip-size {
+  display: none; position: absolute;
+  padding: 2px 6px;
+  background: var(--paper-solid); border: 1px solid var(--hair-2); border-radius: var(--radius-0);
+  color: var(--ink); font-family: var(--font-mono); font-size: 12px; line-height: 16px; white-space: nowrap;
+  pointer-events: none;
+}
+:is(.rail-grip, .panel-grip):is(.is-dragging, :focus-visible) .grip-size { display: block; }
+.rail-grip .grip-size { top: var(--space-2); left: 50%; transform: translateX(-50%); }
+.panel-grip .grip-size { top: 50%; right: var(--space-3); transform: translateY(-50%); }
+/* a panel the viewer sized keeps that height, and gives it up last when the rail runs short */
+.mod.is-sized:not(.is-collapsed) { flex: 0 0.001 var(--panel-h); max-height: none; }
+/* no easing while a size follows the pointer */
+.is-resizing :is(.sidebar, .command-section) { transition: none; }

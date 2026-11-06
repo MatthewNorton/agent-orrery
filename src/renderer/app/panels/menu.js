@@ -96,6 +96,7 @@
     }
     m.appendChild(AUR.el('div', 'panels-menu-sep')).setAttribute('role', 'separator');
     m.appendChild(action(A.foldAllLabel(), A.toggleAllRails));
+    m.appendChild(action('Reset panel sizes', A.resetPanelSizes));
     m.appendChild(action('Start every run with this layout', () => {
       A.saveLaunchLayout(A.currentPanelLayout());
       A.renderLaunchLayout();

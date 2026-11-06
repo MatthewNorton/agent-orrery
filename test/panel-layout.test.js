@@ -62,3 +62,28 @@ test('every panel sits on a listed rail, and a state it cannot take says why', (
   const html = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
   for (const rail of LAYOUT.RAILS) if (rail.module) assert.match(html, new RegExp(`data-module="${rail.module}"`), rail.module);
 });
+
+test('a rail stops 24 px short of the other rail, and the side that yields gives way', () => {
+  const open = { left: 'open', right: 'open' };
+  const fit = (want, shown, yields) => LAYOUT.fitRails(1416, want, shown, 56, yields);
+  assert.deepEqual(fit({ left: 296, right: 312 }, open, 'left'), { left: 296, right: 312 });
+  // Dragging the right rail: it stops beside the left rail as it is.
+  assert.deepEqual(fit({ left: 296, right: 2000 }, open, 'right'), { left: 296, right: 1096 });
+  // The left rail gives way to a wide right rail, down to its least width.
+  assert.deepEqual(fit({ left: 296, right: 2000 }, open, 'left'), { left: 240, right: 1152 });
+  // A folded or empty other rail leaves more room.
+  assert.deepEqual(fit({ left: 296, right: 2000 }, { left: 'compact', right: 'open' }, 'right'), { left: 296, right: 1336 });
+  assert.deepEqual(fit({ left: 296, right: 2000 }, { left: 'none', right: 'open' }, 'right'), { left: 296, right: 1416 });
+  // In a window too small for both, each keeps its least width.
+  assert.deepEqual(LAYOUT.fitRails(400, { left: 296, right: 312 }, open, 56, 'left'), { left: 240, right: 240 });
+});
+
+test('stored sizes keep whole numbers at or above their floor', () => {
+  const sizes = LAYOUT.normalizeSizes({
+    rails: { left: 300.4, right: 100, other: 500 },
+    panels: { feed: 200, agents: 100, project: 300, nowhere: 500, ideas: '400' },
+  });
+  assert.deepEqual(sizes, { rails: { left: 300 }, panels: { feed: 200 } });
+  assert.deepEqual(LAYOUT.normalizeSizes(null), { rails: {}, panels: {} });
+  assert.equal(LAYOUT.clamp(500, 240, 100), 240);
+});
