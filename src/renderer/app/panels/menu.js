@@ -85,8 +85,8 @@
     const head = m.appendChild(AUR.el('div', 'panels-menu-head'));
     head.append(AUR.el('span', 'mod-title', 'Panels'), AUR.el('span', 'mod-m', VIEWS[view] || ''));
     for (const rail of L.RAILS) {
-      const panels = L.PANELS.filter((/** @type {{ rail: string, views: string[] | null }} */ p) =>
-        p.rail === rail.side && (!p.views || p.views.includes(view)));
+      const panels = L.panelsOn(rail.side).filter((/** @type {{ views: string[] | null }} */ p) =>
+        !p.views || p.views.includes(view));
       if (!panels.length) continue;
       const group = m.appendChild(AUR.el('div', 'panels-menu-group'));
       group.setAttribute('role', 'group');
@@ -96,6 +96,7 @@
     }
     m.appendChild(AUR.el('div', 'panels-menu-sep')).setAttribute('role', 'separator');
     m.appendChild(action(A.foldAllLabel(), A.toggleAllRails));
+    m.appendChild(action(A.feedExpandLabel(), A.toggleFeedExpanded));
     m.appendChild(action('Reset panel sizes', A.resetPanelSizes));
     m.appendChild(action('Start every run with this layout', () => {
       A.saveLaunchLayout(A.currentPanelLayout());

@@ -274,6 +274,13 @@ Design tokens (put in `:root`):
     (wrap 2 lines max), right-aligned relative time (`12s ago`). Newest on top,
     cap 30 rows. Kind colors: build `#4da3ff`, form `#ffb454`, spawn `#34d399`,
     depart/info `#8b93a8`, discover `#a78bfa`.
+  - **Expanded feed** (`app/panels/feed.js`). The feed header's expand button, or *Expand the event feed* in the panels menu, widens the right rail to 46% of the window, up to 640 px and never narrower than the rail was. A width dragged while expanded is kept apart (`rightExpanded`). The feed takes the rail's height and lists every event it keeps (60):
+    - each event's time of day and its whole sentence
+    - a search by agent, project or file, and filter chips with counts: All, Builds, Ships, Attention, Systems (`AUR.feedGroup`: build and form are Builds, attention and done Attention, discover Systems, the rest Ships)
+    - "{n} of {total} shown" below
+    - a "{n} new events" jump back to the top when events arrive while the list is scrolled; a scrolled list keeps its place (rows are kept per event, and `overflow-anchor` holds the view), and a text selection survives new events
+    - a click that ends a selection of a row's text does not open the row's system
+    - The rail's other panels show folded without changing their own state. Folding or hiding the feed, folding the right rail (Fold every panel too), or opening one of the rail's other panels puts the feed back.
 - Agent rows and feed rows are clickable: clicking one opens the system view
   of that entry's project (no-op if already viewing that system; pointer
   cursor + hover tint signal it).
