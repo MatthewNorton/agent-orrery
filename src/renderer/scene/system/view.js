@@ -36,8 +36,7 @@
     const glow = new BABYLON.GlowLayer('sglow', scene, { blurKernelSize: 64 });
     glow.intensity = 0.82;
 
-    AUR.addSkybox(scene, project.seed, 1600, 0.055);
-    AUR.addStarfield(scene, 3400, 760);
+    const sky = AUR.addSky(scene, glow, ctx.skyLook, ctx.quality.sky);
     const gui = AUR.guiLayer(scene);
 
     // ---- sun ----
@@ -100,11 +99,14 @@
     const topNames = planetList.slice()
       .sort((a, b) => AUR.planetWeight(b) - AUR.planetWeight(a))
       .slice(0, 3).map((p) => p.name);
+    const ringRoot = new BABYLON.TransformNode('orbitRings', scene); // every orbit ring; Settings turns it off
+    ringRoot.setEnabled(ctx.orbitRings);
 
     function buildPlanet(pd, i) {
       const rand = AUR.mulberry32(AUR.fnv1a(projectId + ':' + pd.name));
       const r = orbitR(i);
       const ring = AUR.orbitRing(scene, r, '#9fb0e0', 0.16, 0);
+      ring.parent = ringRoot;
       const dia = AUR.clamp(AUR.PLANET_DIA.min + Math.sqrt(AUR.planetWeight(pd)) * 0.18, AUR.PLANET_DIA.min, AUR.PLANET_DIA.max);
       const persistent = topNames.indexOf(pd.name) >= 0;
       const world = view.makeWorld(pd.name, dia, persistent);
@@ -209,7 +211,12 @@
       setShipFocus: view.setShipFocus,
       clearShipFocus: view.clearShipFocus,
       shipFocusState: view.shipFocusState,
-      setQuality: view.setWorldsQuality,
+      setQuality(tier) {
+        view.setWorldsQuality(tier);
+        sky.setSize(tier.sky);
+      },
+      setSkyLook: sky.setLook,
+      setOrbitRings(on) { ringRoot.setEnabled(on); },
       dispose() {
         view.clearShipFocus();
         AUR.disposeView(scene, gui);

@@ -150,3 +150,10 @@
 .settings-quality-value { color: var(--ink-2); border-color: var(--hair-2); }
 .settings-quality-scale { margin-top: 6px; display: flex; justify-content: space-between; color: var(--ink-3); font-size: 12px; }
 .settings-section { margin-top: var(--space-5); padding-top: var(--space-4); border-top: 1px solid var(--hair); }
+
+/* Space backdrop: one button per look, the chosen one filled. Orbit rings: one button, filled while on. */
+.settings-choice { display: flex; gap: 6px; }
+.settings-choice .settings-locate { flex: 1 1 0; }
+.settings-toggle { min-width: 56px; }
+.settings-locate[aria-pressed='true'] { border-color: var(--armour); background: var(--armour); color: var(--on-armour); }
+.settings-locate[aria-pressed='true']:hover:not(:disabled) { border-color: var(--armour-2); background: var(--armour-2); }

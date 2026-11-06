@@ -58,7 +58,7 @@ loaders), then:
 | Layer | Files |
 |---|---|
 | Shared libraries | `util.js` (creates `window.AUR`; `fnv1a`/`mulberry32` copied from `src/main/shared/hash.js` so seeds agree), `util-scene.js` (Babylon helpers), `procedural-worlds.js` (world profiles: class, palette, hue, seed; asteroids), `worlds/` (kit 15: the pure map generator `noise.js` + `classes.js` + `maps.js`, run by `worker.js`, a worker file and not a page script; `textures.js`, the map service on `AUR.app.state.worldMaps`; `shaders.js`; `material.js`, a world's globe and shells; `sun.js`, the system sun's photosphere plugin and billboards), `ship-assets.js` + `ship-assets-hulls.js` + `ship-assets-api.js` (`AUR.ships`), `polish-math.js`, `galaxy-layout.js` and `galaxy-field.js` (pure UMD; the field is a galaxy's emission/dust atlas and the stars drawn from it), `search-core.js`, `components/project-vcs-status.js` |
-| Views | `scene/common.js` (`AUR.sceneParts`), then for each view in `scene/<view>/` (universe, system, planet) its parts before its `view.js` |
+| Views | `scene/common.js` (`AUR.sceneParts`), `scene/sky.js` (`AUR.addSky`, the system and planet views' baked sky), then for each view in `scene/<view>/` (universe, system, planet) its parts before its `view.js` |
 | App state | `app/state.js` — the only file that assigns `AUR.app` (`state`, `const`) |
 | App modules | every other file in `app/` and `app/project/`, in `index.html` order |
 | Boot | `app/boot.js` — boot, event routing, view switching, debug hooks |
@@ -67,9 +67,10 @@ View contract: each `scene/<view>/view.js` registers
 `AUR.views.<name> = (engine, data, ctx) => ({ scene, update(eventBatch), dispose() })`
 where `ctx` provides `openSystem(projectId)`, `openPlanet(projectId, name)`, the
 shared `store`, the graphics `quality` tier, the `galaxyFields` cache and `worldMaps`, the generated
-planet maps (`worlds/textures.js`: a view opens an epoch on its scene and requests maps in it; disposing the scene closes the epoch).
+planet maps (`worlds/textures.js`: a view opens an epoch on its scene and requests maps in it; disposing the scene closes the epoch),
+and the Settings `skyLook` and `orbitRings` (§4).
 Views may also implement `resize`,
-`setQuality`, `setSearchMatches`, `setShipFocus`, `focusShip` and `shipFocusState`;
+`setQuality`, `setSkyLook`, `setOrbitRings`, `setSearchMatches`, `setShipFocus`, `focusShip` and `shipFocusState`;
 the app fills in a no-op default for any they leave out (`VIEW_DEFAULTS` in `app/boot.js`).
 Agent focus (`focusShip(id, settings)`, `setShipFocus(settings)`) takes `{ vantage, exterior }`:
 `exterior` (the default environment, a chase camera outside the hull that stands off by the hull's
@@ -240,7 +241,11 @@ Design tokens (put in `:root`):
   query, and the GitHub filter also narrows the PROJECTS directory.
   A persistent gear opens `SETTINGS · GRAPHICS · PROJECT PATHS`. Graphics quality is a
   stepped slider over `AUR.app.const.RENDER_QUALITIES` (Low · Balanced · High), kept per
-  viewer in localStorage; High is the default and the look every gate grades (§9). Missing project folders
+  viewer in localStorage; High is the default and the look every gate grades (§9). Below it,
+  Space backdrop picks the look of the system and planet views' sky from `AUR.app.const.SKY_LOOKS`
+  (Vivid · Soft · Distant · Faint; Distant is the default), and Orbit rings turns the system
+  view's orbit rings on or off (on by default). Both are kept per viewer in localStorage
+  (`app/scenery.js`) and change the open view at once. Missing project folders
   can be recovered with a bounded scan beneath a user-chosen parent or a
   native `Locate…` picker. Scan matches require explicit confirmation, remaps
   keep the original project ID/history, and path changes are LIVE-only.
@@ -391,8 +396,15 @@ Design tokens (put in `:root`):
 
 Data: `AU.getSystem(projectId)`.
 
-- Backdrop: skybox `assets/skyboxes/skybox-XXX.png` where
-  `XXX = String(1 + seed % 12).padStart(3, '0')`, plus starfield.
+- Backdrop: `AUR.addSky` (`scene/sky.js`), a cube baked offline by `scripts/bake-sky.js` from the
+  author's Sidereal Deep Field shader (region The Veil): nebula gas, dust and stars in one
+  `assets/skies/<look>/<size>/` set of six WebP faces, in the Settings look at the graphics tier's
+  face size (`RENDER_QUALITIES[].sky`: 1024 · 1536 · 2048). A new look or size loads beside the
+  one shown and replaces it once ready, one load at a time: a change asked for mid-load starts
+  when that load ends. The stars are baked in, so the view adds no runtime
+  starfield, unless no faces load at all; then `AUR.addStarfield` stands in.
+- Orbit rings: one `AUR.orbitRing` per planet, all under one node that is disabled while
+  Settings has them off.
 - Central sun: the emissive `StandardMaterial` sphere `sunMat`, with the
   photosphere from `worlds/sun.js` injected by a material plugin: granulation
   (fading in as the sun grows past 60 px on screen; none on the low tier),
@@ -471,7 +483,8 @@ Data: `AU.getPlanet(projectId, name)`.
   rotation about a tilted axis, the atmosphere shell, clouds on oceanic worlds on
   the high tier, rings on ringed giants. Its detail map (1024 or 2048 wide by
   tier) lands after the view opens; the scene stays unready until it is bound or
-  6 s pass. 1–2 small rocky moons with their own maps. Skybox + starfield backdrop.
+  6 s pass. 1–2 small rocky moons with their own maps. The system view's baked sky (`AUR.addSky`)
+  as backdrop.
 - This project's ships orbit the planet with name labels.
 - Left panels (stacked, like the mockup):
   1. `PROJECT: <NAME>` mini-card (state + builds and the same folder/terminal
@@ -527,13 +540,17 @@ targeting and safe Windows Terminal fallback arguments, and writes two screensho
 
 ## 9. Performance guardrails
 
-- Target 60fps idle on integrated graphics: ≤3000 starfield points, belt via
+- Target 60fps idle on integrated graphics: ≤3000 starfield points (the universe map; the
+  system and planet views draw one baked sky cube instead, about 34, 75 or 134 MB of GPU memory
+  with mipmaps at 1024, 1536 or 2048, and two of them while a new look or size replaces the
+  one shown), belt via
   thin instances only, one GlowLayer per scene max, no per-frame allocations in
   observables (reuse Vector3s), dispose scenes fully on view switch
   (`scene.dispose()` and drop references).
 - Graphics tiers trade frame rate for detail: each sets the share of the display's
   pixels the engine renders (`setHardwareScalingLevel`), the galaxy volume's raymarch
-  steps (a `STEPS` define) and the share of resolved stars. GUI labels keep their size and
+  steps (a `STEPS` define), the share of resolved stars and the face size of the system and
+  planet views' sky. GUI labels keep their size and
   layout at every tier (`AUR.guiLayer` sets `renderScale`) and soften with the scene below
   High; star points stay capped at 12 display pixels. Test-mode runs keep their
   storage in an in-memory partition, so they render the default tier and default panels
@@ -567,7 +584,12 @@ targeting and safe Windows Terminal fallback arguments, and writes two screensho
   dedicated 512×512 cratered rock surfaces for the three deformed asteroid
   archetypes. Babylon materials consume the RGB normal maps, not raw grayscale.
 - `assets/skyboxes/skybox-001.png` … `skybox-012.png` — 2048×1024 true
-  equirectangular, for PhotoDome.
+  equirectangular, for PhotoDome. Only skybox-001 is drawn, by the universe map.
+- `assets/skies/<look>/<size>/<face>.webp` — the system and planet views' sky: six cube faces
+  (px py pz nx ny nz) per look (vivid · soft · distant · faint) and tier size
+  (1024 · 1536 · 2048), WebP at quality 0.95, baked by `npx electron scripts/bake-sky.js`.
+  `assets/skies/manifest.json` records the bake settings and every face's bytes and SHA-256;
+  `test/scene-sky.test.js` holds the folder to it and to a 20 MB budget.
 - `assets/palettes/palette-001.json` … `palette-012.json` — named color trios:
   `{ name, descriptor, colors: [hex, hex, hex], loreSentence, kind }` with
   `kind` one of `ship | station | system` (4 of each). OPTIONAL, not graded:

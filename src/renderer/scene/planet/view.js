@@ -31,8 +31,7 @@
     const glow = new BABYLON.GlowLayer('pglow', scene, { blurKernelSize: 64 });
     glow.intensity = 0.5;
 
-    AUR.addSkybox(scene, project.seed, 1600, 0.055);
-    AUR.addStarfield(scene, 3400, 760);
+    const sky = AUR.addSky(scene, glow, ctx.skyLook, ctx.quality.sky);
     const gui = AUR.guiLayer(scene);
 
     // ---- planet ----
@@ -183,7 +182,9 @@
         tier = next;
         world.setClouds(tier.key === 'high');
         showDetail();
+        sky.setSize(next.sky);
       },
+      setSkyLook: sky.setLook,
       dispose() {
         release();
         AUR.disposeView(scene, gui);
