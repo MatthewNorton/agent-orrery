@@ -88,13 +88,30 @@
         <div class="settings-summary-row">
           <div>
             <h3><label for="render-quality">Graphics quality</label></h3>
-            <p>Lower renders fewer pixels and lighter galaxies, for a smoother frame rate.</p>
+            <p>Lower renders fewer pixels, lighter galaxies and a softer sky, for a smoother frame rate.</p>
           </div>
           <span class="settings-summary settings-quality-value" id="render-quality-value"></span>
         </div>
         <div class="settings-quality">
           <input class="range" id="render-quality" type="range" min="0" step="1" />
           <div class="settings-quality-scale" id="render-quality-scale" aria-hidden="true"></div>
+        </div>
+        <div class="settings-summary-row settings-section">
+          <div>
+            <h3 id="sky-look-title">Space backdrop</h3>
+            <p>The nebula behind each solar system and planet. Graphics quality sets how sharp it is.</p>
+          </div>
+          <span class="settings-summary settings-quality-value" id="sky-look-value"></span>
+        </div>
+        <!-- One button per look in AUR.app.const.SKY_LOOKS, added by app/scenery.js. -->
+        <div class="settings-quality settings-choice" id="sky-look" role="group" aria-labelledby="sky-look-title"></div>
+        <div class="settings-summary-row settings-section">
+          <div>
+            <h3 id="orbit-rings-title">Orbit rings</h3>
+            <p>The lines that trace each planet's orbit in a solar system.</p>
+          </div>
+          <button class="settings-locate settings-toggle" id="orbit-rings" type="button"
+            aria-labelledby="orbit-rings-title" aria-pressed="true">On</button>
         </div>
         <div class="settings-summary-row settings-section">
           <div>
@@ -413,6 +430,7 @@
   <script src="search-core.js"></script>
   <script src="components/project-vcs-status.js"></script>
   <script src="scene/common.js"></script>
+  <script src="scene/sky.js"></script>
   <script src="scene/universe/galaxies.js"></script>
   <script src="scene/universe/glyphs.js"></script>
   <script src="scene/universe/labels.js"></script>
@@ -445,6 +463,7 @@
   <script src="app/project/forget.js"></script>
   <script src="app/project/backup.js"></script>
   <script src="app/render-quality.js"></script>
+  <script src="app/scenery.js"></script>
   <script src="app/project/tasks.js"></script>
   <script src="app/replay.js"></script>
   <script src="app/store.js"></script>

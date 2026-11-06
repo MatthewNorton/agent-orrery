@@ -19,12 +19,23 @@
     AGENT_FOCUS_ENVIRONMENT_STORAGE_KEY: 'agent-universe.focus-environment.v2', // v2: exterior is the default
     AGENT_FOCUS_VANTAGE_STORAGE_KEY: 'agent-universe.focus-vantage.v1',
     RENDER_QUALITY_STORAGE_KEY: 'agent-universe.render-quality.v1',
-    // Graphics tiers, cheapest first; the last is the default (app/render-quality.js).
+    // Graphics tiers, cheapest first; the last is the default (app/render-quality.js). `sky` is the
+    // face size of the system and planet views' sky (scene/sky.js), close to the pixels each tier renders.
     RENDER_QUALITIES: Object.freeze([
-      Object.freeze({ key: 'low', label: 'Low', resolution: 0.6, steps: 20, stars: 0.4 }),
-      Object.freeze({ key: 'balanced', label: 'Balanced', resolution: 0.8, steps: 32, stars: 0.7 }),
-      Object.freeze({ key: 'high', label: 'High', resolution: 1, steps: 48, stars: 1 }),
+      Object.freeze({ key: 'low', label: 'Low', resolution: 0.6, steps: 20, stars: 0.4, sky: 1024 }),
+      Object.freeze({ key: 'balanced', label: 'Balanced', resolution: 0.8, steps: 32, stars: 0.7, sky: 1536 }),
+      Object.freeze({ key: 'high', label: 'High', resolution: 1, steps: 48, stars: 1, sky: 2048 }),
     ]),
+    // Settings: the look of that sky, as baked by scripts/bake-sky.js (app/scenery.js), and the
+    // system view's orbit rings.
+    SKY_LOOK_STORAGE_KEY: 'agent-universe.sky-look.v1',
+    SKY_LOOKS: Object.freeze([
+      Object.freeze({ key: 'vivid', label: 'Vivid' }),
+      Object.freeze({ key: 'soft', label: 'Soft' }),
+      Object.freeze({ key: 'distant', label: 'Distant' }),
+      Object.freeze({ key: 'faint', label: 'Faint' }),
+    ]),
+    ORBIT_RINGS_STORAGE_KEY: 'agent-universe.orbit-rings.v1',
     // Where agent focus puts the viewer: `camera` is 'exterior' (a chase camera outside the hull,
     // the default) or 'room' (first person inside it, behind a generated foreground `asset`).
     AGENT_FOCUS_ENVIRONMENTS: Object.freeze({
@@ -70,6 +81,8 @@
     galaxyFields: new Map(), // per galaxy key: its emission atlas and star samples (scene/universe/stars.js)
     worldMaps: AUR.worlds.textures.create(), // generated planet maps: their LRU and the workers that fill it (worlds/textures.js)
     renderQuality: C.RENDER_QUALITIES[C.RENDER_QUALITIES.length - 1], // the viewer's graphics tier
+    skyLook: 'distant',  // a key of C.SKY_LOOKS
+    orbitRings: true,
     lastNotificationAt: -Infinity,
 
     // ---------- runtime ----------

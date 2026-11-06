@@ -21,6 +21,7 @@
       preserveDrawingBuffer: true, stencil: true, antialias: true,
     }, true);
     A.wireRenderQuality();
+    A.wireScenery();
     S.engine.runRenderLoop(() => {
       if (S.activeScene && !S.activeScene.isDisposed) {
         try { S.activeScene.render(); } catch (e) { /* swallow transient swap frames */ }
@@ -202,13 +203,14 @@
   // ---------- view switching ----------
   // The extras a view may leave out (kit/SPEC.md view contract), as no-ops.
   const VIEW_DEFAULTS = {
-    resize() {}, setQuality() {}, setSearchMatches() {}, setShipFocus() {},
+    resize() {}, setQuality() {}, setSkyLook() {}, setOrbitRings() {}, setSearchMatches() {}, setShipFocus() {},
     focusShip: () => false, shipFocusState: () => null,
   };
 
   function makeCtx() {
     return {
       store: S.store, galaxyFields: S.galaxyFields, worldMaps: S.worldMaps, quality: S.renderQuality,
+      skyLook: S.skyLook, orbitRings: S.orbitRings,
       openSystem: A.openSystem, openPlanet: A.openPlanet,
     };
   }

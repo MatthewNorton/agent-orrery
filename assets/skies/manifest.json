@@ -1,0 +1,337 @@
+{
+  "about": "The sky behind the system and planet views (src/renderer/scene/sky.js). Do not edit: run the generator.",
+  "generator": "scripts/bake-sky.js",
+  "field": "Sidereal Deep Field by the author (MIT), region The Veil: scripts/lib/sky-field.js",
+  "encoding": "WebP, quality 0.95",
+  "faces": [
+    "px",
+    "py",
+    "pz",
+    "nx",
+    "ny",
+    "nz"
+  ],
+  "sizes": [
+    1024,
+    1536,
+    2048
+  ],
+  "looks": {
+    "vivid": {
+      "gas": 1,
+      "zoom": 1
+    },
+    "soft": {
+      "gas": 0.55,
+      "zoom": 1
+    },
+    "distant": {
+      "gas": 0.55,
+      "zoom": 1.6
+    },
+    "faint": {
+      "gas": 0.35,
+      "zoom": 2.2
+    }
+  },
+  "settings": {
+    "dust": 0.8,
+    "steps": 256,
+    "pitch": -0.6507963267948965,
+    "starRes": 1944.3181818181815,
+    "starScale": 1.5643005423539091,
+    "starGain": 1.8,
+    "tiles": 4,
+    "quality": 0.95
+  },
+  "files": {
+    "distant/1024/nx.webp": {
+      "bytes": 108642,
+      "sha256": "d754cece8762e35078b335cf64c51011c3d296b10a4561bed34d4573776c5848"
+    },
+    "distant/1024/ny.webp": {
+      "bytes": 126608,
+      "sha256": "62357693da76056a972279c1878877e1c1e0a0421e07b35aca61199e2b70f8c4"
+    },
+    "distant/1024/nz.webp": {
+      "bytes": 106882,
+      "sha256": "ae3525b12b087c56bdcd41aec2b0c01b83a08ac88e35db19b4ee3cfdbe6cb4fc"
+    },
+    "distant/1024/px.webp": {
+      "bytes": 121096,
+      "sha256": "f74235f3703373f203a2614d2a6c2e66adebe8af13ee653dfe9fe871a55a9a7a"
+    },
+    "distant/1024/py.webp": {
+      "bytes": 107576,
+      "sha256": "a729e0a3046b05ad45c3fcc2a1ce9e1dcff36207f259f6da23f9499b4c1fbd29"
+    },
+    "distant/1024/pz.webp": {
+      "bytes": 120644,
+      "sha256": "eb6cf6defc28b68fd0b7f729813e85818fa78cd9bbf4fbbe32c464296d52767f"
+    },
+    "distant/1536/nx.webp": {
+      "bytes": 216826,
+      "sha256": "b341d66227506a166e63b60a2acf5f2640363438996cb115b44b0c5184f6b0ec"
+    },
+    "distant/1536/ny.webp": {
+      "bytes": 245728,
+      "sha256": "d90f61a4c2cf88fc0ecca439b9d5580e9f74e28885858a1ccbfa8e0412567667"
+    },
+    "distant/1536/nz.webp": {
+      "bytes": 212548,
+      "sha256": "19ff735c95228586a93e1abd8eb1ecc0bfc4b73665a7a0dc0d9b1d6d64abb702"
+    },
+    "distant/1536/px.webp": {
+      "bytes": 236092,
+      "sha256": "cc7ac72aec3d62c7312c03dc68f0c79aca964946209b343ce3dd022ea1ffb56f"
+    },
+    "distant/1536/py.webp": {
+      "bytes": 211984,
+      "sha256": "6c3614a945df2999264c104bbd2bea9b25aa0be930870c44f5bc55133add3131"
+    },
+    "distant/1536/pz.webp": {
+      "bytes": 236274,
+      "sha256": "6637322074907d735f477ab9cba9fd0781db15a3e6f155cb297e6769d2315c6e"
+    },
+    "distant/2048/nx.webp": {
+      "bytes": 333116,
+      "sha256": "fd54c61523ebe09432d83b4b2796b5e293cde5c1f8bcaf7ee96bc1c0f2a9cc5d"
+    },
+    "distant/2048/ny.webp": {
+      "bytes": 374528,
+      "sha256": "4e4cb48706e944c7863e168c99ea9695df58e2ade696d7596bd4396ce58c3b9b"
+    },
+    "distant/2048/nz.webp": {
+      "bytes": 324924,
+      "sha256": "ad6f9e776612c7def0da9360e896d2eb6a79a2733b548681d385f34e80c81acc"
+    },
+    "distant/2048/px.webp": {
+      "bytes": 361150,
+      "sha256": "0c2fa5fecdc8a191aabb6292fcc2c2167e8f8a22aa58a61fc084bc6fcd16c7de"
+    },
+    "distant/2048/py.webp": {
+      "bytes": 325774,
+      "sha256": "2815a91f3301a6606798500de68ca7e99da6d8e5455faf18095324cad7b14c68"
+    },
+    "distant/2048/pz.webp": {
+      "bytes": 360316,
+      "sha256": "18233a50bd1bfce0e7e89f92cec6958867a1f18f1e32498ebf621e6b662b11fe"
+    },
+    "faint/1024/nx.webp": {
+      "bytes": 99716,
+      "sha256": "801825e5fd22898040ee7eccf9edc82c33928685967e7cbbdde6acc31612de38"
+    },
+    "faint/1024/ny.webp": {
+      "bytes": 128226,
+      "sha256": "6ff6a9fdcea98e57a1f27d49e254b9fc2941c16e083a0b6c4d2727f3539a4215"
+    },
+    "faint/1024/nz.webp": {
+      "bytes": 98280,
+      "sha256": "bace04431f96c377d00932ebd7346371e0889a3874159e864ea0d83f1d44de09"
+    },
+    "faint/1024/px.webp": {
+      "bytes": 120760,
+      "sha256": "a524f86873c277e8be354639a34ca019dba79bc44585cdf587a1df90a892ddab"
+    },
+    "faint/1024/py.webp": {
+      "bytes": 104162,
+      "sha256": "2e4ccff6ef66825fa172fc7a75fda1ccb833f939b1c481548662e601b20ca18a"
+    },
+    "faint/1024/pz.webp": {
+      "bytes": 121104,
+      "sha256": "13c4319e3bcced88f655b0b43dc4b0ce7e1730d1ef6929aedff59b716cd2ceb6"
+    },
+    "faint/1536/nx.webp": {
+      "bytes": 198508,
+      "sha256": "0c3129673d4dcf256e19fa2174083d7cd6e32f4af0444b9e1716276ef82ff61f"
+    },
+    "faint/1536/ny.webp": {
+      "bytes": 250148,
+      "sha256": "faabc105ee42493edee28defe4f73d5c8b8c4fb8b3f0071da7899058d841d71d"
+    },
+    "faint/1536/nz.webp": {
+      "bytes": 189668,
+      "sha256": "c30c251a791710aedd41f379662d344642d52f58008f38af74a31dd3980806c5"
+    },
+    "faint/1536/px.webp": {
+      "bytes": 236510,
+      "sha256": "2c10b2dd159d909c6edafe7e5dc8537c9af919bc1161c49bac2e5573dca85aa9"
+    },
+    "faint/1536/py.webp": {
+      "bytes": 208630,
+      "sha256": "d25cd49f0b4015ed7c4a6d4b658d351c8ef762d711b7880bc5a37d1ab0db85cd"
+    },
+    "faint/1536/pz.webp": {
+      "bytes": 237280,
+      "sha256": "64a38f2877f359cf7b5d8eab997ff8aab70005b1102d51a71720dcb29833a6b1"
+    },
+    "faint/2048/nx.webp": {
+      "bytes": 299046,
+      "sha256": "0a59e6f84d5e4c0880e8a5d44cf281677d5b3205c4798ea53d954c19fbdd633b"
+    },
+    "faint/2048/ny.webp": {
+      "bytes": 381716,
+      "sha256": "d6c6391f21e4b12def600189d5e7f5a9747bd6831733842eb0394a04e3c02477"
+    },
+    "faint/2048/nz.webp": {
+      "bytes": 291290,
+      "sha256": "95e8323160794de405a1b69b023371f0be0a58e04175e8008644dbc881591dfb"
+    },
+    "faint/2048/px.webp": {
+      "bytes": 362144,
+      "sha256": "1dd13e6f83c48d2cb6735916b143a16706b7c8467463d3c16a4732c2d1efda6f"
+    },
+    "faint/2048/py.webp": {
+      "bytes": 318790,
+      "sha256": "bd0e87e93dd795f766a7268d5e224ce3466dc1cdaae18703c9b3f8de27ef5fcc"
+    },
+    "faint/2048/pz.webp": {
+      "bytes": 362150,
+      "sha256": "a45e36213635786d4dcfbbeefdc1417e44f359e6185de095d6170ec71a871460"
+    },
+    "soft/1024/nx.webp": {
+      "bytes": 110506,
+      "sha256": "a060fa2b96282c997d3d361a021412e49f2cff7abaae2c0179a101ccada82e42"
+    },
+    "soft/1024/ny.webp": {
+      "bytes": 117510,
+      "sha256": "94d007caa2a371aad9c2977ab6e766a35e008079e68bf207ec9546873d918eaf"
+    },
+    "soft/1024/nz.webp": {
+      "bytes": 115514,
+      "sha256": "bcccd272d4692d1535e3db53cde1b4de5dd4bc0fb86fed9d317088dae0d40e65"
+    },
+    "soft/1024/px.webp": {
+      "bytes": 119854,
+      "sha256": "5305bc0de6d5fe4d39420d24558589ff7d65569ef4901432b5ee2e0d94ab281d"
+    },
+    "soft/1024/py.webp": {
+      "bytes": 113744,
+      "sha256": "293865b227c37071e87a76f56b07112b8335b7b59b7fa37cccbd4f4e29628c35"
+    },
+    "soft/1024/pz.webp": {
+      "bytes": 111626,
+      "sha256": "b2988de0acf1262266176bbd8c1b3fd0ea020095a13c85a055e8e9149652f960"
+    },
+    "soft/1536/nx.webp": {
+      "bytes": 224806,
+      "sha256": "80e20865cb108390eeadf7b333ef7cba20ecc7a0732f9e11b0b26f160d4553a4"
+    },
+    "soft/1536/ny.webp": {
+      "bytes": 231530,
+      "sha256": "8bec9e6dcaa4284319478b7f33901342870463928d18be3adc1e1e435837a4a7"
+    },
+    "soft/1536/nz.webp": {
+      "bytes": 230056,
+      "sha256": "b07b16461d1ea3b15ae7fa2e41f783e9b4b76ab326bd4aca979aa8006b5d2cec"
+    },
+    "soft/1536/px.webp": {
+      "bytes": 233692,
+      "sha256": "d0c3b434b86b04a90c8617b1835e68f0fdab4adb06891180f0068d62d3f44702"
+    },
+    "soft/1536/py.webp": {
+      "bytes": 225502,
+      "sha256": "59a515029cd546fba413cadea1375ac2d7d260e8cf5944e28d0cb4fb19136da8"
+    },
+    "soft/1536/pz.webp": {
+      "bytes": 230702,
+      "sha256": "f7f6590b41848fe99ac3c2046afa06cd87cfce5d77587fc91e485ecc0b7707dc"
+    },
+    "soft/2048/nx.webp": {
+      "bytes": 343430,
+      "sha256": "67c2215d4ba4c853874638162f1529913654ea6aa2eb2db363b3c8438c00f603"
+    },
+    "soft/2048/ny.webp": {
+      "bytes": 352878,
+      "sha256": "acd58f255cf59e85de6cade4f6f6c930ee37b374e76a36f560b69c8c38ba6e80"
+    },
+    "soft/2048/nz.webp": {
+      "bytes": 352608,
+      "sha256": "981852a97809ca46fa9838974f37790faf25117defe5a47e9fe45afb28481ccd"
+    },
+    "soft/2048/px.webp": {
+      "bytes": 358918,
+      "sha256": "7ddc502224d86b3cd3e9680fc3b6829977222a8dab2cbc25d221dd6394697bf1"
+    },
+    "soft/2048/py.webp": {
+      "bytes": 345130,
+      "sha256": "217d86ee0c2dcf55bb97c13cfbb9fb788b9ceba0f6a64ee1015fceabe70430d2"
+    },
+    "soft/2048/pz.webp": {
+      "bytes": 350270,
+      "sha256": "b75e9ca80c23872c756780664d70d30ca9c363f36b4d81c643f1cd1d1051f089"
+    },
+    "vivid/1024/nx.webp": {
+      "bytes": 110724,
+      "sha256": "b5e62efc2b2c43897abf4e665255faff8ce366701498201c2d478b3626b5dc68"
+    },
+    "vivid/1024/ny.webp": {
+      "bytes": 119510,
+      "sha256": "c519a9f9aa9d4fb0199c29bc5d24ea023e0697a99c52e9e1f34a36bbd53f2e12"
+    },
+    "vivid/1024/nz.webp": {
+      "bytes": 116408,
+      "sha256": "4c23aa2ae4403a653f263ca15dfdbcbb75c623934a8476372eb883189717336a"
+    },
+    "vivid/1024/px.webp": {
+      "bytes": 119218,
+      "sha256": "fe1b241fd72a81276aa2d92c0bb4b0fa563eacd3b23fa8476209118fc33a4227"
+    },
+    "vivid/1024/py.webp": {
+      "bytes": 114836,
+      "sha256": "bd899ac566a86866461d51183376bf11bcea434f64322af39ef9d44ca3b200f2"
+    },
+    "vivid/1024/pz.webp": {
+      "bytes": 121248,
+      "sha256": "3f8e4af5905c1c00d744d0fef910281d5f8e0778338843e035acc911cc11a67f"
+    },
+    "vivid/1536/nx.webp": {
+      "bytes": 224374,
+      "sha256": "0b94f7cfc917cea973a697777ea73bb9708c828e30f1f42f0aa3a4d45c6f8958"
+    },
+    "vivid/1536/ny.webp": {
+      "bytes": 234696,
+      "sha256": "a2e787c4a0349c9891ec668d484923a66bf0cfc24b336fa304d57a0c7fbcad6f"
+    },
+    "vivid/1536/nz.webp": {
+      "bytes": 230670,
+      "sha256": "7b74f0016b12acaadbc58eca756c4534586d963d1ab786154fadf8ca5f004ab8"
+    },
+    "vivid/1536/px.webp": {
+      "bytes": 234472,
+      "sha256": "993772d2bd98bd7edd07de5ad5699ebac5c6c667708a26b7a278e9d51f7cb97d"
+    },
+    "vivid/1536/py.webp": {
+      "bytes": 225558,
+      "sha256": "5c9dc7072240b34ecf7ffb526942ee71b03eb471e5fed15b8a2dfb2a2054eaab"
+    },
+    "vivid/1536/pz.webp": {
+      "bytes": 233152,
+      "sha256": "f30962761bb6246ce2734c87a197115bf7fec74e4d82324fb87fbe4c410e07da"
+    },
+    "vivid/2048/nx.webp": {
+      "bytes": 340938,
+      "sha256": "b8380ec20089d6bdbff28539e955faa49f92037fc0ac3bf7fbef101f6f0af36e"
+    },
+    "vivid/2048/ny.webp": {
+      "bytes": 357002,
+      "sha256": "f8f363a1548bf7b7109efb2c108f4f4c4be6495684ae95e51ce070cb875c54b7"
+    },
+    "vivid/2048/nz.webp": {
+      "bytes": 353376,
+      "sha256": "08a99184cef5198913a615e799ed711a6ce9edde65d73916c483aa3601d38eff"
+    },
+    "vivid/2048/px.webp": {
+      "bytes": 359580,
+      "sha256": "8f362fcc109d55a005aaa69e6892efc3f0ea63d61f239f130e9fbb3a97427395"
+    },
+    "vivid/2048/py.webp": {
+      "bytes": 345152,
+      "sha256": "cada34f450f053dc364d02239b0001ca05bfa62a0a87da5d669d166d0e70445a"
+    },
+    "vivid/2048/pz.webp": {
+      "bytes": 354116,
+      "sha256": "f8896b7a35f1cc0d6162f2bee942ea737ae262a478c22ba5814f07324dc2e666"
+    }
+  }
+}
