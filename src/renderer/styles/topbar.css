@@ -45,6 +45,7 @@
 .search-control { position: relative; width: 100%; }
 .search-kbd { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); pointer-events: none; }
 .search-control:is(:focus-within, :has(.search-input:not(:placeholder-shown))) .search-kbd { display: none; }
+.search-control:has(.search-kbd) .search-input:placeholder-shown { padding-right: 32px; }
 .search-control > svg {
   position: absolute; left: 10px; top: 50%;
   width: 16px; height: 16px; transform: translateY(-50%);
