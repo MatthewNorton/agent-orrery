@@ -1,20 +1,24 @@
-/* settings.css — The settings dialog: graphics quality, backups, and recovering or forgetting
-   moved projects.
+/* settings.css — The settings dialog, in tabs: graphics, the panels' look, recovering or
+   forgetting moved projects, and backups.
    Values come from tokens.css only. */
+/* Pinned under the top bar, so the tabs stay put when a tab's pane is shorter or taller. */
 .settings-dialog {
-  width: min(680px, calc(100vw - 40px));
+  width: min(680px, calc(100vw / var(--ui-zoom) - 40px));
   max-width: none;
-  max-height: calc(100vh - 96px);
+  max-height: calc(100vh / var(--ui-zoom) - 96px);
+  margin: calc(var(--bar-h) + var(--space-4)) auto auto;
   padding: 0;
   color: var(--ink);
   background: transparent;
   border: 0;
   overflow: visible;
 }
-.settings-dialog::backdrop { background: var(--chart-vignette); }
+.settings-dialog::backdrop { background: var(--chart-vignette); transition: opacity var(--dur-collapse) var(--ease); }
+/* While a control on the Panels tab has focus, the dimming lifts so the panels show as they change. */
+.settings-dialog:has(#settings-look :focus)::backdrop { opacity: 0.15; }
 .settings-shell {
   width: 100%;
-  max-height: calc(100vh - 96px);
+  max-height: inherit;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -32,11 +36,32 @@
   padding: 0 var(--space-1) 0 var(--space-3);
   border-bottom: 1px solid var(--hair);
 }
-.settings-head > div { display: flex; align-items: baseline; gap: var(--space-2); }
-.settings-head h2, .settings-head p, .settings-summary-row h3,
+.settings-head h2, .settings-summary-row h3,
 .settings-summary-row p, .settings-status { margin: 0; }
 .settings-head h2 { color: var(--ink); font-size: 12px; font-weight: 700; letter-spacing: 0.1em; line-height: 1; text-transform: uppercase; }
-.settings-head p { color: var(--ink-3); font-size: 12px; font-weight: 500; text-transform: none; letter-spacing: 0; }
+/* Tabs: one section at a time, the chosen tab underlined in orange. */
+.settings-tabs { display: flex; flex: none; padding: 0 var(--space-1); border-bottom: 1px solid var(--hair); }
+.settings-tab {
+  position: relative;
+  height: var(--row-h);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-0);
+  background: transparent;
+  color: var(--ink-3);
+  font: 600 12.5px/1 var(--font-sans);
+  cursor: pointer;
+}
+.settings-tab:hover { color: var(--ink-2); }
+.settings-tab[aria-selected='true'] { color: var(--ink); }
+.settings-tab[aria-selected='true']::after {
+  content: "";
+  position: absolute;
+  left: var(--space-3); right: var(--space-3); bottom: -1px;
+  height: 2px;
+  background: var(--orange);
+}
+.settings-tab:focus-visible, .settings-body:focus-visible { outline: 2px solid var(--orange); outline-offset: -2px; }
 .settings-close {
   margin-left: auto;
   width: 24px; height: 24px; padding: 0;
