@@ -18,9 +18,7 @@
     };
     const visibleRect = (id) => {
       const element = document.getElementById(id);
-      if (!element || element.classList.contains('hidden') ||
-          getComputedStyle(element).display === 'none') return null;
-      return edges(element);
+      return element && AUR.isShown(element) ? edges(element) : null;
     };
     const overlaps = (a, b) => Boolean(a && b && a.left < b.right && a.right > b.left &&
       a.top < b.bottom && a.bottom > b.top);

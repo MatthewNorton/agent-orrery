@@ -60,7 +60,7 @@ loaders), then:
 | Shared libraries | `util.js` (creates `window.AUR`; `fnv1a`/`mulberry32` copied from `src/main/shared/hash.js` so seeds agree), `util-scene.js` (Babylon helpers), `procedural-worlds.js` (world profiles: class, palette, hue, seed; asteroids), `worlds/` (kit 15: the pure map generator `noise.js` + `classes.js` + `maps.js`, run by `worker.js`, a worker file and not a page script; `textures.js`, the map service on `AUR.app.state.worldMaps`; `shaders.js`; `material.js`, a world's globe and shells; `sun.js`, the system sun's photosphere plugin and billboards), `ship-assets.js` + `ship-assets-hulls.js` + `ship-assets-api.js` (`AUR.ships`), `polish-math.js`, `galaxy-layout.js` and `galaxy-field.js` (pure UMD; the field is a galaxy's emission/dust atlas and the stars drawn from it), `search-core.js`, `components/project-vcs-status.js` |
 | Views | `scene/common.js` (`AUR.sceneParts`), `scene/sky.js` (`AUR.addSky`, the system and planet views' baked sky), then for each view in `scene/<view>/` (universe, system, planet) its parts before its `view.js` |
 | App state | `app/state.js` — the only file that assigns `AUR.app` (`state`, `const`) |
-| App modules | every other file in `app/` and `app/project/`, in `index.html` order |
+| App modules | every other file in `app/`, `app/project/` and `app/panels/`, in `index.html` order |
 | Boot | `app/boot.js` — boot, event routing, view switching, debug hooks |
 
 View contract: each `scene/<view>/view.js` registers
@@ -239,16 +239,30 @@ Design tokens (put in `:root`):
   matches appear in a keyboard-accessible dropdown and Enter/click opens the
   existing guarded system route. It is present in every view; a view switch clears the
   query, and the GitHub filter also narrows the PROJECTS directory.
-  A persistent gear opens `SETTINGS · GRAPHICS · PROJECT PATHS`. Graphics quality is a
+  A persistent gear opens Settings, one tab at a time: Graphics · Panels · Shortcuts · Projects · Backup
+  (`app/settings-tabs.js`; arrow keys, Home and End move between the tabs, the last tab chosen
+  stays chosen while the app runs, and Settings opens on Projects while a project folder is
+  missing). On Graphics, quality is a
   stepped slider over `AUR.app.const.RENDER_QUALITIES` (Low · Balanced · High), kept per
   viewer in localStorage; High is the default and the look every gate grades (§9). Below it,
   Space backdrop picks the look of the system and planet views' sky from `AUR.app.const.SKY_LOOKS`
   (Vivid · Soft · Distant · Faint; Distant is the default), and Orbit rings turns the system
   view's orbit rings on or off (on by default). Both are kept per viewer in localStorage
-  (`app/scenery.js`) and change the open view at once. Missing project folders
+  (`app/scenery.js`) and change the open view at once. On Panels (`app/panels/look.js`, both
+  kept per viewer), Panel opacity sets the fill of the rail modules, the compact rail buttons and
+  the timeline from 20% to solid through one token, `--panel-fill`; 86%, the alpha of `--paper`, is
+  the default, text and controls stay, and at 100% the panels drop their blur. Text size zooms the
+  chrome around the star chart (top bar, rails, view title and hint, timeline, planet tab bar,
+  directory, panels menu, toast and Settings) by 100 · 110 · 125 · 150%
+  with CSS `zoom`; the star chart keeps its size. The zoom stops where the window would leave the
+  chrome less than 1024 × 576 CSS px, the least room it was checked to lay out in without its parts
+  overlapping (`C.TEXT_SIZE_ROOM`), and Settings says so under the sizes when it does. While a
+  control for those two has focus, the dimming behind Settings lifts so the panels show as they
+  change. Panels also holds the At launch layout (see Panels below). On Projects, missing project folders
   can be recovered with a bounded scan beneath a user-chosen parent or a
   native `Locate…` picker. Scan matches require explicit confirmation, remaps
-  keep the original project ID/history, and path changes are LIVE-only.
+  keep the original project ID/history, and path changes are LIVE-only. Backup exports the
+  universe to one file and merges one back in (`app/project/backup.js`).
 - **Right sidebar** (fixed ~330px, full height under top bar, panel style):
   - `ACTIVE AGENTS` header with right-aligned `N Running`.
     Rows: small ship glyph (inline SVG, tinted from the provider palette), name
@@ -260,16 +274,37 @@ Design tokens (put in `:root`):
     (wrap 2 lines max), right-aligned relative time (`12s ago`). Newest on top,
     cap 30 rows. Kind colors: build `#4da3ff`, form `#ffb454`, spawn `#34d399`,
     depart/info `#8b93a8`, discover `#a78bfa`.
+  - **Expanded feed** (`app/panels/feed.js`). The feed header's expand button, or *Expand the event feed* in the panels menu, widens the right rail to 46% of the window, up to 640 px and never narrower than the rail was. A width dragged while expanded is kept apart (`rightExpanded`). The feed takes the rail's height and lists every event it keeps (60):
+    - each event's time of day and its whole sentence
+    - a search by agent, project or file, and filter chips with counts: All, Builds, Ships, Attention, Systems (`AUR.feedGroup`: build and form are Builds, attention and done Attention, discover Systems, the rest Ships)
+    - "{n} of {total} shown" below
+    - a "{n} new events" jump back to the top when events arrive while the list is scrolled; a scrolled list keeps its place (rows are kept per event, and `overflow-anchor` holds the view), and a text selection survives new events
+    - a click that ends a selection of a row's text does not open the row's system
+    - The rail's other panels show folded without changing their own state. Folding or hiding the feed, folding the right rail (Fold every panel too), or opening one of the rail's other panels puts the feed back.
 - Agent rows and feed rows are clickable: clicking one opens the system view
   of that entry's project (no-op if already viewing that system; pointer
   cursor + hover tint signal it).
-- **Bottom-left summary card** (panel): 3–4 big-number stats per view (below).
-- Every module on either rail (project card, needs-you, tasks, planet card, summary, fleet,
-  galaxies, event feed, ideas) folds to its header from the chevron at the right of the header,
-  and each rail folds from the chevron at its top: the left rail to a strip, the right rail to
-  its compact section buttons. The top bar's panels button folds or opens both rails at once.
-  One mechanism (`app/modules.js`, `[data-module]` + `.is-collapsed`); the set of folded
-  keys persists in localStorage.
+- **Summary card** (left rail, hidden at launch by default): 3–4 big-number stats per view (below).
+- **Panels.** Every panel is open, folded to its header, or hidden.
+  - **Which panels.** The panels are Needs you, Summary, Project, Tasks and Planet on the left rail; Fleet, Galaxies, Event feed and Ideas on the right; and the Timeline at the bottom. The tables of rails and panels are `panel-layout.js`, a UMD helper the Node tests share; the menu, Settings, folding and the compact rail read them.
+  - **Folding.** A panel folds from the chevron at the right of its header. Each rail folds from the chevron at its top: the left rail to a strip, the right rail to its compact section buttons. The top bar's panels button folds or opens both rails at once. Folding is one mechanism: `app/modules.js`, `[data-module]` plus `.is-collapsed`.
+  - **Hiding.** A panel hides from the panels menu (the caret beside the panels button, `app/panels/menu.js`). The menu lists the panels the view shows, with a tick each, and actions to fold every panel, start every run with this layout, and open Settings › Panels.
+    - A hidden panel takes `.is-dismissed`, apart from the `.hidden` a view sets, and keeps its fold for when it comes back.
+    - Hiding shows a toast with Undo (`app/toast.js`), centred under the top bar.
+    - A hidden Galaxies list skips its renders and renders as it comes back.
+    - Needs you never hides and the timeline never folds.
+    - A rail with no panel on screen takes no room, and the view's name or hint moves into it (CSS `:has()` in `hud.css`). With the timeline hidden, `--dock-h` is 0, so the chrome above it reaches down.
+  - **Resizing** (`app/panels/resize.js`). Sizes are CSS px, so they grow with the text size, and are stored per viewer (`agent-universe.panel-sizes.v1`).
+    - **Rail width.** A rail's inner edge is a `role=separator` grip. It drags the rail's width (`--rail-l`, `--rail-r`), down to 240 px, with no other limit than stopping 24 px short of the other rail (`fitRails` in `panel-layout.js`). When the two do not fit, the side being dragged or put back gives way, otherwise the left rail. The view title and hint, the directory and the camera's clear area follow.
+    - **Panel height.** The gap under Needs you, Summary, Fleet, Galaxies, the Event feed or Ideas drags that panel's height (`--panel-h` with `.is-sized`). A sized panel keeps its height and gives it up last when its rail runs short, so it never pushes the rail past its end. It folds as usual.
+    - **Keys and reset.** Arrow keys step 16 px, Shift 64; Home and End go to the least and greatest size; Enter or a double-click puts one size back; the panels menu's *Reset panel sizes* puts them all back. A hairline shows on hover and turns orange with a size badge while dragged or focused.
+  - **Each run.** Every run starts from the At launch layout in Settings › Panels (`app/panels/launch.js`, stored in localStorage). By default Summary and Galaxies are hidden, Tasks and Ideas folded, and the rest open. The menu, the chevrons and the keys change only the run in progress. The first run with launch layouts carries over the panels folded before.
+- **Keyboard shortcuts** (`shortcuts.js`, a UMD table the Node tests share, run by `app/keys.js`). Settings › Shortcuts lists them and turns single keys on or off (`agent-universe.single-keys.v1`, on by default).
+  - **Go to and views.** `/` or Ctrl K focuses the search; Backspace goes back one level; N opens the first agent that needs you; Ctrl , opens Settings and ? opens it on Shortcuts. On macOS ⌘ stands in for Ctrl.
+  - **Timeline.** Space plays or pauses history; L returns to live.
+  - **Panels.** `[` and `]` fold or open the left and the right rail, `\` every panel, and Shift E expands the event feed or puts it back. A panel's `letter` in `panel-layout.js` hides or shows it: F Fleet, G Galaxies, E Event feed, I Ideas, S Summary, P Project, T Tasks. In a view without that panel, a toast says where it shows.
+  - **When a key is not a shortcut.** Single keys wait while a text field has focus, while Settings is open, with Alt held, and while they are off; Space on a focused button presses the button. Ctrl shortcuts always work. Escape closes the panels menu, then Settings, then the expanded feed, then the toast, unless the agent view, the directory or the search took it first, or a text field with text has focus.
+  - **Hints.** The panels menu and the At launch rows show each panel's key, the menu's actions theirs, the hiding toast says which key shows the panel again, the search shows `/`, the view hint ends with `? shortcuts`, and the panels button and the feed's expand button give theirs in their titles and `aria-keyshortcuts`. Single-key hints go while single keys are off.
 - **Back control** (system + planet views, top-left under the project card or
   above it): `← Universe` / `← Orion System` style button.
 - **History bar** (all views, fixed bottom): Play/Pause, `1x`/`10x`/`100x`/

@@ -12,8 +12,7 @@
   AUR.chromeBounds = function (canvas) {
     const edge = (id, side, fallback) => {
       const el = document.getElementById(id);
-      if (!el || el.classList.contains('hidden') || getComputedStyle(el).display === 'none') return fallback;
-      return el.getBoundingClientRect()[side];
+      return AUR.isShown(el) ? el.getBoundingClientRect()[side] : fallback;
     };
     const width = canvas.clientWidth, height = canvas.clientHeight;
     const top = edge('topbar', 'bottom', 0) + 8;

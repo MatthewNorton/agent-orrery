@@ -1,6 +1,7 @@
 // @ts-check
-// Project path settings (missing-folder recovery, forgetting a missing project). The
-// dialog's backup section is app/project/backup.js.
+// The Settings dialog: opening and closing it, and its Projects tab (missing-folder recovery,
+// forgetting a missing project). The tabs are app/settings-tabs.js and Backup is
+// app/project/backup.js; the other tabs' controls are wired by the modules they set.
 'use strict';
 
 /**
@@ -42,6 +43,7 @@
       if (!inside) closeProjectSettings();
     });
     A.wireUniverseBackup();
+    A.wireSettingsTabs();
     A.renderProjectSettings();
   };
 
@@ -58,12 +60,11 @@
     A.closeProjectDirectory(false);
     resetSettingsSession(true);
     els.button.setAttribute('aria-expanded', 'true');
+    // A missing project folder is what the gear's count says, so Settings opens on Projects then.
+    if (missingPathProjects().length > 0) A.showSettingsTab('projects');
     els.dialog.showModal();
     A.renderProjectSettings();
-    requestAnimationFrame(() => {
-      const target = !els.scan.disabled ? els.scan : els.close;
-      target.focus();
-    });
+    requestAnimationFrame(A.focusSettingsTab);
   };
 
   function closeProjectSettings() {
