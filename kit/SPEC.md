@@ -250,14 +250,15 @@ Design tokens (put in `:root`):
   view's orbit rings on or off (on by default). Both are kept per viewer in localStorage
   (`app/scenery.js`) and change the open view at once. On Panels (`app/panels/look.js`, both
   kept per viewer), Panel opacity sets the fill of the rail modules, the compact rail buttons and
-  the timeline from 20% to solid; 86%, the alpha of `--paper`, is the default, and text, controls
-  and the blur stay. Text size zooms the chrome around the star chart (top bar, rails, view
-  title and hint, timeline, planet tab bar, directory and Settings) by 100 · 110 · 125 · 150%
+  the timeline from 20% to solid through one token, `--panel-fill`; 86%, the alpha of `--paper`, is
+  the default, text and controls stay, and at 100% the panels drop their blur. Text size zooms the
+  chrome around the star chart (top bar, rails, view title and hint, timeline, planet tab bar,
+  directory, panels menu, toast and Settings) by 100 · 110 · 125 · 150%
   with CSS `zoom`; the star chart keeps its size. The zoom stops where the window would leave the
   chrome less than 1024 × 576 CSS px, the least room it was checked to lay out in without its parts
   overlapping (`C.TEXT_SIZE_ROOM`), and Settings says so under the sizes when it does. While a
-  control on Panels has focus, the
-  dimming behind Settings lifts so the panels show as they change. On Projects, missing project folders
+  control for those two has focus, the dimming behind Settings lifts so the panels show as they
+  change. Panels also holds the At launch layout (see Panels below). On Projects, missing project folders
   can be recovered with a bounded scan beneath a user-chosen parent or a
   native `Locate…` picker. Scan matches require explicit confirmation, remaps
   keep the original project ID/history, and path changes are LIVE-only. Backup exports the
@@ -276,13 +277,17 @@ Design tokens (put in `:root`):
 - Agent rows and feed rows are clickable: clicking one opens the system view
   of that entry's project (no-op if already viewing that system; pointer
   cursor + hover tint signal it).
-- **Bottom-left summary card** (panel): 3–4 big-number stats per view (below).
-- Every module on either rail (project card, needs-you, tasks, planet card, summary, fleet,
-  galaxies, event feed, ideas) folds to its header from the chevron at the right of the header,
-  and each rail folds from the chevron at its top: the left rail to a strip, the right rail to
-  its compact section buttons. The top bar's panels button folds or opens both rails at once.
-  One mechanism (`app/modules.js`, `[data-module]` + `.is-collapsed`); the set of folded
-  keys persists in localStorage.
+- **Summary card** (left rail, hidden at launch by default): 3–4 big-number stats per view (below).
+- **Panels.** Every panel is open, folded to its header, or hidden.
+  - **Which panels.** The panels are Needs you, Summary, Project, Tasks and Planet on the left rail; Fleet, Galaxies, Event feed and Ideas on the right; and the Timeline at the bottom. The tables of rails and panels are `panel-layout.js`, a UMD helper the Node tests share; the menu, Settings, folding and the compact rail read them.
+  - **Folding.** A panel folds from the chevron at the right of its header. Each rail folds from the chevron at its top: the left rail to a strip, the right rail to its compact section buttons. The top bar's panels button folds or opens both rails at once. Folding is one mechanism: `app/modules.js`, `[data-module]` plus `.is-collapsed`.
+  - **Hiding.** A panel hides from the panels menu (the caret beside the panels button, `app/panels/menu.js`). The menu lists the panels the view shows, with a tick each, and actions to fold every panel, start every run with this layout, and open Settings › Panels.
+    - A hidden panel takes `.is-dismissed`, apart from the `.hidden` a view sets, and keeps its fold for when it comes back.
+    - Hiding shows a toast with Undo (`app/toast.js`), centred under the top bar.
+    - A hidden Galaxies list skips its renders and renders as it comes back.
+    - Needs you never hides and the timeline never folds.
+    - A rail with no panel on screen takes no room, and the view's name or hint moves into it (CSS `:has()` in `hud.css`). With the timeline hidden, `--dock-h` is 0, so the chrome above it reaches down.
+  - **Each run.** Every run starts from the At launch layout in Settings › Panels (`app/panels/launch.js`, stored in localStorage). By default Summary and Galaxies are hidden, Tasks and Ideas folded, and the rest open. The menu and the chevrons change only the run in progress. The first run with launch layouts carries over the panels folded before.
 - **Back control** (system + planet views, top-left under the project card or
   above it): `← Universe` / `← Orion System` style button.
 - **History bar** (all views, fixed bottom): Play/Pause, `1x`/`10x`/`100x`/

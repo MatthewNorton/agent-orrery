@@ -74,6 +74,9 @@
   overflow-y: auto;
   padding: 4px;
   z-index: 30;
+}
+/* the top bar's dropdowns stand on a solid plate */
+.search-results, .panels-menu {
   background: var(--paper-solid);
   border: 1px solid var(--hair-2);
   border-radius: var(--radius-0);
@@ -196,3 +199,38 @@
   background: var(--red-fill); color: var(--on-red);
   font-family: var(--font-mono); font-size: 12px; line-height: 1;
 }
+
+/* The panels button's caret opens the panels menu: a tick per panel, then actions for the layout. */
+.panels-caret { width: 22px; margin-left: calc(-1 * var(--space-4) - 1px); }
+.panels-caret svg { width: 10px; height: 10px; fill: none; stroke: currentColor; stroke-width: 1.5; }
+.panels-caret[aria-expanded="true"] { background: var(--plate); }
+.panels-menu {
+  position: fixed;
+  top: calc(var(--bar-h) + 4px);
+  right: calc(var(--space-3) + var(--control-h-lg) + var(--space-4));
+  z-index: 30;
+  width: 300px;
+  padding: var(--space-1) 0;
+}
+.panels-menu-head { display: flex; align-items: baseline; justify-content: space-between; padding: var(--space-2) var(--space-3); }
+.panels-menu-label { padding: var(--space-2) var(--space-3) 4px; color: var(--ink-3); font-size: 12px; font-weight: 600; }
+.panels-menu-item {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; height: var(--control-h); padding: 0 var(--space-3);
+  border: 0; background: transparent; color: var(--ink);
+  font: 500 13px/1 var(--font-sans); text-align: left;
+  cursor: pointer;
+}
+.panels-menu-item:hover, .panels-menu-item:focus-visible { background: var(--plate); outline: none; }
+.panels-menu-item[aria-disabled="true"] { color: var(--ink-3); cursor: default; }
+.panels-menu-name { flex: 1 1 auto; }
+.panels-menu-note { color: var(--ink-3); font-size: 12px; }
+.panels-menu-check { position: relative; flex: none; width: 12px; height: 12px; border: 1px solid var(--ink-3); }
+.panels-menu-item[aria-checked="true"] .panels-menu-check { border-color: var(--ink); background: var(--ink); }
+.panels-menu-item[aria-checked="true"] .panels-menu-check::after {
+  content: ""; position: absolute; left: 3px; top: 0;
+  width: 3px; height: 7px;
+  border: solid var(--paper-solid); border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+}
+.panels-menu-sep { height: 1px; margin: var(--space-1) 0; background: var(--hair); }

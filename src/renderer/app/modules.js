@@ -1,17 +1,27 @@
 // @ts-check
 // Folding chrome: any `[data-module]` (a module on either rail, or a rail itself)
 // folds to its header from the `.mod-x` chevron in that header. One delegated click listener
-// serves them all, the top bar's panels button folds or opens both rails at once, and the set
-// of folded keys persists between runs.
+// serves them all, and the top bar's panels button folds or opens both rails at once. Folds
+// last for the run; each run starts from the At launch layout (app/panels/layout.js).
 'use strict';
 
 (function () {
   const AUR = window.AUR;
   const A = AUR.app;
   if (!A) throw new Error('app/state.js must load before app/modules.js');
-  const S = A.state, C = A.const;
+  const S = A.state;
 
-  const RAILS = ['rail-left', 'rail-right'];
+  /** @type {string[]} the rails' own data-module keys */
+  const RAILS = window.AUR_PANEL_LAYOUT.RAILS.map((/** @type {{ module: string }} */ r) => r.module).filter(Boolean);
+  const allFolded = () => RAILS.every((key) => S.modules.collapsed.has(key));
+
+  /** What the panels button does next: fold both rails, or open them. */
+  A.foldAllLabel = () => (allFolded() ? 'Open every panel' : 'Fold every panel');
+
+  A.toggleAllRails = function toggleAllRails() {
+    const fold = !allFolded();
+    for (const key of RAILS) A.setModuleCollapsed(key, fold);
+  };
 
   /** @param {HTMLElement} section */
   function applyModuleState(section) {
@@ -28,9 +38,8 @@
   function syncPanelsToggle() {
     const button = document.getElementById('panels-toggle');
     if (!button) return;
-    const folded = RAILS.every((key) => S.modules.collapsed.has(key));
-    button.setAttribute('aria-pressed', String(folded));
-    button.title = folded ? 'Open every panel' : 'Fold every panel';
+    button.setAttribute('aria-pressed', String(allFolded()));
+    button.title = A.foldAllLabel();
     button.setAttribute('aria-label', button.title);
   }
 
@@ -38,7 +47,6 @@
   A.setModuleCollapsed = function setModuleCollapsed(key, collapsed) {
     if (collapsed) S.modules.collapsed.add(key);
     else S.modules.collapsed.delete(key);
-    AUR.storeJson(C.MODULES_STORAGE_KEY, [...S.modules.collapsed]);
     const section = /** @type {HTMLElement | null} */ (document.querySelector(`[data-module="${key}"]`));
     if (section) applyModuleState(section);
     syncPanelsToggle();
@@ -63,8 +71,6 @@
   };
 
   A.wireModules = function wireModules() {
-    const keys = AUR.storedJson(C.MODULES_STORAGE_KEY, []);
-    S.modules.collapsed = new Set(Array.isArray(keys) ? keys.filter((key) => typeof key === 'string') : []);
     document.addEventListener('click', (event) => {
       const toggle = event.target instanceof Element ? event.target.closest('.mod-x') : null;
       const section = toggle && /** @type {HTMLElement | null} */ (toggle.closest('[data-module]'));
@@ -72,13 +78,7 @@
       const key = section.dataset.module || '';
       A.setModuleCollapsed(key, !S.modules.collapsed.has(key));
     });
-    const panels = document.getElementById('panels-toggle');
-    if (panels) {
-      panels.addEventListener('click', () => {
-        const fold = !RAILS.every((key) => S.modules.collapsed.has(key));
-        for (const key of RAILS) A.setModuleCollapsed(key, fold);
-      });
-    }
+    document.getElementById('panels-toggle')?.addEventListener('click', A.toggleAllRails);
     const sections = /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('[data-module]'));
     for (const section of sections) applyModuleState(section);
     syncPanelsToggle();

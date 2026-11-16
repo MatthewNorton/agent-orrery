@@ -9,6 +9,8 @@ declare global {
   var AUR_POLISH: any;
   /** galaxy-layout.js (UMD). */
   var AUR_GALAXY: any;
+  /** panel-layout.js (UMD). */
+  var AUR_PANEL_LAYOUT: any;
 }
 
 export {};

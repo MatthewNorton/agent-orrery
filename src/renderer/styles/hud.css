@@ -119,3 +119,31 @@ body:not([data-view="universe"]) .view-hint-universe { display: none; }
 .needs-name em { font-style: normal; color: var(--tint); }
 .needs-wait { grid-row: 1; grid-column: 2; font-family: var(--font-mono); font-size: 13px; font-weight: 500; color: var(--tint); }
 .needs-sub { grid-column: 1 / -1; font-family: var(--font-mono); font-size: 12px; line-height: 15px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* A rail with no panel on screen, hidden by the view or by the viewer, takes no room, and the view's
+   name or hint moves into its space. With the timeline hidden, the chrome above it reaches down. */
+body:not(:has(#rail-left > .mod:not(.hidden, .is-dismissed))) #rail-left,
+body:not(:has(#sidebar > .mod:not(.hidden, .is-dismissed))) #sidebar { display: none; }
+body:not(:has(#rail-left > .mod:not(.hidden, .is-dismissed))) .view-title { left: var(--space-3); }
+body:not(:has(#sidebar > .mod:not(.hidden, .is-dismissed))) .view-hint { right: var(--space-3); }
+body:not(:has(#sidebar > .mod:not(.hidden, .is-dismissed))) { --sidebar-effective-w: 0px; }
+body:has(#history-bar.is-dismissed) { --dock-h: 0px; }
+
+/* the toast: one line and an optional Undo, centred under the top bar, where no other chrome sits */
+.toast {
+  position: fixed;
+  left: 50%; top: calc(var(--bar-h) + var(--space-3));
+  transform: translateX(-50%);
+  z-index: 25;
+  display: flex; align-items: center; gap: var(--space-3);
+  min-height: var(--control-h-lg);
+  padding: 0 var(--space-1) 0 var(--space-3);
+  background: var(--paper-solid);
+  border: 1px solid var(--hair-2);
+  border-radius: var(--radius-0);
+  box-shadow: var(--shadow-plate);
+  color: var(--ink);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.toast:empty { min-height: 0; padding: 0; border: 0; box-shadow: none; }

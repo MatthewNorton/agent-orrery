@@ -65,6 +65,11 @@
       aria-label="Fold every panel" aria-pressed="false" title="Fold every panel">
       <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="2.5" width="13" height="11"></rect><path d="M5 2.5v11M11 2.5v11"></path></svg>
     </button>
+    <button class="settings-button panels-caret" id="panels-menu-button" type="button"
+      aria-label="Show or hide panels" title="Show or hide panels" aria-haspopup="menu"
+      aria-expanded="false" aria-controls="panels-menu">
+      <svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2 3.5l3 3 3-3"></path></svg>
+    </button>
     <button class="settings-button" id="settings-button" type="button"
       aria-label="Settings" aria-haspopup="dialog"
       aria-controls="settings-dialog" aria-expanded="false" title="Settings">
@@ -72,6 +77,8 @@
       <span class="settings-count hidden" id="settings-count" aria-hidden="true">0</span>
     </button>
   </header>
+  <!-- The panels menu, filled by app/panels/menu.js when it opens -->
+  <div class="panels-menu" id="panels-menu" role="menu" aria-label="Panels" hidden></div>
 
   <!-- Settings stay above the current scene; they are not a fourth view. One tab's pane shows at
        a time (app/settings-tabs.js). -->
@@ -149,6 +156,20 @@
             aria-describedby="text-size-note"></div>
           <p class="settings-status" id="text-size-note"></p>
         </div>
+        <div class="settings-summary-row settings-section">
+          <div>
+            <h3 id="panel-launch-title">At launch</h3>
+            <p>Each run starts from this layout. The panels menu and the fold buttons change only the run you are in.</p>
+          </div>
+        </div>
+        <!-- A row per panel in AUR_PANEL_LAYOUT.PANELS, added by app/panels/launch.js. -->
+        <div class="panel-launch" id="panel-launch" role="group" aria-labelledby="panel-launch-title"></div>
+        <div class="settings-actions panel-launch-actions">
+          <button class="settings-locate" id="panel-launch-current" type="button">Use the current layout</button>
+          <button class="settings-locate" id="panel-launch-apply" type="button">Apply now</button>
+          <button class="settings-locate" id="panel-launch-defaults" type="button">Restore defaults</button>
+        </div>
+        <p class="settings-status" id="panel-launch-status" role="status" aria-live="polite"></p>
       </div>
       <div class="settings-body" id="settings-pane-projects" role="tabpanel"
         aria-labelledby="settings-tab-projects" tabindex="0" hidden>
@@ -412,6 +433,9 @@
     </div>
   </section>
 
+  <!-- One toast at a time, above the timeline (app/toast.js); empty and invisible between toasts -->
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
   <!-- Persistent live/history controls: the timeline dock -->
   <section class="panel mod history-bar" id="history-bar" data-mode="live" data-playing="false"
     aria-label="History playback">
@@ -468,6 +492,7 @@
   <script src="ship-assets-api.js"></script>
   <script src="polish-math.js"></script>
   <script src="galaxy-layout.js"></script>
+  <script src="panel-layout.js"></script>
   <script src="galaxy-field.js"></script>
   <script src="search-core.js"></script>
   <script src="components/project-vcs-status.js"></script>
@@ -506,7 +531,11 @@
   <script src="app/project/backup.js"></script>
   <script src="app/render-quality.js"></script>
   <script src="app/scenery.js"></script>
+  <script src="app/toast.js"></script>
   <script src="app/panels/look.js"></script>
+  <script src="app/panels/layout.js"></script>
+  <script src="app/panels/menu.js"></script>
+  <script src="app/panels/launch.js"></script>
   <script src="app/settings-tabs.js"></script>
   <script src="app/project/tasks.js"></script>
   <script src="app/replay.js"></script>

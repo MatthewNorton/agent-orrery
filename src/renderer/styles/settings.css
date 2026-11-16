@@ -79,7 +79,7 @@
 }
 .settings-body { min-height: 0; padding: var(--space-4) var(--space-3); overflow-y: auto; scrollbar-width: thin; }
 .settings-summary-row { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); }
-.settings-summary-row h3 { color: var(--ink); font-size: 13px; font-weight: 600; }
+.settings-summary-row h3, .panel-launch-title { color: var(--ink); font-size: 13px; font-weight: 600; }
 .settings-summary-row p { margin-top: 4px; color: var(--ink-3); font-size: 12.5px; line-height: 1.5; }
 .settings-summary {
   flex: 0 0 auto;
@@ -169,7 +169,8 @@
   overflow-wrap: anywhere;
   user-select: text;
 }
-.settings-no-match { margin-top: 8px; color: var(--ink-3); font-size: 12px; }
+.settings-no-match, .panel-launch-where { color: var(--ink-3); font-size: 12px; }
+.settings-no-match { margin-top: 8px; }
 
 /* Graphics quality: a stepped slider over the tiers, the chosen one named at the right. */
 .settings-quality-value { color: var(--ink-2); border-color: var(--hair-2); }
@@ -182,3 +183,9 @@
 .settings-toggle { min-width: 56px; }
 .settings-locate[aria-pressed='true'] { border-color: var(--armour); background: var(--armour); color: var(--on-armour); }
 .settings-locate[aria-pressed='true']:hover:not(:disabled) { border-color: var(--armour-2); background: var(--armour-2); }
+/* At launch: a row per panel, its name and where it shows, then Open, Folded or Hidden. */
+.panel-launch { display: grid; gap: var(--space-2); }
+.panel-launch-group { margin: var(--space-3) 0 0; color: var(--ink-3); font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+.panel-launch-row { display: grid; grid-template-columns: minmax(0, 1fr) 264px; align-items: center; gap: var(--space-3); }
+.panel-launch-name { display: grid; gap: 2px; min-width: 0; }
+.panel-launch-actions { margin-top: var(--space-4); }
