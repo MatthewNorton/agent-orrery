@@ -11,6 +11,9 @@
 
   /** @param {number} fraction */
   const percent = (fraction) => Math.round(fraction * 100) + '%';
+  // The zoom the chrome shows at, for code that measures it in CSS px (app/panels/resize.js).
+  let zoom = 1;
+  A.uiZoom = () => zoom;
 
   // The zoom the window has room for: the chosen size, down to 100% in a window too small for it.
   function fittedZoom() {
@@ -31,7 +34,6 @@
     const sizeValue = document.getElementById('text-size-value');
     const sizeNote = document.getElementById('text-size-note');
     if (!slider || !opacityValue || !sizes || !sizeValue || !sizeNote) return;
-    let zoom = 1;
 
     // At the default the fill is the --paper token itself; a solid fill needs no blur behind it.
     function applyOpacity() {
@@ -56,6 +58,7 @@
     function applySize() {
       zoom = fittedZoom();
       root.style.setProperty('--ui-zoom', String(zoom));
+      A.fitRails();
       pressSize(S.textSize);
       sizeValue.textContent = percent(S.textSize);
       sizeNote.textContent = zoom < S.textSize

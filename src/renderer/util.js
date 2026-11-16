@@ -236,6 +236,8 @@
     if (text != null) n.textContent = text;
     return n;
   };
+  // On screen: there, without the .hidden class a view sets, and not display: none.
+  AUR.isShown = (n) => Boolean(n) && !n.classList.contains('hidden') && getComputedStyle(n).display !== 'none';
   AUR.button = function button(cls, text, onClick) {
     const n = AUR.el('button', cls, text);
     n.type = 'button';

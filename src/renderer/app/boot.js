@@ -36,6 +36,7 @@
       }
     });
     const onChromeResize = () => {
+      A.refitRails();
       A.applyRenderScale();
       S.engine.resize();
       if (S.activeView) S.activeView.resize();

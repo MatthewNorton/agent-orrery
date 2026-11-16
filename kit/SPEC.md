@@ -287,6 +287,10 @@ Design tokens (put in `:root`):
     - A hidden Galaxies list skips its renders and renders as it comes back.
     - Needs you never hides and the timeline never folds.
     - A rail with no panel on screen takes no room, and the view's name or hint moves into it (CSS `:has()` in `hud.css`). With the timeline hidden, `--dock-h` is 0, so the chrome above it reaches down.
+  - **Resizing** (`app/panels/resize.js`). Sizes are CSS px, so they grow with the text size, and are stored per viewer (`agent-universe.panel-sizes.v1`).
+    - **Rail width.** A rail's inner edge is a `role=separator` grip. It drags the rail's width (`--rail-l`, `--rail-r`), down to 240 px, with no other limit than stopping 24 px short of the other rail (`fitRails` in `panel-layout.js`). When the two do not fit, the side being dragged or put back gives way, otherwise the left rail. The view title and hint, the directory and the camera's clear area follow.
+    - **Panel height.** The gap under Needs you, Summary, Fleet, Galaxies, the Event feed or Ideas drags that panel's height (`--panel-h` with `.is-sized`). A sized panel keeps its height and gives it up last when its rail runs short, so it never pushes the rail past its end. It folds as usual.
+    - **Keys and reset.** Arrow keys step 16 px, Shift 64; Home and End go to the least and greatest size; Enter or a double-click puts one size back; the panels menu's *Reset panel sizes* puts them all back. A hairline shows on hover and turns orange with a size badge while dragged or focused.
   - **Each run.** Every run starts from the At launch layout in Settings › Panels (`app/panels/launch.js`, stored in localStorage). By default Summary and Galaxies are hidden, Tasks and Ideas folded, and the rest open. The menu and the chevrons change only the run in progress. The first run with launch layouts carries over the panels folded before.
 - **Back control** (system + planet views, top-left under the project card or
   above it): `← Universe` / `← Orion System` style button.
