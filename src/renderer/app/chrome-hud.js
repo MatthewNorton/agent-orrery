@@ -85,7 +85,8 @@
     const list = document.getElementById('galaxies-list');
     const count = document.getElementById('galaxies-count');
     const GALAXY = window.AUR_GALAXY;
-    if (!list || !GALAXY) return;
+    // Hidden, the list waits; app/panels/layout.js renders it as it comes back.
+    if (!list || !GALAXY || S.panels.hidden.has('galaxies')) return;
     const keyOf = new Map();
     const rows = new Map();
     for (const p of S.store.projects.values()) {

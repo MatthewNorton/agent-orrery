@@ -1,20 +1,24 @@
-/* settings.css — The settings dialog: graphics quality, backups, and recovering or forgetting
-   moved projects.
+/* settings.css — The settings dialog, in tabs: graphics, the panels' look, recovering or
+   forgetting moved projects, and backups.
    Values come from tokens.css only. */
+/* Pinned under the top bar, so the tabs stay put when a tab's pane is shorter or taller. */
 .settings-dialog {
-  width: min(680px, calc(100vw - 40px));
+  width: min(680px, calc(100vw / var(--ui-zoom) - 40px));
   max-width: none;
-  max-height: calc(100vh - 96px);
+  max-height: calc(100vh / var(--ui-zoom) - 96px);
+  margin: calc(var(--bar-h) + var(--space-4)) auto auto;
   padding: 0;
   color: var(--ink);
   background: transparent;
   border: 0;
   overflow: visible;
 }
-.settings-dialog::backdrop { background: var(--chart-vignette); }
+.settings-dialog::backdrop { background: var(--chart-vignette); transition: opacity var(--dur-collapse) var(--ease); }
+/* While a control on the Panels tab has focus, the dimming lifts so the panels show as they change. */
+.settings-dialog:has(#settings-look :focus)::backdrop { opacity: 0.15; }
 .settings-shell {
   width: 100%;
-  max-height: calc(100vh - 96px);
+  max-height: inherit;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -32,11 +36,32 @@
   padding: 0 var(--space-1) 0 var(--space-3);
   border-bottom: 1px solid var(--hair);
 }
-.settings-head > div { display: flex; align-items: baseline; gap: var(--space-2); }
-.settings-head h2, .settings-head p, .settings-summary-row h3,
+.settings-head h2, .settings-summary-row h3,
 .settings-summary-row p, .settings-status { margin: 0; }
 .settings-head h2 { color: var(--ink); font-size: 12px; font-weight: 700; letter-spacing: 0.1em; line-height: 1; text-transform: uppercase; }
-.settings-head p { color: var(--ink-3); font-size: 12px; font-weight: 500; text-transform: none; letter-spacing: 0; }
+/* Tabs: one section at a time, the chosen tab underlined in orange. */
+.settings-tabs { display: flex; flex: none; padding: 0 var(--space-1); border-bottom: 1px solid var(--hair); }
+.settings-tab {
+  position: relative;
+  height: var(--row-h);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-0);
+  background: transparent;
+  color: var(--ink-3);
+  font: 600 12.5px/1 var(--font-sans);
+  cursor: pointer;
+}
+.settings-tab:hover { color: var(--ink-2); }
+.settings-tab[aria-selected='true'] { color: var(--ink); }
+.settings-tab[aria-selected='true']::after {
+  content: "";
+  position: absolute;
+  left: var(--space-3); right: var(--space-3); bottom: -1px;
+  height: 2px;
+  background: var(--orange);
+}
+.settings-tab:focus-visible, .settings-body:focus-visible { outline: 2px solid var(--orange); outline-offset: -2px; }
 .settings-close {
   margin-left: auto;
   width: 24px; height: 24px; padding: 0;
@@ -54,7 +79,7 @@
 }
 .settings-body { min-height: 0; padding: var(--space-4) var(--space-3); overflow-y: auto; scrollbar-width: thin; }
 .settings-summary-row { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); }
-.settings-summary-row h3 { color: var(--ink); font-size: 13px; font-weight: 600; }
+.settings-summary-row h3, .panel-launch-title { color: var(--ink); font-size: 13px; font-weight: 600; }
 .settings-summary-row p { margin-top: 4px; color: var(--ink-3); font-size: 12.5px; line-height: 1.5; }
 .settings-summary {
   flex: 0 0 auto;
@@ -144,16 +169,29 @@
   overflow-wrap: anywhere;
   user-select: text;
 }
-.settings-no-match { margin-top: 8px; color: var(--ink-3); font-size: 12px; }
+.settings-no-match, .panel-launch-where { color: var(--ink-3); font-size: 12px; }
+.settings-no-match { margin-top: 8px; }
 
 /* Graphics quality: a stepped slider over the tiers, the chosen one named at the right. */
 .settings-quality-value { color: var(--ink-2); border-color: var(--hair-2); }
 .settings-quality-scale { margin-top: 6px; display: flex; justify-content: space-between; color: var(--ink-3); font-size: 12px; }
 .settings-section { margin-top: var(--space-5); padding-top: var(--space-4); border-top: 1px solid var(--hair); }
 
-/* Space backdrop: one button per look, the chosen one filled. Orbit rings: one button, filled while on. */
+/* Space backdrop: one button per look, the chosen one filled (modules.css). Orbit rings: one button, filled while on. */
 .settings-choice { display: flex; gap: 6px; }
 .settings-choice .settings-locate { flex: 1 1 0; }
 .settings-toggle { min-width: 56px; }
-.settings-locate[aria-pressed='true'] { border-color: var(--armour); background: var(--armour); color: var(--on-armour); }
-.settings-locate[aria-pressed='true']:hover:not(:disabled) { border-color: var(--armour-2); background: var(--armour-2); }
+/* At launch: a row per panel, its name and where it shows, its key, then Open, Folded or Hidden. */
+.panel-launch { display: grid; gap: var(--space-2); }
+.panel-launch-group { margin: var(--space-3) 0 0; color: var(--ink-3); font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+.panel-launch-row { display: grid; grid-template-columns: minmax(0, 1fr) 20px 264px; align-items: center; gap: var(--space-3); }
+.panel-launch-row .key-hint { justify-self: end; }
+.panel-launch-choice { grid-column: 3; }
+.panel-launch-name { display: grid; gap: 2px; min-width: 0; }
+.panel-launch-actions { margin-top: var(--space-4); }
+/* Shortcuts: two columns of groups, a row per shortcut with its keys at the right */
+.key-list { columns: 2; column-gap: var(--space-5); }
+.key-group { margin-bottom: var(--space-4); break-inside: avoid; }
+.key-group h4 { margin: 0 0 4px; color: var(--ink-3); font-size: 12px; font-weight: 500; }
+.key-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-height: 30px; border-bottom: 1px solid var(--hair); color: var(--ink-2); font-size: 12.5px; }
+.key-or { padding: 0 2px; color: var(--ink-3); font-size: 12px; }

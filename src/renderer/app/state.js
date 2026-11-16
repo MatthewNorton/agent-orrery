@@ -15,7 +15,11 @@
     HISTORY_SLIDER_MAX: 10_000,
     HISTORY_MARKER_LIMIT: 24,
     SEARCH_DEBOUNCE_MS: 120,
+    // The folded modules before launch layouts (app/panels/layout.js reads it once, to carry them over).
     MODULES_STORAGE_KEY: 'agent-universe.modules.v1',
+    PANEL_LAUNCH_STORAGE_KEY: 'agent-universe.panels.launch.v1', // the At launch layout
+    PANEL_SIZES_STORAGE_KEY: 'agent-universe.panel-sizes.v1', // rail widths and panel heights, CSS px
+    TOAST_MS: 4500,
     AGENT_FOCUS_ENVIRONMENT_STORAGE_KEY: 'agent-universe.focus-environment.v2', // v2: exterior is the default
     AGENT_FOCUS_VANTAGE_STORAGE_KEY: 'agent-universe.focus-vantage.v1',
     RENDER_QUALITY_STORAGE_KEY: 'agent-universe.render-quality.v1',
@@ -36,6 +40,19 @@
       Object.freeze({ key: 'faint', label: 'Faint' }),
     ]),
     ORBIT_RINGS_STORAGE_KEY: 'agent-universe.orbit-rings.v1',
+    // Settings › Panels (app/panels/look.js): the panels' fill opacity in percent, and the text
+    // size of the chrome as a zoom factor.
+    PANEL_OPACITY_STORAGE_KEY: 'agent-universe.panel-opacity.v1',
+    PANEL_OPACITY_MIN: 20,
+    PANEL_OPACITY_DEFAULT: 86, // the alpha of the --paper token, which the panels keep at the default
+    PANEL_OPACITY_MAX: 100,
+    TEXT_SIZE_STORAGE_KEY: 'agent-universe.text-size.v1',
+    // Settings › Shortcuts (app/keys.js): whether single-key shortcuts are on.
+    SINGLE_KEYS_STORAGE_KEY: 'agent-universe.single-keys.v1',
+    TEXT_SIZES: Object.freeze([1, 1.1, 1.25, 1.5]),
+    // The least room, in CSS px, the chrome was checked to lay out in without its parts overlapping
+    // (the view title meets the right rail near 930 wide): text grows only while the window keeps it.
+    TEXT_SIZE_ROOM: Object.freeze({ width: 1024, height: 576 }),
     // Where agent focus puts the viewer: `camera` is 'exterior' (a chase camera outside the hull,
     // the default) or 'room' (first person inside it, behind a generated foreground `asset`).
     AGENT_FOCUS_ENVIRONMENTS: Object.freeze({
@@ -83,6 +100,8 @@
     renderQuality: C.RENDER_QUALITIES[C.RENDER_QUALITIES.length - 1], // the viewer's graphics tier
     skyLook: 'distant',  // a key of C.SKY_LOOKS
     orbitRings: true,
+    panelOpacity: C.PANEL_OPACITY_DEFAULT, // percent
+    textSize: 1,         // one of C.TEXT_SIZES
     lastNotificationAt: -Infinity,
 
     // ---------- runtime ----------
@@ -166,6 +185,9 @@
       els: null,
     },
     modules: { collapsed: new Set() }, // data-module keys of the modules folded to their header
+    // the panels hidden in this run (app/panels/layout.js) and the sizes the viewer dragged
+    // (app/panels/resize.js, panel-layout.js normalizeSizes)
+    panels: { hidden: new Set(), sizes: { rails: {}, panels: {} }, feedExpanded: false },
     commandRail: { els: null },
     agentFocus: {
       shipId: null,

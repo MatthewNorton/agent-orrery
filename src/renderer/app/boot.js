@@ -22,6 +22,7 @@
     }, true);
     A.wireRenderQuality();
     A.wireScenery();
+    A.wirePanels();
     S.engine.runRenderLoop(() => {
       if (S.activeScene && !S.activeScene.isDisposed) {
         try { S.activeScene.render(); } catch (e) { /* swallow transient swap frames */ }
@@ -35,6 +36,7 @@
       }
     });
     const onChromeResize = () => {
+      A.refitRails();
       A.applyRenderScale();
       S.engine.resize();
       if (S.activeView) S.activeView.resize();
@@ -56,6 +58,7 @@
     A.wireProjectSearch();
     A.wireProjectDirectory();
     A.wireProjectSettings();
+    A.wireKeys();
 
     // Subscribe before taking the snapshot. Every tracker event has a
     // monotonic sequence within its stream epoch, so batches racing the

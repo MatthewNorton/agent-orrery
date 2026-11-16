@@ -62,6 +62,8 @@
     depart: '#8b93a8', info: '#8b93a8', discover: '#a78bfa',
     attention: '#ff5d5d', done: '#34d399',
   };
+  // The expanded feed's filters: what was built, what needs the viewer, systems found, and ships.
+  AUR.FEED_GROUP = { build: 'builds', form: 'builds', attention: 'attention', done: 'attention', discover: 'systems' };
   AUR.SUN_COLORS = ['#ffb454', '#ff7a59', '#dfe6ff', '#ffd27d', '#9db8ff'];
   // The smallest sun on the universe map; galaxy stars never exceed it.
   AUR.SUN_DIAMETER_MIN = 1.2;
@@ -79,6 +81,7 @@
     return meta ? meta.label : '';
   };
   AUR.feedColor = (kind) => AUR.FEED_KIND[kind] || AUR.FEED_KIND.info;
+  AUR.feedGroup = (kind) => AUR.FEED_GROUP[kind] || 'ships';
   AUR.providerKey = function providerKey(value) {
     // A missing value is a pre-multi-provider ship. Those ships could only
     // have come from Claude, so retain that identity during a live upgrade.
@@ -236,6 +239,8 @@
     if (text != null) n.textContent = text;
     return n;
   };
+  // On screen: there, without the .hidden class a view sets, and not display: none.
+  AUR.isShown = (n) => Boolean(n) && !n.classList.contains('hidden') && getComputedStyle(n).display !== 'none';
   AUR.button = function button(cls, text, onClick) {
     const n = AUR.el('button', cls, text);
     n.type = 'button';
@@ -243,6 +248,14 @@
     return n;
   };
   AUR.clear = (node) => { while (node.firstChild) node.removeChild(node.firstChild); };
+  // A group of choice buttons, each paired with its value: a click picks that value, and the
+  // returned press(value) marks the chosen one with aria-pressed.
+  AUR.choiceButtons = function choiceButtons(pairs, onPick) {
+    for (const [button, value] of pairs) button.addEventListener('click', () => onPick(value));
+    return (current) => {
+      for (const [button, value] of pairs) button.setAttribute('aria-pressed', String(value === current));
+    };
+  };
 
   // Inline fleet/signal glyph used in the sidebar rows.
   AUR.shipSvg = function shipSvg(hex, signal) {
