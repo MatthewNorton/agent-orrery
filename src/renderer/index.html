@@ -73,18 +73,27 @@
     </button>
   </header>
 
-  <!-- Settings stay above the current scene; they are not a fourth view. -->
+  <!-- Settings stay above the current scene; they are not a fourth view. One tab's pane shows at
+       a time (app/settings-tabs.js). -->
   <dialog class="settings-dialog" id="settings-dialog" aria-labelledby="settings-title">
     <section class="panel settings-shell">
       <header class="settings-head">
-        <div>
-          <h2 id="settings-title">SETTINGS</h2>
-          <p>GRAPHICS · BACKUP · PROJECT PATHS</p>
-        </div>
+        <h2 id="settings-title">SETTINGS</h2>
         <button class="settings-close" id="settings-close" type="button"
           aria-label="Close settings">×</button>
       </header>
-      <div class="settings-body">
+      <div class="settings-tabs" id="settings-tabs" role="tablist" aria-label="Settings sections">
+        <button class="settings-tab" id="settings-tab-graphics" type="button" role="tab"
+          aria-controls="settings-pane-graphics" data-tab="graphics" aria-selected="true">Graphics</button>
+        <button class="settings-tab" id="settings-tab-panels" type="button" role="tab"
+          aria-controls="settings-pane-panels" data-tab="panels" aria-selected="false" tabindex="-1">Panels</button>
+        <button class="settings-tab" id="settings-tab-projects" type="button" role="tab"
+          aria-controls="settings-pane-projects" data-tab="projects" aria-selected="false" tabindex="-1">Projects</button>
+        <button class="settings-tab" id="settings-tab-backup" type="button" role="tab"
+          aria-controls="settings-pane-backup" data-tab="backup" aria-selected="false" tabindex="-1">Backup</button>
+      </div>
+      <div class="settings-body" id="settings-pane-graphics" role="tabpanel"
+        aria-labelledby="settings-tab-graphics" tabindex="0">
         <div class="settings-summary-row">
           <div>
             <h3><label for="render-quality">Graphics quality</label></h3>
@@ -113,19 +122,37 @@
           <button class="settings-locate settings-toggle" id="orbit-rings" type="button"
             aria-labelledby="orbit-rings-title" aria-pressed="true">On</button>
         </div>
-        <div class="settings-summary-row settings-section">
-          <div>
-            <h3>Back up your universe</h3>
-            <p>Save every project, its build history and your ideas to one file, for a new machine or a fresh install.</p>
+      </div>
+      <div class="settings-body" id="settings-pane-panels" role="tabpanel"
+        aria-labelledby="settings-tab-panels" tabindex="0" hidden>
+        <div id="settings-look">
+          <div class="settings-summary-row">
+            <div>
+              <h3><label for="panel-opacity">Panel opacity</label></h3>
+              <p>Lower it to see more of the star chart through the panels. Text and controls stay solid.</p>
+            </div>
+            <span class="settings-summary settings-quality-value" id="panel-opacity-value"></span>
           </div>
+          <div class="settings-quality">
+            <input class="range" id="panel-opacity" type="range" step="1" />
+            <div class="settings-quality-scale" aria-hidden="true"><span>See-through</span><span>Solid</span></div>
+          </div>
+          <div class="settings-summary-row settings-section">
+            <div>
+              <h3 id="text-size-title">Text size</h3>
+              <p>Makes the text in the top bar, the panels, the timeline and Settings larger, and the rows and buttons with it. The star chart keeps its size.</p>
+            </div>
+            <span class="settings-summary settings-quality-value" id="text-size-value"></span>
+          </div>
+          <!-- One button per size in AUR.app.const.TEXT_SIZES, added by app/panels/look.js. -->
+          <div class="settings-quality settings-choice" id="text-size" role="group" aria-labelledby="text-size-title"
+            aria-describedby="text-size-note"></div>
+          <p class="settings-status" id="text-size-note"></p>
         </div>
-        <div class="settings-actions">
-          <button class="settings-primary" id="settings-export" type="button">Export…</button>
-          <button class="settings-locate" id="settings-import" type="button">Import…</button>
-          <span>Importing merges a backup in. It never removes a project.</span>
-        </div>
-        <p class="settings-status" id="settings-backup-status" role="status" aria-live="polite"></p>
-        <div class="settings-summary-row settings-section">
+      </div>
+      <div class="settings-body" id="settings-pane-projects" role="tabpanel"
+        aria-labelledby="settings-tab-projects" tabindex="0" hidden>
+        <div class="settings-summary-row">
           <div>
             <h3>Recover moved projects</h3>
             <p>Reconnect derelicts to folders that still exist on this computer, or forget the ones you no longer need.</p>
@@ -138,6 +165,21 @@
         </div>
         <p class="settings-status" id="settings-status" role="status" aria-live="polite"></p>
         <div class="settings-projects" id="settings-projects"></div>
+      </div>
+      <div class="settings-body" id="settings-pane-backup" role="tabpanel"
+        aria-labelledby="settings-tab-backup" tabindex="0" hidden>
+        <div class="settings-summary-row">
+          <div>
+            <h3>Back up your universe</h3>
+            <p>Save every project, its build history and your ideas to one file, for a new machine or a fresh install.</p>
+          </div>
+        </div>
+        <div class="settings-actions">
+          <button class="settings-primary" id="settings-export" type="button">Export…</button>
+          <button class="settings-locate" id="settings-import" type="button">Import…</button>
+          <span>Importing merges a backup in. It never removes a project.</span>
+        </div>
+        <p class="settings-status" id="settings-backup-status" role="status" aria-live="polite"></p>
       </div>
     </section>
   </dialog>
@@ -464,6 +506,8 @@
   <script src="app/project/backup.js"></script>
   <script src="app/render-quality.js"></script>
   <script src="app/scenery.js"></script>
+  <script src="app/panels/look.js"></script>
+  <script src="app/settings-tabs.js"></script>
   <script src="app/project/tasks.js"></script>
   <script src="app/replay.js"></script>
   <script src="app/store.js"></script>

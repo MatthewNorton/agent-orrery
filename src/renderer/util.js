@@ -243,6 +243,14 @@
     return n;
   };
   AUR.clear = (node) => { while (node.firstChild) node.removeChild(node.firstChild); };
+  // A group of choice buttons, each paired with its value: a click picks that value, and the
+  // returned press(value) marks the chosen one with aria-pressed.
+  AUR.choiceButtons = function choiceButtons(pairs, onPick) {
+    for (const [button, value] of pairs) button.addEventListener('click', () => onPick(value));
+    return (current) => {
+      for (const [button, value] of pairs) button.setAttribute('aria-pressed', String(value === current));
+    };
+  };
 
   // Inline fleet/signal glyph used in the sidebar rows.
   AUR.shipSvg = function shipSvg(hex, signal) {

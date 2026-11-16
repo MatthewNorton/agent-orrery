@@ -22,6 +22,7 @@
     }, true);
     A.wireRenderQuality();
     A.wireScenery();
+    A.wirePanelLook();
     S.engine.runRenderLoop(() => {
       if (S.activeScene && !S.activeScene.isDisposed) {
         try { S.activeScene.render(); } catch (e) { /* swallow transient swap frames */ }

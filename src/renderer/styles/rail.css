@@ -36,7 +36,7 @@ body:has(#sidebar.is-collapsed) { --sidebar-effective-w: var(--sidebar-compact-w
   min-height: 52px;
   padding: 8px 4px;
   border-color: var(--hair);
-  background: var(--paper);
+  background: var(--panel-fill);
   backdrop-filter: blur(10px);
 }
 .compact-rail-icon { display: block; color: var(--ink); font-size: 14px; line-height: 1; }

@@ -13,7 +13,7 @@
   right: calc(var(--sidebar-effective-w) + 2 * var(--space-3));
   bottom: calc(var(--dock-h) + 2 * var(--space-3));
   z-index: 18;
-  width: min(420px, calc(100vw - 48px));
+  width: min(420px, calc(100vw / var(--ui-zoom) - 48px));
   min-height: 320px;
   display: flex;
   flex-direction: column;

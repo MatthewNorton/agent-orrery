@@ -60,7 +60,7 @@ loaders), then:
 | Shared libraries | `util.js` (creates `window.AUR`; `fnv1a`/`mulberry32` copied from `src/main/shared/hash.js` so seeds agree), `util-scene.js` (Babylon helpers), `procedural-worlds.js` (world profiles: class, palette, hue, seed; asteroids), `worlds/` (kit 15: the pure map generator `noise.js` + `classes.js` + `maps.js`, run by `worker.js`, a worker file and not a page script; `textures.js`, the map service on `AUR.app.state.worldMaps`; `shaders.js`; `material.js`, a world's globe and shells; `sun.js`, the system sun's photosphere plugin and billboards), `ship-assets.js` + `ship-assets-hulls.js` + `ship-assets-api.js` (`AUR.ships`), `polish-math.js`, `galaxy-layout.js` and `galaxy-field.js` (pure UMD; the field is a galaxy's emission/dust atlas and the stars drawn from it), `search-core.js`, `components/project-vcs-status.js` |
 | Views | `scene/common.js` (`AUR.sceneParts`), `scene/sky.js` (`AUR.addSky`, the system and planet views' baked sky), then for each view in `scene/<view>/` (universe, system, planet) its parts before its `view.js` |
 | App state | `app/state.js` — the only file that assigns `AUR.app` (`state`, `const`) |
-| App modules | every other file in `app/` and `app/project/`, in `index.html` order |
+| App modules | every other file in `app/`, `app/project/` and `app/panels/`, in `index.html` order |
 | Boot | `app/boot.js` — boot, event routing, view switching, debug hooks |
 
 View contract: each `scene/<view>/view.js` registers
@@ -239,16 +239,29 @@ Design tokens (put in `:root`):
   matches appear in a keyboard-accessible dropdown and Enter/click opens the
   existing guarded system route. It is present in every view; a view switch clears the
   query, and the GitHub filter also narrows the PROJECTS directory.
-  A persistent gear opens `SETTINGS · GRAPHICS · PROJECT PATHS`. Graphics quality is a
+  A persistent gear opens Settings, one tab at a time: Graphics · Panels · Projects · Backup
+  (`app/settings-tabs.js`; arrow keys, Home and End move between the tabs, the last tab chosen
+  stays chosen while the app runs, and Settings opens on Projects while a project folder is
+  missing). On Graphics, quality is a
   stepped slider over `AUR.app.const.RENDER_QUALITIES` (Low · Balanced · High), kept per
   viewer in localStorage; High is the default and the look every gate grades (§9). Below it,
   Space backdrop picks the look of the system and planet views' sky from `AUR.app.const.SKY_LOOKS`
   (Vivid · Soft · Distant · Faint; Distant is the default), and Orbit rings turns the system
   view's orbit rings on or off (on by default). Both are kept per viewer in localStorage
-  (`app/scenery.js`) and change the open view at once. Missing project folders
+  (`app/scenery.js`) and change the open view at once. On Panels (`app/panels/look.js`, both
+  kept per viewer), Panel opacity sets the fill of the rail modules, the compact rail buttons and
+  the timeline from 20% to solid; 86%, the alpha of `--paper`, is the default, and text, controls
+  and the blur stay. Text size zooms the chrome around the star chart (top bar, rails, view
+  title and hint, timeline, planet tab bar, directory and Settings) by 100 · 110 · 125 · 150%
+  with CSS `zoom`; the star chart keeps its size. The zoom stops where the window would leave the
+  chrome less than 1024 × 576 CSS px, the least room it was checked to lay out in without its parts
+  overlapping (`C.TEXT_SIZE_ROOM`), and Settings says so under the sizes when it does. While a
+  control on Panels has focus, the
+  dimming behind Settings lifts so the panels show as they change. On Projects, missing project folders
   can be recovered with a bounded scan beneath a user-chosen parent or a
   native `Locate…` picker. Scan matches require explicit confirmation, remaps
-  keep the original project ID/history, and path changes are LIVE-only.
+  keep the original project ID/history, and path changes are LIVE-only. Backup exports the
+  universe to one file and merges one back in (`app/project/backup.js`).
 - **Right sidebar** (fixed ~330px, full height under top bar, panel style):
   - `ACTIVE AGENTS` header with right-aligned `N Running`.
     Rows: small ship glyph (inline SVG, tinted from the provider palette), name
