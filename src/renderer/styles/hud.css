@@ -95,6 +95,7 @@ body:has(#rail-left.is-collapsed) .view-title { left: calc(var(--sidebar-compact
 }
 body:has(#sidebar.is-collapsed) .view-hint { right: calc(var(--sidebar-compact-w) + 2 * var(--space-3)); }
 body:not([data-view="universe"]) .view-hint-universe { display: none; }
+.view-hint .kbd { margin: 0 2px; vertical-align: 1px; text-shadow: none; }
 
 /* needs you: one row per agent waiting on you, oldest first */
 .needs-row {
@@ -147,3 +148,4 @@ body:has(#history-bar.is-dismissed) { --dock-h: 0px; }
   white-space: nowrap;
 }
 .toast:empty { min-height: 0; padding: 0; border: 0; box-shadow: none; }
+.toast .key-hint { gap: 6px; color: var(--ink-3); font-size: 12px; }

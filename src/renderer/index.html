@@ -94,6 +94,8 @@
           aria-controls="settings-pane-graphics" data-tab="graphics" aria-selected="true">Graphics</button>
         <button class="settings-tab" id="settings-tab-panels" type="button" role="tab"
           aria-controls="settings-pane-panels" data-tab="panels" aria-selected="false" tabindex="-1">Panels</button>
+        <button class="settings-tab" id="settings-tab-keys" type="button" role="tab"
+          aria-controls="settings-pane-keys" data-tab="keys" aria-selected="false" tabindex="-1">Shortcuts</button>
         <button class="settings-tab" id="settings-tab-projects" type="button" role="tab"
           aria-controls="settings-pane-projects" data-tab="projects" aria-selected="false" tabindex="-1">Projects</button>
         <button class="settings-tab" id="settings-tab-backup" type="button" role="tab"
@@ -159,7 +161,7 @@
         <div class="settings-summary-row settings-section">
           <div>
             <h3 id="panel-launch-title">At launch</h3>
-            <p>Each run starts from this layout. The panels menu and the fold buttons change only the run you are in.</p>
+            <p>Each run starts from this layout. The panels menu, the fold buttons and the keys change only the run you are in.</p>
           </div>
         </div>
         <!-- A row per panel in AUR_PANEL_LAYOUT.PANELS, added by app/panels/launch.js. -->
@@ -170,6 +172,19 @@
           <button class="settings-locate" id="panel-launch-defaults" type="button">Restore defaults</button>
         </div>
         <p class="settings-status" id="panel-launch-status" role="status" aria-live="polite"></p>
+      </div>
+      <div class="settings-body" id="settings-pane-keys" role="tabpanel"
+        aria-labelledby="settings-tab-keys" tabindex="0" hidden>
+        <div class="settings-summary-row">
+          <div>
+            <h3 id="single-keys-title">Single-key shortcuts</h3>
+            <p>Letters, brackets, Space, Backspace, / and ? work while no text field has focus and Settings is closed. Turn them off if they get in the way of a screen reader or voice control; Ctrl shortcuts and Esc keep working. On macOS, Ctrl is ⌘.</p>
+          </div>
+          <button class="settings-locate settings-toggle" id="single-keys" type="button"
+            aria-labelledby="single-keys-title" aria-pressed="true">On</button>
+        </div>
+        <!-- The shortcuts in AUR_SHORTCUTS, listed by app/keys.js. -->
+        <div class="key-list settings-section" id="key-list"></div>
       </div>
       <div class="settings-body" id="settings-pane-projects" role="tabpanel"
         aria-labelledby="settings-tab-projects" tabindex="0" hidden>
@@ -226,9 +241,9 @@
     <div class="project-directory-list" id="project-directory-list" role="listbox"
       aria-label="Projects"></div>
     <footer class="project-directory-footer">
-      <span><kbd>↑</kbd><kbd>↓</kbd> Navigate</span>
-      <span><kbd>Enter</kbd> Open</span>
-      <span><kbd>Esc</kbd> Close</span>
+      <span><kbd class="kbd kbd--sm">↑</kbd><kbd class="kbd kbd--sm">↓</kbd> Navigate</span>
+      <span><kbd class="kbd kbd--sm">Enter</kbd> Open</span>
+      <span><kbd class="kbd kbd--sm">Esc</kbd> Close</span>
     </footer>
   </section>
 
@@ -493,6 +508,7 @@
   <script src="polish-math.js"></script>
   <script src="galaxy-layout.js"></script>
   <script src="panel-layout.js"></script>
+  <script src="shortcuts.js"></script>
   <script src="galaxy-field.js"></script>
   <script src="search-core.js"></script>
   <script src="components/project-vcs-status.js"></script>
@@ -538,6 +554,7 @@
   <script src="app/panels/launch.js"></script>
   <script src="app/panels/resize.js"></script>
   <script src="app/panels/feed.js"></script>
+  <script src="app/keys.js"></script>
   <script src="app/settings-tabs.js"></script>
   <script src="app/project/tasks.js"></script>
   <script src="app/replay.js"></script>

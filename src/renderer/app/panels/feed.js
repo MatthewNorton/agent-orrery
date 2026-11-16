@@ -130,13 +130,13 @@
     const label = A.feedExpandLabel();
     parts.toggle.setAttribute('aria-pressed', String(S.panels.feedExpanded));
     parts.toggle.setAttribute('aria-label', label);
-    parts.toggle.title = label;
+    A.titleWithKey(parts.toggle, label, 'feed');
     parts.toggle.innerHTML = S.panels.feedExpanded ? PUT_BACK : EXPAND;
   }
 
-  /** Expands the event feed, or puts it back. @param {boolean} on */
+  /** Expands the event feed, or puts it back; whether it changed. @param {boolean} on */
   A.setFeedExpanded = function setFeedExpanded(on) {
-    if (!ui || S.panels.feedExpanded === on) return;
+    if (!ui || S.panels.feedExpanded === on) return false;
     if (on) {
       // The feed and its rail open first: either one folded would put the feed straight back.
       A.setPanelState('feed', 'open');
@@ -150,6 +150,7 @@
     ui.list.scrollTop = 0;
     ui.list.classList.remove('is-scrolled');
     A.renderFeed();
+    return true;
   };
 
   /**

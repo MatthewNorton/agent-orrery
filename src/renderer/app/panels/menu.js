@@ -54,10 +54,11 @@
   /** @param {boolean} refocus */
   A.closePanelsMenu = function closePanelsMenu(refocus) {
     const button = caret(), m = menu();
-    if (!button || !m || m.hidden) return;
+    if (!button || !m || m.hidden) return false;
     m.hidden = true;
     button.setAttribute('aria-expanded', 'false');
     if (refocus) button.focus();
+    return true;
   };
 
   // While the menu is open its ticks and notes follow the panels.
@@ -85,8 +86,7 @@
     const head = m.appendChild(AUR.el('div', 'panels-menu-head'));
     head.append(AUR.el('span', 'mod-title', 'Panels'), AUR.el('span', 'mod-m', VIEWS[view] || ''));
     for (const rail of L.RAILS) {
-      const panels = L.panelsOn(rail.side).filter((/** @type {{ views: string[] | null }} */ p) =>
-        !p.views || p.views.includes(view));
+      const panels = L.panelsOn(rail.side).filter((/** @type {{ views: string[] | null }} */ p) => L.showsIn(p, view));
       if (!panels.length) continue;
       const group = m.appendChild(AUR.el('div', 'panels-menu-group'));
       group.setAttribute('role', 'group');
@@ -95,8 +95,8 @@
       for (const panel of panels) group.appendChild(panelItem(panel));
     }
     m.appendChild(AUR.el('div', 'panels-menu-sep')).setAttribute('role', 'separator');
-    m.appendChild(action(A.foldAllLabel(), A.toggleAllRails));
-    m.appendChild(action(A.feedExpandLabel(), A.toggleFeedExpanded));
+    m.appendChild(action(A.foldAllLabel(), A.toggleAllRails, 'rails'));
+    m.appendChild(action(A.feedExpandLabel(), A.toggleFeedExpanded, 'feed'));
     m.appendChild(action('Reset panel sizes', A.resetPanelSizes));
     m.appendChild(action('Start every run with this layout', () => {
       A.saveLaunchLayout(A.currentPanelLayout());
@@ -106,7 +106,7 @@
     m.appendChild(action('Panel settings…', () => {
       A.openProjectSettings();
       A.showSettingsTab('panels');
-    }, false));
+    }, '', false));
   }
 
   /** @param {{ key: string, name: string, never: string }} panel */
@@ -117,19 +117,20 @@
     item.tabIndex = -1;
     if (panel.never === 'hidden') item.setAttribute('aria-disabled', 'true');
     item.append(AUR.el('span', 'panels-menu-check'), AUR.el('span', 'panels-menu-name', panel.name),
-      AUR.el('span', 'panels-menu-note'));
+      AUR.el('span', 'panels-menu-note'), A.keyChips(`panel-${panel.key}`) || '');
     mark(item, panel);
     item.addEventListener('click', () => A.togglePanelHidden(panel.key));
     return item;
   }
 
   // An action closes the menu first; focus goes back to the caret unless the action takes it.
-  /** @param {string} label @param {() => void} run @param {boolean} [refocus] */
-  function action(label, run, refocus = true) {
-    const item = AUR.button('panels-menu-item panels-menu-action', label, () => {
+  /** @param {string} label @param {() => void} run @param {string} [key] its shortcut @param {boolean} [refocus] */
+  function action(label, run, key = '', refocus = true) {
+    const item = AUR.button('panels-menu-item panels-menu-action', '', () => {
       A.closePanelsMenu(refocus);
       run();
     });
+    item.append(AUR.el('span', 'panels-menu-name', label), A.keyChips(key) || '');
     item.setAttribute('role', 'menuitem');
     item.tabIndex = -1;
     return item;

@@ -181,9 +181,17 @@
 .settings-choice { display: flex; gap: 6px; }
 .settings-choice .settings-locate { flex: 1 1 0; }
 .settings-toggle { min-width: 56px; }
-/* At launch: a row per panel, its name and where it shows, then Open, Folded or Hidden. */
+/* At launch: a row per panel, its name and where it shows, its key, then Open, Folded or Hidden. */
 .panel-launch { display: grid; gap: var(--space-2); }
 .panel-launch-group { margin: var(--space-3) 0 0; color: var(--ink-3); font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
-.panel-launch-row { display: grid; grid-template-columns: minmax(0, 1fr) 264px; align-items: center; gap: var(--space-3); }
+.panel-launch-row { display: grid; grid-template-columns: minmax(0, 1fr) 20px 264px; align-items: center; gap: var(--space-3); }
+.panel-launch-row .key-hint { justify-self: end; }
+.panel-launch-choice { grid-column: 3; }
 .panel-launch-name { display: grid; gap: 2px; min-width: 0; }
 .panel-launch-actions { margin-top: var(--space-4); }
+/* Shortcuts: two columns of groups, a row per shortcut with its keys at the right */
+.key-list { columns: 2; column-gap: var(--space-5); }
+.key-group { margin-bottom: var(--space-4); break-inside: avoid; }
+.key-group h4 { margin: 0 0 4px; color: var(--ink-3); font-size: 12px; font-weight: 500; }
+.key-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-height: 30px; border-bottom: 1px solid var(--hair); color: var(--ink-2); font-size: 12.5px; }
+.key-or { padding: 0 2px; color: var(--ink-3); font-size: 12px; }

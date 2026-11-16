@@ -66,8 +66,8 @@
     setHidden(panel, hide);
     if (hide) {
       A.showToast(`${panel.name} hidden`, {
-        label: 'Undo',
-        run: () => { if (S.panels.hidden.has(key)) A.togglePanelHidden(key); },
+        action: { label: 'Undo', run: () => { if (S.panels.hidden.has(key)) A.togglePanelHidden(key); } },
+        hint: A.keyChips(`panel-${key}`, 'shows it again'),
       });
     } else {
       A.dismissToast();

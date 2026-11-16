@@ -47,6 +47,8 @@
     PANEL_OPACITY_DEFAULT: 86, // the alpha of the --paper token, which the panels keep at the default
     PANEL_OPACITY_MAX: 100,
     TEXT_SIZE_STORAGE_KEY: 'agent-universe.text-size.v1',
+    // Settings › Shortcuts (app/keys.js): whether single-key shortcuts are on.
+    SINGLE_KEYS_STORAGE_KEY: 'agent-universe.single-keys.v1',
     TEXT_SIZES: Object.freeze([1, 1.1, 1.25, 1.5]),
     // The least room, in CSS px, the chrome was checked to lay out in without its parts overlapping
     // (the view title meets the right rail near 930 wide): text grows only while the window keeps it.

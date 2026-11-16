@@ -239,7 +239,7 @@ Design tokens (put in `:root`):
   matches appear in a keyboard-accessible dropdown and Enter/click opens the
   existing guarded system route. It is present in every view; a view switch clears the
   query, and the GitHub filter also narrows the PROJECTS directory.
-  A persistent gear opens Settings, one tab at a time: Graphics · Panels · Projects · Backup
+  A persistent gear opens Settings, one tab at a time: Graphics · Panels · Shortcuts · Projects · Backup
   (`app/settings-tabs.js`; arrow keys, Home and End move between the tabs, the last tab chosen
   stays chosen while the app runs, and Settings opens on Projects while a project folder is
   missing). On Graphics, quality is a
@@ -298,7 +298,13 @@ Design tokens (put in `:root`):
     - **Rail width.** A rail's inner edge is a `role=separator` grip. It drags the rail's width (`--rail-l`, `--rail-r`), down to 240 px, with no other limit than stopping 24 px short of the other rail (`fitRails` in `panel-layout.js`). When the two do not fit, the side being dragged or put back gives way, otherwise the left rail. The view title and hint, the directory and the camera's clear area follow.
     - **Panel height.** The gap under Needs you, Summary, Fleet, Galaxies, the Event feed or Ideas drags that panel's height (`--panel-h` with `.is-sized`). A sized panel keeps its height and gives it up last when its rail runs short, so it never pushes the rail past its end. It folds as usual.
     - **Keys and reset.** Arrow keys step 16 px, Shift 64; Home and End go to the least and greatest size; Enter or a double-click puts one size back; the panels menu's *Reset panel sizes* puts them all back. A hairline shows on hover and turns orange with a size badge while dragged or focused.
-  - **Each run.** Every run starts from the At launch layout in Settings › Panels (`app/panels/launch.js`, stored in localStorage). By default Summary and Galaxies are hidden, Tasks and Ideas folded, and the rest open. The menu and the chevrons change only the run in progress. The first run with launch layouts carries over the panels folded before.
+  - **Each run.** Every run starts from the At launch layout in Settings › Panels (`app/panels/launch.js`, stored in localStorage). By default Summary and Galaxies are hidden, Tasks and Ideas folded, and the rest open. The menu, the chevrons and the keys change only the run in progress. The first run with launch layouts carries over the panels folded before.
+- **Keyboard shortcuts** (`shortcuts.js`, a UMD table the Node tests share, run by `app/keys.js`). Settings › Shortcuts lists them and turns single keys on or off (`agent-universe.single-keys.v1`, on by default).
+  - **Go to and views.** `/` or Ctrl K focuses the search; Backspace goes back one level; N opens the first agent that needs you; Ctrl , opens Settings and ? opens it on Shortcuts. On macOS ⌘ stands in for Ctrl.
+  - **Timeline.** Space plays or pauses history; L returns to live.
+  - **Panels.** `[` and `]` fold or open the left and the right rail, `\` every panel, and Shift E expands the event feed or puts it back. A panel's `letter` in `panel-layout.js` hides or shows it: F Fleet, G Galaxies, E Event feed, I Ideas, S Summary, P Project, T Tasks. In a view without that panel, a toast says where it shows.
+  - **When a key is not a shortcut.** Single keys wait while a text field has focus, while Settings is open, with Alt held, and while they are off; Space on a focused button presses the button. Ctrl shortcuts always work. Escape closes the panels menu, then Settings, then the expanded feed, then the toast, unless the agent view, the directory or the search took it first, or a text field with text has focus.
+  - **Hints.** The panels menu and the At launch rows show each panel's key, the menu's actions theirs, the hiding toast says which key shows the panel again, the search shows `/`, the view hint ends with `? shortcuts`, and the panels button and the feed's expand button give theirs in their titles and `aria-keyshortcuts`. Single-key hints go while single keys are off.
 - **Back control** (system + planet views, top-left under the project card or
   above it): `← Universe` / `← Orion System` style button.
 - **History bar** (all views, fixed bottom): Play/Pause, `1x`/`10x`/`100x`/

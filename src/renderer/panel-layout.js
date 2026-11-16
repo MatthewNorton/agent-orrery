@@ -21,18 +21,19 @@
 
   // In that order too. `key` is the element's data-module (the timeline has none), `id` its
   // element, `views` the views that show it (null: every view), `where` the note Settings gives it,
-  // `never` the state it cannot take and `neverWhy` the reason, `launch` its default, and `minH` the
-  // least height a viewer can drag it to (a panel without one keeps the height of its content).
+  // `never` the state it cannot take and `neverWhy` the reason, `launch` its default, `minH` the
+  // least height a viewer can drag it to (a panel without one keeps the height of its content), and
+  // `letter` the key that shows or hides it (shortcuts.js).
   const PANELS = Object.freeze([
     { key: 'needs-you', name: 'Needs you', rail: 'left', id: 'needs-you-panel', views: null, where: 'While an agent waits', never: 'hidden', neverWhy: 'Needs you never hides while an agent waits', launch: 'open', minH: 72 },
-    { key: 'summary', name: 'Summary', rail: 'left', id: 'summary-card', views: null, where: '', never: '', launch: 'hidden', minH: 96 },
-    { key: 'project', name: 'Project', rail: 'left', id: 'project-card', views: ['system', 'planet'], where: 'System and planet views', never: '', launch: 'open' },
-    { key: 'tasks', name: 'Tasks', rail: 'left', id: 'tasks-panel', views: ['system'], where: 'System view', never: '', launch: 'folded' },
+    { key: 'summary', name: 'Summary', rail: 'left', id: 'summary-card', views: null, where: '', never: '', launch: 'hidden', minH: 96, letter: 'S' },
+    { key: 'project', name: 'Project', rail: 'left', id: 'project-card', views: ['system', 'planet'], where: 'System and planet views', never: '', launch: 'open', letter: 'P' },
+    { key: 'tasks', name: 'Tasks', rail: 'left', id: 'tasks-panel', views: ['system'], where: 'System view', never: '', launch: 'folded', letter: 'T' },
     { key: 'planet', name: 'Planet', rail: 'left', id: 'planet-card', views: ['planet'], where: 'Planet view', never: '', launch: 'open' },
-    { key: 'agents', name: 'Fleet', rail: 'right', id: 'agents-panel', views: null, where: '', never: '', launch: 'open', minH: 140 },
-    { key: 'galaxies', name: 'Galaxies', rail: 'right', id: 'galaxies-panel', views: null, where: '', never: '', launch: 'hidden', minH: 104 },
-    { key: 'feed', name: 'Event feed', rail: 'right', id: 'feed-panel', views: null, where: '', never: '', launch: 'open', minH: 104 },
-    { key: 'ideas', name: 'Ideas', rail: 'right', id: 'ideas-panel', views: null, where: '', never: '', launch: 'folded', minH: 132 },
+    { key: 'agents', name: 'Fleet', rail: 'right', id: 'agents-panel', views: null, where: '', never: '', launch: 'open', minH: 140, letter: 'F' },
+    { key: 'galaxies', name: 'Galaxies', rail: 'right', id: 'galaxies-panel', views: null, where: '', never: '', launch: 'hidden', minH: 104, letter: 'G' },
+    { key: 'feed', name: 'Event feed', rail: 'right', id: 'feed-panel', views: null, where: '', never: '', launch: 'open', minH: 104, letter: 'E' },
+    { key: 'ideas', name: 'Ideas', rail: 'right', id: 'ideas-panel', views: null, where: '', never: '', launch: 'folded', minH: 132, letter: 'I' },
     { key: 'timeline', name: 'Timeline', rail: 'bottom', id: 'history-bar', views: null, where: 'Live and history playback', never: 'folded', neverWhy: 'The timeline does not fold', launch: 'open' },
   ].map((panel) => Object.freeze(panel)));
 
@@ -49,6 +50,8 @@
   const panelsOn = (side) => PANELS.filter((p) => p.rail === side);
   /** @param {string} side */
   const rail = (side) => RAILS.find((r) => r.side === side) || null;
+  /** Whether a panel shows in a view. @param {{ views: string[] | null }} p @param {string} view */
+  const showsIn = (p, view) => !p.views || p.views.includes(view);
 
   /** Whether a panel can take a state. */
   function allowed(key, state) {
@@ -126,7 +129,7 @@
   }
 
   return {
-    RAILS, PANELS, RAIL_MIN, panel, panelsOn, rail, allowed, defaults, normalize, fromFolded,
+    RAILS, PANELS, RAIL_MIN, panel, panelsOn, rail, showsIn, allowed, defaults, normalize, fromFolded,
     clamp, fitRails, expandedWidth, normalizeSizes,
   };
 });
