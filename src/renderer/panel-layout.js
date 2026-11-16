@@ -1,3 +1,4 @@
+// @ts-check
 // The chrome's panels and the layout every run starts from, as pure data and functions: each panel
 // is open, folded to its header, or hidden. UMD keeps the same table available to the renderer
 // (window.AUR_PANEL_LAYOUT) and the Node tests.
@@ -44,6 +45,10 @@
 
   /** @param {string} key */
   const panel = (key) => byKey.get(key) || null;
+  /** The panels on one rail, in order. @param {string} side */
+  const panelsOn = (side) => PANELS.filter((p) => p.rail === side);
+  /** @param {string} side */
+  const rail = (side) => RAILS.find((r) => r.side === side) || null;
 
   /** Whether a panel can take a state. */
   function allowed(key, state) {
@@ -96,14 +101,22 @@
   }
 
   /**
-   * Stored sizes, keeping only whole numbers at or above their floor: `rails` (left and right
-   * widths) and `panels` (heights by panel key).
+   * The right rail's width while the event feed is expanded, in a window `windowW` CSS px wide: the
+   * width kept for it, else a share of the window up to 640 px, and never narrower than the rail is.
+   */
+  function expandedWidth(windowW, own, kept) {
+    return kept || Math.max(own, Math.round(Math.min(640, windowW * 0.46)));
+  }
+
+  /**
+   * Stored sizes, keeping only whole numbers at or above their floor: `rails` (left, right, and the
+   * right rail's width while the event feed is expanded) and `panels` (heights by panel key).
    */
   function normalizeSizes(raw) {
     const sizes = { rails: {}, panels: {} };
     const ok = (value, min) => Number.isFinite(value) && value >= min;
     const rails = raw && raw.rails, panels = raw && raw.panels;
-    for (const side of ['left', 'right']) {
+    for (const side of ['left', 'right', 'rightExpanded']) {
       if (rails && ok(rails[side], RAIL_MIN)) sizes.rails[side] = Math.round(rails[side]);
     }
     for (const p of PANELS) {
@@ -113,7 +126,7 @@
   }
 
   return {
-    RAILS, PANELS, RAIL_MIN, panel, allowed, defaults, normalize, fromFolded,
-    clamp, fitRails, normalizeSizes,
+    RAILS, PANELS, RAIL_MIN, panel, panelsOn, rail, allowed, defaults, normalize, fromFolded,
+    clamp, fitRails, expandedWidth, normalizeSizes,
   };
 });

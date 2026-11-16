@@ -29,7 +29,7 @@
     if (!table || !current || !apply || !reset) return;
     for (const rail of L.RAILS) {
       table.appendChild(AUR.el('h4', 'panel-launch-group', rail.label));
-      for (const panel of L.PANELS.filter((/** @type {{ rail: string }} */ p) => p.rail === rail.side)) {
+      for (const panel of L.panelsOn(rail.side)) {
         table.appendChild(row(panel));
       }
     }

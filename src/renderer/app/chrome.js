@@ -1,16 +1,17 @@
 // @ts-check
-// Compact command rail, project-name helpers, agents/feed/summary renderers, tab bar.
+// Compact command rail, project-name helpers, agents/summary renderers, tab bar. The feed is
+// app/panels/feed.js.
 'use strict';
 
 (function () {
   const AUR = window.AUR;
   const A = AUR.app;
   if (!A) throw new Error('app/state.js must load before app/chrome.js');
-  const S = A.state, C = A.const;
+  const S = A.state;
 
   // ---------- command rail: the rail and its sections fold through app/modules.js ----------
   /** @type {{ key: string, id: string }[]} the right rail's panels (panel-layout.js) */
-  const RAIL_SECTIONS = window.AUR_PANEL_LAYOUT.PANELS.filter((/** @type {{ rail: string }} */ p) => p.rail === 'right');
+  const RAIL_SECTIONS = window.AUR_PANEL_LAYOUT.panelsOn('right');
 
   A.wireCommandRail = function wireCommandRail() {
     /** @type {Record<string, { panel: HTMLElement | null, count: HTMLElement | null }>} */
@@ -41,7 +42,7 @@
     if (section.count) section.count.textContent = String(n);
   };
 
-  // ---------- agents / feed / summary renderers ----------
+  // ---------- agents / summary renderers ----------
   function shipsSorted() {
     const arr = [...S.store.ships.values()];
     arr.sort((a, b) => {
@@ -156,33 +157,6 @@
       sub.append(providerTag, subText);
       body.append(nameLine, sub);
       row.append(glyph, body);
-      list.appendChild(row);
-    }
-  };
-
-  A.renderFeed = function renderFeed() {
-    const list = document.getElementById('feed-list');
-    AUR.clear(list);
-    const rows = S.store.feed.slice(-C.FEED_SHOW).reverse();
-    A.setRailCount('feed', rows.length, rows.length === 0);
-    if (rows.length === 0) {
-      list.appendChild(AUR.el('div', 'empty-note', 'No signals yet'));
-      return;
-    }
-    for (const f of rows) {
-      const row = AUR.el('div', 'feed-row' + (f.project ? ' clickable' : ''));
-      if (f.project) {
-        row.title = 'Go to ' + A.projectName(f.project);
-        row.addEventListener('click', () => A.jumpToProject(f.project));
-      }
-      const dot = AUR.el('span', 'feed-dot');
-      dot.style.background = AUR.feedColor(f.kind);
-      const body = AUR.el('div', 'feed-body');
-      body.append(
-        AUR.el('div', 'feed-text', f.text),
-        AUR.el('div', 'feed-time', AUR.relTime(f.ts, A.playbackReferenceTs()))
-      );
-      row.append(dot, body);
       list.appendChild(row);
     }
   };

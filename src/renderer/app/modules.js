@@ -23,9 +23,10 @@
     for (const key of RAILS) A.setModuleCollapsed(key, fold);
   };
 
-  /** @param {HTMLElement} section */
+  /** Shows a section folded or open: its own fold, or folded while the expanded feed needs its rail. @param {HTMLElement} section */
   function applyModuleState(section) {
-    const collapsed = S.modules.collapsed.has(section.dataset.module || '');
+    const key = section.dataset.module || '';
+    const collapsed = S.modules.collapsed.has(key) || A.foldedByFeed(key);
     section.classList.toggle('is-collapsed', collapsed);
     const toggle = section.querySelector(':scope > .mod-h .mod-x');
     const title = section.querySelector(':scope > .mod-h .mod-title');
@@ -35,13 +36,13 @@
   }
 
   // The panels button reads as pressed while both rails are folded.
-  function syncPanelsToggle() {
+  A.syncPanelsToggle = function syncPanelsToggle() {
     const button = document.getElementById('panels-toggle');
     if (!button) return;
     button.setAttribute('aria-pressed', String(allFolded()));
     button.title = A.foldAllLabel();
     button.setAttribute('aria-label', button.title);
-  }
+  };
 
   /** @param {string} key @param {boolean} collapsed */
   A.setModuleCollapsed = function setModuleCollapsed(key, collapsed) {
@@ -49,7 +50,13 @@
     else S.modules.collapsed.delete(key);
     const section = /** @type {HTMLElement | null} */ (document.querySelector(`[data-module="${key}"]`));
     if (section) applyModuleState(section);
-    syncPanelsToggle();
+    A.panelsChanged(key, !collapsed);
+  };
+
+  A.refreshModules = function refreshModules() {
+    for (const section of /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('[data-module]'))) {
+      applyModuleState(section);
+    }
   };
 
   /**
@@ -74,13 +81,11 @@
     document.addEventListener('click', (event) => {
       const toggle = event.target instanceof Element ? event.target.closest('.mod-x') : null;
       const section = toggle && /** @type {HTMLElement | null} */ (toggle.closest('[data-module]'));
-      if (!section) return;
-      const key = section.dataset.module || '';
-      A.setModuleCollapsed(key, !S.modules.collapsed.has(key));
+      // What the chevron shows flips: a panel the expanded feed folds opens, and the feed goes back.
+      if (section) A.setModuleCollapsed(section.dataset.module || '', !section.classList.contains('is-collapsed'));
     });
     document.getElementById('panels-toggle')?.addEventListener('click', A.toggleAllRails);
-    const sections = /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('[data-module]'));
-    for (const section of sections) applyModuleState(section);
-    syncPanelsToggle();
+    A.refreshModules();
+    A.syncPanelsToggle();
   };
 })();

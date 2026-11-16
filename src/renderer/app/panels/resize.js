@@ -37,6 +37,15 @@
     return el.classList.contains('is-collapsed') ? 'compact' : 'open';
   }
 
+  // While the event feed is expanded the right rail keeps a width of its own (app/panels/feed.js).
+  /** @param {string} side */
+  const sizeKey = (side) => (side === 'right' && S.panels.feedExpanded ? 'rightExpanded' : side);
+  /** The width a rail asks for. @param {string} side */
+  function wantWidth(side) {
+    const own = S.panels.sizes.rails[side] || DEFAULT_WIDTH[side], key = sizeKey(side);
+    return key === side ? own : L.expandedWidth(innerWidth / zoom(), own, S.panels.sizes.rails[key]);
+  }
+
   /**
    * The widths both rails fit at; `yields` gives way when they do not, and `ask` stands in for a
    * rail's kept width. @param {string} yields @param {Record<string, number>} [ask]
@@ -46,7 +55,7 @@
     /** @type {Record<string, number>} */ const want = {};
     /** @type {Record<string, string>} */ const state = {};
     for (const rail of SIDES) {
-      want[rail.side] = ask[rail.side] || S.panels.sizes.rails[rail.side] || DEFAULT_WIDTH[rail.side];
+      want[rail.side] = ask[rail.side] || wantWidth(rail.side);
       state[rail.side] = shown(railOf(rail.module));
     }
     return L.fitRails(room(), want, state, COMPACT_W, yields);
@@ -148,8 +157,8 @@
       size: () => el.getBoundingClientRect().width / zoom(),
       // As wide as the window lets it be beside the other rail as that one is.
       max: () => fit(rail.side, { [rail.side]: Infinity })[rail.side],
-      set: (width) => { S.panels.sizes.rails[rail.side] = width; A.fitRails(rail.side); },
-      reset: () => { delete S.panels.sizes.rails[rail.side]; A.fitRails(rail.side); },
+      set: (width) => { S.panels.sizes.rails[sizeKey(rail.side)] = width; A.fitRails(rail.side); },
+      reset: () => { delete S.panels.sizes.rails[sizeKey(rail.side)]; A.fitRails(rail.side); },
     }));
   }
 
