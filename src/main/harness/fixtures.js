@@ -45,7 +45,7 @@ function createProviderFixture() {
     name: 'fixture-local:7b', model: 'fixture-local:7b', size: 4e9, size_vram: 0,
     expires_at: new Date(Date.now() + 4 * 60 * 1000).toISOString(),
   }] });
-  const ollamaFetch = async () => ({ ok: true, status: 200, text: async () => ollamaStatus });
+  const ollamaFetch = async () => new Response(ollamaStatus, { status: 200, headers: { 'content-type': 'application/json' } });
   fs.mkdirSync(path.dirname(configPath), { recursive: true });
   fs.writeFileSync(configPath, JSON.stringify({
     watch: [{ directory: signalRoot, projectPath: projectDir, label: 'Fixture' }],

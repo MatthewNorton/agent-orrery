@@ -3,7 +3,7 @@
 // O1 layout, O2 endpoint table, O3 reducer fixtures, O4 real sockets through the Tracker,
 // O5 provider key behaviour (main + renderer in a vm sandbox), O6 rendered proof (Electron), O7 docs,
 // O8 regression gates.
-// --killswitch runs O0 alone: a 90 s live poll of the real server that proves expires_at advances.
+// --killswitch runs O0 alone: a 90 s live poll of the real server that proves expires_at changes as requests are served.
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -70,8 +70,11 @@ const psModel = (name, size, sizeVram, expiresAt) => ({ name, size, size_vram: s
 
 // ---- O0: kill-switch against the real server ----
 if (argv.includes('--killswitch')) {
-  const host = (process.env.OLLAMA_HOST || '127.0.0.1:11434').replace(/^https?:\/\//, '').replace(/\/$/, '');
-  const url = `http://${host}/api/ps`;
+  // The app's own address rule, so this never polls anything ollamaEndpoint would refuse.
+  const { ollamaEndpoint } = require(path.join(root, 'src', 'main', 'live', 'ollama-source.js'));
+  const endpoint = ollamaEndpoint({ env: process.env.OLLAMA_HOST });
+  if (!('origin' in endpoint)) { fail('O0', 'warning' in endpoint ? endpoint.warning : 'ollama is disabled'); report(); }
+  const url = `${endpoint.origin}/api/ps`;
   const seen = new Map();
   let advances = 0;
   let last = null;
@@ -86,7 +89,7 @@ if (argv.includes('--killswitch')) {
         const expires = Date.parse(entry.expires_at) || 0;
         const previous = seen.get(name);
         if (previous === undefined) console.log(`  ${new Date().toISOString()} loaded   ${name} expires ${entry.expires_at}`);
-        else if (expires > previous) { advances++; console.log(`  ${new Date().toISOString()} advanced ${name} expires ${entry.expires_at}`); }
+        else if (expires !== previous) { advances++; console.log(`  ${new Date().toISOString()} changed  ${name} expires ${entry.expires_at}`); }
         seen.set(name, expires);
       }
       if ((body.models || []).length) last = body;
@@ -101,8 +104,8 @@ if (argv.includes('--killswitch')) {
     fs.writeFileSync(path.join(out, 'killswitch.json'), JSON.stringify(last, null, 2));
     notes.push(`recorded /api/ps shape to ${path.join(out, 'killswitch.json')}`);
   }
-  if (advances < 2) fail('O0', `expires_at advanced ${advances} time(s); need 2 (is OLLAMA_KEEP_ALIVE infinite? was a message sent?)`);
-  else notes.push(`O0 expires_at advanced ${advances} times for ${seen.size} model(s)`);
+  if (advances < 2) fail('O0', `expires_at changed ${advances} time(s); need 2 (is OLLAMA_KEEP_ALIVE infinite? was a message sent?)`);
+  else notes.push(`O0 expires_at changed ${advances} times for ${seen.size} model(s)`);
   report();
 }
 
@@ -243,15 +246,33 @@ same('O2', source.ollamaDetail(0, 0), null, 'unknown size detail');
   const third = events.find((event) => event.type === 'ship-spawned');
   if (third) same('O3', third.ship.name, 'Ollama-3', 'step 7: third ship name');
 
-  const idleAt = T0 + 30 * SEC + 6 * MIN;
+  // A long keep_alive puts expires_at far ahead, so an idle model is told from a busy one below.
+  source.applyOllamaStatus(model, reachable([m('gemma4:e4b', 4e9, 4e9, T0 + 60 * MIN)]), T0 + 35 * SEC);
+  same('O3', types(take()), ['ship-updated', 'activity'], 'step 8: a changed expires_at is a request served');
+  const idleAt = T0 + 35 * SEC + 6 * MIN;
   departIdleShips(model, idleAt);
   check('O3', types(take()).includes('ship-departed'), 'step 8: idle sweep did not depart Ollama-3');
-  source.applyOllamaStatus(model, reachable([m('gemma4:e4b', 4e9, 4e9, T0 + 5 * MIN + 30 * SEC)]), idleAt + 5 * SEC);
-  same('O3', types(take()), [], 'step 8: same expires_at after the sweep must not re-dock');
+  source.applyOllamaStatus(model, reachable([m('gemma4:e4b', 4e9, 4e9, T0 + 60 * MIN)]), idleAt + 5 * SEC);
+  same('O3', types(take()), [], 'step 8: same expires_at ahead after the sweep must not re-dock');
   source.applyOllamaStatus(model, reachable([m('gemma4:e4b', 4e9, 4e9, idleAt + 10 * SEC + 5 * MIN)]), idleAt + 10 * SEC);
   events = take();
   const fourth = events.find((event) => event.type === 'ship-spawned');
-  if (check('O3', Boolean(fourth), 'step 8: advanced expires_at after the sweep did not re-dock')) same('O3', fourth.ship.name, 'Ollama-4', 'step 8: fourth ship name');
+  if (check('O3', Boolean(fourth), 'step 8: changed expires_at after the sweep did not re-dock')) same('O3', fourth.ship.name, 'Ollama-4', 'step 8: fourth ship name');
+  // A shorter keep_alive moves expires_at back: still a request served. Listed past that expiry, the
+  // unload timer is stopped because a request is running: the ship is kept alive and re-docks.
+  const shortExpiry = idleAt + 10 * SEC + MIN;
+  source.applyOllamaStatus(model, reachable([m('gemma4:e4b', 4e9, 4e9, shortExpiry)]), idleAt + 15 * SEC);
+  same('O3', types(take()), ['ship-updated', 'activity'], 'step 8: expires_at moved back is a request served');
+  const busyAt = shortExpiry + 30 * SEC;
+  source.applyOllamaStatus(model, reachable([m('gemma4:e4b', 4e9, 4e9, shortExpiry)]), busyAt);
+  events = take();
+  same('O3', [types(events), events[0] && events[0].ship ? events[0].ship.lastEvent : null], [['ship-updated'], busyAt],
+    'step 8: a model listed past its expiry is kept alive, with no activity line');
+  departIdleShips(model, busyAt + 6 * MIN);
+  check('O3', types(take()).includes('ship-departed'), 'step 8: idle sweep did not depart Ollama-4');
+  source.applyOllamaStatus(model, reachable([m('gemma4:e4b', 4e9, 4e9, shortExpiry)]), busyAt + 6 * MIN + 5 * SEC);
+  const fifth = take().find((event) => event.type === 'ship-spawned');
+  if (check('O3', Boolean(fifth), 'step 8: a model still listed past its expiry did not re-dock')) same('O3', fifth.ship.name, 'Ollama-5', 'step 8: fifth ship name');
 
   const longName = 'a'.repeat(100) + '\u0007';
   const parsed = source.parseOllamaStatus(JSON.stringify({ models: [

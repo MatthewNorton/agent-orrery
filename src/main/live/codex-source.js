@@ -18,7 +18,7 @@ const { hex8 } = require('../shared/hash');
 const { ACTIVE_WINDOW_MS, HOT_WINDOW_MS } = require('./model');
 const { ensureProjectForPath } = require('./projects');
 const { ensureProviderShip, setModel } = require('./ships');
-const { noteLine, noteVersion, checkDrift } = require('./drift');
+const { noteRecord, noteVersion, checkDrift } = require('./drift');
 
 /** @import { DriftCount, LiveModel, LiveTail } from '../../types/live-model' */
 
@@ -207,11 +207,8 @@ function readCodexOwnMetadata(file, sessionId) {
     let fallback = null;
     for (const line of lines) {
       if (!line.trim()) continue;
-      let record;
-      try { record = JSON.parse(line); } catch { noteLine(probe, false); continue; }
-      const facts = codexRecordFacts(record);
-      noteLine(probe, facts.known);
-      noteVersion(probe, facts.version);
+      const record = noteRecord(probe, line, codexRecordFacts);
+      if (record === undefined) continue;
       const payload = record && record.payload;
       if (!payload || record.type !== 'session_meta') continue;
       const session = codexRecordToSignals(record).find((item) => item.type === 'session');

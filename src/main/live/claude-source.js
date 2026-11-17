@@ -14,6 +14,8 @@ const {
 } = require('./projects');
 const { ensureShip } = require('./ships');
 const { stillForgotten } = require('./forgotten');
+const { noteRecord } = require('./drift');
+const { claudeRecordFacts } = require('../transcripts/claude');
 
 /** @import { LiveModel, LiveTail } from '../../types/live-model' */
 
@@ -93,6 +95,7 @@ function scanClaude(model, isStartup) {
       if (model.files.has(fp) || !(hot || isStartup)) continue;
       const tail = claudeTail(model, fp, project.id, st.size, isStartup);
       if (!hot) continue;
+      if (isStartup) countHead(tail, fp);
       model.files.set(fp, tail);
       if (isStartup && now - st.mtimeMs < ACTIVE_WINDOW_MS) {
         ensureShip(model, project.id, tail.session, false, st.mtimeMs);
@@ -128,21 +131,44 @@ function claudeTail(model, fp, projectId, size, isStartup) {
   return tail;
 }
 
-// Reads the head of a transcript to find the project's real cwd.
-/** @param {string} file */
-function readCwd(file) {
+/**
+ * The first CWD_HEAD_BYTES of a transcript; null when unreadable.
+ * @param {string} file
+ */
+function readHead(file) {
   try {
     const fd = fs.openSync(file, 'r');
     const buf = Buffer.alloc(CWD_HEAD_BYTES);
     const n = fs.readSync(fd, buf, 0, buf.length, 0);
     fs.closeSync(fd);
-    const m = buf.toString('utf8', 0, n).match(/"cwd":"((?:[^"\\]|\\.)*)"/);
-    if (m) {
-      const cwd = JSON.parse(`"${m[1]}"`);
-      return isLocalProjectPath(cwd) ? cwd : null;
-    }
-  } catch { /* unreadable head is fine */ }
-  return null;
+    return buf.toString('utf8', 0, n);
+  } catch { return null; }
+}
+
+// Reads the head of a transcript to find the project's real cwd.
+/** @param {string} file */
+function readCwd(file) {
+  const m = (readHead(file) || '').match(/"cwd":"((?:[^"\\]|\\.)*)"/);
+  if (!m) return null;
+  try {
+    const cwd = JSON.parse(`"${m[1]}"`);
+    return isLocalProjectPath(cwd) ? cwd : null;
+  } catch { return null; }
+}
+
+/**
+ * A startup tail begins at the end of its file, where a long run of bookkeeping records would look
+ * like format drift, so the canary (live/drift.js) counts the head first: a session opens with its
+ * first message, which says whether this version reads the format.
+ * @param {LiveTail} tail
+ * @param {string} file
+ */
+function countHead(tail, file) {
+  const text = readHead(file);
+  if (text === null) return;
+  const lines = text.split(/\r?\n/);
+  if (!text.endsWith('\n')) lines.pop(); // cut by the cap, or still being written
+  for (const line of lines) if (line.trim()) noteRecord(tail, line, claudeRecordFacts);
 }
 
 module.exports = { scanClaude, readCwd };

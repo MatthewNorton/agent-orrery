@@ -107,21 +107,23 @@ export interface OllamaModel {
   name: string;
   size: number;
   sizeVram: number;
-  /** When the server will unload it; moves forward with every request it serves. 0 when unknown. */
+  /** When the server will unload it: set again, from the request's keep_alive, each time it completes a request, and left as it was while one runs. 0 when unknown. */
   expiresAt: number;
 }
 
 export type OllamaStatus = { reachable: true; models: OllamaModel[] } | { reachable: false };
 
-/** A fetch: the real one, or a fixture's. */
-export type OllamaFetch = (url: string, init: { signal: AbortSignal; redirect: 'error' }) => Promise<{ ok: boolean; text(): Promise<string> }>;
+/** A fetch: the real one, or a fixture's. The body is read as a stream, under a byte cap. */
+export type OllamaFetch = (url: string, init: { signal: AbortSignal; redirect: 'error' }) => Promise<Pick<Response, 'ok' | 'body'>>;
 
 /** The Ollama adapter's state (live/ollama-source.js): where it asks, the poll, and the loaded models' ships. */
 export interface OllamaState {
   /** The Tracker option host; providers.json and OLLAMA_HOST are read per poll. */
   host: string | null;
-  /** The server's system: its home folder. */
+  /** The server's system, its home folder: the Tracker option or ~/.ollama. */
   home: string;
+  /** providers.json's ollama.home, read again every poll; null when it names none. */
+  configHome: string | null;
   fetch: OllamaFetch;
   inFlight: AbortController | null;
   /** Consecutive failed polls; 0 after a success. */

@@ -15,7 +15,7 @@ const { READ_LIMIT_BYTES, LINE_LIMIT_BYTES } = require('./model');
 const { adoptProjectPath } = require('./projects');
 const { ensureShip, spawnDrone, setModel, addPending, departShip } = require('./ships');
 const { addBuild } = require('./builds');
-const { noteLine, noteVersion, checkDrift } = require('./drift');
+const { noteRecord, checkDrift } = require('./drift');
 
 /**
  * @import { LiveModel, LiveProject, LiveShip, LiveTail } from '../../types/live-model'
@@ -79,11 +79,8 @@ function pollClaudeFile(model, fp, tail, st) {
  * @param {Pick<LiveTail, 'project' | 'session' | 'catchup' | 'drift'>} tail
  */
 function parseLine(model, line, tail) {
-  let record;
-  try { record = JSON.parse(line); } catch { noteLine(tail, false); return; }
-  const facts = claudeRecordFacts(record);
-  noteLine(tail, facts.known);
-  noteVersion(tail, facts.version);
+  const record = noteRecord(tail, line, claudeRecordFacts);
+  if (record === undefined) return;
   const project = model.projects.get(tail.project);
   if (!project) return;
   // Live stamps an undated record with the time it was read.

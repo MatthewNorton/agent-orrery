@@ -4,8 +4,10 @@
 // Local model ships, Ollama adapter. A model loaded in the loopback Ollama server is a red hull
 // named for the server (Ollama-1, Ollama-2, ...) in the server's own system, its home folder,
 // whatever client is driving it. The one request is GET /api/ps: the loaded models, their memory
-// split and expires_at, never a chat. Ollama moves expires_at forward on every request a model
-// serves, so an advance between two polls means "a request was just served".
+// split and expires_at, never a chat. Ollama sets expires_at again, from the request's own
+// keep_alive, each time a model completes a request, so a change between two polls means "a
+// request was just served"; while a request runs the unload timer is stopped and expires_at is
+// left as it was, so a model still listed past its expiry is serving one now.
 
 const { readGenericWatchConfig } = require('../provider-adapters');
 const { localAbsolutePath } = require('../path-safety');
@@ -18,7 +20,7 @@ const { ensureProjectForPath, announceProjectUpdated } = require('./projects');
 const { ensureProviderShip, departShip } = require('./ships');
 const { warnOnce } = require('./drift');
 
-/** @import { LiveModel, LiveProject, OllamaModel, OllamaStatus } from '../../types/live-model' */
+/** @import { LiveModel, LiveProject, OllamaModel, OllamaState, OllamaStatus } from '../../types/live-model' */
 
 const DEFAULT_HOST = '127.0.0.1:11434';
 const DEFAULT_PORT = 11434;
@@ -45,6 +47,9 @@ function ollamaEndpoint({ config, option, env } = {}) {
   if (config === false) return { disabled: true };
   if (config !== undefined && !plainObject(config)) return { warning: 'provider config ollama entry must be false or an object' };
   const entry = plainObject(config) ? config : {};
+  for (const key of ['host', 'home']) {
+    if (entry[key] != null && typeof entry[key] !== 'string') return { warning: `provider config ollama.${key} must be a string` };
+  }
   const value = firstTrimmed(typeof entry.host === 'string' ? entry.host.slice(0, 128) : null, option, env) || DEFAULT_HOST;
   // Security: the only place a request to a local model server is addressed. Only http on a
   // loopback host is accepted; a LAN host, https, a path, a query or userinfo is refused here.
@@ -64,7 +69,7 @@ function ollamaEndpoint({ config, option, env } = {}) {
  * @returns {{ models: OllamaModel[] } | null}
  */
 function parseOllamaStatus(text) {
-  if (typeof text !== 'string' || text.length > BODY_LIMIT) return null;
+  if (typeof text !== 'string') return null;
   let body;
   try { body = JSON.parse(text); } catch { return null; }
   if (!plainObject(body) || !Array.isArray(body.models)) return null;
@@ -126,9 +131,11 @@ function applyOllamaStatus(model, status, now) {
   if (state.reachable === false) pushFeed(model, 'info', 'Ollama server online', feedProject);
   state.reachable = true;
   const present = new Set(status.models.map((entry) => entry.name));
-  // The system appears once a model has loaded; one restored from an earlier run takes the
-  // server's name as soon as the server answers.
-  const project = present.size || model.projects.has(PROJECT_ID) ? ollamaProject(model, present.size ? now : 0) : null;
+  // A request served or running is the system's activity; a model merely resident is not, so the
+  // system goes idle with its ships. The system appears once a model has loaded; one restored from
+  // an earlier run takes the server's name as soon as the server answers.
+  const active = status.models.some((entry) => { const request = requestState(state, entry, now); return request.served || request.busy; });
+  const project = present.size || model.projects.has(PROJECT_ID) ? ollamaProject(model, active ? now : 0) : null;
   if (project) for (const entry of status.models) dock(model, project, entry, now);
   for (const name of [...state.loaded.keys()]) if (!present.has(name)) unload(model, name, now);
 }
@@ -139,13 +146,29 @@ const sessionIdFor = (name) => `ollama-${hex8(name)}`;
 const shipIdFor = (name) => `ship:local:${sessionIdFor(name)}`;
 
 /**
+ * What one listed model says of requests since the last poll.
+ * @param {OllamaState} state
+ * @param {OllamaModel} entry
+ * @param {number} now
+ */
+function requestState(state, entry, now) {
+  const seen = state.loaded.get(entry.name);
+  return {
+    // expires_at changed either way: a request with a shorter keep_alive moves it back.
+    served: seen === undefined || entry.expiresAt !== seen,
+    // Listed past its expiry: the unload timer is stopped because a request is running.
+    busy: entry.expiresAt > 0 && entry.expiresAt <= now,
+  };
+}
+
+/**
  * The server's system: its home folder, shown as Ollama whatever the folder is called.
  * @param {LiveModel} model
  * @param {number} activity 0 when nothing is loaded, so an idle server is not activity
  * @returns {LiveProject | null}
  */
 function ollamaProject(model, activity) {
-  const home = model.ollama.home;
+  const home = model.ollama.configHome || model.ollama.home;
   const project = ensureProjectForPath(model, home, PROJECT_ID, activity, 0);
   if (!project) return null;
   if (project.name !== LABEL) {
@@ -157,7 +180,7 @@ function ollamaProject(model, activity) {
 }
 
 /**
- * One loaded model: a new ship, a request served, a changed memory split, or nothing.
+ * One loaded model: a new ship, a request served or still running, a changed memory split, or nothing.
  * @param {LiveModel} model
  * @param {LiveProject} project
  * @param {OllamaModel} entry
@@ -166,21 +189,20 @@ function ollamaProject(model, activity) {
 function dock(model, project, entry, now) {
   const state = model.ollama;
   const shipId = shipIdFor(entry.name);
-  const seen = state.loaded.get(entry.name);
-  const served = seen === undefined || entry.expiresAt > seen;
+  const { served, busy } = requestState(state, entry, now);
   const detail = ollamaDetail(entry.size, entry.sizeVram);
   let ship = model.ships.get(shipId);
   if (!ship) {
-    // Warped out idle by the sweep: it docks again only once the model serves a request.
-    if (!served) return;
+    // Warped out idle by the sweep: it docks again once the model serves, or is serving, a request.
+    if (!served && !busy) return;
     ship = ensureProviderShip(model, 'local', project.id, sessionIdFor(entry.name), 'main', now, null,
       { local: true, model: entry.name, label: LABEL, detail });
     if (!ship) return;
-  } else if (served) {
+  } else if (served || busy) {
     ship.lastEvent = now;
     ship.detail = detail;
     queue(model, { type: 'ship-updated', ship: liveShip(ship) });
-    queue(model, { type: 'activity', project: project.id, shipId, tool: 'ollama', status: 'Working', detail, ts: now });
+    if (served) queue(model, { type: 'activity', project: project.id, shipId, tool: 'ollama', status: 'Working', detail, ts: now });
   } else if (ship.detail !== detail) {
     ship.detail = detail;
     queue(model, { type: 'ship-updated', ship: liveShip(ship) });
@@ -221,8 +243,9 @@ async function pollOllama(model) {
     }
     return { polled: false, reachable: state.reachable };
   }
-  // providers.json may name the server's home folder, for an install that keeps none at ~/.ollama.
-  if (endpoint.home) state.home = endpoint.home;
+  // providers.json may name the server's home folder, for an install that keeps none at ~/.ollama;
+  // it is read every poll like the host, so removing the entry takes effect too.
+  state.configHome = endpoint.home;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -231,24 +254,51 @@ async function pollOllama(model) {
   try {
     // Security: a redirect from whatever listens on the port must not turn this into a request elsewhere.
     const response = await state.fetch(`${endpoint.origin}/api/ps`, { signal: controller.signal, redirect: 'error' });
-    const text = await response.text(); // read on any status, so a failed response frees its socket
-    if (response.ok) parsed = parseOllamaStatus(text);
+    const text = await readBody(response); // read on any status, so a failed response frees its socket
+    if (response.ok && text !== null) parsed = parseOllamaStatus(text);
   } catch { /* unreachable, timed out, aborted or not a body: a failure, counted below */ }
   clearTimeout(timer);
   state.inFlight = null;
 
   const now = Date.now();
-  if (parsed) {
-    state.failures = 0;
-    state.nextPollAt = 0;
-    applyOllamaStatus(model, { reachable: true, models: parsed.models }, now);
-  } else {
-    state.failures += 1;
-    state.nextPollAt = now + BACKOFF_MS[Math.min(state.failures, BACKOFF_MS.length) - 1];
-    if (state.failures >= 2) applyOllamaStatus(model, { reachable: false }, now);
+  try {
+    if (parsed) {
+      state.failures = 0;
+      state.nextPollAt = 0;
+      applyOllamaStatus(model, { reachable: true, models: parsed.models }, now);
+    } else {
+      state.failures += 1;
+      state.nextPollAt = now + BACKOFF_MS[Math.min(state.failures, BACKOFF_MS.length) - 1];
+      if (state.failures >= 2) applyOllamaStatus(model, { reachable: false }, now);
+    }
+    flush(model);
+  } catch (error) {
+    // The Tracker's interval drops the promise, and a rejection there would be unhandled.
+    console.error('[ollama] poll failed:', error);
   }
-  flush(model);
   return { polled: true, reachable: state.reachable };
+}
+
+/**
+ * Security: the body as text, read with a cap on bytes received: null once the listener has sent
+ * more than BODY_LIMIT, however slowly, so a misbehaving process on the port cannot fill memory
+ * before the parser's turn.
+ * @param {Pick<Response, 'body'>} response
+ * @returns {Promise<string | null>}
+ */
+async function readBody(response) {
+  if (!response.body) return '';
+  const reader = response.body.getReader();
+  const chunks = [];
+  let bytes = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    bytes += value.byteLength;
+    if (bytes > BODY_LIMIT) { await reader.cancel(); return null; }
+    chunks.push(value);
+  }
+  return Buffer.concat(chunks).toString('utf8');
 }
 
 /**

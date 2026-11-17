@@ -94,6 +94,8 @@ test('ollama endpoint: loopback http in Ollama\'s own syntax, config over option
   }
   assert.ok(!ollamaEndpoint({ env: 'evil\u0007host' }).warning.includes('\u0007'), 'control characters leave the warning');
   assert.deepEqual(ollamaEndpoint({ config: 'yes' }), { warning: 'provider config ollama entry must be false or an object' });
+  assert.deepEqual(ollamaEndpoint({ config: { host: 11434 } }), { warning: 'provider config ollama.host must be a string' });
+  assert.deepEqual(ollamaEndpoint({ config: { home: ['x'] } }), { warning: 'provider config ollama.home must be a string' });
   assert.equal(ollamaEndpoint({ config: { home: 'relative/ollama' } }).home, null, 'a home must be absolute');
   assert.equal(ollamaEndpoint({ config: { home: os.tmpdir() } }).home, os.tmpdir());
 });
@@ -148,12 +150,14 @@ test('ollama reducer: loaded models dock, served requests are activity, unloaded
 
   applyOllamaStatus(model, up([m(QWEN, 23e9, 0, T0 + 5 * MIN)]), T0 + 5 * SEC);
   assert.deepEqual(take(), [], 'nothing changed, nothing said');
+  assert.equal(model.projects.get('project:ollama').lastActivity, T0, 'a resident model serving nothing is no activity for the system');
 
   applyOllamaStatus(model, up([m(QWEN, 23e9, 0, T0 + 5 * MIN + 10 * SEC)]), T0 + 10 * SEC);
   events = take();
   assert.deepEqual(types(events), ['ship-updated', 'activity'], 'expires_at advanced: a request was served');
   assert.equal(events[0].ship.lastEvent, T0 + 10 * SEC);
   assert.deepEqual([events[1].tool, events[1].status, events[1].shipId, events[1].ts], ['ollama', 'Working', ship.id, T0 + 10 * SEC]);
+  assert.equal(model.projects.get('project:ollama').lastActivity, T0 + 10 * SEC);
 
   applyOllamaStatus(model, up([m(QWEN, 23e9, 12e9, T0 + 5 * MIN + 10 * SEC)]), T0 + 12 * SEC);
   events = take();
@@ -177,14 +181,34 @@ test('ollama reducer: loaded models dock, served requests are activity, unloaded
   events = take();
   assert.deepEqual(types(events), ['feed:info:Ollama server online', 'ship-spawned', 'feed:spawn:Ollama-3 entered Ollama']);
 
-  // Idle: the sweep warps the ship out; it docks again only when the model serves another request.
-  const idleAt = T0 + 30 * SEC + 6 * MIN;
+  // A long keep_alive puts expires_at far ahead. Idle, the sweep warps the ship out; the same
+  // expires_at does not re-dock it, a changed one (a request served) does.
+  applyOllamaStatus(model, up([m('gemma4:e4b', 4e9, 4e9, T0 + 60 * MIN)]), T0 + 35 * SEC);
+  assert.deepEqual(types(take()), ['ship-updated', 'activity']);
+  const idleAt = T0 + 35 * SEC + 6 * MIN;
   departIdleShips(model, idleAt);
   assert.deepEqual(types(take()), ['ship-departed', 'feed:depart:Ollama-3 warped out']);
-  applyOllamaStatus(model, up([m('gemma4:e4b', 4e9, 4e9, T0 + 5 * MIN + 30 * SEC)]), idleAt + 5 * SEC);
-  assert.deepEqual(take(), [], 'the same expires_at does not re-dock');
+  applyOllamaStatus(model, up([m('gemma4:e4b', 4e9, 4e9, T0 + 60 * MIN)]), idleAt + 5 * SEC);
+  assert.deepEqual(take(), [], 'the same expires_at ahead does not re-dock');
   applyOllamaStatus(model, up([m('gemma4:e4b', 4e9, 4e9, idleAt + 10 * SEC + 5 * MIN)]), idleAt + 10 * SEC);
   assert.equal(take().find((event) => event.type === 'ship-spawned').ship.name, 'Ollama-4');
+
+  // A request with a shorter keep_alive moves expires_at backwards: a request served all the same.
+  const shortExpiry = idleAt + 10 * SEC + MIN;
+  applyOllamaStatus(model, up([m('gemma4:e4b', 4e9, 4e9, shortExpiry)]), idleAt + 15 * SEC);
+  assert.deepEqual(types(take()), ['ship-updated', 'activity']);
+
+  // Mid-request: Ollama stops the unload timer and sets expires_at again only on completion, so a
+  // model still listed past its expiry is serving. The ship stays, and docks again if it had warped out.
+  const busyAt = shortExpiry + 30 * SEC;
+  applyOllamaStatus(model, up([m('gemma4:e4b', 4e9, 4e9, shortExpiry)]), busyAt);
+  events = take();
+  assert.deepEqual([types(events), events[0].ship.lastEvent], [['ship-updated'], busyAt], 'kept alive, no activity line');
+  assert.equal(model.projects.get('project:ollama').lastActivity, busyAt);
+  departIdleShips(model, busyAt + 6 * MIN);
+  assert.deepEqual(types(take()), ['ship-departed', 'feed:depart:Ollama-4 warped out']);
+  applyOllamaStatus(model, up([m('gemma4:e4b', 4e9, 4e9, shortExpiry)]), busyAt + 6 * MIN + 5 * SEC);
+  assert.equal(take().find((event) => event.type === 'ship-spawned').ship.name, 'Ollama-5', 'still listed past its expiry: docked again');
   assert.equal(console.warn.mock.callCount(), 0, 'an existing home folder warns about nothing');
 });
 
@@ -279,9 +303,14 @@ test('ollama poll: providers.json refuses a LAN host with one warning, turns the
   const otherHome = path.join(path.dirname(w.home), 'other-home');
   fs.mkdirSync(otherHome);
   fs.writeFileSync(w.configPath, JSON.stringify({ ollama: { home: otherHome } }));
-  const moved = w.tracker({ statePath: path.join(path.dirname(w.statePath), 'other-state.json'), ollama: { host: `127.0.0.1:${server.port}` } });
+  const moved = w.tracker({ statePath: path.join(path.dirname(w.statePath), 'other-state.json'), ollama: { host: `127.0.0.1:${server.port}`, home: w.home } });
   await moved.pollOllama();
   assert.equal(moved.snapshot().projects.find((project) => project.id === 'project:ollama').path, otherHome);
+  // Removing the entry takes effect on the next poll as well: back to the default folder.
+  fs.writeFileSync(w.configPath, JSON.stringify({}));
+  await moved.pollOllama();
+  assert.equal(moved.model.ollama.configHome, null);
+  assert.ok(moved.snapshot().projects.some((project) => project.id.startsWith('project:ollama') && project.path === w.home));
   assert.equal(console.warn.mock.callCount(), 2);
 });
 
@@ -311,4 +340,22 @@ test('ollama poll: stop() aborts a poll in flight, and a Tracker without the opt
   assert.equal(plain.model.ollama, null);
   assert.deepEqual(server.hits, []);
   assert.deepEqual(await plain.pollOllama(), { polled: false, reachable: null });
+});
+
+test('ollama poll: a body past the byte cap is a failed poll, cut off as it streams', async (t) => {
+  t.mock.method(console, 'warn', () => {});
+  const w = world(t);
+  const endless = http.createServer((req, res) => {
+    res.setHeader('content-type', 'application/json');
+    // Valid JSON were it ever finished, and never finished: the cap, not the parser or the timeout, must stop it.
+    res.write(`{"pad":"${'x'.repeat(300 * 1024)}","models":[`);
+  });
+  await new Promise((resolve) => endless.listen(0, '127.0.0.1', resolve));
+  t.after(() => closeServer(endless));
+  const tracker = w.tracker({ ollama: { host: `127.0.0.1:${endless.address().port}`, home: w.home } });
+  const startedAt = Date.now();
+  assert.deepEqual(await tracker.pollOllama(), { polled: true, reachable: null });
+  assert.ok(Date.now() - startedAt < 2500, 'cut off at the cap, not by the timeout');
+  assert.equal(tracker.model.ollama.failures, 1);
+  assert.equal(tracker.model.ships.size, 0);
 });

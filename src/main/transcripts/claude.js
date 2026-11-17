@@ -14,6 +14,16 @@ const TOOL_STATUS = Object.freeze({
 });
 const BUILD_TOOLS = new Set(['Edit', 'Write', 'NotebookEdit', 'MultiEdit']);
 const SPAWN_TOOLS = new Set(['Agent', 'Task']);
+// Records Claude Code writes beside a session's messages, which this adapter skips on purpose; the
+// format canary counts them as recognised. Seen in Claude Code 2.1 transcripts (November 2026),
+// where about half of the records are of these kinds.
+const BOOKKEEPING_KINDS = new Set([
+  'agent-name', 'ai-title', 'api-request', 'api-request-blob', 'api-request-shape', 'artifact-autoreact-ledger',
+  'artifact-comment-monitor', 'atis-latch', 'attachment', 'continued-in', 'cost-state', 'custom-title',
+  'file-history-delta', 'file-history-snapshot', 'fork-context-ref', 'frame-link', 'last-prompt', 'mode',
+  'permission-mode', 'pr-link', 'progress', 'queue-operation', 'relocated', 'session-owner', 'summary',
+  'tools-used', 'worktree-state',
+]);
 
 /**
  * @typedef {object} ClaudeSession Every record restates its session envelope.
@@ -93,14 +103,16 @@ function claudeRecordToSignals(value) {
 
 /**
  * What the format canary (live/drift.js) asks of a record: whether it is of a kind this adapter
- * reads, a message or a system record, and the Claude Code version it names.
+ * recognises, a message or a system record it reads or a bookkeeping record it skips, and the
+ * Claude Code version it names.
  * @param {unknown} value
  * @returns {{ known: boolean, version: string | null }}
  */
 function claudeRecordFacts(value) {
   const record = plainObject(value) ? value : {};
   return {
-    known: plainObject(record.message) || record.type === 'system',
+    known: plainObject(record.message) || record.type === 'system' ||
+      (typeof record.type === 'string' && BOOKKEEPING_KINDS.has(record.type)),
     version: typeof record.version === 'string' ? record.version : null,
   };
 }

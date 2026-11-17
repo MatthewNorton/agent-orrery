@@ -78,7 +78,7 @@ function createLiveModel(statePath, options, publish) {
       host: options.ollama.host || null,
       home: options.ollama.home || DEFAULT_OLLAMA_HOME,
       fetch: options.ollama.fetch || ((url, init) => fetch(url, init)),
-      inFlight: null, failures: 0, nextPollAt: 0, reachable: null, loaded: new Map(),
+      configHome: null, inFlight: null, failures: 0, nextPollAt: 0, reachable: null, loaded: new Map(),
     } : null,
     shipCounter: 0,
     providerCounters: new Map(),

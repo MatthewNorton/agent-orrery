@@ -45,17 +45,26 @@ client is driving it: the Ollama desktop app, a script, an editor plugin. The
 (`src/main/live/ollama-source.js`). Every five seconds the main process asks
 `GET /api/ps` on the loopback Ollama server (`http://127.0.0.1:11434` by
 default) which models are loaded. The answer names each model, its memory
-split and the time it will be unloaded, which Ollama moves forward on every
-request the model serves. Agent Orrery never reads a chat, a prompt or a
-response: `/api/ps` is the only request, and it carries none.
+split and the time it will be unloaded, which Ollama sets again, from the
+request's own keep-alive, each time the model completes a request. Agent
+Orrery never reads a chat, a prompt or a response: `/api/ps` is the only
+request, and it carries none.
 
 Each loaded model is a red ship named for the server (`Ollama-1`, `Ollama-2`)
 with the model name as its tag, in the `Ollama` system, which is the server's
 home folder (`~/.ollama`). A served request is an activity on that ship; a
 model unloaded from the server departs as "unloaded"; a ship idle for five
-minutes warps out like any other and docks again on the next request. When
-the server stops answering, the feed says "Ollama server offline" and every
-Ollama ship departs; "Ollama server online" marks its return.
+minutes warps out like any other and docks again on the next request. Ollama
+stops the unload timer while a request runs and sets the expiry again only
+when it completes, so a model still listed past its expiry is mid-request:
+its ship stays docked, or docks again if it had warped out. What `/api/ps`
+cannot show is a request that began inside the keep-alive window and is
+still running: it reads as idle until the window passes, so a generation
+longer than five minutes may warp out and dock again moments later. A model
+that is loaded but serving nothing is no activity: the system goes idle with
+its ships. When the server stops answering, the feed says "Ollama server
+offline" and every Ollama ship departs; "Ollama server online" marks its
+return.
 
 `providers.json` can turn the adapter off or point it elsewhere:
 
@@ -84,21 +93,28 @@ reads them defensively: every line is parsed on its own, every field is
 checked, and a record it does not recognise is skipped. A format change
 therefore never crashes the app; it empties it. To make that visible, each
 tailed transcript counts the lines it reads and the records of a kind its
-adapter reads (`claudeRecordFacts`: a message or a system record;
+adapter recognises (`claudeRecordFacts`: a message, a system record or a
+bookkeeping kind it knows;
 `codexRecordFacts`: a `session_meta`, `turn_context`, `response_item` or
 `event_msg`). One that reaches 40 lines with none of that kind raises a warning
 for its provider, quoting the provider's version when its records name one, in
 the console, the event feed and `snapshot.warnings`; the feed panel keeps it
-pinned for the rest of the run. A fresh Codex rollout whose metadata cannot be
-read is never tailed, so the same rule runs over its head at discovery.
-`providers.json` errors show the same way.
+pinned for the rest of the run. A transcript already on disk when the app
+starts is tailed from its end, where a long run of bookkeeping records would
+look like drift, so its head, where a session opens with its first message, is
+counted first. The bookkeeping records Claude Code writes beside the messages
+(`attachment`, `queue-operation`, `file-history-snapshot` and the rest of the
+list in `claudeRecordFacts`) count as recognised; about half of a transcript
+is such records. A fresh Codex rollout whose metadata cannot be read is never
+tailed, so the same rule runs over its head at discovery. `providers.json`
+errors show the same way.
 
 What each adapter depends on, last confirmed against Claude Code 2.1 and
 Codex CLI 0.167 (November 2026):
 
 | Provider | Files | Fields read |
 |---|---|---|
-| Claude Code | `~/.claude/projects/<slug>/<session>.jsonl` | `type` (`user`, `assistant`, `system` with `subtype: turn_duration`), `cwd`, `isSidechain`, `timestamp`, `version`; `message.role`, `message.model`, and in `message.content[]` the block `type` (`text`, `tool_use`, `tool_result`), `id`, `name`, `input.file_path` / `pattern` / `description`, `tool_use_id` |
+| Claude Code | `~/.claude/projects/<slug>/<session>.jsonl` | `type` (`user`, `assistant`, `system` with `subtype: turn_duration`), `cwd`, `isSidechain`, `timestamp`, `version`; `message.role`, `message.model`, and in `message.content[]` the block `type` (`text`, `tool_use`, `tool_result`), `id`, `name`, `input.file_path` / `pattern` / `description`, `tool_use_id`; recognised and skipped: the bookkeeping kinds listed in `claudeRecordFacts` |
 | Codex | `~/.codex/sessions/**/rollout-*-<uuid>.jsonl` and `~/.codex/archived_sessions/**` | `type` (`session_meta`, `turn_context`, `response_item`, `event_msg`), `timestamp`; in `payload`: `id`, `session_id`, `cwd`, `thread_source`, `source`, `parent_thread_id`, `forked_from_id`, `agent_path`, `model`, `model_provider`, `cli_version`, `type` (`message`, `function_call`, `custom_tool_call`, their `_output` forms, `patch_apply_end`, `task_started`, `task_complete`, `turn_aborted`), `call_id`, `name`, `role`, `content[].text`, `changes`, `success` |
 
 The adapters are `src/main/transcripts/claude.js` and

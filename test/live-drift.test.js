@@ -84,7 +84,10 @@ test('drift: each adapter says which records are of a kind it reads, and the ver
   const { projectDir } = createWorld(t);
   assert.deepEqual(claudeRecordFacts({ ...claude.prompt(projectDir, T0), version: '2.1.0' }), { known: true, version: '2.1.0' });
   assert.deepEqual(claudeRecordFacts(claude.turnDone(projectDir, T0)), { known: true, version: null });
-  assert.deepEqual(claudeRecordFacts({ type: 'attachment', version: '2.1.0', attachment: {} }), { known: false, version: '2.1.0' });
+  assert.deepEqual(claudeRecordFacts({ type: 'attachment', version: '2.1.0', attachment: {} }), { known: true, version: '2.1.0' },
+    'bookkeeping Claude Code writes beside the messages is recognised, and skipped');
+  assert.deepEqual(claudeRecordFacts({ type: 'queue-operation', operation: 'enqueue' }), { known: true, version: null });
+  assert.deepEqual(claudeRecordFacts({ type: 'future-record', version: '2.1.0' }), { known: false, version: '2.1.0' });
   assert.deepEqual(claudeRecordFacts(null), { known: false, version: null });
 
   assert.deepEqual(codexRecordFacts(codex.meta(T0, CODEX_SESSION, projectDir, { cli_version: ' 0.167.0 ' })),
@@ -98,8 +101,9 @@ test('drift: through the Tracker, a Claude transcript of unknown records warns o
   t.mock.method(console, 'warn', () => {});
   const world = createWorld(t);
   const file = world.claudeFile();
-  // On disk at startup, so the tail starts at its end: only what Claude Code writes next is read.
-  appendJsonl(file, [claude.prompt(world.projectDir, T0)], T0);
+  // On disk at startup: the head is counted, then only what Claude Code writes next is read, and
+  // nothing in either is a kind this version knows.
+  appendJsonl(file, [{ type: 'future-record', version: '9.9.9', cwd: world.projectDir, timestamp: iso(T0) }], T0);
   const live = world.live();
   live.tracker.scan(true);
   live.take();
@@ -172,4 +176,25 @@ test('drift: a Codex rollout whose metadata the adapter rejects, but whose recor
   live.tracker.scan(true);
   assert.equal(warnings(live.take()).length, 0);
   assert.equal(live.tracker.ships.size, 0, 'and it is not tracked either');
+});
+
+test('drift: through the Tracker, a transcript on disk at startup is judged by its head before its tail', (t) => {
+  t.mock.method(console, 'warn', () => {});
+  const world = createWorld(t);
+  const file = world.claudeFile();
+  // A session opens with its first message. The tail starts at the end, and what Claude Code writes
+  // next is a long run of records of a kind this version has never seen: normal bookkeeping, not drift.
+  appendJsonl(file, [claude.prompt(world.projectDir, T0), claude.turnDone(world.projectDir, T0 + SEC)], T0 + SEC);
+  const live = world.live();
+  live.tracker.scan(true);
+  live.take();
+
+  const unfamiliar = Array.from({ length: 3 * DRIFT_LINES }, (_, index) => ({
+    type: 'future-bookkeeping', version: '2.1.0', cwd: world.projectDir, timestamp: iso(T0 + 2 * SEC), index,
+  }));
+  world.clock.set(T0 + 2 * SEC);
+  appendJsonl(file, unfamiliar, T0 + 2 * SEC);
+  live.tracker.pollFiles();
+  assert.equal(warnings(live.take()).length, 0);
+  assert.deepEqual(live.tracker.snapshot().warnings, []);
 });
