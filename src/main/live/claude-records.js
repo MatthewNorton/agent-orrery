@@ -13,7 +13,7 @@ const { liveShip } = require('../universe/public-shape');
 const { queue, pushFeed } = require('./events');
 const { READ_LIMIT_BYTES, LINE_LIMIT_BYTES } = require('./model');
 const { adoptProjectPath } = require('./projects');
-const { ensureShip, spawnDrone, setModel, addPending } = require('./ships');
+const { ensureShip, spawnDrone, setModel, addPending, departShip } = require('./ships');
 const { addBuild } = require('./builds');
 const { noteLine, noteVersion, checkDrift } = require('./drift');
 
@@ -179,13 +179,8 @@ function onToolResult(model, toolUseId, ts) {
     model.pendingIndex.delete(toolUseId);
   }
 
-  const droneId = `drone:${toolUseId}`;
-  const drone = model.ships.get(droneId);
-  if (drone) {
-    model.ships.delete(droneId);
-    queue(model, { type: 'ship-departed', shipId: droneId, ts });
-    pushFeed(model, 'depart', `${drone.name} returned to ${drone.parentName}`, drone.project);
-  }
+  const drone = model.ships.get(`drone:${toolUseId}`);
+  if (drone) departShip(model, drone, ts, `returned to ${drone.parentName}`);
 }
 
 module.exports = { pollClaudeFile, parseLine };

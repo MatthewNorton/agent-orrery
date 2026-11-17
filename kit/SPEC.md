@@ -163,7 +163,8 @@ Project = { id, path, name, exists, firstSeen, lastActivity, totalBytes, totalBu
 
 Ship = { id, name, provider, project, kind, status, detail, lastEvent,
          attention, attentionSince, builds, local, model, taskId?, turnOutcome? }   // ?: LIVE only
-// provider: 'claude'|'codex'|'generic'; names use Claude-/Codex-/Signal-.
+// provider: 'claude'|'codex'|'generic'|'local'; names use Claude-/Codex-/Signal-,
+//   and a local server's own label (Ollama-).
 // kind: 'main' | 'drone' (drone = subagent, render smaller);
 // status: 'Building'|'Exploring'|'Gathering Resources'|'Scanning'|'Delegating'|
 //         'Planning'|'Working'; detail: string|null (e.g. relative file path).
@@ -177,6 +178,10 @@ Ship = { id, name, provider, project, kind, status, detail, lastEvent,
 //   local server (oss, ollama, lmstudio, llama.cpp, vllm, localai). Claude: the
 //   latest assistant message.model is not a Claude model. Drones inherit it from
 //   their parent; a change arrives as ship-updated. The provider stays claude/codex.
+//   The 'local' provider is the server itself: a model loaded in Ollama, read from
+//   its loopback /api/ps, is a ship named Ollama-<n> in the Ollama system (the
+//   server's home folder), always local: true with model set; detail is its size
+//   and CPU/GPU split, and an activity (tool 'ollama') marks each request it serves.
 // model: the model name the transcript last reported, as written (Claude
 //   message.model; Codex session_meta.model and each turn_context.model, which the
 //   adapter emits as a `turn-context` signal), control characters dropped, cut to 64

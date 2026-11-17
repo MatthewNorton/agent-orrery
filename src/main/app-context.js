@@ -86,7 +86,8 @@ function createAppContext({ flags, fixtures }, electron = require('electron')) {
     const trackerOptions = ctx.harness.historyFixture ? ctx.harness.historyFixture.trackerOptions : providerFixture?.options;
     ctx.tracker = fixture
       ? new Tracker(fixture.statePath, trackerOptions)
-      : new Tracker(path.join(app.getPath('userData'), 'universe-state.json'));
+      // Test modes without a fixture (shots, polish) stay off the real Ollama server.
+      : new Tracker(path.join(app.getPath('userData'), 'universe-state.json'), ctx.flags.testMode ? {} : { ollama: {} });
     const projectVcsStatusService = createProjectVcsStatusService({
       collector: createLocalGitStatusCollector(),
       githubProvider: createGitHubMetadataProvider(),

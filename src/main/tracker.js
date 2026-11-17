@@ -28,6 +28,7 @@ const { pollClaudeFile, parseLine } = require('./live/claude-records');
 const { scanClaude, readCwd } = require('./live/claude-source');
 const { scanCodex } = require('./live/codex-source');
 const { scanSignals } = require('./live/signal-source');
+const { pollOllama, stopOllama } = require('./live/ollama-source');
 
 /**
  * @import { BuildHistogram, FeedEntry, PlanetData, Project, RootTaskItem, Ship, SystemData } from '../types/contract'
@@ -39,6 +40,7 @@ const SCAN_INTERVAL_MS = 3000;   // discover new projects / session files
 const POLL_INTERVAL_MS = 1000;   // tail active session files
 const TICK_INTERVAL_MS = 5000;   // ship departure sweep
 const SAVE_INTERVAL_MS = 60000;  // write universe-state.json
+const OLLAMA_POLL_MS = 5000;    // ask the local model server which models are loaded
 
 class Tracker extends EventEmitter {
   /**
@@ -67,10 +69,15 @@ class Tracker extends EventEmitter {
     this.timers.push(setInterval(() => this.pollFiles(), POLL_INTERVAL_MS));
     this.timers.push(setInterval(() => this.sweepShips(), TICK_INTERVAL_MS));
     this.timers.push(setInterval(() => this.saveState(), SAVE_INTERVAL_MS));
+    if (this.model.ollama) {
+      this.pollOllama();
+      this.timers.push(setInterval(() => this.pollOllama(), OLLAMA_POLL_MS));
+    }
   }
 
   stop() {
     this.timers.forEach(clearInterval);
+    stopOllama(this.model);
     this.saveState();
   }
 
@@ -185,6 +192,11 @@ class Tracker extends EventEmitter {
 
   scanSignals(isStartup) {
     scanSignals(this.model, isStartup);
+  }
+
+  /** One poll of the local model server (live/ollama-source.js); start() runs it every 5 s. */
+  pollOllama() {
+    return pollOllama(this.model);
   }
 
   readCwd(file) {

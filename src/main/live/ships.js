@@ -72,7 +72,7 @@ function setModel(model, ship, facts) {
 }
 
 /**
- * The ship of a Codex or Signal session, named from its provider's own counter.
+ * The ship of a Codex, Signal or local-server session, named from its provider's own counter.
  * @param {LiveModel} model
  * @param {unknown} providerValue
  * @param {string} projectId
@@ -80,21 +80,25 @@ function setModel(model, ship, facts) {
  * @param {string} kind
  * @param {number} ts
  * @param {string | null | undefined} parentSessionId
+ * @param {{ local?: boolean, model?: string | null, label?: string, detail?: string | null }} [facts]
+ *   what the source knows at spawn; a `label` names the ship family (`Ollama-1`). Names count per label.
  * @returns {LiveShip | null}
  */
-function ensureProviderShip(model, providerValue, projectId, sessionId, kind, ts, parentSessionId) {
+function ensureProviderShip(model, providerValue, projectId, sessionId, kind, ts, parentSessionId, facts = {}) {
   const provider = normalizeProvider(providerValue);
   if (!projectId || !sessionId || !model.projects.has(projectId)) return null;
   const id = `ship:${provider}:${sessionId}`;
   let ship = model.ships.get(id);
   if (!ship) {
-    const labels = { claude: 'Claude', codex: 'Codex', signal: 'Signal' };
-    const next = (model.providerCounters.get(provider) || 0) + 1;
-    model.providerCounters.set(provider, next);
+    const labels = { claude: 'Claude', codex: 'Codex' };
+    const label = facts.label || labels[provider] || 'Signal';
+    const next = (model.providerCounters.get(label) || 0) + 1;
+    model.providerCounters.set(label, next);
     const parent = parentSessionId ? model.ships.get(`ship:${provider}:${parentSessionId}`) : null;
     ship = createShipRecord({
-      id, name: `${labels[provider] || 'Signal'}-${next}`, provider, project: projectId,
+      id, name: `${label}-${next}`, provider, project: projectId,
       kind: kind === 'drone' ? 'drone' : 'main', parentName: parent ? parent.name : null, lastEvent: ts,
+      local: facts.local === true, model: facts.model || null, detail: facts.detail || null,
     });
     model.ships.set(id, ship);
     queue(model, { type: 'ship-spawned', ship: liveShip(ship) });
@@ -160,11 +164,22 @@ function departIdleShips(model, now) {
       for (const toolUseId of ship.pending.keys()) {
         if (model.pendingIndex.get(toolUseId) === id) model.pendingIndex.delete(toolUseId);
       }
-      model.ships.delete(id);
-      queue(model, { type: 'ship-departed', shipId: id, ts: now });
-      pushFeed(model, 'depart', `${ship.name} warped out`, ship.project);
+      departShip(model, ship, now, 'warped out');
     }
   }
+}
+
+/**
+ * A ship leaves: out of the map, announced, and in the feed with why.
+ * @param {LiveModel} model
+ * @param {LiveShip} ship
+ * @param {number} ts
+ * @param {string} reason
+ */
+function departShip(model, ship, ts, reason) {
+  model.ships.delete(ship.id);
+  queue(model, { type: 'ship-departed', shipId: ship.id, ts });
+  pushFeed(model, 'depart', `${ship.name} ${reason}`, ship.project);
 }
 
 /**
@@ -185,5 +200,6 @@ module.exports = {
   addPending,
   clearPending,
   departIdleShips,
+  departShip,
   projectHasShips,
 };

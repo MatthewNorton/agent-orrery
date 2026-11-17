@@ -299,7 +299,8 @@ check('O5', /export type Provider = [^;]*'local'/.test(read('src/types/contract.
   if (AUR) {
     same('O5', AUR.providerKey('local'), 'local', 'providerKey(local)');
     same('O5', AUR.providerKey(' Local '), 'local', 'providerKey folds case and space');
-    same('O5', AUR.providerMeta('local'), { key: 'local', label: 'Local', color: LOCAL_RED }, 'providerMeta(local)');
+    // Sandbox objects have the sandbox's prototypes; spread them into this realm before deepStrictEqual.
+    same('O5', { ...AUR.providerMeta('local') }, { key: 'local', label: 'Local', color: LOCAL_RED }, 'providerMeta(local)');
     same('O5', AUR.PROVIDERS.local && AUR.PROVIDERS.local.color, AUR.LOCAL_MODEL.color, 'PROVIDERS.local shares the LOCAL_MODEL colour');
     same('O5', AUR.isSignalEntity({ provider: 'local', local: true }), false, 'a local ship is a hull, not a signal marker');
     same('O5', AUR.shipColor({ provider: 'local', local: true }), LOCAL_RED, 'shipColor(local)');
@@ -313,7 +314,7 @@ check('O5', /export type Provider = [^;]*'local'/.test(read('src/types/contract.
     let stats = null;
     try { stats = AUR.sceneProviderStats({ meshes: [mesh('claude'), mesh('local')] }); } catch (error) { fail('O5', `sceneProviderStats threw ${error.message}`); }
     if (stats) {
-      same('O5', stats.providerCounts, { claude: 1, codex: 0, generic: 0, local: 1 }, 'sceneProviderStats counts local');
+      same('O5', { ...stats.providerCounts }, { claude: 1, codex: 0, generic: 0, local: 1 }, 'sceneProviderStats counts local');
       check('O5', Object.values(stats.providerCounts).every(Number.isFinite), 'sceneProviderStats has a NaN count');
       same('O5', stats.distinctColorCount, 1, 'sceneProviderStats distinct colours');
     }
@@ -443,7 +444,7 @@ async function sockets() {
     if (savedHost === undefined) delete process.env.OLLAMA_HOST; else process.env.OLLAMA_HOST = savedHost;
     same('O4', hits.length, 0, '4.9 a Tracker without options.ollama contacted the server');
     same('O4', await t7.pollOllama(), { polled: false, reachable: null }, '4.9 pollOllama without options.ollama');
-    for (const w of [w, w5, w6, w7, w9]) fs.rmSync(w.base, { recursive: true, force: true });
+    for (const folder of [w, w5, w6, w7, w9]) fs.rmSync(folder.base, { recursive: true, force: true });
   } catch (error) {
     fail('O4', error.stack || String(error));
   } finally {

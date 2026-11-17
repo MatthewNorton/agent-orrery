@@ -102,12 +102,46 @@ export interface LiveTail {
   drift?: DriftCount;
 }
 
+/** One model the local server lists as loaded. */
+export interface OllamaModel {
+  name: string;
+  size: number;
+  sizeVram: number;
+  /** When the server will unload it; moves forward with every request it serves. 0 when unknown. */
+  expiresAt: number;
+}
+
+export type OllamaStatus = { reachable: true; models: OllamaModel[] } | { reachable: false };
+
+/** A fetch: the real one, or a fixture's. */
+export type OllamaFetch = (url: string, init: { signal: AbortSignal; redirect: 'error' }) => Promise<{ ok: boolean; text(): Promise<string> }>;
+
+/** The Ollama adapter's state (live/ollama-source.js): where it asks, the poll, and the loaded models' ships. */
+export interface OllamaState {
+  /** The Tracker option host; providers.json and OLLAMA_HOST are read per poll. */
+  host: string | null;
+  /** The server's system: its home folder. */
+  home: string;
+  fetch: OllamaFetch;
+  inFlight: AbortController | null;
+  /** Consecutive failed polls; 0 after a success. */
+  failures: number;
+  /** No poll before this time (backoff); 0 after a success. */
+  nextPollAt: number;
+  /** Null until the first verdict. */
+  reachable: boolean | null;
+  /** Model name -> the expires_at last seen; the ship id follows from the name. */
+  loaded: Map<string, number>;
+}
+
 export interface LiveModelOptions {
   claudeProjectsDir?: string;
   codexSessionsDir?: string;
   codexSessionDir?: string;
   codexSessionDirs?: string[];
   providerConfigPath?: string;
+  /** Poll the local Ollama server; absent means never. */
+  ollama?: { host?: string; home?: string; fetch?: OllamaFetch };
 }
 
 /** Everything the live modules share; src/main/live/model.js creates it. */
@@ -138,9 +172,11 @@ export interface LiveModel {
   codexMetaCache: Map<string, { size: number; mtimeMs: number; meta: any; head: DriftCount }>;
   signalFiles: Map<string, { size: number; mtimeMs: number; sessionId: string }>;
   providerWarnings: Set<string>;
+  /** The local model server; null when the Tracker was not given options.ollama. */
+  ollama: OllamaState | null;
   /** Names Claude ships and drones: Claude-1, Claude-2, ... */
   shipCounter: number;
-  /** Names provider ships per provider: Codex-1, Signal-1, ... */
+  /** Names provider ships per label: Codex-1, Signal-1, Ollama-1, ... */
   providerCounters: Map<string, number>;
   systemCache: Map<string, { at: number; data: SystemData }>;
   /** Open tool call id -> id of the ship that issued it. */

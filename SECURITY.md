@@ -13,8 +13,11 @@ You can expect an acknowledgement within 7 days.
 ## Scope
 
 Agent Orrery is a local desktop app. It tails Claude Code and Codex
-transcript files on the user's own machine and never contacts the network from
-the renderer. The security boundary that matters most is **transcript content**:
+transcript files on the user's own machine, asks the local Ollama server on
+loopback which models are loaded (one `GET /api/ps`, refusable in
+`providers.json`; the loopback check is `ollamaEndpoint` in
+`src/main/live/ollama-source.js`), and never contacts the network from the
+renderer. The security boundary that matters most is **transcript content**:
 anything an observed agent writes into a transcript (working directories, file
 paths, tool output) is treated as untrusted input. Those files are also not a
 published interface: a record the app does not recognise is skipped, never

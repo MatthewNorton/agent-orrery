@@ -8,10 +8,10 @@ const { canonicalProjectPath, readGenericWatchConfig } = require('../provider-ad
 const { hex8 } = require('../shared/hash');
 const { signalSources, watchedFiles } = require('../signal-sources');
 const { liveShip } = require('../universe/public-shape');
-const { queue, pushFeed } = require('./events');
+const { queue } = require('./events');
 const { ACTIVE_WINDOW_MS, HOT_WINDOW_MS } = require('./model');
 const { ensureProjectForPath } = require('./projects');
-const { ensureProviderShip } = require('./ships');
+const { ensureProviderShip, departShip } = require('./ships');
 const { warnOnce } = require('./drift');
 
 /** @import { LiveModel } from '../../types/live-model' */
@@ -58,10 +58,7 @@ function scanSignals(model, isStartup) {
     model.signalFiles.delete(fp);
     const shipId = `ship:generic:${previous.sessionId}`;
     const ship = model.ships.get(shipId);
-    if (!ship) continue;
-    model.ships.delete(shipId);
-    queue(model, { type: 'ship-departed', shipId, ts: now });
-    pushFeed(model, 'depart', `${ship.name} signal disappeared`, ship.project);
+    if (ship) departShip(model, ship, now, 'signal disappeared');
   }
 }
 

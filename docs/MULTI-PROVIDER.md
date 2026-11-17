@@ -1,7 +1,7 @@
 # Passive multi-provider tracking
 
 Agent Orrery's passive discovery layer observes Claude Code and Codex session
-files without owning the agents that create them. It never launches or spawns
+files, and the local Ollama server, without owning the agents that create them. It never launches or spawns
 provider processes, sends commands to a discovered session, or writes to its
 transcript. The separate, user-initiated global task workflow may start a new
 Codex process for an assigned tagged goal; see [TASK-IDEAS.md](TASK-IDEAS.md).
@@ -36,6 +36,45 @@ files but never reads their contents. An optional `extensions` array, such as
 warning. A fresh or changed file produces a
 content-free activity signal; generic sources never infer builds, prompts,
 subagents, or attention state.
+
+## Local model servers
+
+A model loaded in a local server is tracked by the server itself, whatever
+client is driving it: the Ollama desktop app, a script, an editor plugin. The
+`local` provider is server-agnostic; Ollama is its first adapter
+(`src/main/live/ollama-source.js`). Every five seconds the main process asks
+`GET /api/ps` on the loopback Ollama server (`http://127.0.0.1:11434` by
+default) which models are loaded. The answer names each model, its memory
+split and the time it will be unloaded, which Ollama moves forward on every
+request the model serves. Agent Orrery never reads a chat, a prompt or a
+response: `/api/ps` is the only request, and it carries none.
+
+Each loaded model is a red ship named for the server (`Ollama-1`, `Ollama-2`)
+with the model name as its tag, in the `Ollama` system, which is the server's
+home folder (`~/.ollama`). A served request is an activity on that ship; a
+model unloaded from the server departs as "unloaded"; a ship idle for five
+minutes warps out like any other and docks again on the next request. When
+the server stops answering, the feed says "Ollama server offline" and every
+Ollama ship departs; "Ollama server online" marks its return.
+
+`providers.json` can turn the adapter off or point it elsewhere:
+
+```json
+{ "ollama": false }
+{ "ollama": { "host": "127.0.0.1:11500", "home": "D:\\ollama" } }
+```
+
+`OLLAMA_HOST` is honoured too, in Ollama's own syntax (`host`, `host:port`,
+`http://host[:port]`). Only `http` on a loopback host (`127.0.0.1`,
+`localhost`, `0.0.0.0`, `::1`) is accepted; anything else, a LAN address
+included, is refused with one warning and no request. A `watch` array is not
+required beside an `ollama` entry.
+
+A second local server (LM Studio on `127.0.0.1:1234`, llama.cpp, vLLM) is one
+more adapter beside the Ollama one in the main process: the same `local`
+provider, its own label and home folder, and its own "in use" signal (LM
+Studio lists `state: "loaded"` on `/api/v0/models`). The renderer and the
+harness need nothing for it.
 
 ## Transcript formats
 
