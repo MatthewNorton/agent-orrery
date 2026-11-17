@@ -20,6 +20,7 @@ const { READ_LIMIT_BYTES, LINE_LIMIT_BYTES } = require('./model');
 const { ensureProjectForPath } = require('./projects');
 const { ensureProviderShip, setModel, addPending, clearPending } = require('./ships');
 const { applyProviderBuildFiles } = require('./builds');
+const { noteLine, noteVersion, checkDrift } = require('./drift');
 
 /** @import { LiveModel, LiveTail } from '../../types/live-model' */
 
@@ -86,9 +87,12 @@ function pollProviderFile(model, fp, tail, st) {
       lineOffset, now: st.mtimeMs,
     });
     if (result && result.state) tail.adapterState = result.state;
+    noteLine(tail, Boolean(result && result.known));
+    if (result) noteVersion(tail, result.version);
     applyProviderSignals(model, result && Array.isArray(result.signals) ? result.signals : [], tail);
     lineOffset += line.length + 1;
   }
+  checkDrift(model, tail);
   if (tail.catchup && tail.offset >= st.size) tail.catchup = false;
 }
 

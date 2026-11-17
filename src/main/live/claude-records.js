@@ -7,7 +7,7 @@
 const fs = require('fs');
 const path = require('path');
 const { canonicalProjectPath } = require('../provider-adapters');
-const { claudeRecordToSignals, claudeTool } = require('../transcripts/claude');
+const { claudeRecordToSignals, claudeRecordFacts, claudeTool } = require('../transcripts/claude');
 const { relativeInside } = require('../path-safety');
 const { liveShip } = require('../universe/public-shape');
 const { queue, pushFeed } = require('./events');
@@ -15,6 +15,7 @@ const { READ_LIMIT_BYTES, LINE_LIMIT_BYTES } = require('./model');
 const { adoptProjectPath } = require('./projects');
 const { ensureShip, spawnDrone, setModel, addPending } = require('./ships');
 const { addBuild } = require('./builds');
+const { noteLine, noteVersion, checkDrift } = require('./drift');
 
 /**
  * @import { LiveModel, LiveProject, LiveShip, LiveTail } from '../../types/live-model'
@@ -68,17 +69,21 @@ function pollClaudeFile(model, fp, tail, st) {
   for (const line of lines) {
     if (Buffer.byteLength(line, 'utf8') <= LINE_LIMIT_BYTES && line.trim()) parseLine(model, line, tail);
   }
+  checkDrift(model, tail);
   if (tail.catchup && tail.offset >= st.size) tail.catchup = false;
 }
 
 /**
  * @param {LiveModel} model
  * @param {string} line
- * @param {Pick<LiveTail, 'project' | 'session' | 'catchup'>} tail
+ * @param {Pick<LiveTail, 'project' | 'session' | 'catchup' | 'drift'>} tail
  */
 function parseLine(model, line, tail) {
   let record;
-  try { record = JSON.parse(line); } catch { return; }
+  try { record = JSON.parse(line); } catch { noteLine(tail, false); return; }
+  const facts = claudeRecordFacts(record);
+  noteLine(tail, facts.known);
+  noteVersion(tail, facts.version);
   const project = model.projects.get(tail.project);
   if (!project) return;
   // Live stamps an undated record with the time it was read.

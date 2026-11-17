@@ -69,6 +69,13 @@ export interface PersistedState {
   forgotten?: Record<string, ForgottenProject>;
 }
 
+/** Lines read, records of a kind the adapter reads, and the provider version named: the format canary's count. */
+export interface DriftCount {
+  lines: number;
+  recognised: number;
+  version: string | null;
+}
+
 /**
  * Where a transcript is being read. Claude tails keep a string remainder, provider tails a
  * Buffer plus their adapter state.
@@ -91,6 +98,8 @@ export interface LiveTail {
   model?: string | null;
   seenSignals?: Set<string>;
   missingScans?: number;
+  /** What the format canary has seen of the file (live/drift.js). */
+  drift?: DriftCount;
 }
 
 export interface LiveModelOptions {
@@ -126,7 +135,7 @@ export interface LiveModel {
   forgottenSlugs: Map<string, string>;
   projectPathIndex: Map<string, string>;
   codexTailsBySession: Map<string, LiveTail>;
-  codexMetaCache: Map<string, { size: number; mtimeMs: number; meta: any }>;
+  codexMetaCache: Map<string, { size: number; mtimeMs: number; meta: any; head: DriftCount }>;
   signalFiles: Map<string, { size: number; mtimeMs: number; sessionId: string }>;
   providerWarnings: Set<string>;
   /** Names Claude ships and drones: Claude-1, Claude-2, ... */

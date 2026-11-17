@@ -9,6 +9,7 @@ const { MAX_PATH_LENGTH, plainObject, safeId, safePath, firstTrimmed } = require
 const {
   codexSessionIdFromFilename,
   codexRecordToSignals,
+  codexRecordFacts,
   adaptCodexRecord,
 } = require('./transcripts/codex');
 
@@ -312,6 +313,8 @@ function adaptLine(provider, utf8Line, state, meta = {}) {
   if (key === 'generic') {
     return {
       state: nextState,
+      known: true,
+      version: null,
       signals: [{
         type: 'heartbeat',
         provider: 'generic',
@@ -332,11 +335,14 @@ function adaptLine(provider, utf8Line, state, meta = {}) {
     return {
       state: nextState,
       signals: [],
+      known: false,
+      version: null,
       diagnostic: { code: 'invalid-json', lineOffset: finiteNumber(meta.lineOffset, 0) },
     };
   }
-  if (!plainObject(record)) return { state: nextState, signals: [] };
-  return adaptCodexRecord(record, nextState, now);
+  if (!plainObject(record)) return { state: nextState, signals: [], known: false, version: null };
+  // The format canary's facts ride along, as diagnostic does.
+  return { ...adaptCodexRecord(record, nextState, now), ...codexRecordFacts(record) };
 }
 
 function validState(value, provider) {

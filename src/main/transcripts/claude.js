@@ -92,6 +92,20 @@ function claudeRecordToSignals(value) {
 }
 
 /**
+ * What the format canary (live/drift.js) asks of a record: whether it is of a kind this adapter
+ * reads, a message or a system record, and the Claude Code version it names.
+ * @param {unknown} value
+ * @returns {{ known: boolean, version: string | null }}
+ */
+function claudeRecordFacts(value) {
+  const record = plainObject(value) ? value : {};
+  return {
+    known: plainObject(record.message) || record.type === 'system',
+    version: typeof record.version === 'string' ? record.version : null,
+  };
+}
+
+/**
  * @param {Record<string, any>} block
  * @returns {ClaudeToolStart}
  */
@@ -114,4 +128,4 @@ function claudeTool(tool) {
   return { status: TOOL_STATUS[tool] || 'Working', build: BUILD_TOOLS.has(tool), spawn: SPAWN_TOOLS.has(tool) };
 }
 
-module.exports = { claudeRecordToSignals, claudeTool };
+module.exports = { claudeRecordToSignals, claudeRecordFacts, claudeTool };

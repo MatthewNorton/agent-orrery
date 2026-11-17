@@ -6,7 +6,7 @@ export type ShipStatus =
   | 'Building' | 'Exploring' | 'Gathering Resources' | 'Scanning'
   | 'Delegating' | 'Planning' | 'Working';
 export type Attention = 'question' | 'permission' | 'stalled' | 'done';
-export type FeedKind = 'discover' | 'form' | 'build' | 'info' | 'spawn' | 'depart' | 'attention' | 'done';
+export type FeedKind = 'discover' | 'form' | 'build' | 'info' | 'spawn' | 'depart' | 'attention' | 'done' | 'warning';
 export type StreamMode = 'live' | 'replay';
 export type ReplaySpeed = 1 | 10 | 100 | 1000;
 export type DebugView = 'universe' | 'system' | 'planet';
@@ -119,6 +119,8 @@ export interface Snapshot {
   playback: PlaybackStatus;
   /** LIVE only; replay snapshots carry none. */
   buildHistogram?: BuildHistogram;
+  /** LIVE only: provider problems this run, such as a transcript format this version does not recognise or a providers.json error. */
+  warnings?: string[];
 }
 
 // ---- events ----

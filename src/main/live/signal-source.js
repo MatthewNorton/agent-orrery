@@ -12,6 +12,7 @@ const { queue, pushFeed } = require('./events');
 const { ACTIVE_WINDOW_MS, HOT_WINDOW_MS } = require('./model');
 const { ensureProjectForPath } = require('./projects');
 const { ensureProviderShip } = require('./ships');
+const { warnOnce } = require('./drift');
 
 /** @import { LiveModel } from '../../types/live-model' */
 
@@ -21,11 +22,7 @@ const { ensureProviderShip } = require('./ships');
  */
 function scanSignals(model, isStartup) {
   const config = readGenericWatchConfig(model.providerConfigPath);
-  for (const warning of config.warnings || []) {
-    if (model.providerWarnings.has(warning)) continue;
-    model.providerWarnings.add(warning);
-    console.warn(`[providers] ${warning}`);
-  }
+  for (const warning of config.warnings || []) warnOnce(model, warning);
   const now = Date.now();
   const seenFiles = new Set();
   for (const source of signalSources(config.watch || [])) {

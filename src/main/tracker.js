@@ -119,7 +119,7 @@ class Tracker extends EventEmitter {
 
   // ---------- views ----------
 
-  /** @returns {{ projects: Project[], ships: Ship[], feed: FeedEntry[], eventSequence: number, buildHistogram: BuildHistogram }} */
+  /** @returns {{ projects: Project[], ships: Ship[], feed: FeedEntry[], eventSequence: number, buildHistogram: BuildHistogram, warnings: string[] }} */
   snapshot() {
     return {
       projects: [...this.projects.values()].map(liveProject),
@@ -127,6 +127,7 @@ class Tracker extends EventEmitter {
       feed: recentFeed(this.model),
       eventSequence: this.model.eventSequence,
       buildHistogram: snapshotHistogram(this.model.buildHistogram, Date.now()),
+      warnings: [...this.model.providerWarnings],
     };
   }
 

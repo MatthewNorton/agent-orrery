@@ -36,3 +36,33 @@ files but never reads their contents. An optional `extensions` array, such as
 warning. A fresh or changed file produces a
 content-free activity signal; generic sources never infer builds, prompts,
 subagents, or attention state.
+
+## Transcript formats
+
+The transcripts are the providers' own working files, not a published
+interface, and either provider may change them without notice. Agent Orrery
+reads them defensively: every line is parsed on its own, every field is
+checked, and a record it does not recognise is skipped. A format change
+therefore never crashes the app; it empties it. To make that visible, each
+tailed transcript counts the lines it reads and the records of a kind its
+adapter reads (`claudeRecordFacts`: a message or a system record;
+`codexRecordFacts`: a `session_meta`, `turn_context`, `response_item` or
+`event_msg`). One that reaches 40 lines with none of that kind raises a warning
+for its provider, quoting the provider's version when its records name one, in
+the console, the event feed and `snapshot.warnings`; the feed panel keeps it
+pinned for the rest of the run. A fresh Codex rollout whose metadata cannot be
+read is never tailed, so the same rule runs over its head at discovery.
+`providers.json` errors show the same way.
+
+What each adapter depends on, last confirmed against Claude Code 2.1 and
+Codex CLI 0.167 (November 2026):
+
+| Provider | Files | Fields read |
+|---|---|---|
+| Claude Code | `~/.claude/projects/<slug>/<session>.jsonl` | `type` (`user`, `assistant`, `system` with `subtype: turn_duration`), `cwd`, `isSidechain`, `timestamp`, `version`; `message.role`, `message.model`, and in `message.content[]` the block `type` (`text`, `tool_use`, `tool_result`), `id`, `name`, `input.file_path` / `pattern` / `description`, `tool_use_id` |
+| Codex | `~/.codex/sessions/**/rollout-*-<uuid>.jsonl` and `~/.codex/archived_sessions/**` | `type` (`session_meta`, `turn_context`, `response_item`, `event_msg`), `timestamp`; in `payload`: `id`, `session_id`, `cwd`, `thread_source`, `source`, `parent_thread_id`, `forked_from_id`, `agent_path`, `model`, `model_provider`, `cli_version`, `type` (`message`, `function_call`, `custom_tool_call`, their `_output` forms, `patch_apply_end`, `task_started`, `task_complete`, `turn_aborted`), `call_id`, `name`, `role`, `content[].text`, `changes`, `success` |
+
+The adapters are `src/main/transcripts/claude.js` and
+`src/main/transcripts/codex.js`; the fixtures in `test/support/transcripts.js`
+are the executable half of this table. When the warning fires, the repair is in
+those two files, and `src/main/live/drift.js` is the canary.

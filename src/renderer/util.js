@@ -60,10 +60,12 @@
   AUR.FEED_KIND = {
     build: '#4da3ff', form: '#ffb454', spawn: '#34d399',
     depart: '#8b93a8', info: '#8b93a8', discover: '#a78bfa',
-    attention: '#ff5d5d', done: '#34d399',
+    attention: '#ff5d5d', done: '#34d399', warning: '#ff5d5d',
   };
   // The expanded feed's filters: what was built, what needs the viewer, systems found, and ships.
-  AUR.FEED_GROUP = { build: 'builds', form: 'builds', attention: 'attention', done: 'attention', discover: 'systems' };
+  AUR.FEED_GROUP = {
+    build: 'builds', form: 'builds', attention: 'attention', done: 'attention', warning: 'attention', discover: 'systems',
+  };
   AUR.SUN_COLORS = ['#ffb454', '#ff7a59', '#dfe6ff', '#ffd27d', '#9db8ff'];
   // The smallest sun on the universe map; galaxy stars never exceed it.
   AUR.SUN_DIAMETER_MIN = 1.2;

@@ -18,7 +18,7 @@ The video and screenshots show the app running against a synthetic demo universe
 - **Sessions are starships.** When a Claude Code or Codex session is active, a ship appears in that project's system. Subagents spawn as drones alongside it.
 - **Edits grow planets.** Verified file edits accrete into planets, so a system's look reflects the real history of work done there.
 - **Time travel.** A replay source indexes past transcripts, so you can scrub back through history and watch sessions play out, while live tracking keeps running in the background.
-- **Passive by design.** The main process only reads provider JSONL transcripts. The two deliberate exceptions: opening a terminal at a project, and kicking off an agent on an item from the global IDEAS queue.
+- **Passive by design.** The main process only reads provider JSONL transcripts. The two deliberate exceptions: opening a terminal at a project, and kicking off an agent on an item from the global IDEAS queue. Those transcripts are the providers' own files, not a published interface, so the app reads them defensively and the event feed warns when a provider's records stop being recognised (see [docs/MULTI-PROVIDER.md](docs/MULTI-PROVIDER.md)).
 
 Built with Electron and Babylon.js. The renderer is fully offline — no network requests, local UMD bundles only.
 
