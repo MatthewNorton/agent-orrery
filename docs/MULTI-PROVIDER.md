@@ -50,21 +50,23 @@ request's own keep-alive, each time the model completes a request. Agent
 Orrery never reads a chat, a prompt or a response: `/api/ps` is the only
 request, and it carries none.
 
-Each loaded model is a red ship named for the server (`Ollama-1`, `Ollama-2`)
-with the model name as its tag, in the `Ollama` system, which is the server's
-home folder (`~/.ollama`). A served request is an activity on that ship; a
-model unloaded from the server departs as "unloaded"; a ship idle for five
-minutes warps out like any other and docks again on the next request. Ollama
-stops the unload timer while a request runs and sets the expiry again only
-when it completes, so a model still listed past its expiry is mid-request:
-its ship stays docked, or docks again if it had warped out. What `/api/ps`
-cannot show is a request that began inside the keep-alive window and is
-still running: it reads as idle until the window passes, so a generation
-longer than five minutes may warp out and dock again moments later. A model
-that is loaded but serving nothing is no activity: the system goes idle with
-its ships. When the server stops answering, the feed says "Ollama server
-offline" and every Ollama ship departs; "Ollama server online" marks its
-return.
+Each loaded model is a red ship named for the server (`Ollama-1`,
+`Ollama-2`) with the model name as its tag, in the `Ollama` system, which is
+the server's home folder (`~/.ollama`). A served request is an activity on
+that ship; a model unloaded from the server departs as "unloaded"; a ship
+idle for five minutes warps out like any other and docks again on the next
+request. Ollama stops the unload timer while a request runs and sets the
+expiry again only when it completes, so a model still listed past its expiry
+is mid-request: its ship stays docked, or docks again if it had warped out.
+Until a model completes its first request the server reports a fresh expiry
+on every poll, so that first request shows as an activity on every poll
+rather than one. What `/api/ps` cannot show is a request that began inside
+the keep-alive window and is still running: it reads as idle until the
+window passes, so a generation longer than five minutes may warp out and
+dock again moments later. A model that is loaded but serving nothing is no
+activity: the system goes idle with its ships. When the server stops
+answering, the feed says "Ollama server offline" and every Ollama ship
+departs; "Ollama server online" marks its return.
 
 `providers.json` can turn the adapter off or point it elsewhere:
 

@@ -124,6 +124,21 @@ test('drift: through the Tracker, a Claude transcript of unknown records warns o
   assert.equal(warnings(live.take()).length, 0);
 });
 
+test('drift: through the Tracker, a startup transcript whose head is all unknown warns at the first scan', (t) => {
+  t.mock.method(console, 'warn', () => {});
+  const world = createWorld(t);
+  const file = world.claudeFile();
+  // The real-drift case: a hot transcript on disk at startup, and nothing in its head is a kind this
+  // version knows. The head count alone must warn; Claude Code need not write another line first.
+  appendJsonl(file, Array.from({ length: DRIFT_LINES }, (_, index) => ({
+    type: 'future-record', version: '9.9.9', cwd: world.projectDir, timestamp: iso(T0), index,
+  })), T0);
+  const live = world.live();
+  live.tracker.scan(true);
+  assert.deepEqual(warnings(live.take()).map((entry) => [entry.text, entry.project]), [[CLAUDE_UNKNOWN, '']]);
+  assert.deepEqual(live.tracker.snapshot().warnings, [CLAUDE_UNKNOWN]);
+});
+
 test('drift: through the Tracker, a transcript this version reads says nothing however it grows', (t) => {
   t.mock.method(console, 'warn', () => {});
   const world = createWorld(t);

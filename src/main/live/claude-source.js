@@ -14,7 +14,7 @@ const {
 } = require('./projects');
 const { ensureShip } = require('./ships');
 const { stillForgotten } = require('./forgotten');
-const { noteRecord } = require('./drift');
+const { noteRecord, checkDrift } = require('./drift');
 const { claudeRecordFacts } = require('../transcripts/claude');
 
 /** @import { LiveModel, LiveTail } from '../../types/live-model' */
@@ -95,7 +95,10 @@ function scanClaude(model, isStartup) {
       if (model.files.has(fp) || !(hot || isStartup)) continue;
       const tail = claudeTail(model, fp, project.id, st.size, isStartup);
       if (!hot) continue;
-      if (isStartup) countHead(tail, fp);
+      if (isStartup) {
+        countHead(tail, fp);
+        checkDrift(model, tail); // a head this version cannot read warns now, not when the file next grows
+      }
       model.files.set(fp, tail);
       if (isStartup && now - st.mtimeMs < ACTIVE_WINDOW_MS) {
         ensureShip(model, project.id, tail.session, false, st.mtimeMs);

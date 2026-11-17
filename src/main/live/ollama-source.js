@@ -154,9 +154,12 @@ const shipIdFor = (name) => `ship:local:${sessionIdFor(name)}`;
 function requestState(state, entry, now) {
   const seen = state.loaded.get(entry.name);
   return {
-    // expires_at changed either way: a request with a shorter keep_alive moves it back.
+    // expires_at changed either way: a request with a shorter keep_alive moves it back. Until a
+    // model completes its first request the server reports now + keep_alive on every poll, so
+    // that first request is an activity per poll rather than one; /api/ps cannot tell the two apart.
     served: seen === undefined || entry.expiresAt !== seen,
-    // Listed past its expiry: the unload timer is stopped because a request is running.
+    // Listed past its expiry: the unload timer is stopped because a request is running. With
+    // parallel requests the expiry is set again only when the last of them completes.
     busy: entry.expiresAt > 0 && entry.expiresAt <= now,
   };
 }
