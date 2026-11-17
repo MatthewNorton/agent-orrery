@@ -59,9 +59,11 @@ you (or a Claude kit-runner session):
 
 ## Current state (update when it changes)
 
-Nothing is feedable right now. Kits 01–08, 10, 11 and 13–15 are done (see
-`kit/README.md`); `kit/todo/09-ship-assets-gen.md` and
-`kit/todo/16-idle-cap-and-glyphs.md` are stubs and
-`kit/todo/12-standalone-installer.md` is declined. To make another feedable
-kit, run `/distill` on a stub to produce its contract and grader, then use
-this handoff.
+Feedable now: `kit/todo/17-ollama-source/CONTRACT.md` (distilled 2026-11-04,
+re-cut 2026-11-06 to a server-agnostic `local` provider; run its O0 kill-switch
+with the owner first, then the runner loop above). Kits
+01–08, 10, 11 and 13–15 are done (see `kit/README.md`);
+`kit/todo/09-ship-assets-gen.md` and `kit/todo/16-idle-cap-and-glyphs.md` are
+stubs and `kit/todo/12-standalone-installer.md` is declined. To make another
+feedable kit, run `/distill` on a stub to produce its contract and grader, then
+use this handoff.

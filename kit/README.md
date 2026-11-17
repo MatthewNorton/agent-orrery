@@ -32,6 +32,7 @@ kit/
     09-ship-assets-gen.md stub — ready to distill from the landed manifest
     12-standalone-installer.md declined — developers install with npm run setup
     16-idle-cap-and-glyphs.md stub — idle frame cap, glyph consolidation, Ultra tier
+    17-ollama-source/     READY — local model ships: a `local` provider, Ollama as its first adapter, a red hull per loaded model (CONTRACT.md + grade-ollama.mjs)
 ```
 
 ## Status
@@ -55,6 +56,7 @@ kit/
 | 14 Main-process split | **DONE** — PASS 2026-10-01; `main.js` (2217 lines) is a 47-line bootstrap over `app-context.js`, `window.js`, `replay-control.js`, `ipc/*`, `harness/*`; zero module-level `let` in `src/main`; `main.js` unfrozen; project-tasks gate widened to the `src/main` layer (owner-authorized); archived in `done/main-split/` | `node kit/done/main-split/grade-main-split.mjs` (sweep: `node kit/run-gates.mjs`) |
 | 15 Procedural worlds | **DONE** — PASS 2026-11-01, three stacked PRs; distilled the same day after the owner approved the browser preview (D1–D4): generated equirect planet maps in workers (the PNG planet library no longer feeds the renderer), the preview's planet shaders ported, a photosphere plugin on the system sun with corona and glow billboards; archived in `done/procedural-worlds/` with the reference generator its parity check needs | `node kit/done/procedural-worlds/grade-worlds.mjs` (sweep: `node kit/run-gates.mjs`) |
 | 16 Idle cap and glyphs | **STUB** — split from the old kit-15 stub 2026-11-01: idle frame cap, universe glyph consolidation, Ultra tier, with the 2026-10-18 measurements; `todo/16-idle-cap-and-glyphs.md` | none yet |
+| 17 Ollama source | **READY** — distilled 2026-11-04 after the owner asked why a model chatting in Ollama was not tracked ("it literally says local model tracking"); re-cut 2026-11-06 ("it could be anything like LM Studio too"): `local` is the fourth, server-agnostic provider key, Ollama is its first adapter (a loopback `/api/ps` poll in the main process), ships are red hulls named `Ollama-N` with the model name in the `Ollama` system; LM Studio and friends become main-process adapters only. Run the O0 kill-switch with the owner before feeding; today the gate FAILs at O1 as intended | `node kit/todo/17-ollama-source/grade-ollama.mjs` |
 
 ## How the app works (context for any executor)
 
