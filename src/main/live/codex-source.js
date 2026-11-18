@@ -18,7 +18,8 @@ const { hex8 } = require('../shared/hash');
 const { ACTIVE_WINDOW_MS, HOT_WINDOW_MS } = require('./model');
 const { ensureProjectForPath } = require('./projects');
 const { ensureProviderShip, setModel } = require('./ships');
-const { noteRecord, noteVersion, checkDrift } = require('./drift');
+const { noteHead, checkDrift } = require('./drift');
+const { completeLines, readHead } = require('../history/jsonl');
 
 /** @import { DriftCount, LiveModel, LiveTail } from '../../types/live-model' */
 
@@ -47,7 +48,9 @@ function scanCodex(model, isStartup) {
     const filenameSessionId = codexSessionIdFromFilename(fp) || path.basename(fp, '.jsonl');
     let st;
     try { st = fs.statSync(fp); } catch { continue; }
-    const { meta, head } = readCodexMetadata(model, fp, filenameSessionId, st);
+    const read = readCodexMetadata(model, fp, filenameSessionId, st);
+    if (read === null) continue;
+    const { meta, head } = read;
     const hot = now - st.mtimeMs <= HOT_WINDOW_MS;
     if (!meta || !meta.cwd) {
       // Never tailed, so its head is all the format canary sees of it.
@@ -76,6 +79,7 @@ function scanCodex(model, isStartup) {
         tail.offset = 0;
         tail.remainder = Buffer.alloc(0);
         tail.catchup = true;
+        delete tail.drift; // counted again from zero
         tail.adapterState = createAdapterState('codex', {
           sessionId,
         });
@@ -83,7 +87,8 @@ function scanCodex(model, isStartup) {
       model.files.set(fp, tail);
     } else if (!tail) {
       tail = newCodexTail(fp, project.id, sessionId, meta, st, isStartup);
-      noteVersion(tail, head.version);
+      // Tailed from its end, the head stands in for what the tail skipped; from zero, it reads its own.
+      if (!tail.catchup) tail.drift = { ...head };
       model.files.set(fp, tail);
       model.codexTailsBySession.set(sessionId, tail);
       if (isStartup && now - st.mtimeMs < ACTIVE_WINDOW_MS) {
@@ -160,6 +165,8 @@ function newCodexTail(fp, projectId, sessionId, meta, st, isStartup) {
 }
 
 /**
+ * The rollout's metadata and head count, cached by size and mtime; null when the file cannot be
+ * read just now, which is not cached, so the next scan reads it again.
  * @param {LiveModel} model
  * @param {string} fp
  * @param {string} sessionId
@@ -168,7 +175,9 @@ function newCodexTail(fp, projectId, sessionId, meta, st, isStartup) {
 function readCodexMetadata(model, fp, sessionId, stat) {
   const cached = model.codexMetaCache.get(fp);
   if (cached && cached.size === stat.size && cached.mtimeMs === stat.mtimeMs) return cached;
-  const entry = { size: stat.size, mtimeMs: stat.mtimeMs, ...readCodexOwnMetadata(fp, sessionId) };
+  const own = readCodexOwnMetadata(fp, sessionId);
+  if (own === null) return null;
+  const entry = { size: stat.size, mtimeMs: stat.mtimeMs, ...own };
   model.codexMetaCache.set(fp, entry);
   return entry;
 }
@@ -191,24 +200,15 @@ function listFilesRecursive(root, extension) {
 
 // The rollout's own session_meta (a forked child's head also holds its parent's), and what the head
 // showed the format canary: its complete lines, how many were of a kind the adapter reads, and the
-// CLI version it names.
+// CLI version it names. Null when the file cannot be read.
 function readCodexOwnMetadata(file, sessionId) {
   const head = /** @type {DriftCount} */ ({ lines: 0, recognised: 0, version: null });
   const probe = { drift: head };
+  const bytes = readHead(file, META_HEAD_BYTES);
+  if (bytes === null) return null;
   try {
-    const fd = fs.openSync(file, 'r');
-    const size = Math.min(fs.fstatSync(fd).size, META_HEAD_BYTES);
-    const buf = Buffer.alloc(size);
-    const n = fs.readSync(fd, buf, 0, size, 0);
-    fs.closeSync(fd);
-    const text = buf.toString('utf8', 0, n);
-    const lines = text.split(/\r?\n/);
-    if (!text.endsWith('\n')) lines.pop(); // cut by the cap, or still being written
     let fallback = null;
-    for (const line of lines) {
-      if (!line.trim()) continue;
-      const record = noteRecord(probe, line, codexRecordFacts);
-      if (record === undefined) continue;
+    for (const record of noteHead(probe, completeLines(bytes, false), codexRecordFacts)) {
       const payload = record && record.payload;
       if (!payload || record.type !== 'session_meta') continue;
       const session = codexRecordToSignals(record).find((item) => item.type === 'session');
@@ -228,7 +228,7 @@ function readCodexOwnMetadata(file, sessionId) {
     }
     const strictFilenameId = STRICT_SESSION_ID.test(sessionId);
     return { meta: strictFilenameId ? null : fallback, head };
-  } catch { /* unreadable or locked sessions are retried on the next scan */ }
+  } catch { /* a head the adapter cannot digest is no metadata */ }
   return { meta: null, head };
 }
 

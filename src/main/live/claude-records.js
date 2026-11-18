@@ -15,7 +15,8 @@ const { READ_LIMIT_BYTES, LINE_LIMIT_BYTES } = require('./model');
 const { adoptProjectPath } = require('./projects');
 const { ensureShip, spawnDrone, setModel, addPending, departShip } = require('./ships');
 const { addBuild } = require('./builds');
-const { noteRecord, checkDrift } = require('./drift');
+const { noteRecord, noteHead, checkDrift } = require('./drift');
+const { completeLines, readHead } = require('../history/jsonl');
 
 /**
  * @import { LiveModel, LiveProject, LiveShip, LiveTail } from '../../types/live-model'
@@ -33,13 +34,16 @@ function resumesTurn(message) {
 }
 
 /**
- * Reads what a transcript gained since the last poll and parses its complete lines.
+ * Reads what a transcript gained since the last poll and parses its complete lines. A tail begun
+ * past its head counts the head first.
  * @param {LiveModel} model
  * @param {string} fp
  * @param {LiveTail} tail
  * @param {import('fs').Stats} st
  */
 function pollClaudeFile(model, fp, tail, st) {
+  // A head still to count is tried each poll until it reads; the tail is read either way.
+  if (tail.headBytes && countHead(tail, fp)) checkDrift(model, tail);
   if (st.size <= tail.offset) return;
   let chunk;
   try {
@@ -71,6 +75,24 @@ function pollClaudeFile(model, fp, tail, st) {
   }
   checkDrift(model, tail);
   if (tail.catchup && tail.offset >= st.size) tail.catchup = false;
+}
+
+/**
+ * A tail that begins at the end of its file (startup, or a session cold at startup that resumes)
+ * would see a long run of bookkeeping records as format drift, so the canary (live/drift.js) counts
+ * the head first: a session opens with its first message, which says whether this version reads
+ * the format. The head is the file's first HEAD_BYTES at most, up to where the tail began; a first
+ * line longer than that leaves nothing to count, and the tail is judged on its own.
+ * @param {LiveTail} tail
+ * @param {string} file
+ * @returns {boolean} false when the file cannot be read just now
+ */
+function countHead(tail, file) {
+  const head = readHead(file, tail.headBytes || 0);
+  if (head === null) return false;
+  noteHead(tail, completeLines(head, false), claudeRecordFacts);
+  tail.headBytes = 0;
+  return true;
 }
 
 /**

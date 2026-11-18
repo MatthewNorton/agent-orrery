@@ -6,8 +6,10 @@
 // a word. Each tail counts the lines it read and the records its adapter recognises, the kinds it
 // reads and the kinds it knows to skip (transcripts/claude.js and codex.js say which); one that has
 // read DRIFT_LINES lines and recognised none raises a warning, which the feed shows and the snapshot
-// keeps for the rest of the run. A Claude transcript tailed from its end at startup has its head
-// counted first (live/claude-source.js).
+// keeps for the rest of the run. A transcript tailed from its end, because it was on disk at
+// startup, has its head counted first: a Claude one on its first poll, so also when a session cold
+// at startup resumes (live/claude-records.js); a Codex one from the head read for its metadata
+// (live/codex-source.js).
 // providers.json errors reach the viewer the same way.
 
 const { pushFeed } = require('./events');
@@ -60,6 +62,24 @@ function noteRecord(tail, line, factsOf) {
 }
 
 /**
+ * Counts the head of a file whose tail begins past it, as the tail would: blank lines are nothing.
+ * @param {Pick<LiveTail, 'drift'>} tail
+ * @param {Buffer[]} lines the head's complete lines
+ * @param {(record: unknown) => { known: boolean, version: string | null }} factsOf the adapter's record facts
+ * @returns {any[]} the records the head held, in order
+ */
+function noteHead(tail, lines, factsOf) {
+  const records = [];
+  for (const line of lines) {
+    const text = line.toString('utf8');
+    if (!text.trim()) continue;
+    const record = noteRecord(tail, text, factsOf);
+    if (record !== undefined) records.push(record);
+  }
+  return records;
+}
+
+/**
  * After a poll: a tail that has read enough and recognised nothing warns, once per provider and version.
  * @param {LiveModel} model
  * @param {Pick<LiveTail, 'provider' | 'drift'>} tail
@@ -85,4 +105,4 @@ function warnOnce(model, text) {
   pushFeed(model, 'warning', text, '');
 }
 
-module.exports = { DRIFT_LINES, noteLine, noteVersion, noteRecord, checkDrift, warnOnce };
+module.exports = { DRIFT_LINES, noteLine, noteVersion, noteRecord, noteHead, checkDrift, warnOnce };

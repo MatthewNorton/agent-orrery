@@ -40,6 +40,7 @@ function pollProviderFile(model, fp, tail, st) {
     tail.offset = 0;
     tail.remainder = Buffer.alloc(0);
     tail.catchup = true;
+    delete tail.drift; // counted again from zero
     tail.adapterState = createAdapterState(tail.provider, {
       sessionId: tail.session,
     });

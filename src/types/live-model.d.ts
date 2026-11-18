@@ -100,6 +100,8 @@ export interface LiveTail {
   missingScans?: number;
   /** What the format canary has seen of the file (live/drift.js). */
   drift?: DriftCount;
+  /** Bytes of a startup Claude tail's head the canary has still to count, on a poll (live/claude-records.js). */
+  headBytes?: number;
 }
 
 /** One model the local server lists as loaded. */

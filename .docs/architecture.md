@@ -194,7 +194,7 @@ in a closure, and anything shared is a field of `ctx`.
 | File | Lines | Shape | Job | Requires |
 |---|---|---|---|---|
 | `tracker.js` | 180 | `class Tracker extends EventEmitter` | Façade over `live/`: creates the one live model, runs the four timers, exposes `snapshot` / `getSystem` / `getPlanet`. `tracker.projects`, `.ships`, `.files` are the model's Maps; `tracker.model` is the model itself | `live/*`, `universe/galaxy`, `universe/public-shape` |
-| `live/model.js` | 86 | factory | `createLiveModel`: the LiveModel object every live module takes as its first argument (maps, counters, time windows, read limits) | `live/state-file` |
+| `live/model.js` | 103 | factory | `createLiveModel`: the LiveModel object every live module takes as its first argument (maps, counters, time windows, read limits) | `live/state-file`, `live/forgotten` |
 | `live/events.js` | 53 | functions | Event queue (`seq` assigned on queue), feed, one flush per scan / poll / sweep | — |
 | `live/attention.js` | 81 | functions | `classifyAttention` | `live/events`, `universe/public-shape` |
 | `live/state-file.js` | 50 | functions | Load / save `universe-state.json` | `shared/atomic-write` |
@@ -202,18 +202,18 @@ in a closure, and anything shared is a field of `ctx`.
 | `live/projects.js` | 235 | functions | Project registry: path → id, display path, folder still exists | `provider-adapters`, `shared/hash`, `universe/public-shape`, `live/events`, `live/state-file` |
 | `live/ships.js` | 180 | functions | Ships and drones: spawn, pending tool calls, departure | `provider-adapters`, `universe/ships`, `universe/public-shape`, `live/events` |
 | `live/builds.js` | 60 | functions | One verified edit → one build in its top-level folder | `build-buckets`, `path-safety`, `live/events` |
-| `live/claude-source.js` | 170 | functions | Finds Claude projects and which transcripts to tail | `provider-adapters`, `universe/public-shape`, `live/projects`, `live/ships` |
-| `live/claude-records.js` | 193 | functions | Reads new Claude text, applies each record | `transcripts/claude`, `provider-adapters`, `path-safety`, `live/projects`, `live/ships`, `live/builds` |
-| `live/codex-source.js` | 219 | functions | Finds Codex rollouts, one tail per session (also across `archived_sessions/`) | `provider-adapters`, `transcripts/codex`, `shared/hash`, `live/projects`, `live/ships` |
+| `live/claude-source.js` | 144 | functions | Finds Claude projects and which transcripts to tail | `provider-adapters`, `live/events`, `live/model`, `live/projects`, `live/ships`, `live/forgotten`, `history/jsonl` |
+| `live/claude-records.js` | 205 | functions | Reads new Claude text, applies each record; counts a startup tail's head for the canary on a poll | `transcripts/claude`, `provider-adapters`, `path-safety`, `universe/public-shape`, `live/events`, `live/model`, `live/projects`, `live/ships`, `live/builds`, `live/drift`, `history/jsonl` |
+| `live/codex-source.js` | 235 | functions | Finds Codex rollouts, one tail per session (also across `archived_sessions/`) | `provider-adapters`, `transcripts/codex`, `shared/hash`, `live/model`, `live/projects`, `live/ships`, `live/drift`, `history/jsonl` |
 | `live/signal-source.js` | 71 | functions | Signal ships from file stats only | `signal-sources`, `provider-adapters`, `live/projects`, `live/ships` |
 | `live/provider-records.js` | 200 | functions | Codex / Signal bytes → `adaptLine` signals → ships, pending calls, builds | `provider-adapters`, `live/projects`, `live/ships`, `live/builds` |
-| `live/drift.js` | 90 | functions | Format canary: lines read vs records the adapter recognises (`claudeRecordFacts`, `codexRecordFacts`) per tail, a startup Claude tail counting its head first; one `warning` feed entry per provider, kept in `snapshot.warnings` | `live/events` |
+| `live/drift.js` | 108 | functions | Format canary: lines read vs records the adapter recognises (`claudeRecordFacts`, `codexRecordFacts`) per tail, a tail begun at a file's end counting its head first; one `warning` feed entry per provider, kept in `snapshot.warnings` | `live/events` |
 | `live/ollama-source.js` | 310 | functions | Local model ships, Ollama adapter: one `GET /api/ps` on the loopback server every 5 s (body read under a byte cap); a red ship per loaded model in the `Ollama` system, activity when `expires_at` changes, kept alive while listed past its expiry, "unloaded" and server offline/online in the feed | `provider-adapters`, `path-safety`, `shared/hash`, `transcripts/fields`, `transcripts/model`, `universe/public-shape`, `live/events`, `live/projects`, `live/ships`, `live/drift` |
 | `replay-source.js` | 359 | `class ReplaySource extends EventEmitter` | Façade over `history/`: indexes all history once at startup; rebuilds the universe at any timestamp, from the nearest seek checkpoint | `history/*` |
 | `history/options.js` | 107 | functions | Source roots and limits | — |
 | `history/index-builder.js` | 295 | functions | Finds every transcript and records its time range from bounded head / tail reads | `provider-adapters`, `transcripts/*`, `shared/hash`, `history/jsonl`, `history/order` |
 | `history/record-reader.js` | 267 | functions | Per-source cursors over the indexed byte ranges; 256 KB chunks, a read index into the cursor buffer, a shared pool of open handles | `provider-adapters`, `history/jsonl`, `history/historical-line` |
-| `history/jsonl.js` | 73 | functions | Line helpers shared by the index and the reader | — |
+| `history/jsonl.js` | 95 | functions | Line helpers and the bounded head read, shared by the index, the reader and the live sources | — |
 | `history/historical-line.js` | 120 | functions | One line → history signals (Codex through `adaptLine`, parsed once; Claude read by history's own rules) | `provider-adapters`, `transcripts/*`, `history/jsonl` |
 | `history/order.js` | 74 | functions | Deterministic record order: compare function and heap | — |
 | `history/merge.js` | 78 | functions | k-way merge of the cursors | `history/order`, `history/record-reader` |

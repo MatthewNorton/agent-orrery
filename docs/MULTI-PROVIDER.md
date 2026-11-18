@@ -104,7 +104,10 @@ the console, the event feed and `snapshot.warnings`; the feed panel keeps it
 pinned for the rest of the run. A transcript already on disk when the app
 starts is tailed from its end, where a long run of bookkeeping records would
 look like drift, so its head, where a session opens with its first message, is
-counted first. The bookkeeping records Claude Code writes beside the messages
+counted first, on its first poll: at startup if it is fresh, or when a
+session that was cold at startup resumes. A Codex rollout tailed from its
+end starts from what its head showed, its own `session_meta`. The
+bookkeeping records Claude Code writes beside the messages
 (`attachment`, `queue-operation`, `file-history-snapshot` and the rest of the
 list in `claudeRecordFacts`) count as recognised; about half of a transcript
 is such records. A fresh Codex rollout whose metadata cannot be read is never
