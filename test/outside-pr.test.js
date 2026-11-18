@@ -40,7 +40,7 @@ test('source, docs and assets change freely; agent and tool files anywhere, and 
     'src/node_modules/electron/index.js', 'scripts/setup.mjs', 'test/a.test.js', '.github/workflows/ci.yml', '.mcp.json',
     '.vscode/tasks.json', 'docs/a.code-workspace', 'Install Agent Orrery.cmd', 'design/tricolor/build.cjs', 'tsconfig.json',
     'assets/ships/a/.gitignore', 'new-tool.toml'];
-  const free = ['src/main/tracker.js', 'src/renderer/index.html', 'README.md', 'LICENSE', 'SECURITY.md', 'docs/GOALS.md',
+  const free = ['src/main/tracker.js', 'src/renderer/index.html', 'README.md', 'LICENSE', 'NOTICE', 'SECURITY.md', 'docs/GOALS.md',
     'docs/AGENTS-notes.md', 'docs/kit/a.md', 'src/scripts.js', 'assets/a.png'];
   for (const file of review) assert.equal(needsReview(file), true, file);
   for (const file of free) assert.equal(needsReview(file), false, file);

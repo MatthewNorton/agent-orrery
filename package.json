@@ -1,6 +1,6 @@
 {
   "name": "agent-orrery",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Lightweight persistent universe visualization of Claude Code agents. Projects are solar systems, agents are starships.",
   "main": "src/main/main.js",
   "scripts": {
@@ -17,7 +17,7 @@
     "postinstall": "install-electron"
   },
   "author": "Matt Norton (https://github.com/MatthewNorton)",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "devDependencies": {
     "electron": "^45.3.2",
     "typescript": "7.0.2"

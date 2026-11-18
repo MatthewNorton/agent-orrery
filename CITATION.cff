@@ -5,4 +5,4 @@ authors:
   - given-names: Matt
     family-names: Norton
 repository-code: "https://github.com/MatthewNorton/agent-orrery"
-license: MIT
+license: Apache-2.0

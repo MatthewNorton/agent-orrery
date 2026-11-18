@@ -25,7 +25,7 @@ const NAME_CHARS = 200;
 // The app's source, docs and assets, and the root docs, change without a review. Agent instructions,
 // package manifests, dot files and folders, and VS Code workspaces need one wherever they are.
 const FREE_ROOTS = ['src', 'docs', 'assets'];
-const FREE_FILES = ['readme.md', 'license', 'citation.cff', 'contributing.md', 'security.md'];
+const FREE_FILES = ['readme.md', 'license', 'notice', 'citation.cff', 'contributing.md', 'security.md'];
 const ALWAYS = ['agents.md', 'agents.override.md', 'agent.md', 'claude.md', 'claude.local.md', 'gemini.md',
   'package.json', 'package-lock.json', 'npm-shrinkwrap.json', 'node_modules'];
 

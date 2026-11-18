@@ -79,6 +79,8 @@ Bug reports, ideas and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBU
 
 ## License
 
-MIT © Matt Norton. See [LICENSE](LICENSE).
+Apache-2.0 © Matt Norton. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
 
-If you build on Agent Orrery, a credit and a link back to [github.com/MatthewNorton/agent-orrery](https://github.com/MatthewNorton/agent-orrery) are appreciated.
+If you redistribute Agent Orrery, or something built on it, the license requires you to pass on a copy of the license, keep the copyright notices and the attribution in `NOTICE`, and mark the files you changed. It does not grant use of the Agent Orrery name, beyond saying where your work came from. A link back to [github.com/MatthewNorton/agent-orrery](https://github.com/MatthewNorton/agent-orrery) is appreciated.
+
+Some files keep their own license: the fonts are under the SIL Open Font License 1.1 (`src/renderer/fonts/`, `design/tricolor/fonts/`), and the ship models under `assets/ships/` are CC0, as their manifests say.

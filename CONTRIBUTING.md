@@ -26,4 +26,4 @@ Setup is in the [README](README.md#getting-started). Before you open a pull requ
 - Changes outside `src/`, `docs/` and `assets/`, and agent instructions, dot files or package manifests anywhere, get a closer review, so say why they're needed (`scripts/outside-pr.mjs` has the exact rule). On an outside pull request, the `tooling review` check stays red until the maintainer has reviewed them.
 - AI-assisted contributions are welcome. You're responsible for what you submit, so say what you ran and what you checked.
 
-By contributing, you agree that your contribution is licensed under the [MIT License](LICENSE).
+By contributing, you agree that your contribution is licensed under the [Apache License 2.0](LICENSE).

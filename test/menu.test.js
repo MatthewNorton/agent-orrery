@@ -39,14 +39,14 @@ test('zoom keys: in on Ctrl+= and the keypad, out on Ctrl+-, reset on Ctrl+0', (
   assert.ok(accelerators(calls.template, 'resetZoom').includes('CommandOrControl+0'));
 });
 
-test('Help > About credits the author and the repository, as LICENSE does', () => {
+test('Help > About credits the author and the repository, as NOTICE does', () => {
   const { electron, calls } = fakeElectron();
   installAppMenu(electron);
   const [about] = calls.template.find((item) => item.label === 'Help').submenu;
   assert.equal(about.role, 'about');
   assert.equal(about.label, `About ${calls.about.applicationName}`);
   assert.equal(calls.about.applicationVersion, '9.9.9');
-  const license = fs.readFileSync(path.join(__dirname, '..', 'LICENSE'), 'utf8');
-  assert.ok(license.includes(calls.about.copyright), 'the About copyright matches LICENSE');
-  assert.ok(license.includes(calls.about.credits), 'LICENSE carries the repository link');
+  const notice = fs.readFileSync(path.join(__dirname, '..', 'NOTICE'), 'utf8');
+  assert.ok(notice.includes(calls.about.copyright), 'the About copyright matches NOTICE');
+  assert.ok(notice.includes(calls.about.credits), 'NOTICE carries the repository link');
 });
