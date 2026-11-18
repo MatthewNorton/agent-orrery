@@ -53,17 +53,23 @@
     generic: Object.freeze({
       key: 'generic', label: 'Signal', color: '#94a3b8',
     }),
+    // A model loaded in a local server (Ollama), tracked by the server itself; the legend's red.
+    local: Object.freeze({
+      key: 'local', label: 'Local', color: '#ff3344',
+    }),
   });
   AUR.PROVIDERS = PROVIDERS;
-  // A session on a local model keeps its provider identity but flies red.
-  AUR.LOCAL_MODEL = Object.freeze({ key: 'local', label: 'Local model', color: '#ff3344' });
+  // A session on a local model keeps its provider identity but flies the local provider's red.
+  AUR.LOCAL_MODEL = Object.freeze({ ...PROVIDERS.local, label: 'Local model' });
   AUR.FEED_KIND = {
     build: '#4da3ff', form: '#ffb454', spawn: '#34d399',
     depart: '#8b93a8', info: '#8b93a8', discover: '#a78bfa',
-    attention: '#ff5d5d', done: '#34d399',
+    attention: '#ff5d5d', done: '#34d399', warning: '#ff5d5d',
   };
   // The expanded feed's filters: what was built, what needs the viewer, systems found, and ships.
-  AUR.FEED_GROUP = { build: 'builds', form: 'builds', attention: 'attention', done: 'attention', discover: 'systems' };
+  AUR.FEED_GROUP = {
+    build: 'builds', form: 'builds', attention: 'attention', done: 'attention', warning: 'attention', discover: 'systems',
+  };
   AUR.SUN_COLORS = ['#ffb454', '#ff7a59', '#dfe6ff', '#ffd27d', '#9db8ff'];
   // The smallest sun on the universe map; galaxy stars never exceed it.
   AUR.SUN_DIAMETER_MIN = 1.2;
@@ -87,9 +93,10 @@
     // have come from Claude, so retain that identity during a live upgrade.
     if (value == null || String(value).trim() === '') return 'claude';
     const key = String(value).trim().toLowerCase().replace(/[\s_]+/g, '-');
-    if (key === 'claude' || key === 'claude-code' || key === 'anthropic') return 'claude';
-    if (key === 'codex' || key === 'codex-cli' || key === 'openai') return 'codex';
-    if (key === 'signal' || key === 'generic' || key === 'unknown') return 'generic';
+    if (Object.hasOwn(PROVIDERS, key)) return key;
+    if (key === 'claude-code' || key === 'anthropic') return 'claude';
+    if (key === 'codex-cli' || key === 'openai') return 'codex';
+    if (key === 'signal' || key === 'unknown') return 'generic';
     // Future/unregistered sources get the deliberately generic identity. Raw
     // provider text is never interpolated into CSS, SVG, or material colors.
     return 'generic';
@@ -98,9 +105,12 @@
   // Provider color is fleet identity, red for a local model. It never varies by agent or hull.
   AUR.shipColor = (ship) => (ship && ship.local === true
     ? AUR.LOCAL_MODEL.color : AUR.providerMeta(ship && ship.provider).color);
-  // What the chrome says about a ship's model: 'Local · <model>', either half alone, or ''.
-  AUR.modelLabel = (ship) => [ship && ship.local === true ? AUR.LOCAL_MODEL.label.split(' ')[0] : null,
-    ship && ship.model].filter(Boolean).join(' · ');
+  // What the chrome says about a ship's model: 'Local · <model>', either half alone, or ''. A ship
+  // of the local provider is tagged LOCAL already, so its label is the bare model name.
+  AUR.modelLabel = (ship) => [
+    ship && ship.local === true && AUR.providerKey(ship.provider) !== 'local' ? AUR.LOCAL_MODEL.label.split(' ')[0] : null,
+    ship && ship.model,
+  ].filter(Boolean).join(' · ');
   AUR.shipTint = (shipId, provider) => {
     const ship = typeof AUR.shipLookup === 'function' ? AUR.shipLookup(shipId) : null;
     return AUR.shipColor(ship && ship.local === true ? ship : { provider });

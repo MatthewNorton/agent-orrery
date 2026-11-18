@@ -252,7 +252,7 @@
   // Mechanical proof derived from live Babylon meshes and materials. Each
   // scene exposes this through scene.metadata.providerStats().
   AUR.sceneProviderStats = function sceneProviderStats(scene) {
-    const counts = { claude: 0, codex: 0, generic: 0 };
+    const counts = Object.fromEntries(Object.keys(AUR.PROVIDERS).map((key) => [key, 0]));
     const ships = [];
     const meshes = scene && Array.isArray(scene.meshes) ? scene.meshes : [];
     for (const mesh of meshes) {

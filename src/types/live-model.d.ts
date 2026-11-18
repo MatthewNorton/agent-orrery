@@ -69,6 +69,13 @@ export interface PersistedState {
   forgotten?: Record<string, ForgottenProject>;
 }
 
+/** Lines read, records of a kind the adapter reads, and the provider version named: the format canary's count. */
+export interface DriftCount {
+  lines: number;
+  recognised: number;
+  version: string | null;
+}
+
 /**
  * Where a transcript is being read. Claude tails keep a string remainder, provider tails a
  * Buffer plus their adapter state.
@@ -91,6 +98,44 @@ export interface LiveTail {
   model?: string | null;
   seenSignals?: Set<string>;
   missingScans?: number;
+  /** What the format canary has seen of the file (live/drift.js). */
+  drift?: DriftCount;
+  /** Bytes of a startup Claude tail's head the canary has still to count, on a poll (live/claude-records.js). */
+  headBytes?: number;
+}
+
+/** One model the local server lists as loaded. */
+export interface OllamaModel {
+  name: string;
+  size: number;
+  sizeVram: number;
+  /** When the server will unload it: set again, from the request's keep_alive, each time it completes a request, and left as it was while one runs. 0 when unknown. */
+  expiresAt: number;
+}
+
+export type OllamaStatus = { reachable: true; models: OllamaModel[] } | { reachable: false };
+
+/** A fetch: the real one, or a fixture's. The body is read as a stream, under a byte cap. */
+export type OllamaFetch = (url: string, init: { signal: AbortSignal; redirect: 'error' }) => Promise<Pick<Response, 'ok' | 'body'>>;
+
+/** The Ollama adapter's state (live/ollama-source.js): where it asks, the poll, and the loaded models' ships. */
+export interface OllamaState {
+  /** The Tracker option host; providers.json and OLLAMA_HOST are read per poll. */
+  host: string | null;
+  /** The server's system, its home folder: the Tracker option or ~/.ollama. */
+  home: string;
+  /** providers.json's ollama.home, read again every poll; null when it names none. */
+  configHome: string | null;
+  fetch: OllamaFetch;
+  inFlight: AbortController | null;
+  /** Consecutive failed polls; 0 after a success. */
+  failures: number;
+  /** No poll before this time (backoff); 0 after a success. */
+  nextPollAt: number;
+  /** Null until the first verdict. */
+  reachable: boolean | null;
+  /** Model name -> the expires_at last seen; the ship id follows from the name. */
+  loaded: Map<string, number>;
 }
 
 export interface LiveModelOptions {
@@ -99,6 +144,8 @@ export interface LiveModelOptions {
   codexSessionDir?: string;
   codexSessionDirs?: string[];
   providerConfigPath?: string;
+  /** Poll the local Ollama server; absent means never. */
+  ollama?: { host?: string; home?: string; fetch?: OllamaFetch };
 }
 
 /** Everything the live modules share; src/main/live/model.js creates it. */
@@ -126,12 +173,14 @@ export interface LiveModel {
   forgottenSlugs: Map<string, string>;
   projectPathIndex: Map<string, string>;
   codexTailsBySession: Map<string, LiveTail>;
-  codexMetaCache: Map<string, { size: number; mtimeMs: number; meta: any }>;
+  codexMetaCache: Map<string, { size: number; mtimeMs: number; meta: any; head: DriftCount }>;
   signalFiles: Map<string, { size: number; mtimeMs: number; sessionId: string }>;
   providerWarnings: Set<string>;
+  /** The local model server; null when the Tracker was not given options.ollama. */
+  ollama: OllamaState | null;
   /** Names Claude ships and drones: Claude-1, Claude-2, ... */
   shipCounter: number;
-  /** Names provider ships per provider: Codex-1, Signal-1, ... */
+  /** Names provider ships per label: Codex-1, Signal-1, Ollama-1, ... */
   providerCounters: Map<string, number>;
   systemCache: Map<string, { at: number; data: SystemData }>;
   /** Open tool call id -> id of the ship that issued it. */

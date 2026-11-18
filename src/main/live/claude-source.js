@@ -8,16 +8,15 @@ const fs = require('fs');
 const path = require('path');
 const { canonicalProjectPath, isLocalProjectPath } = require('../provider-adapters');
 const { pushFeed } = require('./events');
-const { ACTIVE_WINDOW_MS, HOT_WINDOW_MS } = require('./model');
+const { ACTIVE_WINDOW_MS, HOT_WINDOW_MS, HEAD_BYTES } = require('./model');
 const {
   createProject, adoptProjectPath, updateProjectExists, preferredProjectPath, projectIdAtPath,
 } = require('./projects');
 const { ensureShip } = require('./ships');
 const { stillForgotten } = require('./forgotten');
+const { readHead } = require('../history/jsonl');
 
 /** @import { LiveModel, LiveTail } from '../../types/live-model' */
-
-const CWD_HEAD_BYTES = 32768;
 
 /**
  * @param {LiveModel} model
@@ -103,7 +102,8 @@ function scanClaude(model, isStartup) {
 
 /**
  * A transcript keeps one tail for the whole run, so a session that goes cold and resumes
- * reads on from where it stopped. Startup doesn't replay history: it tails from the end. A
+ * reads on from where it stopped. Startup doesn't replay history: it tails from the end, and
+ * leaves the head for the format canary to count on the first poll (live/claude-records.js). A
  * file appearing while we run (or replacing a longer one) is a new session: replay it from
  * zero in catchup mode so its ship materializes with correct state.
  * @param {LiveModel} model
@@ -123,6 +123,7 @@ function claudeTail(model, fp, projectId, size, isStartup) {
   const tail = {
     provider: 'claude', project: projectId, session: path.basename(fp, '.jsonl'),
     offset: isStartup ? size : 0, catchup: !isStartup, remainder: '',
+    headBytes: isStartup ? Math.min(HEAD_BYTES, size) : 0,
   };
   model.claudeTails.set(fp, tail);
   return tail;
@@ -131,18 +132,13 @@ function claudeTail(model, fp, projectId, size, isStartup) {
 // Reads the head of a transcript to find the project's real cwd.
 /** @param {string} file */
 function readCwd(file) {
+  const head = readHead(file, HEAD_BYTES);
+  const m = (head === null ? '' : head.toString('utf8')).match(/"cwd":"((?:[^"\\]|\\.)*)"/);
+  if (!m) return null;
   try {
-    const fd = fs.openSync(file, 'r');
-    const buf = Buffer.alloc(CWD_HEAD_BYTES);
-    const n = fs.readSync(fd, buf, 0, buf.length, 0);
-    fs.closeSync(fd);
-    const m = buf.toString('utf8', 0, n).match(/"cwd":"((?:[^"\\]|\\.)*)"/);
-    if (m) {
-      const cwd = JSON.parse(`"${m[1]}"`);
-      return isLocalProjectPath(cwd) ? cwd : null;
-    }
-  } catch { /* unreadable head is fine */ }
-  return null;
+    const cwd = JSON.parse(`"${m[1]}"`);
+    return isLocalProjectPath(cwd) ? cwd : null;
+  } catch { return null; }
 }
 
 module.exports = { scanClaude, readCwd };

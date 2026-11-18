@@ -90,7 +90,8 @@ Three more members are optional and have no default: the `planetData` field, rea
 AU.snapshot()  -> Promise<{ projects: Project[], ships: Ship[], feed: FeedEntry[],
                             eventSequence: number, streamEpoch: number,
                             playback: PlaybackStatus,
-                            buildHistogram?: { day: number, bins: number[] } }>  // LIVE: builds per half hour today
+                            buildHistogram?: { day: number, bins: number[] },  // LIVE: builds per half hour today
+                            warnings?: string[] }>  // LIVE: provider problems this run (format drift, providers.json)
 AU.getSystem(projectId)          -> Promise<SystemData | null>
 AU.getPlanet(projectId, name)    -> Promise<PlanetData | null>
 AU.openProject(projectId)        -> Promise<void>   // opens folder in Explorer
@@ -162,7 +163,8 @@ Project = { id, path, name, exists, firstSeen, lastActivity, totalBytes, totalBu
 
 Ship = { id, name, provider, project, kind, status, detail, lastEvent,
          attention, attentionSince, builds, local, model, taskId?, turnOutcome? }   // ?: LIVE only
-// provider: 'claude'|'codex'|'generic'; names use Claude-/Codex-/Signal-.
+// provider: 'claude'|'codex'|'generic'|'local'; names use Claude-/Codex-/Signal-,
+//   and a local server's own label (Ollama-).
 // kind: 'main' | 'drone' (drone = subagent, render smaller);
 // status: 'Building'|'Exploring'|'Gathering Resources'|'Scanning'|'Delegating'|
 //         'Planning'|'Working'; detail: string|null (e.g. relative file path).
@@ -176,6 +178,10 @@ Ship = { id, name, provider, project, kind, status, detail, lastEvent,
 //   local server (oss, ollama, lmstudio, llama.cpp, vllm, localai). Claude: the
 //   latest assistant message.model is not a Claude model. Drones inherit it from
 //   their parent; a change arrives as ship-updated. The provider stays claude/codex.
+//   The 'local' provider is the server itself: a model loaded in Ollama, read from
+//   its loopback /api/ps, is a ship named Ollama-<n> in the Ollama system (the
+//   server's home folder), always local: true with model set; detail is its size
+//   and CPU/GPU split, and an activity (tool 'ollama') marks each request it serves.
 // model: the model name the transcript last reported, as written (Claude
 //   message.model; Codex session_meta.model and each turn_context.model, which the
 //   adapter emits as a `turn-context` signal), control characters dropped, cut to 64
@@ -183,7 +189,7 @@ Ship = { id, name, provider, project, kind, status, detail, lastEvent,
 //   interprets it. Drones inherit it; a change is a ship-updated.
 
 FeedEntry = { kind, text, project, ts }
-// kind: 'discover'|'form'|'build'|'info'|'spawn'|'depart'|'attention'|'done'
+// kind: 'discover'|'form'|'build'|'info'|'spawn'|'depart'|'attention'|'done'|'warning'
 
 SystemData = { project: Project, planets: Planet[], beltDensity: number }
 Planet     = { name, files, builds, procedural? }   // name '(root)' possible
@@ -273,10 +279,12 @@ Design tokens (put in `:root`):
     is visible. Rows: colored dot, text
     (wrap 2 lines max), right-aligned relative time (`12s ago`). Newest on top,
     cap 30 rows. Kind colors: build `#4da3ff`, form `#ffb454`, spawn `#34d399`,
-    depart/info `#8b93a8`, discover `#a78bfa`.
+    depart/info `#8b93a8`, discover `#a78bfa`, warning `#ff5d5d`. The run's provider warnings
+    (`snapshot.warnings`, plus every `warning` entry since) stay pinned above the list in both modes:
+    a transcript format this version does not recognise, or a `providers.json` error.
   - **Expanded feed** (`app/panels/feed.js`). The feed header's expand button, or *Expand the event feed* in the panels menu, widens the right rail to 46% of the window, up to 640 px and never narrower than the rail was. A width dragged while expanded is kept apart (`rightExpanded`). The feed takes the rail's height and lists every event it keeps (60):
     - each event's time of day and its whole sentence
-    - a search by agent, project or file, and filter chips with counts: All, Builds, Ships, Attention, Systems (`AUR.feedGroup`: build and form are Builds, attention and done Attention, discover Systems, the rest Ships)
+    - a search by agent, project or file, and filter chips with counts: All, Builds, Ships, Attention, Systems (`AUR.feedGroup`: build and form are Builds, attention, done and warning Attention, discover Systems, the rest Ships)
     - "{n} of {total} shown" below
     - a "{n} new events" jump back to the top when events arrive while the list is scrolled; a scrolled list keeps its place (rows are kept per event, and `overflow-anchor` holds the view), and a text selection survives new events
     - a click that ends a selection of a row's text does not open the row's system

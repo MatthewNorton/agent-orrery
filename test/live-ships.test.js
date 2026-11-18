@@ -53,6 +53,23 @@ test('live ships: Claude ships and drones share one name counter; each provider 
   assert.equal(child.project, 'p');
 });
 
+test('live ships: a local-server ship is named for its label, counted per label, and carries its facts', () => {
+  const { model, take } = world();
+  const ollama = { local: true, label: 'Ollama' };
+  const first = ensureProviderShip(model, 'local', 'p', 'ollama-1', 'main', 1, null, { ...ollama, model: 'qwen3.6:27b', detail: '23.0 GB · 100% CPU' });
+  const second = ensureProviderShip(model, 'local', 'p', 'ollama-2', 'main', 2, null, { ...ollama, model: 'gemma4:e4b' });
+  const other = ensureProviderShip(model, 'local', 'p', 'lm-1', 'main', 3, null, { local: true, model: 'x', label: 'LM Studio' });
+  const codex = ensureProviderShip(model, 'codex', 'p', 'c1', 'main', 4, null);
+  assert.deepEqual([first, second, other, codex].map((ship) => [ship.id, ship.name, ship.local, ship.model, ship.detail]), [
+    ['ship:local:ollama-1', 'Ollama-1', true, 'qwen3.6:27b', '23.0 GB · 100% CPU'],
+    ['ship:local:ollama-2', 'Ollama-2', true, 'gemma4:e4b', null],
+    ['ship:local:lm-1', 'LM Studio-1', true, 'x', null],
+    ['ship:codex:c1', 'Codex-1', false, null, null],
+  ]);
+  assert.deepEqual(take().filter(([type]) => type === 'feed').map(([, text]) => text),
+    ['Ollama-1 entered demo', 'Ollama-2 entered demo', 'LM Studio-1 entered demo', 'Codex-1 entered demo']);
+});
+
 test('live ships: a ship keeps at most 12 open calls; the oldest leaves the index too', () => {
   const { model, take } = world();
   const ship = ensureShip(model, 'p', 's1', false, 1);

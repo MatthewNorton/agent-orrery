@@ -138,7 +138,8 @@ test('provider colors are fixed fleet identities in renderer source; a local mod
   const source = fs.readFileSync(path.join(ROOT, 'src', 'renderer', 'util.js'), 'utf8');
   assert.match(source, /key: 'claude', label: 'Claude', color: '#d97757'/);
   assert.match(source, /key: 'codex', label: 'Codex', color: '#f2f0ea'/);
-  assert.match(source, /LOCAL_MODEL = Object\.freeze\(\{ key: 'local', label: 'Local model', color: '#ff3344' \}\)/);
+  assert.match(source, /key: 'local', label: 'Local', color: '#ff3344'/);
+  assert.match(source, /LOCAL_MODEL = Object\.freeze\(\{ \.\.\.PROVIDERS\.local, label: 'Local model' \}\)/, 'the red has one source');
   assert.match(source, /AUR\.shipTint = \(shipId, provider\) =>/);
   assert.match(source, /ship\.local === true/);
   assert.doesNotMatch(source, /kind === 'drone'/, 'drones fly hulls; only a generic provider is a signal marker');

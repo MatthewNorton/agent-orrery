@@ -91,6 +91,7 @@
       projects: new Map(), // id -> Project
       ships: new Map(),    // id -> Ship
       feed: [], buildHistogram: null,            // chronological FeedEntry[], capped
+      warnings: [],                              // provider problems this run (snapshot.warnings), pinned above the feed
     },
 
     notificationByShip: new Map(),

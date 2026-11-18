@@ -1,7 +1,10 @@
 // @ts-check
 'use strict';
 
-// Transcript line helpers shared by the history index and the record reader.
+// Transcript line helpers shared by the history index, the record reader and the live sources'
+// head reads.
+
+const fs = require('fs');
 
 const MAX_LINE_BYTES = 1024 * 1024;
 const MIN_TIMESTAMP_MS = Date.UTC(2000, 0, 1);
@@ -32,6 +35,25 @@ function completeLines(buffer, dropFirst) {
     start = index + 1;
   }
   return output;
+}
+
+/**
+ * The first `bytes` of a transcript, or the whole of a shorter one; null when it cannot be read.
+ * @param {string} file
+ * @param {number} bytes
+ * @returns {Buffer | null}
+ */
+function readHead(file, bytes) {
+  let fd = null;
+  try {
+    fd = fs.openSync(file, 'r');
+    const buf = Buffer.allocUnsafe(Math.min(fs.fstatSync(fd).size, bytes)); // only the bytes read are returned
+    return buf.subarray(0, fs.readSync(fd, buf, 0, buf.length, 0));
+  } catch {
+    return null;
+  } finally {
+    if (fd !== null) try { fs.closeSync(fd); } catch { /* fails only for an fd already invalid */ }
+  }
 }
 
 /**
@@ -70,4 +92,4 @@ function safeTimestamp(value, indexNow) {
   return ts !== null && ts >= MIN_TIMESTAMP_MS && ts <= upper ? ts : null;
 }
 
-module.exports = { MAX_LINE_BYTES, completeLines, parseJsonLine, parseTimestamp, safeTimestamp };
+module.exports = { MAX_LINE_BYTES, completeLines, readHead, parseJsonLine, parseTimestamp, safeTimestamp };

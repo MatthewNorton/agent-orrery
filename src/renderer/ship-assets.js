@@ -164,7 +164,8 @@
     if (!manifest) return null;
     const providerKey = AUR.providerKey(ship && ship.provider);
     if (providerKey === 'generic') return null;
-    const family = manifest.providerFamilies[providerKey];
+    // A provider the frozen manifest does not list (a local server) flies the first listed family.
+    const family = manifest.providerFamilies[providerKey] || Object.values(manifest.providerFamilies)[0];
     if (!family) return null;
     const ladder = rankLadder(manifest, family);
     if (!ladder.length) return hashedHull(manifest, family, ship);

@@ -9,12 +9,13 @@ const { MAX_PATH_LENGTH, plainObject, safeId, safePath, firstTrimmed } = require
 const {
   codexSessionIdFromFilename,
   codexRecordToSignals,
+  codexRecordFacts,
   adaptCodexRecord,
 } = require('./transcripts/codex');
 
 /** @import { Provider } from '../types/contract' */
 
-const PROVIDERS = new Set(['claude', 'codex', 'generic']);
+const PROVIDERS = new Set(['claude', 'codex', 'generic', 'local']);
 
 const TOOL_CLASSES = Object.freeze({
   apply_patch: Object.freeze({ tool: 'Edit', status: 'Building', build: true }),
@@ -73,7 +74,7 @@ const UNKNOWN_TOOL = Object.freeze({ tool: 'Tool', status: 'Working', build: fal
 const SIGNAL_EXTENSIONS = Object.freeze(['.json', '.jsonl', '.log', '.txt']);
 
 /**
- * Normalize every externally supplied provider to the three public keys.
+ * Normalize every externally supplied provider to the four public keys.
  * @param {unknown} value
  * @returns {Provider}
  */
@@ -176,10 +177,12 @@ function providerToolStatus(value) {
 }
 
 /**
- * Read and validate the optional manual watch registry. This is the sole I/O
+ * Read and validate providers.json: the manual watch registry, plus the `ollama` entry as written
+ * (live/ollama-source.js checks that one). This is the sole I/O
  * helper in this module; parsing and every transcript adapter remain pure.
  */
 function readGenericWatchConfig(file) {
+  /** @type {{ watch: any[], warnings: string[], ollama?: unknown }} */
   const result = { watch: [], warnings: [] };
   if (typeof file !== 'string' || !file) return result;
   let raw;
@@ -203,15 +206,17 @@ function readGenericWatchConfig(file) {
     result.warnings.push('provider config is not valid JSON');
     return result;
   }
-  if (!plainObject(parsed) || !Array.isArray(parsed.watch)) {
+  if (!plainObject(parsed) || (parsed.watch !== undefined && !Array.isArray(parsed.watch))) {
     result.warnings.push('provider config must contain a watch array');
     return result;
   }
+  result.ollama = parsed.ollama;
+  const watch = parsed.watch || [];
 
   const seen = new Set();
   let invalid = 0;
   let unsupportedExtensions = 0;
-  for (const entry of parsed.watch.slice(0, 128)) {
+  for (const entry of watch.slice(0, 128)) {
     if (!plainObject(entry)) { invalid++; continue; }
     const directory = safePath(entry.directory);
     const projectPath = safePath(entry.projectPath) || directory;
@@ -232,7 +237,7 @@ function readGenericWatchConfig(file) {
     if (entry.extensions !== undefined && !extensions) unsupportedExtensions++;
     result.watch.push({ directory, projectPath, label, extensions: extensions || [...SIGNAL_EXTENSIONS] });
   }
-  if (parsed.watch.length > 128 || invalid > 0) {
+  if (watch.length > 128 || invalid > 0) {
     result.warnings.push('provider config contains invalid or duplicate watch entries');
   }
   if (unsupportedExtensions > 0) {
@@ -310,15 +315,8 @@ function adaptLine(provider, utf8Line, state, meta = {}) {
   const now = finiteNumber(meta.now, 0);
 
   if (key === 'generic') {
-    return {
-      state: nextState,
-      signals: [{
-        type: 'heartbeat',
-        provider: 'generic',
-        sessionId: nextState.sessionId || 'signal',
-        ts: now,
-      }],
-    };
+    const heartbeat = { type: 'heartbeat', provider: 'generic', sessionId: nextState.sessionId || 'signal', ts: now };
+    return { state: nextState, known: true, version: null, signals: [heartbeat] };
   }
 
   // Claude records go through transcripts/claude.js, whose facts each model applies itself.
@@ -329,14 +327,12 @@ function adaptLine(provider, utf8Line, state, meta = {}) {
     const text = Buffer.isBuffer(utf8Line) ? utf8Line.toString('utf8') : String(utf8Line || '');
     record = JSON.parse(text);
   } catch {
-    return {
-      state: nextState,
-      signals: [],
-      diagnostic: { code: 'invalid-json', lineOffset: finiteNumber(meta.lineOffset, 0) },
-    };
+    const diagnostic = { code: 'invalid-json', lineOffset: finiteNumber(meta.lineOffset, 0) };
+    return { state: nextState, signals: [], known: false, version: null, diagnostic };
   }
-  if (!plainObject(record)) return { state: nextState, signals: [] };
-  return adaptCodexRecord(record, nextState, now);
+  if (!plainObject(record)) return { state: nextState, signals: [], known: false, version: null };
+  // The format canary's facts ride along, as diagnostic does.
+  return { ...adaptCodexRecord(record, nextState, now), ...codexRecordFacts(record) };
 }
 
 function validState(value, provider) {

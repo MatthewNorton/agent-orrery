@@ -27,6 +27,8 @@
     if (snap && Array.isArray(snap.feed)) {
       S.store.feed = snap.feed.slice(-C.FEED_CAP);
     }
+    // Live carries the run's provider warnings; a replay snapshot carries none and leaves them be.
+    if (snap && Array.isArray(snap.warnings)) S.store.warnings = snap.warnings.filter((text) => typeof text === 'string');
   };
 
   /** @param {AUEvent} ev */
@@ -52,6 +54,7 @@
       case 'feed':
         S.store.feed.push(ev.entry);
         if (S.store.feed.length > C.FEED_CAP) S.store.feed = S.store.feed.slice(-C.FEED_CAP);
+        if (ev.entry.kind === 'warning' && !S.store.warnings.includes(ev.entry.text)) S.store.warnings.push(ev.entry.text);
         break;
       case 'build': {
         const p = S.store.projects.get(ev.project);

@@ -7,14 +7,16 @@
 const fs = require('fs');
 const path = require('path');
 const { canonicalProjectPath } = require('../provider-adapters');
-const { claudeRecordToSignals, claudeTool } = require('../transcripts/claude');
+const { claudeRecordToSignals, claudeRecordFacts, claudeTool } = require('../transcripts/claude');
 const { relativeInside } = require('../path-safety');
 const { liveShip } = require('../universe/public-shape');
 const { queue, pushFeed } = require('./events');
 const { READ_LIMIT_BYTES, LINE_LIMIT_BYTES } = require('./model');
 const { adoptProjectPath } = require('./projects');
-const { ensureShip, spawnDrone, setModel, addPending } = require('./ships');
+const { ensureShip, spawnDrone, setModel, addPending, departShip } = require('./ships');
 const { addBuild } = require('./builds');
+const { noteRecord, noteHead, checkDrift } = require('./drift');
+const { completeLines, readHead } = require('../history/jsonl');
 
 /**
  * @import { LiveModel, LiveProject, LiveShip, LiveTail } from '../../types/live-model'
@@ -32,13 +34,16 @@ function resumesTurn(message) {
 }
 
 /**
- * Reads what a transcript gained since the last poll and parses its complete lines.
+ * Reads what a transcript gained since the last poll and parses its complete lines. A tail begun
+ * past its head counts the head first.
  * @param {LiveModel} model
  * @param {string} fp
  * @param {LiveTail} tail
  * @param {import('fs').Stats} st
  */
 function pollClaudeFile(model, fp, tail, st) {
+  // A head still to count is tried each poll until it reads; the tail is read either way.
+  if (tail.headBytes && countHead(tail, fp)) checkDrift(model, tail);
   if (st.size <= tail.offset) return;
   let chunk;
   try {
@@ -68,17 +73,36 @@ function pollClaudeFile(model, fp, tail, st) {
   for (const line of lines) {
     if (Buffer.byteLength(line, 'utf8') <= LINE_LIMIT_BYTES && line.trim()) parseLine(model, line, tail);
   }
+  checkDrift(model, tail);
   if (tail.catchup && tail.offset >= st.size) tail.catchup = false;
+}
+
+/**
+ * A tail that begins at the end of its file (startup, or a session cold at startup that resumes)
+ * would see a long run of bookkeeping records as format drift, so the canary (live/drift.js) counts
+ * the head first: a session opens with its first message, which says whether this version reads
+ * the format. The head is the file's first HEAD_BYTES at most, up to where the tail began; a first
+ * line longer than that leaves nothing to count, and the tail is judged on its own.
+ * @param {LiveTail} tail
+ * @param {string} file
+ * @returns {boolean} false when the file cannot be read just now
+ */
+function countHead(tail, file) {
+  const head = readHead(file, tail.headBytes || 0);
+  if (head === null) return false;
+  noteHead(tail, completeLines(head, false), claudeRecordFacts);
+  tail.headBytes = 0;
+  return true;
 }
 
 /**
  * @param {LiveModel} model
  * @param {string} line
- * @param {Pick<LiveTail, 'project' | 'session' | 'catchup'>} tail
+ * @param {Pick<LiveTail, 'project' | 'session' | 'catchup' | 'drift'>} tail
  */
 function parseLine(model, line, tail) {
-  let record;
-  try { record = JSON.parse(line); } catch { return; }
+  const record = noteRecord(tail, line, claudeRecordFacts);
+  if (record === undefined) return;
   const project = model.projects.get(tail.project);
   if (!project) return;
   // Live stamps an undated record with the time it was read.
@@ -174,13 +198,8 @@ function onToolResult(model, toolUseId, ts) {
     model.pendingIndex.delete(toolUseId);
   }
 
-  const droneId = `drone:${toolUseId}`;
-  const drone = model.ships.get(droneId);
-  if (drone) {
-    model.ships.delete(droneId);
-    queue(model, { type: 'ship-departed', shipId: droneId, ts });
-    pushFeed(model, 'depart', `${drone.name} returned to ${drone.parentName}`, drone.project);
-  }
+  const drone = model.ships.get(`drone:${toolUseId}`);
+  if (drone) departShip(model, drone, ts, `returned to ${drone.parentName}`);
 }
 
 module.exports = { pollClaudeFile, parseLine };
