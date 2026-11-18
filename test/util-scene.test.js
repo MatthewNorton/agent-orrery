@@ -57,7 +57,7 @@ test('sceneProviderStats counts ship meshes per provider and flags tint mismatch
   });
 
   assert.equal(stats.shipMeshCount, 3);
-  assert.deepEqual({ ...stats.providerCounts }, { claude: 2, codex: 1, generic: 0 });
+  assert.deepEqual({ ...stats.providerCounts }, { claude: 2, codex: 1, generic: 0, local: 0 });
   assert.deepEqual([...stats.representedProviders], ['claude', 'codex']);
   assert.equal(stats.distinctProviderCount, 2);
   assert.equal(stats.distinctColorCount, 3);

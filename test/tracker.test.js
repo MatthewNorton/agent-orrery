@@ -929,7 +929,7 @@ test('snapshot(), getSystem() and getPlanet() public shapes for a project on dis
   const { tracker } = session;
 
   const snapshot = tracker.snapshot();
-  assert.deepEqual(Object.keys(snapshot).sort(), ['buildHistogram', 'eventSequence', 'feed', 'projects', 'ships']);
+  assert.deepEqual(Object.keys(snapshot).sort(), ['buildHistogram', 'eventSequence', 'feed', 'projects', 'ships', 'warnings']);
   assert.equal(snapshot.buildHistogram.bins.length, 48);
   assert.equal(snapshot.eventSequence, events.at(-1).seq);
   assert.deepEqual(Object.keys(snapshot.projects[0]).sort(), PROJECT_KEYS);

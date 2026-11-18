@@ -31,7 +31,7 @@
   /** @type {Map<FeedEntry, HTMLElement>} the expanded list's rows, kept by the event each shows */
   let wideRows = new Map();
   /** @type {{ panel: HTMLElement, list: HTMLElement, toggle: HTMLElement, pill: HTMLElement,
-   *   pillText: HTMLElement, count: HTMLElement, counts: Map<string, HTMLElement> } | null} */
+   *   pillText: HTMLElement, count: HTMLElement, counts: Map<string, HTMLElement>, warnings: HTMLElement } | null} */
   let ui = null;
 
   /** @param {number} ts */
@@ -70,9 +70,20 @@
     return el;
   }
 
+  /**
+   * The run's provider warnings (snapshot.warnings, and every warning event since), pinned above the
+   * list in both modes: a transcript format this version does not recognise, or a providers.json error.
+   */
+  function renderWarnings() {
+    if (!ui) return;
+    AUR.clear(ui.warnings);
+    for (const text of S.store.warnings) ui.warnings.appendChild(AUR.el('div', 'feed-warning', text));
+  }
+
   A.renderFeed = function renderFeed() {
     const list = document.getElementById('feed-list');
     if (!list) return;
+    renderWarnings();
     const parts = S.panels.feedExpanded ? ui : null;
     /** @type {FeedEntry[]} */
     const kept = S.store.feed.slice(parts ? -C.FEED_CAP : -C.FEED_SHOW).reverse();
@@ -201,6 +212,7 @@
 
     // The pill jumps back to the newest events; the list back at its top clears it. Only a scrolled
     // list keeps its place as events come in above (rail.css).
+    const warnings = AUR.el('div', 'feed-warnings');
     const wrap = AUR.el('div', 'feed-wrap');
     const pill = AUR.button('btn feed-new', '', () => { list.scrollTop = 0; });
     pill.innerHTML = icon('M8 13 V3 M4 7 L8 3 L12 7');
@@ -217,10 +229,10 @@
     const foot = AUR.el('div', 'feed-foot');
     const count = foot.appendChild(AUR.el('span'));
     foot.appendChild(AUR.el('span', '', `The feed keeps the last ${C.FEED_CAP} events. Older activity is on the timeline.`));
-    list.before(tools, wrap);
+    list.before(tools, warnings, wrap);
     wrap.append(pill, list);
     wrap.after(foot);
-    ui = { panel, list, toggle, pill, pillText, count, counts };
+    ui = { panel, list, toggle, pill, pillText, count, counts, warnings };
     syncToggle(ui);
   };
 })();

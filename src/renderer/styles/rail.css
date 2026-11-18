@@ -191,6 +191,9 @@ body:has(#sidebar.is-collapsed) { --sidebar-effective-w: var(--sidebar-compact-w
 }
 .feed-time, .feed-clock { font-family: var(--font-mono); font-size: 12px; line-height: 15px; color: var(--ink-3); }
 .feed-time { margin-top: 2px; }
+/* provider warnings (snapshot.warnings): pinned above the feed for the run */
+.feed-warnings:empty { display: none; }
+.feed-warning { padding: 6px 12px; border-bottom: 1px solid var(--hair); color: var(--red); font-size: 12.5px; line-height: 1.4; }
 
 /* Resizing (app/panels/resize.js): a rail's inner edge and the gap under a panel are separators. A
    hairline shows on hover, orange while one is dragged or has focus, with the size beside it. */

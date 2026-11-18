@@ -7,6 +7,7 @@ const { codexProviderIsLocal, modelName } = require('./model');
 const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/ig;
 const MAX_BUILD_FILES = 256;
 const TASK_MARKER_RE = /(?:^|\s)agent-universe:([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?=\s|$)/i;
+const RECORD_TYPES = new Set(['session_meta', 'turn_context', 'response_item', 'event_msg']);
 
 /**
  * The rollout UUID from either a POSIX or Windows Codex filename: the last one in the leaf.
@@ -100,6 +101,18 @@ function codexRecordToSignals(record) {
   if (payloadType === 'task_complete') return [withTs({ type: 'turn-end' })];
   if (payloadType === 'turn_aborted') return [withTs({ type: 'turn-aborted' })];
   return [];
+}
+
+/**
+ * What the format canary (live/drift.js) asks of a record: whether its type is one this adapter
+ * reads, before any ownership or path check, and the CLI version it names.
+ * @param {unknown} record
+ * @returns {{ known: boolean, version: string | null }}
+ */
+function codexRecordFacts(record) {
+  if (!plainObject(record)) return { known: false, version: null };
+  const payload = plainObject(record.payload) ? record.payload : {};
+  return { known: RECORD_TYPES.has(safeToken(record.type)), version: firstTrimmed(payload.cli_version) };
 }
 
 /**
@@ -242,6 +255,7 @@ function recordTimestamp(primary, secondary, fallback) {
 module.exports = {
   codexSessionIdFromFilename,
   codexRecordToSignals,
+  codexRecordFacts,
   adaptCodexRecord,
   codexParentSessionId,
 };

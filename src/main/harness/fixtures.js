@@ -37,6 +37,15 @@ function createProviderFixture() {
 
   fs.mkdirSync(signalRoot, { recursive: true });
   fs.writeFileSync(path.join(signalRoot, 'builder.log'), 'fixture\n');
+
+  // The local model server is a fake fetch with one loaded model, so the renderer draws a local hull.
+  const ollamaHome = path.join(providerFixtureRoot, '.ollama');
+  fs.mkdirSync(ollamaHome, { recursive: true });
+  const ollamaStatus = JSON.stringify({ models: [{
+    name: 'fixture-local:7b', model: 'fixture-local:7b', size: 4e9, size_vram: 0,
+    expires_at: new Date(Date.now() + 4 * 60 * 1000).toISOString(),
+  }] });
+  const ollamaFetch = async () => new Response(ollamaStatus, { status: 200, headers: { 'content-type': 'application/json' } });
   fs.mkdirSync(path.dirname(configPath), { recursive: true });
   fs.writeFileSync(configPath, JSON.stringify({
     watch: [{ directory: signalRoot, projectPath: projectDir, label: 'Fixture' }],
@@ -44,7 +53,10 @@ function createProviderFixture() {
   return {
     root: providerFixtureRoot,
     statePath,
-    options: { claudeProjectsDir: claudeRoot, codexSessionsDir: codexRoot, providerConfigPath: configPath },
+    options: {
+      claudeProjectsDir: claudeRoot, codexSessionsDir: codexRoot, providerConfigPath: configPath,
+      ollama: { home: ollamaHome, fetch: ollamaFetch },
+    },
   };
 }
 

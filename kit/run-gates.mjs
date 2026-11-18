@@ -28,6 +28,7 @@ const GATES = [
   { name: 'attention', script: 'kit/done/attention/grade-attention.mjs', args: ['--fixtures-only'], static: true },
   { name: 'project-search', script: 'kit/done/project-search/grade-search.mjs', args: ['--fixtures-only'], static: true },
   { name: 'project-tasks', script: 'kit/done/project-tasks/grade-tasks.mjs', args: ['--fixtures-only'], static: true },
+  { name: 'ollama-source', script: 'kit/done/ollama-source/grade-ollama.mjs', args: ['--fixtures-only'], static: true },
   { name: 'ship-assets-pack', script: 'kit/done/ship-assets-pack/grade-ships.mjs', args: ['--no-regression'], static: true },
   { name: 'structural-cleanup', script: 'kit/done/structural-cleanup/grade-structure.mjs', args: ['--no-unit-tests'], static: true },
   { name: 'main-split', script: 'kit/done/main-split/grade-main-split.mjs', args: ['--no-unit-tests'], static: true },

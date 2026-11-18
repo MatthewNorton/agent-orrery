@@ -59,7 +59,7 @@ you (or a Claude kit-runner session):
 
 ## Current state (update when it changes)
 
-Nothing is feedable right now. Kits 01–08, 10, 11 and 13–15 are done (see
+Nothing is feedable right now. Kits 01–08, 10, 11, 13–15 and 17 are done (see
 `kit/README.md`); `kit/todo/09-ship-assets-gen.md` and
 `kit/todo/16-idle-cap-and-glyphs.md` are stubs and
 `kit/todo/12-standalone-installer.md` is declined. To make another feedable

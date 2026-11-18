@@ -18,6 +18,7 @@ const { loadForgotten } = require('./forgotten');
 
 const ACTIVE_WINDOW_MS = 5 * 60 * 1000;   // ship visible this long after last write
 const HOT_WINDOW_MS = 15 * 60 * 1000;     // only files this fresh get tailed
+const HEAD_BYTES = 32 * 1024;             // a transcript's head: its cwd and first message
 const READ_LIMIT_BYTES = 8 * 1024 * 1024; // most read from one file per poll
 const LINE_LIMIT_BYTES = 1024 * 1024;     // longer lines are skipped, never parsed
 
@@ -26,6 +27,7 @@ const DEFAULT_CODEX_SESSION_DIRS = [
   path.join(os.homedir(), '.codex', 'sessions'),
   path.join(os.homedir(), '.codex', 'archived_sessions'),
 ];
+const DEFAULT_OLLAMA_HOME = path.join(os.homedir(), '.ollama');
 
 /**
  * @param {string} statePath universe-state.json, read once here
@@ -71,6 +73,14 @@ function createLiveModel(statePath, options, publish) {
     codexMetaCache: new Map(),
     signalFiles: new Map(),
     providerWarnings: new Set(),
+    // The local model server (live/ollama-source.js); null means the source is off. The default
+    // fetch is Node's, which sends no cookies and no Windows credentials; never Electron's net.fetch.
+    ollama: options.ollama ? {
+      host: options.ollama.host || null,
+      home: options.ollama.home || DEFAULT_OLLAMA_HOME,
+      fetch: options.ollama.fetch || ((url, init) => fetch(url, init)),
+      configHome: null, inFlight: null, failures: 0, nextPollAt: 0, reachable: null, loaded: new Map(),
+    } : null,
     shipCounter: 0,
     providerCounters: new Map(),
     systemCache: new Map(),
@@ -86,6 +96,7 @@ function createLiveModel(statePath, options, publish) {
 module.exports = {
   ACTIVE_WINDOW_MS,
   HOT_WINDOW_MS,
+  HEAD_BYTES,
   READ_LIMIT_BYTES,
   LINE_LIMIT_BYTES,
   createLiveModel,

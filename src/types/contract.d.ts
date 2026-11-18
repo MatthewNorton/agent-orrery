@@ -1,12 +1,12 @@
 // Shapes that cross the `window.AU` bridge; kit/SPEC.md §3 is the prose version.
 
-export type Provider = 'claude' | 'codex' | 'generic';
+export type Provider = 'claude' | 'codex' | 'generic' | 'local';
 export type ShipKind = 'main' | 'drone';
 export type ShipStatus =
   | 'Building' | 'Exploring' | 'Gathering Resources' | 'Scanning'
   | 'Delegating' | 'Planning' | 'Working';
 export type Attention = 'question' | 'permission' | 'stalled' | 'done';
-export type FeedKind = 'discover' | 'form' | 'build' | 'info' | 'spawn' | 'depart' | 'attention' | 'done';
+export type FeedKind = 'discover' | 'form' | 'build' | 'info' | 'spawn' | 'depart' | 'attention' | 'done' | 'warning';
 export type StreamMode = 'live' | 'replay';
 export type ReplaySpeed = 1 | 10 | 100 | 1000;
 export type DebugView = 'universe' | 'system' | 'planet';
@@ -48,7 +48,7 @@ export interface Ship {
   attentionSince: number | null;
   /** Build events attributed to this ship since its source first observed it; picks its hull rank. */
   builds: number;
-  /** The session runs a local model (a Codex local model_provider, or a non-Claude model in Claude Code); tints the ship red. */
+  /** The session runs a local model (a Codex local model_provider, a non-Claude model in Claude Code, or any ship of the `local` provider); tints the ship red. */
   local: boolean;
   /** The model the session reports (Claude message.model; Codex session_meta and turn_context model), for any provider; null until known. */
   model: string | null;
@@ -119,6 +119,8 @@ export interface Snapshot {
   playback: PlaybackStatus;
   /** LIVE only; replay snapshots carry none. */
   buildHistogram?: BuildHistogram;
+  /** LIVE only: provider problems this run, such as a transcript format this version does not recognise or a providers.json error. */
+  warnings?: string[];
 }
 
 // ---- events ----
