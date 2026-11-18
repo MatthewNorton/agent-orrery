@@ -90,7 +90,7 @@ or the record of how the app was built.
 | `kit/` | 23 | — | Kit tooling, two stubs **and** 13 regression gate scripts | No (gates matter, see §9) |
 | `scripts/` | 11 | — | One-step setup (run by the root `Install Agent Orrery.cmd` / `.command`), ship generators, the fleet-v2 LOD build, launcher shortcuts, demo screenshots and their synthetic profile, a VCS UI lab | No |
 | `docs/` | 16 | — | Feature notes and plans; four of them are also gate fixtures | No |
-| root | 11 | — | README, AGENTS.md (CLAUDE.md imports it), SECURITY, LICENSE, `package.json` + lockfile, git config, 3 mockup PNGs | Mockups are the visual "gold samples" |
+| root | 12 | — | README, AGENTS.md (CLAUDE.md imports it), SECURITY, LICENSE, NOTICE, `package.json` + lockfile, git config, 3 mockup PNGs | Mockups are the visual "gold samples" |
 | `.github/` | 4 | — | CI (Ubuntu + Windows), Dependabot, CODEOWNERS, PR template | No |
 
 Generated and ignored: `.shots/` (gate screenshots), `kit/done/*/output/` (old gate evidence),
