@@ -81,25 +81,29 @@
     return S.activeView && S.activeView.planetData ? S.activeView.planetData : null;
   };
 
-  /** @param {number} kb @param {number} files */
-  function sizeText(kb, files) {
-    if (kb === 0) return files > 0 ? '< 1 KB' : '0 KB';
+  /**
+   * @param {number} kb @param {number} files
+   * @param {boolean} floor the least it can be (a read that stopped short): rounded down, never "< 1 KB"
+   */
+  function sizeText(kb, files, floor) {
+    if (kb === 0) return files > 0 && !floor ? '< 1 KB' : '0 KB';
     if (kb < 1024) return kb + ' KB';
-    const mb = kb / 1024;
-    return mb < 1024 ? mb.toFixed(1) + ' MB' : (mb / 1024).toFixed(1) + ' GB';
+    const tenth = (/** @type {number} */ n) => (floor ? Math.floor(n * 10) : Math.round(n * 10)) / 10;
+    const mb = tenth(kb / 1024);
+    return mb < 1024 ? mb.toFixed(1) + ' MB' : tenth(kb / 1048576).toFixed(1) + ' GB';
   }
 
   /**
    * A planet's folder counts as the cards show them, or null where main read no folder (a
-   * procedural planet, a folder gone or locked, or history). Where the read stopped short, files
-   * and size end in `+`.
+   * procedural planet, a folder that could not be read, or history). Where the read stopped short,
+   * files and size end in `+`.
    * @param {PlanetData | null} pd
    * @returns {{ files: string, size: string, subdirs: string } | null}
    */
   A.planetFolderCounts = function planetFolderCounts(pd) {
     if (!pd || (pd.folderRead !== 'full' && pd.folderRead !== 'partial')) return null;
-    const more = pd.folderRead === 'partial' ? '+' : '';
-    return { files: pd.files + more, size: sizeText(pd.sizeKb || 0, pd.files) + more, subdirs: String(pd.subdirs) };
+    const floor = pd.folderRead === 'partial', more = floor ? '+' : '';
+    return { files: pd.files + more, size: sizeText(pd.sizeKb || 0, pd.files, floor) + more, subdirs: String(pd.subdirs) };
   };
 
   A.onlineProjectCount = function onlineProjectCount() {

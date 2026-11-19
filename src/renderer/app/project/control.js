@@ -2,7 +2,7 @@
 // Project card (folder/terminal actions) and planet card.
 'use strict';
 
-/** @import { OpenTerminalResult, PlanetData } from '../../../types/contract' */
+/** @import { OpenTerminalResult, PlanetData, SystemData } from '../../../types/contract' */
 
 (function () {
   const AUR = window.AUR;
@@ -193,16 +193,41 @@
 
   /**
    * What the globe is drawn as, what the planet stands for, and why its folder rows are dashes.
+   * From the planet's own data, not the mode, which moves first when LIVE and REPLAY switch.
    * @param {PlanetData} pd @param {string} projectName
    */
   function planetLine(pd, projectName) {
     const world = WORLD_NAMES[AUR.worldProfile(S.current.projectId, pd.name).key] || 'World';
-    if (pd.procedural) return world + ' · no folder on disk';
+    // A stand-in: its project has no folder on disk, or nothing was built here (yet, in history).
+    if (pd.procedural) return world + (pd.project.path && pd.project.exists !== false ? ' · no builds here yet' : ' · no folder on disk');
     const line = world + (pd.name === '(root)' ? ' · the top-level files of ' : ' · a folder in ') + projectName;
-    // From the planet's own data, not the mode, which moves first when LIVE and REPLAY switch.
+    if (pd.folderRead === 'gone') return line + ' · no longer on disk';
     if (pd.folderRead === 'none') return line + ' · could not be read';
     return pd.folderRead ? line : line + ' · history keeps no file counts';
   }
+
+  /**
+   * The project's system, for the planet card's solar-system rows: the open view's own copy when it
+   * holds this project's from this stream (a planet opened from its system view, or from another
+   * planet of the system), else fetched; null when that fails.
+   * @param {string} projectId @returns {Promise<SystemData | null>}
+   */
+  A.systemForPlanet = async function systemForPlanet(projectId) {
+    const held = S.activeView && S.activeView.systemData;
+    if (held && held.project.id === projectId && A.sameEpoch(S.viewEpoch, S.streamEpoch)) return held;
+    const system = await AUR.settle(() => AU.getSystem(projectId));
+    return Array.isArray(system.planets) ? system : null;
+  };
+
+  /** A build that starts a planet changes the open planet card's PLANETS row: its system is fetched again. */
+  A.refreshPlanetSystem = async function refreshPlanetSystem() {
+    const view = S.activeView;
+    if (!view || S.current.view !== 'planet') return;
+    const system = await AUR.settle(() => AU.getSystem(S.current.projectId));
+    if (S.activeView !== view || !Array.isArray(system.planets)) return;
+    view.systemData = system;
+    A.scheduleChrome(C.CHROME.PLANET);
+  };
 
   A.renderPlanetCard = function renderPlanetCard() {
     const card = document.getElementById('planet-card');
@@ -240,24 +265,32 @@
       AUR.el('div', 'plc-title', 'BUILDS (FILE EDITS)'),
       pcRow('THIS PLANET', String(planetBuilds)),
       pcRow('WHOLE SOLAR SYSTEM', String(systemBuilds)),
-      shareBar(systemBuilds ? planetBuilds / systemBuilds : 0, systemBuilds > 0),
+      shareBar(planetBuilds, systemBuilds),
       AUR.el('div', 'plc-title', 'SOLAR SYSTEM'),
-      pcRow('PLANETS', system ? String(system.planets.length) : '—'),
+      // The system view draws at most 8; past that, of how many.
+      pcRow('PLANETS', !system ? '—' : system.planetTotal
+        ? `${system.planets.length} of ${system.planetTotal}` : String(system.planets.length)),
       pcRow('AGENTS', String(ships.length))
     );
     card.appendChild(body);
   };
 
-  /** @param {number} frac @param {boolean} any whether the system has builds at all */
-  function shareBar(frac, any) {
-    const pct = Math.round(AUR.clamp(frac, 0, 1) * 100);
+  /**
+   * The planet's share of its system's builds: a whole percent, but never 0% of a planet that has
+   * builds nor 100% of one that does not have them all.
+   * @param {number} planetBuilds @param {number} systemBuilds
+   */
+  function shareBar(planetBuilds, systemBuilds) {
+    const frac = systemBuilds > 0 ? AUR.clamp(planetBuilds / systemBuilds, 0, 1) : 0;
+    const pct = AUR.clamp(Math.round(frac * 100), frac > 0 ? 1 : 0, frac < 1 ? 99 : 100);
+    const text = frac > 0 && frac < 0.005 ? '< 1%' : frac < 1 && frac >= 0.995 ? '> 99%' : pct + '%';
     const share = AUR.el('div', 'plc-share');
     const track = AUR.el('div', 'bar-track');
     const fill = AUR.el('div', 'bar-fill');
     fill.style.width = pct + '%';
     track.appendChild(fill);
     share.append(track, AUR.el('div', 'plc-share-note',
-      any ? pct + '% of the system’s builds' : 'No builds in this system yet'));
+      systemBuilds > 0 ? text + ' of the system’s builds' : 'No builds in this system yet'));
     return share;
   }
 })();

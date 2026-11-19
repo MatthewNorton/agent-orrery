@@ -30,6 +30,9 @@
   // ---- copy of src/main/path-safety.js ignoresCase (test/path-safety.test.js checks they agree) ----
   // Under a Windows path main matches folder names in any case.
   AUR.ignoresCase = (root) => typeof root === 'string' && (/^[a-z]:[\\/]/i.test(root) || root.includes('\\'));
+  // What a folder name compares by under `root`: main keeps one build bucket for a folder's casings
+  // (build-buckets.js bucketKey), so a bucket, a build event and a planet name match on this key.
+  AUR.folderKey = (root, name) => (AUR.ignoresCase(root) ? String(name).toLowerCase() : String(name));
 
   // ---- palettes / tokens ----
   AUR.STATUS_DOT = {

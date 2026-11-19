@@ -109,6 +109,7 @@
     engine: null,
     canvas: null,
     activeView: null,   // what the view factory returned (kit/SPEC.md view contract)
+    viewEpoch: null,    // the stream epoch the active view's data came from; null once a reset outdates it
     activeScene: null,
     current: { view: 'universe', projectId: null, planetName: null },
     routeRequestGeneration: 0,

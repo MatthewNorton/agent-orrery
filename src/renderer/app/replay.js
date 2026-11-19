@@ -115,6 +115,7 @@
   };
 
   A.rebuildRoute = function rebuildRoute(route) {
+    S.viewEpoch = null; // the open view's data is from before the reset: nothing of it is reused
     if (!route || route.view === 'universe' || !route.projectId ||
         !S.store.projects.has(route.projectId)) {
       A.showUniverse();

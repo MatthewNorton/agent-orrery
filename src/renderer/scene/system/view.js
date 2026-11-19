@@ -205,7 +205,8 @@
 
     return {
       scene,
-      systemData: sys,
+      // The system as last fetched: the ships part fetches it again when a build starts a planet.
+      get systemData() { return view.sys; },
       update: view.update,
       focusShip: view.focusShip,
       setShipFocus: view.setShipFocus,
