@@ -52,10 +52,12 @@
       return { islands, length: zMax - zMin };
     }
 
-    // The nozzles a ship trails from: its hull's stern glow discs (found once per hull), else a
-    // dart's tail.
+    // The nozzles a ship trails from: the ones its model names, else its hull's stern glow discs
+    // (found once per hull), else a dart's tail.
     function nozzles(rec) {
       const found = rec.hull ? AUR.memo(hulls, rec.hull, () => {
+        const named = AUR.shipModels.nozzles(rec.hull);
+        if (named) return named;
         const { islands, length } = glowIslands(rec.mesh);
         return AUR.sternIslands(islands, length, PLUME.sternShare);
       }) : [];

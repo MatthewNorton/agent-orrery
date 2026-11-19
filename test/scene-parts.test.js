@@ -6,10 +6,9 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const vm = require('node:vm');
-const { readRenderer, rendererFiles } = require('./support/renderer-source');
+const { readRenderer, rendererFiles, scriptTags } = require('./support/renderer-source');
 
-const scripts = [...readRenderer('index.html')
-  .matchAll(/<script src="([^"]+)"><\/script>/g)].map((match) => match[1]);
+const scripts = scriptTags();
 const sceneFiles = rendererFiles('scene');
 const PART = /^scene\/([a-z]+)\/(?!view\.js$)([a-z-]+)\.js$/;
 const VIEWS = sceneFiles.map((file) => file.match(/^scene\/([a-z]+)\/view\.js$/)?.[1]).filter(Boolean);

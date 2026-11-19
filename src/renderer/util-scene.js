@@ -12,6 +12,21 @@
     return new BABYLON.Color4(c.r, c.g, c.b, a == null ? 1 : a);
   };
 
+  // Babylon ignores a mesh's visibility while its material has a transparency mode set, and focus
+  // mode fades ships by visibility: an opaque material gives the mode up.
+  AUR.fadeWithMesh = function (material) {
+    if (material.transparencyMode === BABYLON.Material.MATERIAL_OPAQUE) material.transparencyMode = null;
+  };
+
+  // A light that reaches only the meshes carrying a layer bit.
+  AUR.layerLight = function (light, intensity, diffuse, layer) {
+    light.intensity = intensity;
+    light.diffuse = diffuse;
+    light.specular = diffuse.clone();
+    light.includeOnlyWithLayerMask = layer;
+    return light;
+  };
+
   // ---- shared 3D scene helpers ----
 
   // Equirectangular skybox via PhotoDome, dimmed to a subtle backdrop.

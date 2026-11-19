@@ -5,15 +5,17 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const { scriptTags } = require('./support/renderer-source');
 
 const RENDERER = path.join(__dirname, '..', 'src', 'renderer');
 // The core loads first; the files after it extend AUR.shipAssets and publish AUR.ships.
-const SHIP_ASSET_FILES = [...fs.readFileSync(path.join(RENDERER, 'index.html'), 'utf8')
-  .matchAll(/<script src="(ship-assets[a-z-]*\.js)"><\/script>/g)].map((match) => match[1]);
+const SHIP_ASSET_FILES = scriptTags().filter((file) => /^ship-assets[a-z-]*\.js$/.test(file));
 
+// The model registry loads before them (ship-assets asks it which ranks a model has taken); these
+// tests register no model, so every rank flies its manifest hull.
 function loadShipAssetFiles(context) {
   vm.createContext(context);
-  for (const file of SHIP_ASSET_FILES) {
+  for (const file of ['ships/models.js', ...SHIP_ASSET_FILES]) {
     vm.runInContext(fs.readFileSync(path.join(RENDERER, file), 'utf8'), context, { filename: file });
   }
 }
@@ -66,6 +68,7 @@ function fakeAur({ Color, Material, markShipMesh }) {
       if (!map.has(key)) map.set(key, build());
       return map.get(key);
     },
+    fadeWithMesh() {},
     isNodeDisposed(node) { return !node || node.isDisposed(); },
     SHIP_LAYER: 0x10000000,
     nodeFamily(node) { return !node ? [] : typeof node.getChildMeshes === 'function' ? [node, ...node.getChildMeshes(false)] : [node]; },
@@ -281,6 +284,9 @@ function loadShipAssets(manifest, trianglesByFile, materials = ['hull_primary', 
   }
   class TransformNode extends Node {}
   class Mesh extends Node {
+    clone(name, parent) {
+      return Object.assign(new Mesh(name), { hasGeometry: this.hasGeometry, material: this.material, isVisible: this.isVisible, parent });
+    }
     instantiateHierarchy(newParent, options, onNewNodeCreated) {
       const copy = this.hasGeometry ? new InstancedMesh(this) : new Mesh(this.name);
       copy.parent = newParent;
@@ -339,8 +345,11 @@ function loadShipAssets(manifest, trianglesByFile, materials = ['hull_primary', 
   let sceneCount = 0;
   return {
     ships: AUR.ships,
+    models: AUR.shipModels,
     loads,
+    Mesh,
     InstancedMesh,
+    containerFor,
     scene: (view) => ({ uid: 'scene-' + (++sceneCount), metadata: view ? { view } : null, isDisposed: () => false }),
     fallback: (id) => Object.assign(new Mesh('fallback-' + id), {
       material: { alpha: 1 }, metadata: { isShip: true, shipId: id },
@@ -375,6 +384,47 @@ test('main ships take the highest rank their build count has reached', async () 
   assert.deepEqual(ranks, ['small', 'small', 'mid', 'mid', 'big', 'big', 'small']);
   assert.equal(hullId(await assets.ships.upgrade(scene, ship('d', 50, { kind: 'drone' }), assets.fallback('d'))), 'small', 'a drone flies the first rank at any build count');
   assert.ok(!assets.loads.some((file) => file.startsWith('escort')), 'the reserved escort is never a rank');
+});
+
+// The model here is a stand-in and so are its container and materials (the real ones need the
+// real Babylon build: test/ships-models.test.js); this covers what ship-assets does with a model.
+test('a rank a ship model has taken flies the model, built in code, until the ship is promoted past it', async () => {
+  const assets = loadShipAssets(LADDER_MANIFEST, {});
+  const built = [];
+  Object.assign(assets.models, {
+    container(_scene, model) { built.push(model.id); return assets.containerFor('model:' + model.id); },
+    material: (_materials, model, palette, hex, base) => ({ worn: [model.id, palette, hex, base.name].join(' ') }),
+  });
+  assets.models.register({ id: 'coded', replaces: 'small', correction: { scale: 0.1, offset: [0, 0, -1] }, trim: {} });
+
+  const system = assets.scene('system');
+  const root = await assets.ships.upgrade(system, ship('a', 0), assets.fallback('a'));
+  const drone = await assets.ships.upgrade(system, ship('d', 40, { kind: 'drone', provider: 'codex' }), assets.fallback('d'));
+  assert.deepEqual([hullId(root), hullId(drone)], ['coded', 'coded']);
+  assert.deepEqual([built, assets.loads], [['coded'], []], 'one built container for the scene, and no hull file');
+  assert.deepEqual([root.children[0].rotation.y, root.children[0].scaling.x, root.children[0].children[0].position.z], [0, 0.1, -1]);
+  // In a near view a ship is its own copy of the container's meshes, wearing what the model gives its palette.
+  const parts = (node) => node.getChildMeshes(false).filter((mesh) => mesh.material);
+  assert.deepEqual(parts(root).map((mesh) => mesh.material.worn), ['coded claude #d97757 hull_primary', 'coded claude #d97757 accent_energy']);
+  assert.deepEqual(parts(drone).map((mesh) => mesh.material.worn), ['coded codex #f2f0ea hull_primary', 'coded codex #f2f0ea accent_energy']);
+  for (const mesh of [...parts(root), ...parts(drone)]) {
+    assert.ok(!(mesh instanceof assets.InstancedMesh) && mesh.layerMask === assets.models.LAYER, 'a copy, lit by the model lights only');
+  }
+
+  assert.equal(await assets.ships.refresh(system, ship('a', 3)), root, 'promoted in place');
+  assert.equal(hullId(root), 'mid');
+  assert.deepEqual(assets.loads, ['mid-near.glb']);
+  assert.ok(parts(root).every((mesh) => mesh.layerMask === 0x10000000 && !mesh.material.worn), 'a manifest hull wears the fleet livery');
+
+  const universe = assets.scene('universe');
+  const far = [];
+  for (const id of ['x', 'y']) far.push(await assets.ships.upgrade(universe, ship(id, 0), assets.fallback(id)));
+  assert.deepEqual(built, ['coded', 'coded'], 'one built container per scene');
+  const sources = far.map((entry) => parts(entry).map((mesh) => {
+    assert.ok(mesh instanceof assets.InstancedMesh && mesh.isVisible && mesh.layerMask === assets.models.LAYER);
+    return mesh.sourceMesh;
+  }));
+  assert.deepEqual(sources[0], sources[1], 'on the map the ships of a palette are instances of one template');
 });
 
 test('the universe instances far hulls from one template per provider; other views clone near hulls', async () => {
@@ -479,7 +529,7 @@ test('refresh waits while focus mode fades the ship and only applies the latest 
 
 test('the triangle budget steps near hulls down to far before falling back to the dart', async () => {
   const assets = loadShipAssets(LADDER_MANIFEST, {
-    'small-near.glb': 160000, 'small-far.glb': 60000, 'mid-near.glb': 240000, 'mid-far.glb': 80000, // a 400k budget
+    'small-near.glb': 360000, 'small-far.glb': 135000, 'mid-near.glb': 540000, 'mid-far.glb': 180000, // a 900k budget
   });
   const scene = assets.scene('system');
   const lods = [];
@@ -493,7 +543,7 @@ test('the triangle budget steps near hulls down to far before falling back to th
   roots[0].dispose();
   const freed = await assets.ships.upgrade(scene, ship('e', 0), assets.fallback('e'));
   assert.equal(freed.metadata.assetLod, 'near', 'a disposed hull returns its triangles');
-  // 160k + 60k + 160k are in use: the 240k near hull of the next rank does not
+  // 360k + 135k + 360k are in use: the 540k near hull of the next rank does not
   // fit, so the promoted ship takes that rank's far file.
   assert.equal(await assets.ships.refresh(scene, ship('b', 3)), roots[1]);
   assert.equal(hullId(roots[1]), 'mid');
