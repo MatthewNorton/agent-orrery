@@ -207,4 +207,16 @@ test('planet card: a planet that starts while a planet is opening reaches its ca
   assert.deepEqual([await open('p', null, () => app.refreshPlanetSystem('p')), asked], ['4', 3], 'a fetched system can be behind too');
   assert.deepEqual([await open('p', systemOf(1)), asked], ['1', 3], 'a planet from an earlier opening is not counted against this one');
   assert.deepEqual([state.planetSystem.awaited, state.planetSystem.missed], [null, false]);
+
+  // The planet could not be shown and the app fell back to the universe, which has no project:
+  // the planet that started meanwhile is nobody's to fetch, and is not held against the next opening.
+  state.current.view = 'system';
+  await app.requestPlanetSystem('p', systemOf(1));
+  app.refreshPlanetSystem('p');
+  Object.assign(state.current, { view: 'universe', projectId: null });
+  app.planetSystemOpened();
+  await settled();
+  assert.deepEqual([state.planetSystem.awaited, state.planetSystem.missed, asked], [null, false, 3]);
+  await app.refreshPlanetSystem(null);
+  assert.deepEqual([state.planetSystem.awaited, state.planetSystem.missed, asked], [null, false, 3]);
 });

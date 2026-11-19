@@ -236,11 +236,13 @@
   /**
    * A build that starts a planet in `projectId` changes a planet card's PLANETS row. For the open
    * planet, its system (S.planetSystem) is fetched again, one request at a time, and once more for
-   * a build that came while one was out; for a planet still opening, when it has opened.
-   * @param {string} projectId
+   * a build that came while one was out; for a planet still opening, when it has opened. No project
+   * (the planet could not be shown, and the app is back at the universe) is no planet's system.
+   * @param {string | null} projectId
    */
   A.refreshPlanetSystem = async function refreshPlanetSystem(projectId) {
     const held = S.planetSystem;
+    if (!projectId) return;
     if (projectId === held.awaited) held.missed = true;
     if (S.current.view !== 'planet' || S.current.projectId !== projectId) return;
     held.stale = true;
