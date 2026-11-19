@@ -142,7 +142,9 @@ AU.universeImport()                    -> Promise<{ok, canceled, added, merged, 
    // One JSON file: universe-state.json as the model stands plus the IDEAS queue's texts.
    // Import merges (larger build counts, earlier firstSeen, later lastActivity) and never
    // removes; new projects arrive as project-added events, imported ideas as new items.
-   // A bucket is a folder's name and is kept whatever it is (`__proto__`, `constructor`).
+   // A bucket is a folder's name and is kept whatever it is (`__proto__`, `constructor`), and so
+   // is a project id. A folder keeps one bucket: under a Windows path a count for `docs` merges
+   // into the project's `Docs`.
 ```
 
 ```js
@@ -215,8 +217,10 @@ PlanetData = { name, key, project: Project, builds, files, sizeKb, subdirs,
 //   folder that cannot be listed (when getSystem draws stand-ins). History: no builds at the cursor.
 // folderRead: live only. 'full'; 'partial' (the read stopped short, so files and size are
 //   floors); 'gone' (the folder is not there); 'none' (it is there and could not be read: locked,
-//   a passing error, or a link, which a planet read never follows out of the project: a linked
-//   folder is not opened, and a link inside one counts as a file of the link's own size).
+//   a passing error, or a link). A planet read reads nothing that resolves outside the project:
+//   a linked folder is not opened, a link inside one counts as a file of the link's own size, and
+//   each folder is resolved just before it is read, so one that turns out to be elsewhere (a
+//   junction lstat calls a folder, a folder swapped for a link) counts as one that cannot be read.
 //   Absent when there was no folder to read (procedural, or history).
 // builds, project: as they stand when the answer is made, after the folder was read. A project
 //   forgotten meanwhile answers null.
@@ -290,7 +294,9 @@ Design tokens (put in `:root`):
   entries that share a key each keep a row of their own),
   and the list stays scrolled where it was. A click opens the entry that was pressed
   (`A.wireListbox`): when the rows moved under a pointer that stayed put, the release lands on
-  another row and the pressed entry still opens. PROJECTS shares all of it. While an input method
+  another row and the pressed entry still opens. Entries that share a key are never told apart
+  by where they stand: the pressed one opens only while it is still listed, or is the one entry
+  with its key. PROJECTS shares all of it. While an input method
   composes text (`AUR.composing`), Enter, Escape and the arrows are its own. Escape, a click
   outside (pressed and released outside the dialog's own box with the main button, so a drag out
   of the field selecting text keeps it; Settings follows the same rule, `AUR.closeOnBackdrop`), a
@@ -553,8 +559,11 @@ Data: `AU.getSystem(projectId)`.
   ring (`AUR.MOTION.returnSeconds`). The `bucket` planet is the one whose `key` the build
   carries (`AUR.planetOfBuild`; the view keeps its planets by name). On `build` with
   `isNew: true` and no such planet: re-fetch `AU.getSystem` (the view's `systemData` follows),
-  one request at a time and once more for a planet that started while one was out, grow the new
-  planet in from zero, feed shows planet formation.
+  one request at a time and once more for a planet that started while one was out (also behind
+  a fetch that failed; three failures in a row rest until the next such build), grow the new
+  planet in from zero, feed shows planet formation. A folder is one planet whatever its casing:
+  one renamed in case only keeps the globe it has, under the name it was drawn with, until the
+  view is built again; a key gets a second globe only when the answer lists it twice.
   On `activity`: brief thruster flash.
 - Project card (top-left, panel): `PROJECT: <NAME>`; rows: `STATE` (any ship
   Building → `Building` in accent blue; else the busiest ship status; no ships →
