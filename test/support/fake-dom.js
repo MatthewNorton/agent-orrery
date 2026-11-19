@@ -35,16 +35,20 @@ function fakeElement(tag) {
   return element;
 }
 
-/** A document whose getElementById makes each element the first time it is asked for. */
-function fakeDocument() {
-  const byId = new Map();
-  return {
+/**
+ * A document whose getElementById makes each element the first time it is asked for. Given `ids`,
+ * the page holds those elements and no others.
+ */
+function fakeDocument(ids) {
+  const byId = new Map((ids || []).map((id) => [id, fakeElement('div')]));
+  return Object.assign(fakeElement('#document'), {
     createElement: fakeElement,
+    activeElement: null,
     getElementById(id) {
-      if (!byId.has(id)) byId.set(id, fakeElement('div'));
-      return byId.get(id);
+      if (!ids && !byId.has(id)) byId.set(id, fakeElement('div'));
+      return byId.get(id) || null;
     },
-  };
+  });
 }
 
 /** The text a node shows: its own, then its children's, in order. */

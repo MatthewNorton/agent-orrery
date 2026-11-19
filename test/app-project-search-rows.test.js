@@ -4,23 +4,16 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { runRenderer } = require('./support/renderer-source');
+const { runApp } = require('./support/renderer-source');
 const { fakeDocument, fakeElement, textOf, withClass } = require('./support/fake-dom');
 
 function setup() {
-  const document = fakeDocument();
-  const window = {};
-  runRenderer('util.js', { window, document });
-  const { AUR } = window;
-  AUR.ProjectVcsStatus = require('../src/renderer/components/project-vcs-status');
-  AUR.app = {
+  return runApp(['app/project/search-rows.js'], {
     state: { store: { projects: new Map(), ships: new Map() } },
     projectLabel: (project) => project.name || project.id,
     projectGalaxyLabel: (project) => (project.galaxy ? project.galaxy.label : ''),
     shipsInProject: () => [],
-  };
-  runRenderer('app/project/search-rows.js', { window, document });
-  return AUR.app;
+  }, { document: fakeDocument(), aur: { ProjectVcsStatus: require('../src/renderer/components/project-vcs-status') } }).app;
 }
 
 // What the rows built for `entries` show of their paths: [head, tail] each, and the row's title.

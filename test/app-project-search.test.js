@@ -4,44 +4,38 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { runRenderer } = require('./support/renderer-source');
-const { fakeElement } = require('./support/fake-dom');
+const { runApp } = require('./support/renderer-source');
+const { fakeDocument } = require('./support/fake-dom');
 
 // The page holds only the elements named in `ids`.
 function setup(ids) {
-  const elements = new Map(ids.map((id) => [id, fakeElement('div')]));
-  const document = { createElement: fakeElement, getElementById: (id) => elements.get(id) || null, activeElement: null };
-  const window = {};
-  runRenderer('util.js', { window, document });
-  const { AUR } = window;
-  AUR.ProjectVcsStatus = require('../src/renderer/components/project-vcs-status');
+  const document = fakeDocument(ids);
   const calls = [];
   const state = {
     store: { projects: new Map(), ships: new Map() },
     projectSearch: { els: null, filterEls: null, opener: null, timer: null, query: '', results: [], selected: 0, filter: 'all' },
     projectSettings: { open: false },
   };
-  AUR.app = {
+  const { app } = runApp(['app/project/search.js'], {
     state, const: { SEARCH_DEBOUNCE_MS: 10 },
     cancelListboxTimer() {},
     syncProjectMatches: () => calls.push('map'),
     refreshProjectDirectoryFromStore: () => calls.push('directory'),
-  };
-  runRenderer('app/project/search.js', { window, document });
-  return { app: AUR.app, state, elements, calls };
+  }, { document, aur: { ProjectVcsStatus: require('../src/renderer/components/project-vcs-status') } });
+  return { app, state, filter: document.getElementById('project-vcs-filter'), calls };
 }
 
 test('palette wiring: the GitHub filter works on a page without the palette', () => {
-  const { app, state, elements, calls } = setup(['project-vcs-filter', 'project-vcs-filter-count']);
+  const { app, state, filter, calls } = setup(['project-vcs-filter', 'project-vcs-filter-count']);
   app.wireProjectSearch();
   assert.equal(state.projectSearch.els, null, 'no palette is wired');
-  assert.equal(state.projectSearch.filterEls.filter, elements.get('project-vcs-filter'));
+  assert.equal(state.projectSearch.filterEls.filter, filter);
 
-  elements.get('project-vcs-filter').fire('click');
+  filter.fire('click');
   assert.equal(state.projectSearch.filter, 'github');
   assert.ok(calls.includes('directory'), 'PROJECTS follows the filter');
-  assert.equal(elements.get('project-vcs-filter').getAttribute('aria-pressed'), 'true');
-  elements.get('project-vcs-filter').fire('click');
+  assert.equal(filter.getAttribute('aria-pressed'), 'true');
+  filter.fire('click');
   assert.equal(state.projectSearch.filter, 'all');
   assert.equal(app.openProjectSearch(), false, 'and Go to has nothing to open');
 });
