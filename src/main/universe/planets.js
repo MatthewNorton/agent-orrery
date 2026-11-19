@@ -2,6 +2,7 @@
 'use strict';
 
 const { fnv1a, mulberry32 } = require('../shared/hash');
+const { planetKey } = require('../build-buckets');
 
 /** @import { Planet, Project, SystemData } from '../../types/contract' */
 
@@ -13,13 +14,14 @@ const STAND_IN = 'Sector-';
 const isStandInName = (name) => name.startsWith(STAND_IN);
 
 /**
- * A system's public shape, live and history alike: its planets cut to the ones the view draws, and
- * `planetTotal` when it has more.
- * @param {Project} project @param {Planet[]} planets biggest first @param {number} beltDensity
+ * A system's public shape, live and history alike: its planets cut to the ones the view draws, each
+ * with the key it is compared by, and `planetTotal` when it has more.
+ * @param {Project} project @param {Omit<Planet, 'key'>[]} planets biggest first @param {number} beltDensity
  * @returns {SystemData}
  */
 function systemData(project, planets, beltDensity) {
-  const data = { project, planets: planets.slice(0, SYSTEM_PLANETS), beltDensity };
+  const drawn = planets.slice(0, SYSTEM_PLANETS).map((planet) => ({ ...planet, key: planetKey(project, planet.name) }));
+  const data = { project, planets: drawn, beltDensity };
   return planets.length > SYSTEM_PLANETS ? { ...data, planetTotal: planets.length } : data;
 }
 

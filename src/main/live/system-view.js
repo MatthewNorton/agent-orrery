@@ -6,23 +6,18 @@
 const fs = require('fs');
 const path = require('path');
 const { fnv1a, mulberry32 } = require('../shared/hash');
-const { ignoresCase, relativeInside } = require('../path-safety');
-const { bucketBuilds, bucketKey } = require('../build-buckets');
+const { relativeInside } = require('../path-safety');
+const { bucketBuilds, bucketFor, matchingName, planetKey } = require('../build-buckets');
 const { isStandInName, proceduralSystem, systemData } = require('../universe/planets');
 const { liveProject } = require('../universe/public-shape');
 
 /**
  * @import { PlanetData, SystemData } from '../../types/contract'
- * @import { LiveModel, LiveProject } from '../../types/live-model'
+ * @import { LiveModel } from '../../types/live-model'
  */
 
 const SYSTEM_CACHE_MS = 30000;
-// A planet's folder read: at most 600 files and 300 folders, five levels deep. A folder left unread
-// for those limits is looked into, and the folders below it, at most 100 in all: one that holds a
-// file, or cannot be looked into, makes the counts floors and `folderRead` 'partial', as does a
-// folder below the planet's that cannot be read and a file whose size cannot. When the planet's
-// own folder is not there, 'gone'; when it is there and cannot be read (locked, or a passing error
-// such as too many open files), 'none'.
+// A planet's folder read: its limits, and how many folders left unread are looked into for a file.
 const READ_FILES = 600, READ_FOLDERS = 300, READ_LEVELS = 5, READ_PEEKS = 100;
 const IGNORE_DIRS = new Set([
   'node_modules', '.git', '.next', '.venv', 'venv', 'dist', 'build', 'out',
@@ -78,50 +73,40 @@ function getSystem(model, projectId) {
 async function getPlanet(model, projectId, planetName) {
   const project = model.projects.get(projectId);
   if (!project) return null;
+  // Security follow-up: own keys only; 'constructor'/'__proto__' must not return a non-cloneable prototype value.
+  const bucket = bucketFor(project, planetName);
   /** @param {string} name */
-  const base = (name) => ({
-    name,
-    project: liveProject(project),
-    // Security follow-up: own keys only; 'constructor'/'__proto__' must not return a non-cloneable prototype value.
-    builds: bucketBuilds(project, name),
-  });
+  const base = (name) => ({ name, key: planetKey(project, name), project: liveProject(project), builds: bucket.builds });
   // A stand-in's numbers are invented; the same project and name always get the same ones. With no
   // folder to name it, it answers to its bucket's key.
   const standIn = () => {
-    const named = bucketKey(project, planetName) ?? planetName;
-    const rand = mulberry32(fnv1a(projectId + named));
-    return { ...base(named), files: Math.floor(rand() * 200), sizeKb: Math.floor(rand() * 4000), subdirs: Math.floor(rand() * 9), resources: ['Unknown'], procedural: true };
+    const rand = mulberry32(fnv1a(projectId + bucket.name));
+    return { ...base(bucket.name), files: Math.floor(rand() * 200), sizeKb: Math.floor(rand() * 4000), subdirs: Math.floor(rand() * 9), resources: ['Unknown'], procedural: true };
   };
   if (!project.path || !project.exists) return standIn();
   // Security: planetName arrives over IPC. Only a single plain directory segment
   // is a planet; anything with separators or dot-segments could walk outside the project.
   const root = planetName === '(root)';
   if (!root && !isPlanetSegment(planetName)) return null;
-  const name = root ? planetName : await diskName(project, planetName);
+  const name = root ? planetName : await diskName(project.path, planetName) ?? bucket.name;
   const dir = root ? project.path : path.join(project.path, name);
   if (!root && relativeInside(project.path, dir) === null) return null;
   const read = await readFolder(dir, root);
   // A stand-in planet of a project without folders (universe/planets.js) has no folder and no builds.
-  if (read.folderRead === 'gone' && isStandInName(planetName) && bucketKey(project, planetName) === null) return standIn();
+  if (read.folderRead === 'gone' && isStandInName(planetName) && bucket.key === null) return standIn();
   return { ...base(name), ...read };
 }
 
 /**
- * The folder's name as the disk spells it. Under a Windows path a planet can be asked for in
- * another casing (a build bucket keeps the first casing it saw, or an older lower-cased key), and
- * the renderer seeds the globe from the name, so every casing has to open the planet the system
- * view draws. A folder that is gone answers to its bucket's key.
- * @param {LiveProject} project
+ * Folder `name` as the disk spells it, which names the planet and seeds its globe; null when gone.
+ * @param {string} root
  * @param {string} name
  */
-async function diskName(project, name) {
-  if (!ignoresCase(project.path)) return name;
-  const folded = name.toLowerCase();
+async function diskName(root, name) {
   /** @type {string[]} */
   let names = [];
-  try { names = await fs.promises.readdir(project.path); } catch { /* the bucket's key, below */ }
-  return names.includes(name) ? name
-    : names.find((entry) => entry.toLowerCase() === folded) ?? bucketKey(project, name) ?? name;
+  try { names = await fs.promises.readdir(root); } catch { /* gone, as far as a name goes */ }
+  return matchingName(names, name, root);
 }
 
 /**
@@ -136,6 +121,8 @@ async function readFolder(dir, root) {
   /** @type {'gone' | 'none' | null} */
   let failed = null;
   const exts = new Map();
+  /** @type {Promise<number | null>[]} one per counted file, awaited together after the walk */
+  const sizes = [];
   const list = (/** @type {string} */ d) => fs.promises.readdir(d, { withFileTypes: true });
 
   // Whether a folder the walk leaves unread holds a file at any depth, which the walk would count.
@@ -166,7 +153,6 @@ async function readFolder(dir, root) {
       else failed = error && (error.code === 'ENOENT' || error.code === 'ENOTDIR') ? 'gone' : 'none';
       return;
     }
-    const counted = [];
     for (const e of entries) {
       if (e.isDirectory()) {
         if (ignored(e.name)) continue;
@@ -181,19 +167,17 @@ async function readFolder(dir, root) {
         files++;
         const ext = path.extname(e.name).slice(1).toUpperCase() || 'MISC';
         exts.set(ext, (exts.get(ext) || 0) + 1);
-        counted.push(e.name);
+        sizes.push(fs.promises.stat(path.join(d, e.name)).then((stat) => stat.size, () => null));
       }
-    }
-    // Bytes, rounded once at the end: rounding each file made a folder of small files read 0 KB.
-    // A file whose size cannot be read leaves the size a floor.
-    const sizes = await Promise.all(counted.map((file) => (
-      fs.promises.stat(path.join(d, file)).then((stat) => stat.size, () => null))));
-    for (const size of sizes) {
-      if (size === null) partial = true;
-      else bytes += size;
     }
   };
   await walk(dir, 0);
+  // Bytes, rounded once at the end: rounding each file made a folder of small files read 0 KB.
+  // A file whose size cannot be read leaves the size a floor.
+  for (const size of await Promise.all(sizes)) {
+    if (size === null) partial = true;
+    else bytes += size;
+  }
   const resources = [...exts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k]) => k);
   // A planet whose own folder could not be read read nothing, which is no counts at all rather
   // than a floor of none. A floor is rounded down.

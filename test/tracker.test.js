@@ -220,11 +220,11 @@ test('claude: in-project edits emit build events and grow buckets; out-of-projec
   ], T0 + 4 * SEC);
 
   assert.deepEqual(Object.keys(ofType(events, 'build')[0]).sort(),
-    ['bucket', 'file', 'isNew', 'project', 'seq', 'shipId', 'ts', 'type']);
-  assert.deepEqual(ofType(events, 'build').map(pick(['project', 'bucket', 'file', 'shipId', 'isNew', 'ts'])), [
-    { project: SLUG, bucket: 'src', file: path.join('src', 'a.js'), shipId: SHIP_ID, isNew: true, ts: T0 + 1 * SEC },
-    { project: SLUG, bucket: 'src', file: path.join('src', 'b.js'), shipId: SHIP_ID, isNew: false, ts: T0 + 2 * SEC },
-    { project: SLUG, bucket: '(root)', file: 'notes.md', shipId: SHIP_ID, isNew: true, ts: T0 + 3 * SEC },
+    ['bucket', 'file', 'isNew', 'key', 'project', 'seq', 'shipId', 'ts', 'type']);
+  assert.deepEqual(ofType(events, 'build').map(pick(['project', 'bucket', 'key', 'file', 'shipId', 'isNew', 'ts'])), [
+    { project: SLUG, bucket: 'src', key: 'src', file: path.join('src', 'a.js'), shipId: SHIP_ID, isNew: true, ts: T0 + 1 * SEC },
+    { project: SLUG, bucket: 'src', key: 'src', file: path.join('src', 'b.js'), shipId: SHIP_ID, isNew: false, ts: T0 + 2 * SEC },
+    { project: SLUG, bucket: '(root)', key: '(root)', file: 'notes.md', shipId: SHIP_ID, isNew: true, ts: T0 + 3 * SEC },
   ]);
   assert.deepEqual(ofType(events, 'activity').map(pick(['tool', 'status', 'detail'])),
     [{ tool: 'Edit', status: 'Building', detail: 'x.js' }]);
@@ -241,8 +241,8 @@ test('claude: in-project edits emit build events and grow buckets; out-of-projec
   // previous count; the renderer counts build events itself.
   assert.deepEqual(ofType(events, 'ship-updated').map((event) => event.ship.builds), [0, 1, 2, 3]);
   assert.deepEqual(tracker.getSystem(SLUG).planets, [
-    { name: 'src', files: 0, builds: 2 },
-    { name: '(root)', files: 0, builds: 1 },
+    { name: 'src', key: 'src', files: 0, builds: 2 },
+    { name: '(root)', key: '(root)', files: 0, builds: 1 },
   ]);
 });
 
@@ -297,7 +297,7 @@ test('claude: a mixed-case top-level folder shows its builds on its planet (Wind
   ], T0 + 1 * SEC);
   assert.equal(session.tracker.snapshot().projects[0].totalBuilds, 1);
   assert.deepEqual(session.tracker.getSystem(SLUG).planets.find((planet) => planet.name === 'Docs'),
-    { name: 'Docs', files: 0, builds: 1 });
+    { name: 'Docs', key: 'docs', files: 0, builds: 1 });
 });
 
 test('claude: a lower-cased saved bucket and new builds share the folder\'s on-disk planet (Windows host)', {
@@ -308,12 +308,13 @@ test('claude: a lower-cased saved bucket and new builds share the folder\'s on-d
   const events = appendAndPoll(session, [
     claude.tool(session.dir, T0 + 1 * SEC, 'toolu_d', 'Write', { file_path: path.join(session.dir, 'Docs', 'guide.md') }),
   ], T0 + 1 * SEC);
-  assert.deepEqual(ofType(events, 'build').map(pick(['bucket', 'file', 'isNew'])),
-    [{ bucket: 'Docs', file: path.join('Docs', 'guide.md'), isNew: false }]);
+  // The build, the system's planet and the planet itself carry one key, whatever casing each has.
+  assert.deepEqual(ofType(events, 'build').map(pick(['bucket', 'key', 'file', 'isNew'])),
+    [{ bucket: 'Docs', key: 'docs', file: path.join('Docs', 'guide.md'), isNew: false }]);
   assert.deepEqual(session.tracker.getSystem(SLUG).planets.filter((planet) => planet.name.toLowerCase() === 'docs'),
-    [{ name: 'Docs', files: 0, builds: 3 }]);
+    [{ name: 'Docs', key: 'docs', files: 0, builds: 3 }]);
   // Asked for by the saved key, as the Go to palette's Folder row does: the planet the system draws.
-  assert.deepEqual(pick(['name', 'builds'])(await session.tracker.getPlanet(SLUG, 'docs')), { name: 'Docs', builds: 3 });
+  assert.deepEqual(pick(['name', 'key', 'builds'])(await session.tracker.getPlanet(SLUG, 'docs')), { name: 'Docs', key: 'docs', builds: 3 });
 });
 
 test('claude: Task and Agent tool_use launch drones that dock again on tool_result', (t) => {
@@ -942,19 +943,19 @@ test('snapshot(), getSystem() and getPlanet() public shapes for a project on dis
   assert.deepEqual(system, {
     project: snapshot.projects[0],
     planets: [
-      { name: 'src', files: 3, builds: 2 },
-      { name: '(root)', files: 3, builds: 1 },
-      { name: 'docs', files: 1, builds: 0 },
+      { name: 'src', key: 'src', files: 3, builds: 2 },
+      { name: '(root)', key: '(root)', files: 3, builds: 1 },
+      { name: 'docs', key: 'docs', files: 1, builds: 0 },
     ],
     beltDensity: 3,
   });
   assert.equal(tracker.getSystem('missing'), null);
 
   assert.deepEqual(await tracker.getPlanet(SLUG, 'src'), {
-    name: 'src', project: snapshot.projects[0], builds: 2, files: 3, sizeKb: 0, subdirs: 1, resources: ['JS'], folderRead: 'full',
+    name: 'src', key: 'src', project: snapshot.projects[0], builds: 2, files: 3, sizeKb: 0, subdirs: 1, resources: ['JS'], folderRead: 'full',
   });
   assert.deepEqual(await tracker.getPlanet(SLUG, '(root)'), {
-    name: '(root)', project: snapshot.projects[0], builds: 1, files: 3, sizeKb: 0, subdirs: 2, resources: ['MD', 'JSON'],
+    name: '(root)', key: '(root)', project: snapshot.projects[0], builds: 1, files: 3, sizeKb: 0, subdirs: 2, resources: ['MD', 'JSON'],
     folderRead: 'full',
   });
   const sector = await tracker.getPlanet(SLUG, 'Sector-1');
@@ -978,7 +979,7 @@ test('getSystem() and getPlanet() fall back to deterministic procedural planets 
   const system = first.getSystem(SLUG);
   assert.ok(system.planets.length >= 3 && system.planets.length <= 6, String(system.planets.length));
   system.planets.forEach((planet, index) => {
-    assert.deepEqual(Object.keys(planet).sort(), ['builds', 'files', 'name', 'procedural']);
+    assert.deepEqual(Object.keys(planet).sort(), ['builds', 'files', 'key', 'name', 'procedural']);
     assert.equal(planet.name, `Sector-${index + 1}`);
     assert.equal(planet.builds, 0);
     assert.equal(planet.procedural, true);
@@ -987,7 +988,7 @@ test('getSystem() and getPlanet() fall back to deterministic procedural planets 
 
   const planet = await first.getPlanet(SLUG, 'src');
   assert.deepEqual(Object.keys(planet).sort(),
-    ['builds', 'files', 'name', 'procedural', 'project', 'resources', 'sizeKb', 'subdirs']);
+    ['builds', 'files', 'key', 'name', 'procedural', 'project', 'resources', 'sizeKb', 'subdirs']);
   assert.deepEqual(await second.getPlanet(SLUG, 'src'), planet);
 });
 

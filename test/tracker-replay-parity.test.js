@@ -298,12 +298,12 @@ test('differs: getSystem — live lists folders on disk, replay lists build buck
   const { world, live, replay } = await runBoth(t);
   fs.writeFileSync(path.join(world.projectDir, 'src', 'a.js'), 'a');
   assert.deepEqual(live.tracker.getSystem(SLUG).planets, [
-    { name: 'src', files: 1, builds: 1 },
-    { name: '(root)', files: 0, builds: 1 },
+    { name: 'src', key: 'src', files: 1, builds: 1 },
+    { name: '(root)', key: '(root)', files: 0, builds: 1 },
   ]);
   assert.deepEqual(replay.source.getSystem(SLUG), {
     project: replay.snapshot.projects[0],
-    planets: [{ name: '(root)', files: 0, builds: 1 }, { name: 'src', files: 0, builds: 1 }],
+    planets: [{ name: '(root)', key: '(root)', files: 0, builds: 1 }, { name: 'src', key: 'src', files: 0, builds: 1 }],
     beltDensity: 0,
   });
 });

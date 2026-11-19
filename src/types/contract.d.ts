@@ -65,8 +65,16 @@ export interface FeedEntry {
   ts: number;
 }
 
+/**
+ * What main compares a planet by (build-buckets.js planetKey): the same for a folder, its bucket
+ * and every build in it, in whatever casing each was written. Match on it with `===`; it is not a
+ * name to show.
+ */
+export type PlanetKey = string;
+
 export interface Planet {
   name: string;
+  key: PlanetKey;
   files: number;
   builds: number;
   procedural?: boolean;
@@ -88,6 +96,7 @@ export interface PlanetData {
    * case from the name asked for.
    */
   name: string;
+  key: PlanetKey;
   project: Project;
   builds: number;
   files: number;
@@ -197,10 +206,12 @@ export interface BuildEvent extends Sequenced {
   /** Project id. */
   project: string;
   /**
-   * The edit's top-level folder as the edit wrote it, or '(root)'. Under a Windows path it can
-   * differ in case from its planet's name and its bucket's key; AUR.folderKey compares them.
+   * The edit's top-level folder as the edit wrote it, or '(root)': a name to show. Under a Windows
+   * path it can differ in case from its planet's name, so the planet is found by `key`.
    */
   bucket: string;
+  /** The key of the planet this build is in. */
+  key: PlanetKey;
   file: string;
   shipId: string;
   /** True when this build forms a new planet. */

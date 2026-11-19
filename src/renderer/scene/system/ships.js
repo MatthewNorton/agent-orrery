@@ -12,7 +12,6 @@
     const SIZE = AUR.SHIP_SIZE.system;
     const STANDOFF = 0.9;        // clear water between a planet's surface and a ship at work
     const BELT_CLEARANCE = 0.9;  // and between the belt's outer edge and the patrol ring
-    const root = view.sys.project.path;
     const shipLookTarget = new BABYLON.Vector3();
     const standoff = new BABYLON.Vector3();
     let refetching = false;
@@ -150,7 +149,7 @@
         } else if (ev.type === 'ship-departed') {
           removeShip(ev.shipId);
         } else if (ev.type === 'build' && ev.project === projectId) {
-          const pr = planetOf(ev.bucket);
+          const pr = planets.get(ev.key);
           const sh = ships.get(ev.shipId);
           if (ev.isNew && !pr) { refetchPlanets(); }
           if (pr) {
@@ -170,16 +169,6 @@
       }
     }
 
-    // A build's planet: its folder's, in any casing under a Windows path, where main keeps one
-    // bucket for them all and names the planet as the disk does (AUR.folderKey).
-    function planetOf(bucket) {
-      const exact = planets.get(bucket);
-      if (exact) return exact;
-      const key = AUR.folderKey(root, bucket);
-      for (const p of planets.values()) if (AUR.folderKey(root, p.name) === key) return p;
-      return null;
-    }
-
     function refetchPlanets() {
       if (refetching) return;
       refetching = true;
@@ -188,7 +177,7 @@
         if (!ns) return;
         view.sys = ns;
         ns.planets.forEach((pd, i) => {
-          if (!planets.has(pd.name)) {
+          if (!planets.has(pd.key)) {
             const rec = view.buildPlanet(pd, i);
             rec.appear = 0.01;
           }

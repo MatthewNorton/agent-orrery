@@ -5,7 +5,7 @@
 
 const path = require('path');
 const { relativeInside } = require('../path-safety');
-const { bucketOf, countBuild } = require('../build-buckets');
+const { bucketOf, countBuild, planetKey } = require('../build-buckets');
 const { queue, pushFeed } = require('./events');
 const { countBuild: countHistogramBuild } = require('../shared/build-histogram');
 
@@ -31,7 +31,7 @@ function addBuild(model, project, ship, rel, ts, catchup) {
   countHistogramBuild(model.buildHistogram, ts);
   if (catchup) return;
   queue(model, {
-    type: 'build', project: project.id, bucket, file: rel,
+    type: 'build', project: project.id, bucket, key: planetKey(project, bucket), file: rel,
     shipId: ship.id, isNew, ts,
   });
   if (isNew) pushFeed(model, 'form', `Planet formation started: ${bucket} in ${project.name}`, project.id);

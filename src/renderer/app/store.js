@@ -63,8 +63,7 @@
         // that starts a planet changes how many its system has.
         const pd = A.activePlanetData();
         if (pd && ev.project === S.current.projectId) {
-          const root = p && p.path;
-          if (AUR.folderKey(root, ev.bucket) === AUR.folderKey(root, pd.name)) pd.builds = (pd.builds || 0) + 1;
+          if (ev.key === pd.key) pd.builds = (pd.builds || 0) + 1;
           if (ev.isNew) A.refreshPlanetSystem();
         }
         // A ship-updated can precede the build it reports (and Codex patches

@@ -9,7 +9,7 @@ const path = require('path');
 const { canonicalProjectPath, isLocalProjectPath } = require('../provider-adapters');
 const { fnv1a, hex8, mulberry32 } = require('../shared/hash');
 const { relativeInside } = require('../path-safety');
-const { bucketOf, bucketKey, countBuild, bucketBuilds } = require('../build-buckets');
+const { bucketOf, bucketFor, countBuild, planetKey } = require('../build-buckets');
 const { safeId, safePath } = require('../transcripts/fields');
 const { proceduralSystem, systemData } = require('../universe/planets');
 const { historyProject, historyShip } = require('../universe/public-shape');
@@ -184,7 +184,7 @@ function createHistoryModel({ batchSize, onBatch, preferredProjectId }) {
       project.totalBuilds++;
       ship.builds++;
       queue({
-        type: 'build', project: project.id, bucket, file: relative,
+        type: 'build', project: project.id, bucket, key: planetKey(project, bucket), file: relative,
         shipId: ship.id, isNew, ts,
       }, emit);
       if (isNew) pushFeed('form',
@@ -265,15 +265,15 @@ function createHistoryModel({ batchSize, onBatch, preferredProjectId }) {
   function getPlanet(projectId, planetName) {
     const project = state.projects.get(projectId);
     if (!project || typeof planetName !== 'string') return null;
-    const builds = bucketBuilds(project, planetName);
-    const key = bucketKey(project, planetName);
-    const procedural = key === null;
+    const bucket = bucketFor(project, planetName);
+    const procedural = bucket.key === null;
     const rand = mulberry32(fnv1a(`${projectId}:${planetName}`));
     return {
       // By its bucket's key, the name the system view draws it under, whatever casing asked for it.
-      name: key ?? planetName,
+      name: bucket.name,
+      key: planetKey(project, bucket.name),
       project: historyProject(project),
-      builds,
+      builds: bucket.builds,
       files: procedural ? Math.floor(rand() * 160) : 0,
       sizeKb: procedural ? Math.floor(rand() * 3200) : 0,
       subdirs: procedural ? Math.floor(rand() * 8) : 0,

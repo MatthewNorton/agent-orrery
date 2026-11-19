@@ -204,17 +204,17 @@ test('replay: getSystem() and getPlanet() derive planets from build buckets only
   const { source } = await historyAt(t);
   await source.seek(T0 + 31 * SEC);
   const early = source.getSystem(SLUG);
-  assert.deepEqual(early.planets, [{ name: 'src', files: 0, builds: 1 }]);
+  assert.deepEqual(early.planets, [{ name: 'src', key: 'src', files: 0, builds: 1 }]);
 
   await source.seek(END);
   const system = source.getSystem(SLUG);
   assert.deepEqual(system, {
     project: source.snapshot().projects[0],
-    planets: [{ name: 'docs', files: 0, builds: 1 }, { name: 'src', files: 0, builds: 1 }],
+    planets: [{ name: 'docs', key: 'docs', files: 0, builds: 1 }, { name: 'src', key: 'src', files: 0, builds: 1 }],
     beltDensity: 0,
   });
   assert.deepEqual(source.getPlanet(SLUG, 'src'), {
-    name: 'src', project: system.project, builds: 1, files: 0, sizeKb: 0, subdirs: 0, resources: [], procedural: false,
+    name: 'src', key: 'src', project: system.project, builds: 1, files: 0, sizeKb: 0, subdirs: 0, resources: [], procedural: false,
   });
   const unknown = source.getPlanet(SLUG, 'Sector-1');
   assert.equal(unknown.procedural, true);

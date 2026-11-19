@@ -5,27 +5,22 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
-const os = require('node:os');
 const path = require('node:path');
 const { getSystem, getPlanet, isPlanetSegment, IGNORE_DIRS } = require('../src/main/live/system-view');
+const { liveProject, tempDir } = require('./support/main-wiring');
 
 // `files` are written; a path ending in '/' is an empty folder. `under` nests the project below the
 // temp folder: 'case\\root' gives it a Windows-style path on every host (one folder with a
 // backslash in its name on POSIX), so folder names compare in any case.
 function projectOnDisk(t, files, buckets = {}, under = '') {
-  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'au-live-system-'));
-  t.after(() => fs.rmSync(temp, { recursive: true, force: true }));
-  const root = path.join(temp, under);
+  const root = path.join(tempDir(t, 'au-live-system-'), under);
   fs.mkdirSync(root, { recursive: true });
   for (const rel of files) {
     if (rel.endsWith('/')) { fs.mkdirSync(path.join(root, rel), { recursive: true }); continue; }
     fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true });
     fs.writeFileSync(path.join(root, rel), 'x');
   }
-  const project = {
-    id: 'p', path: root, name: path.basename(root), exists: true,
-    lastActivity: 0, totalBytes: 0, buckets, totalBuilds: 0, firstSeen: 0,
-  };
+  const project = liveProject('p', root, { totalBytes: 0, buckets, totalBuilds: 0, firstSeen: 0 });
   const model = { projects: new Map([['p', project]]), systemCache: new Map() };
   return { root, project, model };
 }
@@ -52,9 +47,9 @@ test('live system view: planets are top-level folders ranked by files plus five 
 
   const system = getSystem(model, 'p');
   assert.deepEqual(system.planets, [
-    { name: 'small', files: 3, builds: 2 },
-    { name: '(root)', files: 2, builds: 1 },
-    { name: 'big', files: 5, builds: 0 },
+    { name: 'small', key: 'small', files: 3, builds: 2 },
+    { name: '(root)', key: '(root)', files: 2, builds: 1 },
+    { name: 'big', key: 'big', files: 5, builds: 0 },
   ]);
   assert.equal(system.beltDensity, 2);
   assert.equal(system.project.id, 'p');
@@ -209,22 +204,26 @@ test('live system view: a stand-in planet is one without a folder or builds, wha
 
 test('live system view: under a Windows path a planet answers to any casing, by the name on disk', async (t) => {
   const { model } = projectOnDisk(t, ['Docs/a.md', 'Docs/b.md', 'src/a.js'], { docs: 3, Gone: 2 }, 'case\\root');
-  assert.deepEqual(getSystem(model, 'p').planets.map((planet) => [planet.name, planet.builds]), [['Docs', 3], ['src', 0]]);
+  // One key for the folder, in the system and in the planet, whatever casing asked for it.
+  assert.deepEqual(getSystem(model, 'p').planets.map((planet) => [planet.name, planet.key, planet.builds]),
+    [['Docs', 'docs', 3], ['src', 'src', 0]]);
   for (const asked of ['Docs', 'docs', 'DOCS']) {
     const planet = await getPlanet(model, 'p', asked);
-    assert.deepEqual([planet.name, planet.files, planet.builds, planet.folderRead], ['Docs', 2, 3, 'full'], asked);
+    assert.deepEqual([planet.name, planet.key, planet.files, planet.builds, planet.folderRead], ['Docs', 'docs', 2, 3, 'full'], asked);
   }
   const gone = await getPlanet(model, 'p', 'GONE');
-  assert.deepEqual([gone.name, gone.builds, gone.folderRead], ['Gone', 2, 'gone'], 'a folder that is gone answers to its bucket key');
+  assert.deepEqual([gone.name, gone.key, gone.builds, gone.folderRead], ['Gone', 'gone', 2, 'gone'],
+    'a folder that is gone answers to its bucket key');
   const neither = await getPlanet(model, 'p', 'Nowhere');
-  assert.deepEqual([neither.name, neither.builds, neither.folderRead], ['Nowhere', 0, 'gone']);
+  assert.deepEqual([neither.name, neither.key, neither.builds, neither.folderRead], ['Nowhere', 'nowhere', 0, 'gone']);
 });
 
 test('live system view: under a POSIX path a planet keeps the name it was asked for', async (t) => {
   const { model } = projectOnDisk(t, ['Docs/a.md'], { Docs: 1 });
   if (path.sep === '\\') return t.skip('a temp folder on Windows has a Windows path');
-  assert.equal((await getPlanet(model, 'p', 'Docs')).name, 'Docs');
-  assert.deepEqual([(await getPlanet(model, 'p', 'docs')).name, (await getPlanet(model, 'p', 'docs')).builds], ['docs', 0]);
+  assert.deepEqual([(await getPlanet(model, 'p', 'Docs')).name, getSystem(model, 'p').planets[0].key], ['Docs', 'Docs']);
+  const other = await getPlanet(model, 'p', 'docs');
+  assert.deepEqual([other.name, other.key, other.builds], ['docs', 'docs', 0]);
 });
 
 test('live system view: a planet name is one plain path segment', () => {
