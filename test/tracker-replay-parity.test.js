@@ -171,9 +171,25 @@ test('agree: one folder written in two casings under a Windows-style root keeps 
     assert.deepEqual(ofType(side.events, 'build').map(pick(['bucket', 'isNew'])),
       [{ bucket: 'Docs', isNew: true }, { bucket: 'docs', isNew: false }]);
   }
-  assert.equal(live.tracker.getPlanet(SLUG, 'DOCS').builds, 2);
+  assert.deepEqual(pick(['name', 'builds'])(await live.tracker.getPlanet(SLUG, 'DOCS')), { name: 'Docs', builds: 2 });
   assert.deepEqual(replay.snapshot.projects[0].buckets, { Docs: 2 });
-  assert.equal(replay.source.getPlanet(SLUG, 'DOCS').builds, 2);
+  assert.deepEqual(pick(['name', 'builds'])(replay.source.getPlanet(SLUG, 'DOCS')), { name: 'Docs', builds: 2 },
+    'by the bucket key, which the replay system view draws it under');
+});
+
+test('agree: a system of more than eight planets keeps the biggest eight and says of how many', async (t) => {
+  const { live, replay } = await runBoth(t, {
+    records: (dir) => {
+      for (let index = 0; index < 10; index++) fs.mkdirSync(path.join(dir, `dir${index}`));
+      return [claude.prompt(dir, T0), ...Array.from({ length: 10 }, (_, index) => (
+        claude.tool(dir, T0 + (index + 1) * SEC, `toolu_${index}`, 'Write', { file_path: path.join(dir, `dir${index}`, 'a.js') })))];
+    },
+  });
+  // Live counts the folders on disk, the fixture's own src among them; history, the folders built in.
+  const live8 = live.tracker.getSystem(SLUG), replay8 = replay.source.getSystem(SLUG);
+  assert.deepEqual([live8.planets.length, live8.planetTotal], [8, 11]);
+  assert.deepEqual([replay8.planets.length, replay8.planetTotal], [8, 10]);
+  assert.equal(live8.planets.some((planet) => planet.name === 'src'), false, 'the one without builds is past the eighth');
 });
 
 // ---------- Claude: where the models differ today ----------

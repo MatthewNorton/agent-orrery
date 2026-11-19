@@ -149,7 +149,7 @@ class Tracker extends EventEmitter {
   /**
    * @param {string} projectId
    * @param {string} planetName
-   * @returns {PlanetData | null}
+   * @returns {Promise<PlanetData | null>}
    */
   getPlanet(projectId, planetName) {
     return getPlanet(this.model, projectId, planetName);

@@ -156,7 +156,7 @@ if (failures.length === 0) {
     const expected = { key: 'workspace:personal', label: 'Personal' };
     same(tracker.snapshot().projects[0].galaxy, expected, 'snapshot galaxy');
     same(tracker.getSystem(raw.id).project.galaxy, expected, 'system galaxy');
-    same(tracker.getPlanet(raw.id, 'Sector-1').project.galaxy, expected, 'planet galaxy');
+    same((await tracker.getPlanet(raw.id, 'Sector-1')).project.galaxy, expected, 'planet galaxy');
 
     const latePath = path.join(integrationRoot, 'workspace', 'code', 'research', 'late');
     fs.mkdirSync(latePath, { recursive: true });

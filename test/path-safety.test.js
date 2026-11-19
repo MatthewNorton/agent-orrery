@@ -41,11 +41,17 @@ test('canonicalProjectPath refuses network and device paths from transcripts', (
 
 function withTempRoot(run) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'au-path-safety-'));
+  const done = () => fs.rmSync(root, { recursive: true, force: true });
+  let result;
   try {
-    return run(root);
-  } finally {
-    fs.rmSync(root, { recursive: true, force: true });
+    result = run(root);
+  } catch (error) {
+    done();
+    throw error;
   }
+  if (result instanceof Promise) return result.finally(done);
+  done();
+  return result;
 }
 
 test('tracker readCwd drops a UNC cwd and never marks the project as existing', () => {
@@ -67,7 +73,7 @@ test('tracker readCwd drops a UNC cwd and never marks the project as existing', 
 });
 
 test('getPlanet refuses traversal segments and only walks inside the project', () => {
-  withTempRoot((root) => {
+  return withTempRoot(async (root) => {
     const project = path.join(root, 'project');
     fs.mkdirSync(path.join(project, 'src'), { recursive: true });
     fs.mkdirSync(path.join(root, 'secret'), { recursive: true });
@@ -81,10 +87,10 @@ test('getPlanet refuses traversal segments and only walks inside the project', (
       id: 'p1', path: project, name: 'project', exists: true, buckets: {}, lastActivity: 0,
       totalBytes: 0, totalBuilds: 0, firstSeen: 0,
     });
-    const inside = tracker.getPlanet('p1', 'src');
+    const inside = await tracker.getPlanet('p1', 'src');
     assert.equal(inside.files, 1);
     for (const evil of ['..', '../secret', '..\\secret', 'src/../../secret', '/secret', 'C:\\Windows']) {
-      assert.equal(tracker.getPlanet('p1', evil), null, evil);
+      assert.equal(await tracker.getPlanet('p1', evil), null, evil);
     }
   });
 });
@@ -143,18 +149,18 @@ test('ensureProjectForPath trims a leading-space cwd instead of throwing', () =>
 });
 
 test('getPlanet ignores inherited property names and returns a cloneable result', () => {
-  withTempRoot((root) => {
+  return withTempRoot(async (root) => {
     const tracker = isolatedTracker(root);
     tracker.projects.set('p1', {
       id: 'p1', path: null, name: 'project', exists: false, buckets: { src: 3 }, lastActivity: 0,
       totalBytes: 0, totalBuilds: 3, firstSeen: 0,
     });
     for (const name of ['constructor', '__proto__', 'toString']) {
-      const planet = tracker.getPlanet('p1', name);
+      const planet = await tracker.getPlanet('p1', name);
       assert.equal(planet.builds, 0, name);
       assert.equal(structuredClone(planet).builds, 0, name);
     }
-    assert.equal(tracker.getPlanet('p1', 'src').builds, 3);
+    assert.equal((await tracker.getPlanet('p1', 'src')).builds, 3);
   });
 });
 

@@ -11,7 +11,7 @@ const { fnv1a, hex8, mulberry32 } = require('../shared/hash');
 const { relativeInside } = require('../path-safety');
 const { bucketOf, bucketKey, countBuild, bucketBuilds } = require('../build-buckets');
 const { safeId, safePath } = require('../transcripts/fields');
-const { proceduralSystem } = require('../universe/planets');
+const { proceduralSystem, systemData } = require('../universe/planets');
 const { historyProject, historyShip } = require('../universe/public-shape');
 const { createShipRecord } = require('../universe/ships');
 const { applyRecord } = require('./apply-record');
@@ -252,10 +252,9 @@ function createHistoryModel({ batchSize, onBatch, preferredProjectId }) {
     if (!project) return null;
     let planets = Object.entries(project.buckets)
       .map(([name, builds]) => ({ name, files: 0, builds }))
-      .sort((a, b) => b.builds - a.builds || a.name.localeCompare(b.name))
-      .slice(0, 8);
+      .sort((a, b) => b.builds - a.builds || a.name.localeCompare(b.name));
     if (planets.length === 0) planets = proceduralSystem(projectId).planets;
-    return { project: historyProject(project), planets, beltDensity: 0 };
+    return systemData(historyProject(project), planets, 0);
   }
 
   /**
@@ -267,10 +266,12 @@ function createHistoryModel({ batchSize, onBatch, preferredProjectId }) {
     const project = state.projects.get(projectId);
     if (!project || typeof planetName !== 'string') return null;
     const builds = bucketBuilds(project, planetName);
-    const procedural = bucketKey(project, planetName) === null;
+    const key = bucketKey(project, planetName);
+    const procedural = key === null;
     const rand = mulberry32(fnv1a(`${projectId}:${planetName}`));
     return {
-      name: planetName,
+      // By its bucket's key, the name the system view draws it under, whatever casing asked for it.
+      name: key ?? planetName,
       project: historyProject(project),
       builds,
       files: procedural ? Math.floor(rand() * 160) : 0,

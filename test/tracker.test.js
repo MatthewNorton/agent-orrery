@@ -273,13 +273,14 @@ test('claude: build file paths under a Windows-style root keep their own casing'
     [path.join('Docs', 'Guide.md'), path.join('Src', 'A.js')]);
 });
 
-test('claude: under a Windows-style root, builds merge into the lower-cased buckets earlier versions saved', (t) => {
+test('claude: under a Windows-style root, builds merge into the lower-cased buckets earlier versions saved', async (t) => {
   const { world, tracker, builds } = windowsRootBuilds(t, {
     [WINDOWS_SLUG]: { buckets: { docs: 2 }, totalBuilds: 2, firstSeen: T0 - MIN },
   });
   assert.deepEqual(builds.map(pick(['bucket', 'isNew'])),
     [{ bucket: 'Docs', isNew: false }, { bucket: 'Src', isNew: true }]);
-  assert.deepEqual(['Docs', 'docs', 'DOCS'].map((name) => tracker.getPlanet(WINDOWS_SLUG, name).builds), [3, 3, 3]);
+  const planets = await Promise.all(['Docs', 'docs', 'DOCS'].map((name) => tracker.getPlanet(WINDOWS_SLUG, name)));
+  assert.deepEqual(planets.map((planet) => planet.builds), [3, 3, 3]);
   tracker.saveState();
   const saved = JSON.parse(fs.readFileSync(world.statePath, 'utf8')).projects[WINDOWS_SLUG];
   assert.deepEqual(pick(['buckets', 'totalBuilds'])(saved), { buckets: { docs: 3, Src: 1 }, totalBuilds: 4 },
@@ -301,7 +302,7 @@ test('claude: a mixed-case top-level folder shows its builds on its planet (Wind
 
 test('claude: a lower-cased saved bucket and new builds share the folder\'s on-disk planet (Windows host)', {
   skip: process.platform !== 'win32' && 'needs a Windows-rooted project on disk',
-}, (t) => {
+}, async (t) => {
   const session = startClaude(t, { saved: { [SLUG]: { buckets: { docs: 2 }, totalBuilds: 2, firstSeen: T0 - MIN } } });
   fs.mkdirSync(path.join(session.dir, 'Docs'));
   const events = appendAndPoll(session, [
@@ -311,7 +312,8 @@ test('claude: a lower-cased saved bucket and new builds share the folder\'s on-d
     [{ bucket: 'Docs', file: path.join('Docs', 'guide.md'), isNew: false }]);
   assert.deepEqual(session.tracker.getSystem(SLUG).planets.filter((planet) => planet.name.toLowerCase() === 'docs'),
     [{ name: 'Docs', files: 0, builds: 3 }]);
-  assert.equal(session.tracker.getPlanet(SLUG, 'Docs').builds, 3);
+  // Asked for by the saved key, as the Go to palette's Folder row does: the planet the system draws.
+  assert.deepEqual(pick(['name', 'builds'])(await session.tracker.getPlanet(SLUG, 'docs')), { name: 'Docs', builds: 3 });
 });
 
 test('claude: Task and Agent tool_use launch drones that dock again on tool_result', (t) => {
@@ -907,7 +909,7 @@ test('signal: an idle Signal ship warps out once and returns, renamed, only when
 
 // ---------- Derived views and persistence ----------
 
-test('snapshot(), getSystem() and getPlanet() public shapes for a project on disk', (t) => {
+test('snapshot(), getSystem() and getPlanet() public shapes for a project on disk', async (t) => {
   const world = createWorld(t);
   const dir = world.projectDir;
   for (const [rel, text] of [
@@ -948,20 +950,20 @@ test('snapshot(), getSystem() and getPlanet() public shapes for a project on dis
   });
   assert.equal(tracker.getSystem('missing'), null);
 
-  assert.deepEqual(tracker.getPlanet(SLUG, 'src'), {
+  assert.deepEqual(await tracker.getPlanet(SLUG, 'src'), {
     name: 'src', project: snapshot.projects[0], builds: 2, files: 3, sizeKb: 0, subdirs: 1, resources: ['JS'], folderRead: 'full',
   });
-  assert.deepEqual(tracker.getPlanet(SLUG, '(root)'), {
+  assert.deepEqual(await tracker.getPlanet(SLUG, '(root)'), {
     name: '(root)', project: snapshot.projects[0], builds: 1, files: 3, sizeKb: 0, subdirs: 2, resources: ['MD', 'JSON'],
     folderRead: 'full',
   });
-  const sector = tracker.getPlanet(SLUG, 'Sector-1');
+  const sector = await tracker.getPlanet(SLUG, 'Sector-1');
   assert.equal(sector.procedural, true);
   assert.deepEqual(sector.resources, ['Unknown']);
-  assert.equal(tracker.getPlanet('missing', 'src'), null);
+  assert.equal(await tracker.getPlanet('missing', 'src'), null);
 });
 
-test('getSystem() and getPlanet() fall back to deterministic procedural planets for a missing path', (t) => {
+test('getSystem() and getPlanet() fall back to deterministic procedural planets for a missing path', async (t) => {
   const world = createWorld(t);
   const gone = path.join(world.root, 'workspace', 'gone');
   appendJsonl(world.claudeFile(), [claude.prompt(gone, T0)], T0);
@@ -983,10 +985,10 @@ test('getSystem() and getPlanet() fall back to deterministic procedural planets 
   });
   assert.deepEqual(second.getSystem(SLUG), system, 'seeded only by the project id');
 
-  const planet = first.getPlanet(SLUG, 'src');
+  const planet = await first.getPlanet(SLUG, 'src');
   assert.deepEqual(Object.keys(planet).sort(),
     ['builds', 'files', 'name', 'procedural', 'project', 'resources', 'sizeKb', 'subdirs']);
-  assert.deepEqual(second.getPlanet(SLUG, 'src'), planet);
+  assert.deepEqual(await second.getPlanet(SLUG, 'src'), planet);
 });
 
 test('saveState()/loadState() round-trip buckets, totals, firstSeen and path ids', (t) => {

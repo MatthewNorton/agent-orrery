@@ -74,11 +74,19 @@ export interface Planet {
 
 export interface SystemData {
   project: Project;
+  /** The planets the system view draws: the biggest, at most 8 (universe/planets.js). */
   planets: Planet[];
   beltDensity: number;
+  /** How many planets the project has, when that is more than `planets` holds. */
+  planetTotal?: number;
 }
 
 export interface PlanetData {
+  /**
+   * The planet's name as the system view draws it, which seeds its globe: live, the folder's name
+   * as the disk spells it; in history, its bucket's key. Under a Windows path it can differ in
+   * case from the name asked for.
+   */
   name: string;
   project: Project;
   builds: number;
@@ -87,14 +95,19 @@ export interface PlanetData {
   subdirs: number;
   /** Top file extensions, upper case. */
   resources: string[];
+  /**
+   * A stand-in whose folder numbers are invented. Live: the project has no folder on disk, or the
+   * planet is a stand-in of a project without folders. History: no builds at the cursor.
+   */
   procedural?: boolean;
   /**
-   * Live only, how far main read the folder (live/system-view.js): 'partial' when a read limit or an
-   * unreadable folder below it cut it short, so files and size are floors; 'none' when the folder
-   * itself is gone or locked. Absent when there was no folder to read: a procedural planet's numbers
-   * are invented, and history never reads the disk.
+   * Live only, how far main read the folder (live/system-view.js): 'partial' when a read limit left
+   * a folder holding a file unread, or a folder below it or a file's size could not be read, so files
+   * and size are floors; 'gone' when the folder itself is not there; 'none' when it is there and
+   * could not be read (locked, or a passing error). Absent when there was no folder to read: a
+   * procedural planet's numbers are invented, and history never reads the disk.
    */
-  folderRead?: 'full' | 'partial' | 'none';
+  folderRead?: 'full' | 'partial' | 'none' | 'gone';
 }
 
 /** Bounded by main (replay-control.js): unknown times are null; in LIVE, playing is false and cursorTs is maxTs once known. */
@@ -183,7 +196,10 @@ export interface BuildEvent extends Sequenced {
   type: 'build';
   /** Project id. */
   project: string;
-  /** Planet name. */
+  /**
+   * The edit's top-level folder as the edit wrote it, or '(root)'. Under a Windows path it can
+   * differ in case from its planet's name and its bucket's key; AUR.folderKey compares them.
+   */
   bucket: string;
   file: string;
   shipId: string;
