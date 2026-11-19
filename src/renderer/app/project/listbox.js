@@ -24,6 +24,22 @@
   };
 
   /**
+   * Each entry's row key: `keyOf`, and where entries share one, a count after it.
+   * Security: the rows are told apart by these, so two entries with one key must not share a row.
+   * @returns {string[]}
+   */
+  function rowKeys(results, keyOf) {
+    const used = new Set();
+    return results.map((entry) => {
+      const key = String(keyOf(entry));
+      let own = key;
+      for (let n = 2; used.has(own); n++) own = key + '\0' + n;
+      used.add(own);
+      return own;
+    });
+  }
+
+  /**
    * The field's keys and the list's clicks. Escape runs `escape`; arrows move the selection
    * (`select` shows it) and Enter activates it, once a pending query has run. While an input method
    * composes text the keys are its own: Enter commits the text and Escape cancels it. A click
@@ -45,7 +61,7 @@
       const stayed = pressed && Math.abs(event.clientX - pressed.x) < PRESS_SLOP && Math.abs(event.clientY - pressed.y) < PRESS_SLOP;
       const key = stayed ? pressed.key : rowKey(event);
       pressed = null;
-      const index = key == null ? -1 : state.results.findIndex((entry) => String(keyOf(entry)) === key);
+      const index = key == null ? -1 : rowKeys(state.results, keyOf).indexOf(key);
       if (index >= 0) activate(index);
     });
     input.addEventListener('keydown', (event) => {
@@ -113,7 +129,7 @@
       const old = kids[i];
       if (!old) node.appendChild(child);
       else if (old.nodeName !== child.nodeName) node.replaceChild(child, old);
-      else if (old instanceof Element) adopt(old, /** @type {Element} */ (child));
+      else if (old.nodeType === 1) adopt(/** @type {Element} */ (old), /** @type {Element} */ (child));
       else if (old.nodeValue !== child.nodeValue) old.nodeValue = child.nodeValue;
     });
     for (const extra of kids.slice(next.length)) extra.remove();
@@ -136,26 +152,29 @@
     const was = list.querySelector('[aria-selected="true"]');
     const rows = /** @type {HTMLElement[]} */ ([...list.children]);
     const held = new Map(rows.map((row) => [row.dataset.key, row]));
-    const listed = new Set(state.results.map((entry) => String(opts.keyOf(entry))));
+    const keys = rowKeys(state.results, opts.keyOf);
+    const listed = new Set(keys);
     let at = 0; // the next row not yet placed
     state.results.forEach((entry, index) => {
       // Rows of entries no longer listed (and the note of an empty list) leave first, so no row is moved past them.
       while (at < rows.length && !listed.has(rows[at].dataset.key)) rows[at++].remove();
       const row = AUR.button(opts.rowClass);
       row.id = opts.idPrefix + index;
-      row.dataset.key = String(opts.keyOf(entry));
+      row.dataset.key = keys[index];
       row.setAttribute('role', 'option');
       opts.fill(row, entry);
       markRow(row, index === state.selected);
       const old = held.get(row.dataset.key);
-      if (!old) { list.insertBefore(row, rows[at] || null); return; }
-      if (old === rows[at]) at++;
-      else { list.insertBefore(old, rows[at] || null); rows.splice(rows.indexOf(old), 1); }
+      // Where the entry's row stands among those not yet placed; a new entry has none.
+      const from = old ? rows.indexOf(old, at) : -1;
+      if (from < 0) { list.insertBefore(row, rows[at] || null); return; }
+      if (from === at) at++;
+      else { list.insertBefore(old, rows[at]); rows.splice(from, 1); }
       adopt(old, row);
     });
     while (at < rows.length) rows[at++].remove();
     input.setAttribute('aria-activedescendant', opts.idPrefix + state.selected);
     const selectedRow = list.children[state.selected];
-    if (selectedRow !== was) selectedRow.scrollIntoView({ block: 'nearest' });
+    if (selectedRow && selectedRow !== was) selectedRow.scrollIntoView({ block: 'nearest' });
   };
 })();

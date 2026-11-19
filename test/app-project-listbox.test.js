@@ -108,6 +108,67 @@ test('listbox clicks: a click opens the entry its row stands for, wherever a ref
   assert.deepEqual(calls, [], 'an entry that is gone, a click off the rows and a row of another list open nothing');
 });
 
+// The list drawn from `state.results`: entries are { id, label }, and a row shows its entry's label.
+function drawn(results) {
+  const page = setup(results);
+  const list = fakeElement('div');
+  const render = (next = page.state.results) => {
+    page.state.results = next;
+    page.app.renderListbox(list, page.input, page.state, {
+      rowClass: 'row', idPrefix: 'row-', emptyClass: 'empty', emptyText: 'None',
+      keyOf: (entry) => entry.id, fill: (row, entry) => row.setAttribute('data-label', entry.label),
+    });
+    return list.children.map((row) => row.getAttribute('data-label'));
+  };
+  return { ...page, list, render };
+}
+
+test('listbox rows: a refresh keeps the row of every entry still listed, whatever came or went above it', () => {
+  const [a, b, c, n] = ['a', 'b', 'c', 'n'].map((id) => ({ id, label: id.toUpperCase() }));
+  const { list, render, state, input } = drawn([a, b, c]);
+  assert.deepEqual(render(), ['A', 'B', 'C']);
+  const [rowA, rowB, rowC] = list.children;
+  assert.deepEqual(render([n, a, b, c]), ['N', 'A', 'B', 'C']);
+  assert.deepEqual(list.children.slice(1), [rowA, rowB, rowC], 'a row came in above: the others are the same elements');
+  assert.deepEqual(render([a, c]), ['A', 'C']);
+  assert.deepEqual(list.children, [rowA, rowC], 'rows left: the others are the same elements');
+  assert.deepEqual(render([c, { ...a, label: 'A2' }]), ['C', 'A2']);
+  assert.deepEqual(list.children, [rowC, rowA], 'the order changed and a row reads anew: still the same elements');
+  assert.deepEqual(render([]), [null], 'the note of an empty list');
+  assert.deepEqual(render([b]), ['B']);
+
+  // A selection past the end of the list (the results shrank under it) scrolls nothing and throws nothing.
+  state.selected = 5;
+  assert.deepEqual(render([a, b]), ['A', 'B']);
+  assert.equal(input.getAttribute('aria-activedescendant'), 'row-5');
+});
+
+test('listbox rows: entries that share a key each get a row of their own, and a click opens the one pressed', () => {
+  const [a1, a2, a3, b, n] = [['a', 'A1'], ['a', 'A2'], ['a', 'A3'], ['b', 'B'], ['n', 'N']].map(([id, label]) => ({ id, label }));
+  const { list, render, state, document, app, input } = drawn([a1, a2, b]);
+  assert.deepEqual(render(), ['A1', 'A2', 'B']);
+  const rows = [...list.children];
+  assert.equal(new Set(rows.map((row) => row.dataset.key)).size, 3, 'three keys for three rows');
+  // The same list again, as every refresh from the store draws it.
+  assert.deepEqual(render(), ['A1', 'A2', 'B']);
+  assert.deepEqual(list.children, rows, 'and the same elements');
+  assert.deepEqual(render([n, a1, a2, a3, b]), ['N', 'A1', 'A2', 'A3', 'B']);
+  assert.deepEqual([list.children[1], list.children[2], list.children[4]], rows);
+  assert.deepEqual(render([a2, b]), ['A2', 'B'], 'the first of a key left: the one that stays reads as itself');
+  assert.equal(list.children.length, 2);
+
+  // Clicks go by the same keys: the second of two entries with one key opens the second.
+  const calls = [];
+  app.wireListbox(list, input, state, { escape() {}, update() {}, select() {}, activate: (index) => calls.push(index), keyOf: (entry) => entry.id });
+  render([a1, a2, b]);
+  for (const row of list.children) {
+    const target = { closest: (selector) => (selector === '[role="option"]' ? row : null) };
+    document.fire('mousedown', { target, clientX: 10, clientY: 10 });
+    document.fire('click', { target, clientX: 10, clientY: 10 });
+  }
+  assert.deepEqual(calls, [0, 1, 2]);
+});
+
 test('listbox selection: an arrow key marks the rows as they stand and builds none', () => {
   const { app, input, state } = setup();
   const scrolled = [];
