@@ -26,9 +26,9 @@ const IGNORE_DIRS = new Set([
 ]);
 const ignored = (/** @type {string} */ name) => IGNORE_DIRS.has(name) || name.startsWith('.');
 // A project without a folder has stand-in planets only; a folder that is not read has no counts.
-const NO_FOLDER = { name: null, read: null, standIn: true };
-/** @type {FolderRead} */
-const UNREAD = { files: 0, sizeKb: 0, subdirs: 0, resources: [], folderRead: 'none' };
+const NO_FOLDER = Object.freeze({ name: null, read: null, standIn: true });
+/** @returns {FolderRead} a new one each time: the answer it goes into belongs to its caller */
+const unread = () => ({ files: 0, sizeKb: 0, subdirs: 0, resources: [], folderRead: 'none' });
 
 // Planets = top-level directories of the real project on disk, sized by a
 // shallow file count, enriched by accumulated build counts. Missing paths
@@ -79,19 +79,23 @@ async function getPlanet(model, projectId, planetName) {
   const project = model.projects.get(projectId);
   if (!project) return null;
   const folderOf = () => (project.path && project.exists ? project.path : null);
-  const projectPath = folderOf();
   const root = planetName === '(root)';
-  // Security: planetName arrives over IPC. Only a single plain directory segment
-  // is a planet; anything with separators or dot-segments could walk outside the project.
-  if (projectPath && !root && !isPlanetSegment(planetName)) return null;
-  const folder = projectPath ? await readPlanet(projectPath, planetName, root) : NO_FOLDER;
-  if (!folder) return null;
-  // Everything the answer takes from the project is read from here on, after the disk: the
-  // renderer counts builds onto a planet only once it has this answer, so one counted during the
-  // read has to be in it. A project forgotten meanwhile has no planets; one whose folder changed
-  // is read again.
-  if (model.projects.get(projectId) !== project) return null;
-  if (folderOf() !== projectPath) return getPlanet(model, projectId, planetName);
+  let folder = null;
+  for (let reads = 1; ; reads++) {
+    const projectPath = folderOf();
+    // Security: planetName arrives over IPC. Only a single plain directory segment
+    // is a planet; anything with separators or dot-segments could walk outside the project.
+    if (projectPath && !root && !isPlanetSegment(planetName)) return null;
+    folder = projectPath ? await readPlanet(projectPath, planetName, root) : NO_FOLDER;
+    if (!folder) return null;
+    // Everything the answer takes from the project is read from here on, after the disk: the
+    // renderer counts builds onto a planet only once it has this answer, so one counted during the
+    // read has to be in it. A project forgotten meanwhile has no planets. One whose folder changed
+    // is read again, once: a folder that keeps changing (a drive that comes and goes) is answered
+    // from the second read.
+    if (model.projects.get(projectId) !== project) return null;
+    if (folderOf() === projectPath || reads === 2) break;
+  }
   // Security follow-up: own keys only; 'constructor'/'__proto__' must not return a non-cloneable prototype value.
   const bucket = bucketFor(project, planetName);
   /** @param {string} name */
@@ -107,22 +111,25 @@ async function getPlanet(model, projectId, planetName) {
 
 /**
  * What the disk has of a planet, which reads nothing of the model: the name its folder is
- * spelled by (null when the project folder lists none such), its counts, and whether a planet
- * with no builds and a stand-in's name would be one. Null when the name leads out of the project.
+ * spelled by (diskName: null when a project folder that ignores case lists none such), its
+ * counts, and whether a planet with no builds and a stand-in's name would be one. Null when the
+ * name leads out of the project.
  * @param {string} projectPath
  * @param {string} planetName
  * @param {boolean} root
  * @returns {Promise<{ name: string | null, read: FolderRead, standIn: boolean } | null>}
  */
 async function readPlanet(projectPath, planetName, root) {
-  if (root) return { name: planetName, read: await readFolder(projectPath, true), standIn: false };
+  if (root) return { name: planetName, read: await readFolder(projectPath, true, projectPath), standIn: false };
   const name = await diskName(projectPath, planetName);
   const dir = path.join(projectPath, name ?? planetName);
   if (relativeInside(projectPath, dir) === null) return null;
-  // Security: a planet is a folder of the project. A link there (on Windows a junction too) leads
-  // out of it, to any folder or a network share, so what is behind one is not listed.
+  // Security: a planet is a folder of the project. A link there (on Windows a junction too) can
+  // lead out of it, to any folder or a network share, so what is behind one is not listed. lstat
+  // does not see every link (it calls some junctions folders, and it can fail): readFolder checks
+  // where each folder really is before it reads it.
   const linked = await fs.promises.lstat(dir).then((stat) => stat.isSymbolicLink(), () => false);
-  const read = linked ? UNREAD : await readFolder(dir, false);
+  const read = linked ? unread() : await readFolder(dir, false, projectPath);
   // getSystem draws stand-ins (universe/planets.js) for a project folder that lists no planet, and
   // for one it cannot list at all, whatever the error: so a folder that is gone is a stand-in, and
   // one that could not be read is too when the project folder cannot be listed either.
@@ -132,9 +139,12 @@ async function readPlanet(projectPath, planetName, root) {
 }
 
 /**
- * Folder `name` as the disk spells it, which names the planet and seeds its globe; null when gone.
+ * Folder `name` as the disk spells it, which names the planet and seeds its globe. A root that
+ * ignores case is listed for it: null when it has no such folder in any casing, or cannot be
+ * listed. A case-sensitive root answers the name as asked, whether the folder is there or not.
  * @param {string} root
  * @param {string} name
+ * @returns {Promise<string | null>}
  */
 async function diskName(root, name) {
   // Security: a case-sensitive root spells a folder one way, so nothing is listed to find it.
@@ -147,19 +157,33 @@ async function diskName(root, name) {
 
 /**
  * A planet's folder counts. '(root)' (`root`) stands for the top-level files alone, so it reads no
- * folder below them.
+ * folder below them. No folder that resolves outside `projectPath` is read.
  * @param {string} dir
  * @param {boolean} root
+ * @param {string} projectPath
  * @returns {Promise<FolderRead>}
  */
-async function readFolder(dir, root) {
+async function readFolder(dir, root, projectPath) {
   let files = 0, bytes = 0, subdirs = 0, folders = 0, peeks = 0, partial = false;
   /** @type {'gone' | 'none' | null} */
   let failed = null;
   const exts = new Map();
   /** @type {Promise<number | null>[]} one per counted file, awaited together after the walk */
   const sizes = [];
-  const list = (/** @type {string} */ d) => fs.promises.readdir(d, { withFileTypes: true });
+  /** @type {Promise<string> | null} where the project folder really is, resolved once a read */
+  let projectReal = null;
+  // Security: every folder is resolved just before it is read, links and junctions of any kind
+  // followed, and read only when that is the project folder or a place inside it. A folder that
+  // resolves elsewhere, or does not resolve, fails like one that cannot be read. A link put in
+  // place between this check and the read is still followed: the check narrows that, no more.
+  const list = async (/** @type {string} */ d) => {
+    projectReal ??= fs.promises.realpath(projectPath);
+    const [base, real] = await Promise.all([projectReal, fs.promises.realpath(d)]);
+    if (real !== base && relativeInside(base, real) === null) {
+      throw Object.assign(new Error('the folder resolves outside the project'), { code: 'EACCES' });
+    }
+    return fs.promises.readdir(d, { withFileTypes: true });
+  };
 
   // Whether a folder the walk leaves unread holds a file at any depth, which the walk would count.
   /** @param {string} d @returns {Promise<boolean>} */
@@ -204,7 +228,7 @@ async function readFolder(dir, root) {
         const ext = path.extname(e.name).slice(1).toUpperCase() || 'MISC';
         exts.set(ext, (exts.get(ext) || 0) + 1);
         // Security: lstat, which follows no link: a link in the folder counts as the file it is,
-        // and its target (another folder, a network share) is never touched.
+        // and its target (another folder, a network share) is not opened.
         sizes.push(fs.promises.lstat(path.join(d, e.name)).then((stat) => stat.size, () => null));
       }
     }
