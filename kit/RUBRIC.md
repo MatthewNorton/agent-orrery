@@ -45,8 +45,7 @@ Soft: asteroid belt visible; ship(s) with name labels; planet name labels on lar
 Hard fail if any of:
 
 - [ ] No single dominant textured planet (should fill roughly half the view height)
-- [ ] Left panel stack missing (need at least PLANET card + PLANET STATUS bars)
-- [ ] No bottom tab bar (`Overview … Scans`)
+- [ ] Left panel stack missing (need at least the PLANET card with its rows and its builds bar)
 - [ ] Right rail chrome (Fleet, Event feed) missing
 
 Soft: the planet is a generated world of its class with relief and a soft terminator, an atmosphere rim where it has air, no visible seam, and no neon: oceanic shows glint, and on high clouds and city lights on the night side; volcanic lava glows on the night side; ice shows long arcs, not loops.
@@ -63,8 +62,8 @@ Soft: moons; atmosphere rim; orbiting labeled ships.
 3. Click into that system: a ship is present; trigger a file edit (ask the
    agent to touch a file) → ship moves toward the matching planet and the feed
    logs a build.
-4. Click a planet → planet view shows non-zero MASS/DIAMETER and real file
-   extensions under RESOURCES. Back navigation works both levels. `Open Folder`
+4. Click a planet → planet view shows non-zero FILES/SIZE and real file
+   extensions under FILE TYPES. Back navigation works both levels. `Open Folder`
    opens Explorer.
 5. Close the app window → process exits (no orphaned Electron in Task Manager).
 

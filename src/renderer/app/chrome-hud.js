@@ -10,6 +10,7 @@
   const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const pad = (n) => String(n).padStart(2, '0');
+  const count = (n, noun) => n + ' ' + noun + (n === 1 ? '' : 's');
 
   // ---------- the view's name ----------
   A.renderViewTitle = function renderViewTitle() {
@@ -27,10 +28,10 @@
       title = pd ? String(pd.name) : (project ? project.name : 'System');
       const builds = project ? (project.totalBuilds || 0) : 0;
       line = pd
-        ? (project ? project.name : '') + ' · ' + ships.length + ' agents'
-        : ships.length + ' agents · ' + builds + ' builds';
+        ? (project ? project.name : '') + ' · ' + count(ships.length, 'agent')
+        : count(ships.length, 'agent') + ' · ' + count(builds, 'build');
     } else {
-      line = S.store.projects.size + ' projects · ' + A.onlineProjectCount() + ' systems online';
+      line = count(S.store.projects.size, 'solar system') + ' · ' + A.onlineProjectCount() + ' online';
     }
     kind.textContent = VIEW_KIND[view] || VIEW_KIND.universe;
     name.textContent = title;

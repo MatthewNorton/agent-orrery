@@ -59,6 +59,9 @@
       case 'build': {
         const p = S.store.projects.get(ev.project);
         if (p) p.totalBuilds = (p.totalBuilds || 0) + 1;
+        // The open planet's own count keeps pace, so its card compares like with like.
+        const pd = A.activePlanetData();
+        if (pd && ev.project === S.current.projectId && ev.bucket === pd.name) pd.builds = (pd.builds || 0) + 1;
         // A ship-updated can precede the build it reports (and Codex patches
         // send none), so the stored count follows build events too.
         const ship = S.store.ships.get(ev.shipId);

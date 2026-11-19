@@ -80,7 +80,8 @@ environment re-seats it) or one of the first-person rooms, each a `camera: 'room
 the scene gets it, and the view spends it on the chase camera's orbit or, in a room, ignores it.
 Three more members are optional and have no default: the `planetData` field, read through
 `A.activePlanetData()`, and the `systemData` field and `clearShipFocus()` method, which
-`app/agent-focus.js` checks for before using them.
+`app/agent-focus.js` checks for before using them. The system view and the planet view both carry
+`systemData` (the planet view's is its planet's system, for the planet card).
 
 ## 3. The `window.AU` bridge (matches `src/preload.js`)
 
@@ -272,7 +273,7 @@ Design tokens (put in `:root`):
   kept per viewer), Panel opacity sets the fill of the rail modules, the compact rail buttons and
   the timeline from 20% to solid through one token, `--panel-fill`; 86%, the alpha of `--paper`, is
   the default, text and controls stay, and at 100% the panels drop their blur. Text size zooms the
-  chrome around the star chart (top bar, rails, view title and hint, timeline, planet tab bar,
+  chrome around the star chart (top bar, rails, view title and hint, timeline,
   directory, panels menu, toast and Settings) by 100 · 110 · 125 · 150%
   with CSS `zoom`; the star chart keeps its size. The zoom stops where the window would leave the
   chrome less than 1024 × 576 CSS px, the least room it was checked to lay out in without its parts
@@ -448,8 +449,9 @@ Design tokens (put in `:root`):
   `project-added` → glyph grows in from zero.
 - Interaction: hover glyph → highlight + pointer cursor; click → zoom/fade
   transition into system view.
-- Summary card: `UNIVERSE SUMMARY` — Projects / Active Agents / Systems Online
-  (systems online = distinct projects with ≥1 ship).
+- Summary card: `UNIVERSE SUMMARY` — Systems / Agents / Online
+  (online = distinct projects with ≥1 ship). The view title's line reads
+  `<n> solar systems · <m> online`.
 
 ## 6. Solar system view (`2.solar-system-view.png`)
 
@@ -536,7 +538,8 @@ Data: `AU.getSystem(projectId)`.
 
 ## 7. Planet view (`1.planet-view.png`)
 
-Data: `AU.getPlanet(projectId, name)`.
+Data: `AU.getPlanet(projectId, name)`, and `AU.getSystem(projectId)` alongside it for the planet
+card's solar-system totals (the view carries it as `systemData`; when it fails, those rows show `—`).
 
 - Large generated world (same class rule) filling ~60% of view height, slow
   rotation about a tilted axis, the atmosphere shell, clouds on oceanic worlds on
@@ -545,21 +548,20 @@ Data: `AU.getPlanet(projectId, name)`.
   6 s pass. 1–2 small rocky moons with their own maps. The system view's baked sky (`AUR.addSky`)
   as backdrop.
 - This project's ships orbit the planet with name labels.
-- Left panels (stacked, like the mockup):
+- Left panels (stacked):
   1. `PROJECT: <NAME>` mini-card (state + builds and the same folder/terminal
      actions as in system view).
-  2. `PLANET: <NAME uppercased>` card — status dot `Active` (ships present) or
-     `Dormant`; rows: `TYPE` `Terrestrial` (or `Unknown` when `procedural`),
-     `RESOURCES` top file extensions joined (`TS, JSON, PNG`), `MASS`
-     `<files> files`, `DIAMETER` `<sizeKb> KB`, `STRUCTURES` `<subdirs>`.
-  3. `PLANET STATUS` card with labeled progress bars (clamped 0–100%):
-     Infrastructure `subdirs/10`, Resources `files/500`, Build Energy
-     `builds/50`.
-- Bottom-center tab bar like the mockup: `Overview · Surface · Orbit ·
-  Resources · Structures · Scans` — `Overview` active; all others rendered but
-  disabled (muted, no-op). This is deliberate visual parity without scope creep.
-- Summary card: `PLANET SUMMARY` — Active Agents / Structures / Resources /
-  Builds.
+  2. `PLANET: <NAME uppercased>` card, in plain words — status dot `Active` (ships present) or
+     `Dormant`; a line saying what the globe is drawn as (its class from `AUR.worldProfile`:
+     Rocky world, Gas giant, Ice world, Volcanic world, Oceanic world) and what the planet stands
+     for (`a folder in <project>`, `the top-level files of <project>` for `(root)`, or `no folder on
+     disk` when `procedural`); rows `FILES`, `SIZE` (KB, MB or GB), `SUBFOLDERS`, `FILE TYPES` (top
+     extensions, `MISC` shown as `other`), each `—` when `procedural` (those numbers are
+     invented) or in REPLAY (history never reads the disk; `A.planetOnDisk`); then `BUILDS (FILE EDITS)`: `THIS PLANET`, `WHOLE SOLAR SYSTEM` (the project's
+     `totalBuilds`) and a bar of the planet's share; then `SOLAR SYSTEM`: `PLANETS` (from
+     `systemData`) and `AGENTS`. A `build` event on the open planet raises its count in place.
+- No tab bar: the mockup's `Overview … Scans` row was dropped because its tabs did nothing.
+- Summary card: `PLANET SUMMARY` — Agents / Files / Subfolders / Builds.
 - Back button → system view.
 
 ## 8. Debug / shots contract (grading depends on this — get it exact)

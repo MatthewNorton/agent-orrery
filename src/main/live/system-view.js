@@ -88,7 +88,7 @@ function getPlanet(model, projectId, planetName) {
   if (planetName !== '(root)' && !isPlanetSegment(planetName)) return null;
   const dir = planetName === '(root)' ? project.path : path.join(project.path, planetName);
   if (planetName !== '(root)' && relativeInside(project.path, dir) === null) return null;
-  let files = 0, sizeKb = 0, subdirs = 0;
+  let files = 0, bytes = 0, subdirs = 0;
   const exts = new Map();
   try {
     const walk = (d, depth) => {
@@ -104,14 +104,15 @@ function getPlanet(model, projectId, planetName) {
           files++;
           const ext = path.extname(e.name).slice(1).toUpperCase() || 'MISC';
           exts.set(ext, (exts.get(ext) || 0) + 1);
-          try { sizeKb += Math.round(fs.statSync(path.join(d, e.name)).size / 1024); } catch { /* ignore */ }
+          // Bytes, rounded once at the end: rounding each file made a folder of small files read 0 KB.
+          try { bytes += fs.statSync(path.join(d, e.name)).size; } catch { /* ignore */ }
         }
       }
     };
     walk(dir, 0);
   } catch { /* partial data is fine */ }
   const resources = [...exts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k]) => k);
-  return { ...base, files, sizeKb, subdirs, resources };
+  return { ...base, files, sizeKb: Math.round(bytes / 1024), subdirs, resources };
 }
 
 function isPlanetSegment(value) {

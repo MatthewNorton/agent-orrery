@@ -492,7 +492,7 @@ contract), `AUR`, `AUR_POLISH` and `AUR_GALAXY` (all `any` for now).
 | `app/boot.js` | 384 | Boot, routing, view switching, debug hooks |
 | `app/ideas.js` | 152 | IDEAS panel |
 | `app/ideas-list.js` | 263 | IDEAS list rendering |
-| `app/chrome.js` | 279 | Command rail, project-name helpers, RECENT strip, agent list, feed, summary, tabs |
+| `app/chrome.js` | 279 | Command rail, project-name helpers, agent list, feed, summary, back button |
 | `app/agent-focus.js` | 306 | Cockpit overlay, hologram mini-map |
 | `app/project/settings.js` | 314 | Moved-project dialog |
 | `app/project/tasks.js` | 267 | TASKS panel |

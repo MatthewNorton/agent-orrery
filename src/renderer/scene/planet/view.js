@@ -177,6 +177,7 @@
     return {
       scene,
       planetData: pd,
+      systemData: data.system || null,
       update,
       setQuality(next) {
         tier = next;

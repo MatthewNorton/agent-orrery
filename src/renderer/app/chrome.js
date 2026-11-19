@@ -1,5 +1,5 @@
 // @ts-check
-// Compact command rail, project-name helpers, agents/summary renderers, tab bar. The feed is
+// Compact command rail, project-name helpers, agents/summary renderers, back button. The feed is
 // app/panels/feed.js.
 'use strict';
 
@@ -77,6 +77,12 @@
 
   A.activePlanetData = function activePlanetData() {
     return S.activeView && S.activeView.planetData ? S.activeView.planetData : null;
+  };
+
+  /** Whether a planet's files, size and subfolders were read from its folder: a procedural planet's are
+   * invented (live/system-view.js) and history never reads the disk (history/model.js). */
+  A.planetOnDisk = function planetOnDisk(pd) {
+    return Boolean(pd && !pd.procedural && S.playback.mode !== 'replay');
   };
 
   A.onlineProjectCount = function onlineProjectCount() {
@@ -190,7 +196,7 @@
   };
 
   function universeSummaryStats() {
-    return [[S.store.projects.size, 'Projects'], [S.store.ships.size, 'Agents'],
+    return [[S.store.projects.size, 'Systems'], [S.store.ships.size, 'Agents'],
       [A.onlineProjectCount(), 'Online']];
   }
 
@@ -215,33 +221,10 @@
   function planetSummaryStats() {
     const ships = A.shipsInProject(S.current.projectId);
     const pd = A.activePlanetData();
-    const structures = pd ? pd.subdirs : 0;
-    const resources = pd && pd.resources ? pd.resources.length : 0;
-    const builds = pd ? pd.builds : 0;
-    return [[ships.length, 'Agents'], [structures, 'Structures'],
-      [resources, 'Resources'], [builds, 'Builds']];
+    const disk = A.planetOnDisk(pd);
+    return [[ships.length, 'Agents'], [disk ? pd.files : '—', 'Files'],
+      [disk ? pd.subdirs : '—', 'Subfolders'], [pd ? pd.builds : 0, 'Builds']];
   }
-
-  // ---------- tab bar ----------
-  const TABS = ['Overview', 'Surface', 'Orbit', 'Resources', 'Structures', 'Scans'];
-  function tabIco() {
-    return '<svg class="tab-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
-      'stroke-width="1.6" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="8"/>' +
-      '<circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none"/></svg>';
-  }
-  A.renderTabbar = function renderTabbar() {
-    const bar = document.getElementById('tabbar');
-    const planet = S.current.view === 'planet';
-    bar.classList.toggle('hidden', !planet);
-    if (!planet || bar.childElementCount) return;
-    TABS.forEach((t, i) => {
-      const tab = AUR.el('div', 'tab' + (i === 0 ? ' active' : ' disabled'));
-      const ico = document.createElement('span');
-      ico.innerHTML = tabIco();
-      tab.append(ico.firstChild, AUR.el('span', null, t));
-      bar.appendChild(tab);
-    });
-  };
 
   A.renderBackButton = function renderBackButton() {
     const btn = document.getElementById('back-btn');

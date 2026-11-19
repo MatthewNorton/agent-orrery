@@ -2,7 +2,7 @@
 // Project card (folder/terminal actions) and planet card.
 'use strict';
 
-/** @import { OpenTerminalResult } from '../../../types/contract' */
+/** @import { OpenTerminalResult, PlanetData } from '../../../types/contract' */
 
 (function () {
   const AUR = window.AUR;
@@ -186,15 +186,37 @@
     return row;
   }
 
-  // ---------- planet card ----------
+  // ---------- planet card: a folder's numbers in plain words, beside its solar system's ----------
+  const WORLD_NAMES = Object.freeze({
+    rocky: 'Rocky world', gas: 'Gas giant', ice: 'Ice world', volcanic: 'Volcanic world', oceanic: 'Oceanic world',
+  });
+
+  /** @param {number} kb @param {number} files */
+  function sizeText(kb, files) {
+    if (kb === 0) return files > 0 ? '< 1 KB' : '0 KB';
+    if (kb < 1024) return kb + ' KB';
+    const mb = kb / 1024;
+    return mb < 1024 ? mb.toFixed(1) + ' MB' : (mb / 1024).toFixed(1) + ' GB';
+  }
+
+  /** What the globe is drawn as, and what the planet stands for. @param {PlanetData} pd @param {string} projectName */
+  function planetLine(pd, projectName) {
+    const world = WORLD_NAMES[AUR.worldProfile(S.current.projectId, pd.name).key] || 'World';
+    if (pd.procedural) return world + ' · no folder on disk';
+    if (pd.name === '(root)') return world + ' · the top-level files of ' + projectName;
+    return world + ' · a folder in ' + projectName;
+  }
+
   A.renderPlanetCard = function renderPlanetCard() {
     const card = document.getElementById('planet-card');
     if (S.current.view !== 'planet') { card.classList.add('hidden'); return; }
+    /** @type {PlanetData | null} */
     const pd = A.activePlanetData();
     if (!pd) { card.classList.add('hidden'); return; }
     card.classList.remove('hidden');
     AUR.clear(card);
 
+    const project = S.store.projects.get(S.current.projectId) || pd.project;
     const ships = A.shipsInProject(S.current.projectId);
     const active = ships.length > 0;
 
@@ -205,29 +227,40 @@
     status.append(sdot, active ? 'Active' : 'Dormant');
     A.moduleHead(card, 'PLANET: ' + String(pd.name).toUpperCase(), { extras: [status] });
 
+    const real = A.planetOnDisk(pd);
+    const types = real && pd.resources.length
+      ? pd.resources.map((ext) => (ext === 'MISC' ? 'other' : ext)).join(' · ') : '—';
+    const planetBuilds = pd.builds || 0;
+    const systemBuilds = project.totalBuilds || 0;
+    const system = S.activeView && S.activeView.systemData;
     const body = AUR.el('div', 'mod-b plc-body');
     body.append(
-      pcRow('TYPE', pd.procedural ? 'Unknown' : 'Terrestrial'),
-      pcRow('RESOURCES', (pd.resources && pd.resources.length) ? pd.resources.join(', ') : '—'),
-      pcRow('MASS', (pd.files || 0) + ' files'),
-      pcRow('DIAMETER', (pd.sizeKb || 0) + ' KB'),
-      pcRow('STRUCTURES', String(pd.subdirs || 0)),
-      AUR.el('div', 'bars-title', 'PLANET STATUS'),
-      bar('Infrastructure', (pd.subdirs || 0) / 10),
-      bar('Resources', (pd.files || 0) / 500),
-      bar('Build Energy', (pd.builds || 0) / 50)
+      AUR.el('div', 'plc-sub', planetLine(pd, project.name)),
+      pcRow('FILES', real ? String(pd.files) : '—'),
+      pcRow('SIZE', real ? sizeText(pd.sizeKb || 0, pd.files) : '—'),
+      pcRow('SUBFOLDERS', real ? String(pd.subdirs) : '—'),
+      pcRow('FILE TYPES', types),
+      AUR.el('div', 'plc-title', 'BUILDS (FILE EDITS)'),
+      pcRow('THIS PLANET', String(planetBuilds)),
+      pcRow('WHOLE SOLAR SYSTEM', String(systemBuilds)),
+      shareBar(systemBuilds ? planetBuilds / systemBuilds : 0, systemBuilds > 0),
+      AUR.el('div', 'plc-title', 'SOLAR SYSTEM'),
+      pcRow('PLANETS', system ? String(system.planets.length) : '—'),
+      pcRow('AGENTS', String(ships.length))
     );
     card.appendChild(body);
   };
 
-  function bar(key, frac) {
+  /** @param {number} frac @param {boolean} any whether the system has builds at all */
+  function shareBar(frac, any) {
     const pct = Math.round(AUR.clamp(frac, 0, 1) * 100);
-    const row = AUR.el('div', 'bar-row');
+    const share = AUR.el('div', 'plc-share');
     const track = AUR.el('div', 'bar-track');
     const fill = AUR.el('div', 'bar-fill');
     fill.style.width = pct + '%';
     track.appendChild(fill);
-    row.append(AUR.el('div', 'bar-key', key), track, AUR.el('div', 'bar-val', pct + '%'));
-    return row;
+    share.append(track, AUR.el('div', 'plc-share-note',
+      any ? pct + '% of the system’s builds' : 'No builds in this system yet'));
+    return share;
   }
 })();

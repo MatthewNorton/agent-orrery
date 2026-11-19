@@ -36,7 +36,6 @@ function createDriver(ctx) {
         planetCard: document.getElementById('planet-card')?.textContent || '',
         backText: document.getElementById('back-btn')?.textContent || '',
         backVisible: shown('back-btn'),
-        tabbarVisible: shown('tabbar'),
         liveScenes,
       };
     })()`);

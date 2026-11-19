@@ -295,14 +295,19 @@
   A.openPlanet = async function openPlanet(projectId, name) {
     const request = ++S.routeRequestGeneration;
     const requestedEpoch = S.streamEpoch;
+    // The system rides along for the planet card's solar-system totals; without it they show dashes.
+    const systemRequest = AUR.settle(() => AU.getSystem(projectId));
     /** @type {PlanetData} */
     let data = null;
     try { data = await AU.getPlanet(projectId, name); } catch (e) { AUR.log('getPlanet err', e && e.message); }
+    const system = await systemRequest;
     if (request !== S.routeRequestGeneration || !A.sameEpoch(requestedEpoch, S.streamEpoch)) return;
     S.current.projectId = projectId;
     S.current.planetName = name;
     if (!data) { AUR.log('no planet data for', projectId, name); return A.openSystem(projectId); }
-    setView('planet', { planet: data, projectId, name, store: S.store });
+    setView('planet', {
+      planet: data, system: Array.isArray(system.planets) ? system : null, projectId, name, store: S.store,
+    });
   };
 
   function back() {

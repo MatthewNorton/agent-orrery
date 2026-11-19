@@ -17,7 +17,7 @@
   // ---------- agent focus ----------
   // The chrome roots focus mode makes inert; focus-rooms.css fades whatever is [inert].
   const AGENT_FOCUS_INERT_IDS = [
-    'topbar', 'sidebar', 'rail-left', 'view-title', 'view-hint', 'tabbar', 'history-bar',
+    'topbar', 'sidebar', 'rail-left', 'view-title', 'view-hint', 'history-bar',
   ];
 
   A.wireAgentFocus = function wireAgentFocus() {
