@@ -550,6 +550,18 @@ test('the triangle budget steps near hulls down to far before falling back to th
   assert.equal(roots[1].metadata.assetLod, 'far');
 });
 
+test('the universe map has a hull budget of its own, above a near view\'s', async () => {
+  const assets = loadShipAssets(LADDER_MANIFEST, { 'small-near.glb': 250000, 'small-far.glb': 250000 });
+  const hulled = async (view) => {
+    const scene = assets.scene(view);
+    let count = 0;
+    for (const id of ['a', 'b', 'c', 'd', 'e', 'f']) count += (await assets.ships.upgrade(scene, ship(id, 0), assets.fallback(view + id))) ? 1 : 0;
+    return count;
+  };
+  assert.equal(await hulled('system'), 3, '900k triangles');
+  assert.equal(await hulled('universe'), 4, '1.25M triangles: its hulls are instances');
+});
+
 test('a fleet hull keeps its baked tones and glass, and its trim lights and nozzles emit the ship color', async () => {
   const assets = loadShipAssets(LADDER_MANIFEST, {}, [
     { name: 'hull_white', textured: true, albedo: '#f2f2f2' }, { name: 'hull_grey', textured: true, albedo: '#f2f2f2' },

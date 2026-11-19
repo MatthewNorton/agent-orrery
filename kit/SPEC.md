@@ -351,8 +351,9 @@ Design tokens (put in `:root`):
   instances it from a per-provider template, the system and planet views clone
   it (so focus mode can fade ships one by one; a hull material carries no
   transparency mode, because with one set Babylon ignores a mesh's visibility);
-  a view steps down to the dart at 900k hull triangles per scene, which holds
-  fifty ships of the first rank. Ship size is one policy (`AUR.SHIP_SIZE` per
+  a view steps down to the dart past its hull triangle budget: 900k in a
+  system or planet view, which holds fifty ships of the first rank, and 1.25M
+  on the universe map, whose hulls are instances, which holds seventy. Ship size is one policy (`AUR.SHIP_SIZE` per
   view, `AUR.fitShip` with a pixel floor so a hull sized to its planets still
   reads from the default orbit). `AUR.ships.refresh(scene, ship)` swaps the hull
   inside the asset root the scene already holds; `app/boot.js` calls it after
@@ -378,8 +379,8 @@ Design tokens (put in `:root`):
   The ship color is still trim lighting, never hull paint: the model lists its
   trim by material name, and each is copied once per palette as a light in the
   ship color (a number: `TRIM_LIGHT` for a lamp, lower for a wide surface that
-  should glow as a lit panel) or, for `'lamps'`, keeps its surface and gives
-  its emissive map that color. `AUR.shipModels.trimLight` is that light, and
+  should glow as a lit panel) or, for `{ lamps: <the color its emissive map
+  is painted in> }`, keeps its surface and has that map show the ship color. `AUR.shipModels.trimLight` is that light, and
   the fleet's livery stripes and nozzles are made by it too.
 - A model's `source/` folder is generated: `node scripts/import-ship.mjs <ship>
   <source folder>` converts the ship's ES modules to page scripts that register

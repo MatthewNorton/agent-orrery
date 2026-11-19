@@ -23,7 +23,7 @@
     trim: {
       'port position lamp': LIGHT, 'starboard position lamp': LIGHT, 'folded bronze nozzle liner': LIGHT,
       'burnt orange bay liner': PANEL, 'orange anodized return': PANEL, 'orange wing duct': PANEL,
-      'pearl pressure hull': 'lamps',
+      'pearl pressure hull': { lamps: '#f4ba76' },
     },
     nozzles() {
       const { DRIVE } = use('petrel/exhaust');

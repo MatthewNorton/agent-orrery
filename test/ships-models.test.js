@@ -7,7 +7,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const BABYLON = require('babylonjs');
 const { withCanvas, onNullScene, loadShipModules } = require('../scripts/lib/ship-fingerprint.js');
-const { runRenderer } = require('./support/renderer-source');
+const { readRenderer, runRenderer } = require('./support/renderer-source');
 
 const ROOT = path.join(__dirname, '..');
 const SHIPS = path.join(ROOT, 'src', 'renderer', 'ships');
@@ -137,9 +137,15 @@ test('a ship wears the model finishes, with its trim copied once per palette in 
     assert.ok(inlet.emissiveIntensity < models.TRIM_LIGHT, 'a wide surface glows as a lit panel, not a light');
     assert.ok(base('burnt orange bay liner').albedoTexture, 'and the model keeps its own');
 
-    // The hull's lamps take the color; its painted maps stay the model's own (a clone alone would blank them).
+    // The hull's lamps show the ship color: its lamp map, painted in one color, times the emissive
+    // color. Its painted maps stay the model's own (a clone alone would blank them).
+    const { lamps } = petrel.trim['pearl pressure hull'];
+    assert.ok(readRenderer('ships/petrel/source/plating.js').includes(`'${lamps}'`), 'the color Petrel paints its lamps in');
     const hull = wear('pearl pressure hull', 'claude', '#d97757');
-    assert.ok(hull.emissiveColor.equalsWithEpsilon(claude.scale(2.5), 1e-6), 'at the level the lamp map was authored at');
+    const shown = (worn) => BABYLON.Color3.FromHexString(lamps).toLinearSpace().multiply(worn.emissiveColor);
+    assert.ok(shown(hull).equalsWithEpsilon(claude.scale(2.5), 1e-6), 'at the level the lamp map was authored at');
+    assert.ok(shown(wear('pearl pressure hull', 'codex', '#f2f0ea'))
+      .equalsWithEpsilon(BABYLON.Color3.FromHexString('#f2f0ea').toLinearSpace().scale(2.5), 1e-6), 'pearl on a Codex ship, not amber');
     for (const slot of ['albedoTexture', 'bumpTexture', 'metallicTexture', 'emissiveTexture', 'reflectionTexture']) {
       assert.ok(hull[slot], slot);
       assert.equal(hull[slot], base('pearl pressure hull')[slot], slot);
@@ -186,16 +192,23 @@ test('the nozzles sit at the stern in the fleet frame', () => {
   assert.ok(port.radius > 0.02 && port.radius < 0.05);
 });
 
-test('an opaque material fades with its mesh once it gives its transparency mode up', () => onNullScene(BABYLON, (scene) => {
+test('an opaque or cut-out material fades with its mesh once it gives its transparency mode up', () => onNullScene(BABYLON, (scene) => {
   const AUR = load();
   const mesh = new BABYLON.Mesh('hull', scene);
-  const opaque = new BABYLON.PBRMaterial('opaque', scene), glass = new BABYLON.PBRMaterial('glass', scene);
-  opaque.transparencyMode = BABYLON.Material.MATERIAL_OPAQUE;
-  glass.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+  const made = (name, mode) => Object.assign(new BABYLON.PBRMaterial(name, scene), { transparencyMode: mode });
+  const opaque = made('opaque', BABYLON.Material.MATERIAL_OPAQUE), glass = made('glass', BABYLON.Material.MATERIAL_ALPHABLEND);
+  const cutOut = made('cut-out', BABYLON.Material.MATERIAL_ALPHATEST);
+  cutOut.albedoTexture = Object.assign(new BABYLON.Texture(null, scene), { hasAlpha: true });
   mesh.visibility = 0.16;
-  assert.equal(opaque.needAlphaBlendingForMesh(mesh), false, 'with a mode set, Babylon ignores visibility');
-  AUR.fadeWithMesh(opaque);
+  for (const material of [opaque, cutOut]) {
+    assert.equal(material.needAlphaBlendingForMesh(mesh), false, material.name + ': with a mode set, Babylon ignores visibility');
+    AUR.fadeWithMesh(material);
+    assert.equal(material.needAlphaBlendingForMesh(mesh), true, material.name + ' fades');
+    mesh.visibility = 1;
+    assert.equal(material.needAlphaBlendingForMesh(mesh), false, material.name + ' is solid at full visibility');
+    mesh.visibility = 0.16;
+  }
+  assert.equal(cutOut.needAlphaTesting(), true, 'a cut-out still tests against its texture');
   AUR.fadeWithMesh(glass);
-  assert.equal(opaque.needAlphaBlendingForMesh(mesh), true);
   assert.equal(glass.transparencyMode, BABYLON.Material.MATERIAL_ALPHABLEND, 'a blended material keeps its mode');
 }));

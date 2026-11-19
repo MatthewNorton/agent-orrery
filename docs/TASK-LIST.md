@@ -14,12 +14,13 @@ entry in that pull request.
 
 - **What.** A view builds its own copy of a ship model the first time a ship needs it: the
   geometry and its merge into one mesh, nineteen painted canvas textures (six of them 1024 pixels square) and a 128 pixel
-  reflection cube, all on the renderer's main thread. For Petrel that is 80 to 100 ms per scene,
-  measured in the app on an integrated GPU (the ship about 46 ms, the cube about 27, the merge
-  about 7), so universe → system → planet pays it three times, and the universe map pays it for
+  reflection cube, all on the renderer's main thread. For Petrel that is about 100 ms per scene,
+  measured in the app on an integrated GPU (80 to 150 ms across runs on a machine shared with
+  other windows; in a run of six, the ship about 46 ms, the cube about 27, the merge about 7),
+  so universe → system → planet pays it three times, and the universe map pays it for
   hulls a dozen pixels long. Hulls still arrive sooner than the GLB they replaced (about 200 ms
-  after a system opens against about 340 ms), but for those five or six frames nothing else
-  draws.
+  after a system opens against about 340 ms), but for those six or more frames nothing
+  else draws.
 - **Where.** `container` in `src/renderer/ships/models.js:65`, called per scene by
   `ensureContainer` in `src/renderer/ship-assets.js:197`. The work is inside the generated
   modules: `createSurfaces` in `src/renderer/ships/petrel/source/surfaces.js:147` paints the
@@ -42,8 +43,9 @@ entry in that pull request.
   per finish: Petrel is 24 draws per ship, and the glow pass draws them again. A system with
   fifty Petrels took about 14 ms a frame on an integrated GPU, which is why the hull budget stops
   there and later ships stay darts; before ship models the budget held seventy ships of the first
-  rank. The universe map instances one template per provider and draws any number of ships in 24
-  draws per provider. The budget itself counts triangles (`TRIANGLE_BUDGET`, 900k), though what
+  rank. The universe map instances one template per provider, draws its ships in 24 draws per
+  provider and has its own budget (seventy ships of the first rank, about 4 ms). The budget
+  itself counts triangles (`TRIANGLE_BUDGET`, 900k in these views), though what
   it guards is CPU time per ship and per draw. The number fits the hulls that fly today: it admits
   fifty Petrels (24 draws each, measured), or 92 of the smallest later-rank hull file (9.7k
   triangles in 6 draws), which by the 0.13 ms a ship the old Scout file measured comes to about

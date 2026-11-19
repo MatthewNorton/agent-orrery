@@ -7,6 +7,7 @@
 'use strict';
 
 /**
+ * @import { HullEntry } from '../ship-assets.js'
  * @typedef {object} ShipModel one ship, built by its converted modules under ships/<id>/source/
  * @property {string} id also the id of the hull it flies as
  * @property {string} replaces the manifest hull whose rank it takes
@@ -14,9 +15,10 @@
  *   centred, nose on +Z (the offset is in the model's own units)
  * @property {(scene: BABYLON.Scene) => BABYLON.TransformNode} build one ship with its materials
  * @property {(scene: BABYLON.Scene) => BABYLON.BaseTexture} probe the reflections its finishes were tuned under
- * @property {Record<string, number | 'lamps'>} trim by material name: a surface that becomes a
- *   trim light in the ship color (the number is how hot it emits; AUR.shipModels.TRIM_LIGHT is a
- *   light, less is a lit panel), or one whose emissive map (its lamps) takes that color
+ * @property {Record<string, number | { lamps: string }>} trim by material name: a surface that
+ *   becomes a trim light in the ship color (the number is how hot it emits;
+ *   AUR.shipModels.TRIM_LIGHT is a light, less is a lit panel), or one whose emissive map (its
+ *   lamps, painted in the one color named) shows that color instead
  * @property {() => Array<{ position: number[], radius: number }>} nozzles in the model's own units
  */
 
@@ -42,7 +44,7 @@
 
   /** @type {Map<string, ShipModel>} */
   const models = new Map();
-  /** @type {Map<string, any>} */
+  /** @type {Map<string, HullEntry>} */
   const hulls = new Map(); // replaced hull id -> the hull entry the model flies as
 
   /** @param {ShipModel} model */
@@ -50,7 +52,10 @@
     models.set(model.id, model);
   }
 
-  /** The hull to fly for a manifest hull: the model that replaces it, in its rank, else itself. */
+  /**
+   * The hull to fly for a manifest hull: the model that replaces it, in its rank, else itself.
+   * @param {HullEntry} hull @returns {HullEntry}
+   */
   function inPlaceOf(hull) {
     const model = [...models.values()].find((candidate) => candidate.replaces === hull.id);
     if (!model) return hull;
@@ -82,7 +87,7 @@
     image.toneMappingType = BABYLON.ImageProcessingConfiguration.TONEMAPPING_ACES;
     image.exposure = EXPOSURE;
     const parts = /** @type {BABYLON.Mesh[]} */ (root.getChildMeshes(false));
-    for (const material of new Set(parts.map((part) => /** @type {any} */ (part.material)))) {
+    for (const material of new Set(parts.map((part) => /** @type {BABYLON.PBRMaterial} */ (part.material)))) {
       if (!material) continue;
       material.reflectionTexture = probe;
       material.imageProcessingConfiguration = image;
@@ -102,6 +107,7 @@
 
   // Material.clone() would clone each texture too (and give a painted one a blank canvas): a copy
   // shares the model's.
+  /** @param {BABYLON.PBRMaterial} material @param {string} name */
   function copyMaterial(material, name) {
     const textures = TEXTURE_SLOTS.map((slot) => material[slot]);
     for (const slot of TEXTURE_SLOTS) material[slot] = null;
@@ -114,35 +120,49 @@
   /**
    * A trim light in the ship color: a dark surface, so the light adds no white, and the color as
    * the emission (the PBR emissive slot is linear: linearized, the frame shows the exact hex).
+   * @param {BABYLON.PBRMaterial | BABYLON.StandardMaterial} material standard when a hull file's own could not be cloned
+   * @param {BABYLON.Color3} tint
    */
   function trimLight(material, tint, intensity = TRIM_LIGHT) {
     const surface = tint.scale(0.25);
-    if (material.albedoColor) material.albedoColor = surface.toLinearSpace();
-    if (material.diffuseColor) material.diffuseColor = surface;
+    if ('albedoColor' in material) {
+      material.albedoColor = surface.toLinearSpace();
+      material.emissiveIntensity = intensity;
+    } else {
+      material.diffuseColor = surface;
+    }
     material.emissiveColor = tint.toLinearSpace();
-    material.emissiveIntensity = intensity;
   }
 
   /**
    * What a ship's hull wears: the model's own finishes, except its trim, which is copied once per
    * palette into `materials` (the scene's hull materials, released with them).
    * @param {Map<string, any>} materials @param {ShipModel} model @param {string} palette
-   * @param {string} hex the ship color @param {any} base the hull's material, or one of its finishes
+   * @param {string} hex the ship color
+   * @param {BABYLON.PBRMaterial | BABYLON.MultiMaterial} base the hull's material, or one of its finishes
+   * @returns {BABYLON.PBRMaterial | BABYLON.MultiMaterial}
    */
   function material(materials, model, palette, hex, base) {
+    const whole = base instanceof BABYLON.MultiMaterial;
     const role = model.trim[base.name];
-    if (!role && !base.subMaterials) return base;
+    if (!role && !whole) return base;
     return AUR.memo(materials, model.id + ':' + palette + ':' + base.name, () => {
-      if (base.subMaterials) {
+      if (base instanceof BABYLON.MultiMaterial) {
         const worn = new BABYLON.MultiMaterial(base.name + ' ' + palette, base.getScene());
-        worn.subMaterials = base.subMaterials.map((finish) => material(materials, model, palette, hex, finish));
+        worn.subMaterials = base.subMaterials.map((finish) =>
+          material(materials, model, palette, hex, /** @type {BABYLON.PBRMaterial} */ (finish)));
         return worn;
       }
+      /** @type {BABYLON.Color3} */
       const tint = AUR.color3(hex);
       const copy = copyMaterial(base, base.name + ' ' + palette);
-      if (role === 'lamps') {
-        const { r, g, b } = base.emissiveColor; // the level the lamp map is authored at
-        copy.emissiveColor = tint.toLinearSpace().scale(Math.max(r, g, b));
+      if (typeof role !== 'number') {
+        // The map times the emissive color is what shows: with the painted color divided out, that
+        // is the ship color, at the level the model lights its lamps to.
+        const painted = AUR.color3(role.lamps).toLinearSpace();
+        const shown = tint.toLinearSpace();
+        copy.emissiveColor = base.emissiveColor.multiply(new BABYLON.Color3(
+          shown.r / Math.max(painted.r, 0.01), shown.g / Math.max(painted.g, 0.01), shown.b / Math.max(painted.b, 0.01)));
         return copy;
       }
       copy.albedoTexture = null;

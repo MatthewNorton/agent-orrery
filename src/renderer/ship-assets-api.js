@@ -32,7 +32,7 @@
       ensureContainer(scene, state, file);
       return null;
     }
-    if (!fitsBudget(state, record, 0)) return null; // upgrade() may step down to the far file
+    if (!fitsBudget(scene, state, record, 0)) return null; // upgrade() may step down to the far file
     const entry = createShipEntry(scene, state, hull, { ...file, record }, ship);
     return entry ? entry.root : null;
   }

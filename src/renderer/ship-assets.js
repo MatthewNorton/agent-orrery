@@ -34,7 +34,7 @@
  * @property {(manifest: ShipManifest | null, ship: Ship) => HullEntry | null} selectHull
  * @property {(hull: HullEntry, lod: 'far' | 'near') => HullFile[]} hullFiles
  * @property {(scene: any, state: SceneState, file: HullFile) => Promise<HullRecord | null>} ensureContainer
- * @property {(state: SceneState, record: HullRecord, released: number) => boolean} fitsBudget
+ * @property {(scene: any, state: SceneState, record: HullRecord, released: number) => boolean} fitsBudget
  * @property {(scene: any, state: SceneState, hull: HullEntry, released: number) => Promise<HullAsset | null>} resolveAsset
  */
 
@@ -42,11 +42,12 @@
   const AUR = window.AUR;
   const MANIFEST_PATH = '../../assets/ships/manifest.json';
   const HULL_ROOT = '../../assets/ships/';
-  // Hulls carry their detail as geometry (10k to 58k triangles each). The budget holds fifty ships
-  // of the first rank (Petrel, 17.5k) before the step-down to darts starts: the most a system view
-  // drew inside a 60 fps frame on an integrated GPU (about 14 ms, nearly all of it on the CPU, which
-  // a hull loads by its draws, so triangles stand in for them here: docs/TASK-LIST.md).
-  const TRIANGLE_BUDGET = 900000;
+  // Hulls carry their detail as geometry (10k to 58k triangles each), and past its budget a view
+  // steps down to darts. A system or planet view holds fifty ships of the first rank (Petrel,
+  // 17.5k): the most it drew inside a 60 fps frame on an integrated GPU (about 14 ms, nearly all of
+  // it on the CPU, which a hull loads by its draws, so triangles stand in for them:
+  // docs/TASK-LIST.md). The universe map instances its hulls and holds seventy (about 4 ms).
+  const TRIANGLE_BUDGET = { near: 900000, far: 1250000 };
   /** @type {WeakMap<object, SceneState>} */
   const sceneStates = new WeakMap();
   const logged = new Set();
@@ -227,8 +228,8 @@
     return record.promise;
   }
 
-  function fitsBudget(state, record, released) {
-    return state.triangles - released + record.triangles < TRIANGLE_BUDGET;
+  function fitsBudget(scene, state, record, released) {
+    return state.triangles - released + record.triangles < TRIANGLE_BUDGET[viewLod(scene) || 'far'];
   }
 
   function logBudget(scene) {
@@ -249,7 +250,7 @@
       }
       return ensureContainer(scene, state, files[index]).then((record) => {
         if (!record || isSceneDisposed(scene, state)) return null;
-        if (fitsBudget(state, record, released)) return { ...files[index], record };
+        if (fitsBudget(scene, state, record, released)) return { ...files[index], record };
         return tryFile(index + 1);
       });
     };
