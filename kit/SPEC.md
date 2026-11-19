@@ -192,14 +192,22 @@ Ship = { id, name, provider, project, kind, status, detail, lastEvent,
 FeedEntry = { kind, text, project, ts }
 // kind: 'discover'|'form'|'build'|'info'|'spawn'|'depart'|'attention'|'done'|'warning'
 
-SystemData = { project: Project, planets: Planet[], beltDensity: number }
+SystemData = { project: Project, planets: Planet[], beltDensity: number, planetTotal? }
+// planets: the project's biggest, at most 8, which the system view draws; planetTotal: how many
+//   it has, present only when that is more
 Planet     = { name, files, builds, procedural? }   // name '(root)' possible
 
 PlanetData = { name, project: Project, builds, files, sizeKb, subdirs,
                resources: string[], procedural?, folderRead? }   // resources = top file exts;
-                                  // folderRead: live only, 'full', 'partial' (the read stopped
-                                  // short) or 'none' (the folder is gone or locked); absent
-                                  // when there was no folder to read (procedural, or history)
+// name: the planet as the system view draws it, which seeds its globe: live, the folder as the
+//   disk spells it; in history, its bucket's key. Under a Windows path it can differ in case from
+//   the name asked for, and the renderer takes it as the planet's name.
+// procedural: a stand-in with invented folder numbers. Live: the project has no folder on disk,
+//   or the planet is a `Sector-N` stand-in with no folder and no builds. History: no builds at
+//   the cursor.
+// folderRead: live only. 'full'; 'partial' (the read stopped short, so files and size are
+//   floors); 'gone' (the folder is not there); 'none' (it is there and could not be read: locked,
+//   or a passing error). Absent when there was no folder to read (procedural, or history).
 ```
 
 Event batch entries (from `AU.onEvents`):
@@ -211,7 +219,9 @@ Event batch entries (from `AU.onEvents`):
 { type: 'ship-updated',   ship }           // status/detail changed
 { type: 'ship-departed',  shipId, ts }
 { type: 'build', project, bucket, file, shipId, isNew, ts }
-   // project is the ID string; bucket = planet name; isNew => planet formation
+   // project is the ID string; bucket = the edit's top-level folder as the edit wrote it, or
+   // '(root)'; isNew => planet formation. Under a Windows path main keeps one bucket for a
+   // folder's casings, so the renderer matches a bucket to a planet with `AUR.folderKey`.
 { type: 'activity', project, shipId, tool, status, detail, ts }
 { type: 'feed', entry: FeedEntry }
 ```
@@ -247,23 +257,38 @@ Design tokens (put in `:root`):
   800 px wide, with its field first and the results below. The query ranks up to 6 projects, 4
   agents and 4 folders (`search-core.js`): prefix, then substring, then a project's path,
   repository or branch (an agent's status) holding the query, then fuzzy matches, the query's
-  characters in order (3 or more), scored by how close they sit and whether they start words.
-  PROJECTS ranks its query the same way, without the fuzzy matches. Both match real values only:
+  characters in order (3 or more), scored by how close they sit and whether they start words; a
+  word counts the same wherever it sits in the name (`dsb` finds `web-dashboard` as it finds
+  `dashboard`), and how far along the match starts only orders the matches.
+  PROJECTS ranks its query the same way, whole matches only (`rankProjects` with `fuzzy: false`
+  runs no fuzzy pass). Both rank and mark the name they show (`A.projectLabel`, so a project
+  without a name is found by its id) and match real values only:
   the `Unnamed project`, `Branch unavailable` and `Detached HEAD` labels match nothing, and case
-  folds letter by letter (`İ` as `i`, `ς` as `σ`). Each row shows the live dot (an agent's is its
+  folds letter by letter (`İ` as `i`, `ς` as `σ`; the VCS component's own search folds the same
+  way). Each row shows the live dot (an agent's is its
   provider colour), the name with the characters its match found marked (none when the path,
   repository, branch or status found it), the full path, the repository and branch (an agent's
   status) and its kind. Short of room the repository gives way first, then the start of the
-  path; the path's last two folders stay, or as many as tell it from a result of the same name.
-  Arrows, Enter and click pick a result through the existing guarded routes. Escape, a click
-  outside (pressed and released there with the main button, so a drag out of the field selecting
-  text keeps it; Settings follows the same rule, `AUR.closeOnBackdrop`), a pick or a view switch
-  closes the palette and clears the query; focus goes back where it was unless a pick moved on,
-  and stays in the dialog while it is open. The
+  path; the path's last two folders stay, or as many as tell it from a result of the same name (a
+  folder of a project at a drive or filesystem root reads `D:\src`, with one separator).
+  Arrows, Enter and click pick a result through the existing guarded routes. The arrows move the
+  selection on the rows as they stand, and a refresh from the store keeps the element of every row
+  whose entry stays in its place (`A.renderListbox`), so a click that is under way still lands and
+  the list stays scrolled where it was; PROJECTS shares both. While an input method composes text,
+  Enter, Escape and the arrows are its own. Escape, a click
+  outside (pressed and released outside the dialog's own box with the main button, so a drag out
+  of the field selecting text keeps it; Settings follows the same rule, `AUR.closeOnBackdrop`), a
+  pick or a view switch closes the palette and clears the query; focus goes back where it was,
+  except after a pick, which leaves it on the page (a field the palette was opened from would
+  take the next keys as text), and stays in the dialog while it is open. The
   backdrop is a light shade, so the universe's matching systems show behind. The GitHub filter
-  narrows the results (and their agents and folders), the map and the PROJECTS directory; the
+  narrows the results (and their agents and folders), the map and the PROJECTS directory, and is
+  wired apart from the palette; the
   palette's footer says so while it is on. A bar under 1100 layout px (text size counts) keeps
-  PROJECTS to its mark and count.
+  PROJECTS to its mark and count; a bar still short of room takes it from the brand (the badge
+  gives way to an ellipsis, then the name), so the controls on the right stay on screen. The
+  chrome's other width rules count the text size too: PROJECTS opens at the window's edge, not
+  beside the right rail, once the chrome has 1040 layout px or fewer across.
   A persistent gear opens Settings, one tab at a time: Graphics · Panels · Shortcuts · Projects · Backup
   (`app/settings-tabs.js`; arrow keys, Home and End move between the tabs, the last tab chosen
   stays chosen while the app runs, and Settings opens on Projects while a project folder is
@@ -336,7 +361,9 @@ Design tokens (put in `:root`):
   above it): `← Universe` / `← Orion System` style button.
 - **History bar** (all views, fixed bottom): Play/Pause, `1x`/`10x`/`100x`/
   `1000x`, historical clock, scrubber, and exact `LIVE`. Existing sidebar,
-  summaries, and planet tabs remain above it at 1200×720. Seeking atomically
+  summaries, and planet tabs remain above it at 1200×720. The bar of a window 1280 px wide or
+  less at 100% text, or as narrow in layout px at a larger text size (a container query on its own
+  width), closes up: less room between its parts, narrower buttons, no `PROJECT STARTS` caption. Seeking atomically
   reseeds the store; returning LIVE installs a fresh tracker snapshot.
 - Status dot colors: Building `#4da3ff`, Exploring `#a78bfa`,
   Gathering Resources `#ffb454`, Scanning `#34d399`, Delegating `#f472b6`,
@@ -445,7 +472,10 @@ Design tokens (put in `:root`):
   filter is on), matching system glyphs and labels brighten through those same
   state materials and nonmatches dim, in view behind the palette's light
   backdrop; closing the palette, clearing or leaving the universe restores the
-  ordinary online/idle/derelict appearance.
+  ordinary online/idle/derelict appearance. Behind the backdrop a label still
+  keeps clear of the chrome, as it does with the palette shut, and of the
+  palette's own box: a hit test skips the page a modal dialog makes inert, so
+  `scene/universe/labels.js` tests the boxes of the elements that take the pointer.
 - Ships: every live ship = its hull (a dart until it loads) cruising outside
   its project's glyph rings (slow orbit, gentle bob), instanced per provider.
   Drones smaller. On `ship-spawned`: warp-in grow; `ship-departed`: removed.
@@ -503,8 +533,10 @@ Data: `AU.getSystem(projectId)`.
   belt; on `build` → `flyto` (`AUR.MOTION.flyToSeconds`, arcing over the belt
   and the largest planet) to a standoff beside the `bucket` planet → `hold`
   (~2.4s, a thin emissive beam, planet pulses 1 → 1.15 → 1) → `return` to the
-  ring (`AUR.MOTION.returnSeconds`). On `build` with `isNew: true`: re-fetch
-  `AU.getSystem`, grow the new planet in from zero, feed shows planet formation.
+  ring (`AUR.MOTION.returnSeconds`). The `bucket` planet is the one of that folder, in any
+  casing under a Windows path (`AUR.folderKey`). On `build` with `isNew: true` and no
+  such planet: re-fetch `AU.getSystem` (the view's `systemData` follows), grow the new
+  planet in from zero, feed shows planet formation.
   On `activity`: brief thruster flash.
 - Project card (top-left, panel): `PROJECT: <NAME>`; rows: `STATE` (any ship
   Building → `Building` in accent blue; else the busiest ship status; no ships →
@@ -528,7 +560,9 @@ Data: `AU.getSystem(projectId)`.
   source line endings in the file are preserved.
 - IDEAS panel (global command rail): captures root-level to-do ideas before a
   project is selected. In LIVE mode the user can assign one to an existing
-  project, which idempotently adds an internally tagged `GOALS.md` item and
+  project (the picker's lines are `A.projectSubtitles`: name, then galaxy, repository,
+  branch and path; projects that share a name lead with the end of the path that tells
+  them apart), which idempotently adds an internally tagged `GOALS.md` item and
   starts Codex. Any idea that is not mid-start or mid-run can be removed after
   confirmation; removing an assigned one also drops its unfinished tagged
   `GOALS.md` line when the project is reachable. The task shows Agent working while correlated work
@@ -542,8 +576,12 @@ Data: `AU.getSystem(projectId)`.
 
 ## 7. Planet view (`1.planet-view.png`)
 
-Data: `AU.getPlanet(projectId, name)`, and `AU.getSystem(projectId)` alongside it for the planet
-card's solar-system totals (the view carries it as `systemData`; when it fails, those rows show `—`).
+Data: `AU.getPlanet(projectId, name)`, and the project's system alongside it for the planet
+card's solar-system totals: the open view's own `systemData` when it holds this project's from
+this stream and no reset has come since, else `AU.getSystem(projectId)` (`A.systemForPlanet`).
+The view carries it as `systemData`; when it fails, those rows show `—`; a `build` with
+`isNew: true` in the open planet's project fetches it again. The view and the route take the
+planet's name from the answer (`PlanetData.name`), not from the name asked for.
 
 - Large generated world (same class rule) filling ~60% of view height, slow
   rotation about a tilted axis, the atmosphere shell, clouds on oceanic worlds on
@@ -558,18 +596,25 @@ card's solar-system totals (the view carries it as `systemData`; when it fails, 
   2. `PLANET: <NAME uppercased>` card, in plain words — status dot `Active` (ships present) or
      `Dormant`; a line saying what the globe is drawn as (its class from `AUR.worldProfile`:
      Rocky world, Gas giant, Ice world, Volcanic world, Oceanic world) and what the planet stands
-     for (`a folder in <project>`, `the top-level files of <project>` for `(root)`, or `no folder on
-     disk` when `procedural`); rows `FILES`, `SIZE` (KB, MB or GB), `SUBFOLDERS`, `FILE TYPES` (top
-     extensions, `MISC` shown as `other`), each `—` where main read no folder (`A.planetFolderCounts`),
-     and the line says why from the planet's own data: `no folder on disk` (`procedural`, its
-     numbers invented), `· could not be read` (`folderRead: 'none'`: a build bucket's folder gone
-     or locked), or `· history keeps no file counts` (`folderRead` absent: REPLAY never reads the
-     disk); `FILES` and `SIZE` end in `+` when the read stopped short (`folderRead: 'partial'`:
-     600 files, 300 folders, five levels, or a folder it could not read); then `BUILDS (FILE EDITS)`:
+     for (`a folder in <project>`, `the top-level files of <project>` for `(root)`, or, when
+     `procedural`, `no folder on disk` for a project without one and `no builds here yet` for a
+     stand-in of a project whose folder is there); rows `FILES`, `SIZE` (KB, MB or GB),
+     `SUBFOLDERS`, `FILE TYPES` (top extensions, `MISC` shown as `other`), each `—` where main read
+     no folder (`A.planetFolderCounts`), and the line says why from the planet's own data: the
+     `procedural` lines above (its numbers invented), `· no longer on disk` (`folderRead: 'gone'`:
+     a build bucket outlives its folder), `· could not be read` (`folderRead: 'none'`: there, and
+     locked or failing just now), or `· history keeps no file counts` (`folderRead` absent: REPLAY
+     never reads the disk); `FILES` and `SIZE` end in `+` when the read stopped short
+     (`folderRead: 'partial'`: past 600 files, 300 folders or five levels, where a folder left
+     unread counts only if it or a folder below it holds a file, at most 100 of them looked into;
+     or a folder below the planet's, or a file's size, that could not be read), and a floor is
+     rounded down (`0 KB+`, never `< 1 KB+`); then `BUILDS (FILE EDITS)`:
      `THIS PLANET`, `WHOLE SOLAR SYSTEM` (the project's `totalBuilds`) and a bar of the planet's
-     share; then `SOLAR SYSTEM`: `PLANETS` (the planets the system view draws, at most 8, from
-     `systemData`) and `AGENTS`. A `build` event on the open planet raises its count in place,
-     its folder matched as main matches buckets (case-insensitively under a Windows path).
+     share, a whole percent that is never `0%` of a planet with builds (`< 1%`) nor `100%` of one
+     without them all (`> 99%`); then `SOLAR SYSTEM`: `PLANETS` (the planets the system view
+     draws, `8 of <planetTotal>` when the project has more, from `systemData`) and `AGENTS`. A
+     `build` event on the open planet raises its count in place, its folder matched as main
+     matches buckets (`AUR.folderKey`: case-insensitively under a Windows path).
 - No tab bar: the mockup's `Overview … Scans` row was dropped because its tabs did nothing.
 - Summary card: `PLANET SUMMARY` — Agents / Files / Subfolders / Builds.
 - Back button → system view.
