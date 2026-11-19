@@ -297,7 +297,7 @@
     const request = ++S.routeRequestGeneration;
     const requestedEpoch = S.streamEpoch;
     // The system rides along for the planet card's solar-system totals; without it they show dashes.
-    const systemRequest = system || A.fetchSystem(projectId);
+    const systemRequest = A.requestPlanetSystem(projectId, system);
     /** @type {PlanetData} */
     let data = null;
     try { data = await AU.getPlanet(projectId, name); } catch (e) { AUR.log('getPlanet err', e && e.message); }
@@ -309,6 +309,7 @@
     if (!data) { AUR.log('no planet data for', projectId, name); return A.openSystem(projectId); }
     S.planetSystem.data = held;
     setView('planet', { planet: data, projectId, name: data.name, store: S.store });
+    A.planetSystemOpened();
   };
 
   function back() {

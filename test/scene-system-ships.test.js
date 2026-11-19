@@ -1,6 +1,7 @@
 'use strict';
 
-// The system view's ships part (src/renderer/scene/system/ships.js): which planet a build goes to.
+// The system view's ships part (src/renderer/scene/system/ships.js): which planet a build goes to,
+// and the system fetched again when a build starts a planet the view does not draw.
 
 const assert = require('node:assert/strict');
 const test = require('node:test');
@@ -49,4 +50,38 @@ test('system ships: a build goes to the planet with its key; of two that share o
   build('src', 'src', { project: 'other' });
   build('lib', 'lib');
   assert.deepEqual(pulsed(), []);
+});
+
+test('system ships: a build that starts a planet fetches the system again, and it is behind until the answer', async () => {
+  const { view, asked, built, build } = loadPart([{ name: 'src', key: 'src' }]);
+  build('src', 'src', { isNew: true });
+  assert.deepEqual([asked.length, view.sysBehind], [0, false], 'a planet the view already draws is no news');
+
+  build('docs', 'docs', { isNew: true });
+  assert.deepEqual([asked.length, view.sysBehind], [1, true]);
+  build('lib', 'lib', { isNew: true });
+  assert.equal(asked.length, 1, 'one request at a time');
+  asked[0].resolve(systemOf('src', 'docs'));
+  await settled();
+  assert.deepEqual([asked.length, view.sysBehind, built], [2, true, ['docs']], 'an answer from before the later planet is asked for again');
+  build('web', 'web', { isNew: true });
+  asked[1].resolve(systemOf('src', 'docs', 'lib'));
+  await settled();
+  asked[2].resolve(systemOf('src', 'docs', 'lib', 'web'));
+  await settled();
+  assert.deepEqual([asked.length, view.sysBehind, built, view.sys.planets.length], [3, false, ['docs', 'lib', 'web'], 4]);
+
+  // No answer: the system stays behind, and the next such build asks again.
+  build('api', 'api', { isNew: true });
+  asked[3].reject(new Error('main is away'));
+  await settled();
+  assert.deepEqual([view.sysBehind, view.sys.planets.length], [true, 4]);
+  build('cli', 'cli', { isNew: true });
+  assert.equal(asked.length, 5);
+
+  // An answer for a view that has closed builds nothing.
+  view.scene.isDisposed = true;
+  asked[4].resolve(systemOf('src', 'docs', 'lib', 'web', 'api', 'cli'));
+  await settled();
+  assert.deepEqual([built.length, view.sys.planets.length, asked.length], [3, 4, 5]);
 });

@@ -112,8 +112,9 @@
     activeScene: null,
     current: { view: 'universe', projectId: null, planetName: null },
     // The open planet's system, for its card's solar-system rows: set as the planet opens, fetched
-    // again (one request at a time) when a build starts a planet (app/project/control.js).
-    planetSystem: { data: null, loading: false, stale: false },
+    // again (one request at a time) when a build starts a planet, also one that came while the
+    // planet of project `awaited` was opening (`missed`) (app/project/control.js).
+    planetSystem: { data: null, loading: false, stale: false, awaited: null, missed: false },
     routeRequestGeneration: 0,
     booting: true,
     bootEventQueue: [],

@@ -216,20 +216,41 @@
   };
 
   /**
-   * A build that starts a planet changes the open planet card's PLANETS row: its system
-   * (S.planetSystem) is fetched again, one request at a time, and once more for a build that came
-   * while one was out.
+   * The system a planet opens its card with: the system view's own (`handed`) or a fetch. Either
+   * can predate a planet that forms in the project while the planet is read, so from here until
+   * A.planetSystemOpened such a build is noted.
+   * @param {string} projectId @param {SystemData} [handed] @returns {Promise<SystemData | null>}
    */
-  A.refreshPlanetSystem = async function refreshPlanetSystem() {
+  A.requestPlanetSystem = function requestPlanetSystem(projectId, handed) {
+    Object.assign(S.planetSystem, { awaited: projectId, missed: false });
+    return handed ? Promise.resolve(handed) : A.fetchSystem(projectId);
+  };
+
+  /** The planet view is open with the system it asked for: one a planet has formed since is fetched again. */
+  A.planetSystemOpened = function planetSystemOpened() {
+    const { missed } = S.planetSystem;
+    Object.assign(S.planetSystem, { awaited: null, missed: false });
+    if (missed) A.refreshPlanetSystem(S.current.projectId);
+  };
+
+  /**
+   * A build that starts a planet in `projectId` changes a planet card's PLANETS row. For the open
+   * planet, its system (S.planetSystem) is fetched again, one request at a time, and once more for
+   * a build that came while one was out; for a planet still opening, when it has opened.
+   * @param {string} projectId
+   */
+  A.refreshPlanetSystem = async function refreshPlanetSystem(projectId) {
     const held = S.planetSystem;
+    if (projectId === held.awaited) held.missed = true;
+    if (S.current.view !== 'planet' || S.current.projectId !== projectId) return;
     held.stale = true;
     if (held.loading) return;
     held.loading = true;
     while (held.stale && S.current.view === 'planet') {
       held.stale = false;
-      const projectId = S.current.projectId;
-      const system = await A.fetchSystem(projectId);
-      if (!system || S.current.view !== 'planet' || S.current.projectId !== projectId) continue;
+      const open = S.current.projectId;
+      const system = await A.fetchSystem(open);
+      if (!system || S.current.view !== 'planet' || S.current.projectId !== open) continue;
       held.data = system;
       A.scheduleChrome(C.CHROME.PLANET);
     }

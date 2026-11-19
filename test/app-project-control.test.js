@@ -68,7 +68,7 @@ function planetSetup(planet, { project = {}, system = null } = {}) {
     current: { view: 'planet', projectId: 'p', planetName: planet.name },
     store: { projects: new Map([['p', whole]]), ships: new Map() },
     activeView: { planetData: { project: whole, builds: 0, resources: [], ...planet } },
-    planetSystem: { data: system, loading: false, stale: false },
+    planetSystem: { data: system, loading: false, stale: false, awaited: null, missed: false },
     commandRail: {},
     projectControl: { projectId: null }, terminalRequestSerial: 0, playback: { mode: 'live' },
   };
@@ -158,9 +158,11 @@ test('planet card: a build that starts a planet fetches the system again, one re
   assert.equal(card().rows.PLANETS, '1');
 
   // Three planets start in a row: the first asks, the others wait for its answer and share one more.
-  const first = app.refreshPlanetSystem();
-  app.refreshPlanetSystem();
-  app.refreshPlanetSystem();
+  app.refreshPlanetSystem('other');
+  assert.equal(asked.length, 0, 'a planet of another project changes nothing here');
+  const first = app.refreshPlanetSystem('p');
+  app.refreshPlanetSystem('p');
+  app.refreshPlanetSystem('p');
   assert.equal(asked.length, 1);
   asked[0].resolve(systemOf(2));
   await settled();
@@ -170,12 +172,39 @@ test('planet card: a build that starts a planet fetches the system again, one re
   assert.deepEqual([card().rows.PLANETS, asked.length, scheduled, state.planetSystem.loading], ['4', 2, [4, 4], false]);
 
   // An answer for a route that has moved on to another project is dropped.
-  const late = app.refreshPlanetSystem();
+  const late = app.refreshPlanetSystem('p');
   state.current.projectId = 'other';
   asked[2].resolve(systemOf(9));
   await late;
   assert.deepEqual([state.planetSystem.data.planets.length, scheduled.length, state.planetSystem.loading], [4, 2, false]);
   state.current.view = 'system';
   window.AU.getSystem = async () => assert.fail('only an open planet has a system to refresh');
-  await app.refreshPlanetSystem();
+  await app.refreshPlanetSystem('other');
+});
+
+test('planet card: a planet that starts while a planet is opening reaches its card once it has opened', async () => {
+  const systemOf = (count) => ({ project: { id: 'p' }, beltDensity: 0, planets: Array.from({ length: count }, (_, index) => ({ name: 'd' + index })) });
+  const { app, state, window, card } = planetSetup({ name: 'src', folderRead: 'full' });
+  const settled = () => new Promise((done) => setImmediate(done));
+  let asked = 0;
+  window.AU.getSystem = async () => systemOf(++asked + 1);
+  // What boot.js openPlanet does around its own awaits: ask, wait for the planet, show it.
+  const open = async (projectId, handed, meanwhile = () => {}) => {
+    state.current.view = 'system';
+    const request = app.requestPlanetSystem(projectId, handed);
+    meanwhile();
+    state.planetSystem.data = await request;
+    Object.assign(state.current, { view: 'planet', projectId });
+    app.planetSystemOpened();
+    await settled();
+    return card().rows.PLANETS;
+  };
+
+  assert.deepEqual([await open('p', systemOf(1)), asked], ['1', 0], 'the system view\'s own system is shown as handed over');
+  assert.deepEqual([await open('p', systemOf(1), () => app.refreshPlanetSystem('p')), asked], ['2', 1],
+    'a planet started meanwhile: the system handed over is behind, and is fetched again');
+  assert.deepEqual([await open('p', systemOf(1), () => app.refreshPlanetSystem('other')), asked], ['1', 1], 'another project\'s planet is not this card\'s');
+  assert.deepEqual([await open('p', null, () => app.refreshPlanetSystem('p')), asked], ['4', 3], 'a fetched system can be behind too');
+  assert.deepEqual([await open('p', systemOf(1)), asked], ['1', 3], 'a planet from an earlier opening is not counted against this one');
+  assert.deepEqual([state.planetSystem.awaited, state.planetSystem.missed], [null, false]);
 });

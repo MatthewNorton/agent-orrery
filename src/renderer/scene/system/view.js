@@ -73,7 +73,7 @@
     const beltR = planetList.length >= 2 ? (orbitR(Math.floor(planetList.length / 2) - 1) + orbitR(Math.floor(planetList.length / 2))) / 2 : outer + 4;
     const view = {
       scene, gui, sys, projectId, orbitR, outer, beltR, beltWidth: 3.4, planets, ships,
-      camera, canvas, glow, shipFocus: null, buildPlanet,
+      camera, canvas, glow, shipFocus: null, buildPlanet, sysBehind: false,
       sun, sunHex, sunDia, worldMaps: ctx.worldMaps, quality: ctx.quality,
     };
     const parts = AUR.sceneParts.system;
@@ -158,8 +158,8 @@
         view.orbitShipFocus(pi);
       } else if (pi.type === BABYLON.PointerEventTypes.POINTERPICK) {
         const m = pi.pickInfo && pi.pickInfo.pickedMesh;
-        // The system rides along, as this view holds it now, for the planet card.
-        if (m && m.metadata && m.metadata.isPlanet) ctx.openPlanet(projectId, m.metadata.planetName, view.sys);
+        // The system rides along for the planet card, unless a planet has started since it was read.
+        if (m && m.metadata && m.metadata.isPlanet) ctx.openPlanet(projectId, m.metadata.planetName, view.sysBehind ? undefined : view.sys);
       } else if (pi.type === BABYLON.PointerEventTypes.POINTERMOVE) {
         const pick = scene.pick(scene.pointerX, scene.pointerY, (mm) => mm.metadata && mm.metadata.isPlanet);
         const hit = pick && pick.hit ? pick.pickedMesh.metadata.planetName : null;

@@ -14,7 +14,7 @@
     const BELT_CLEARANCE = 0.9;  // and between the belt's outer edge and the patrol ring
     const shipLookTarget = new BABYLON.Vector3();
     const standoff = new BABYLON.Vector3();
-    let refetching = false;
+    let refetching = false, refetchAgain = false;
 
     function attentionSuffix(attention) {
       if (AUR.needsYou(attention)) return '· needs you';
@@ -169,20 +169,24 @@
       }
     }
 
-    function refetchPlanets() {
+    // A build started a planet this view does not draw: the system is fetched again, one request
+    // at a time, and once more for a planet that started while one was out. Until an answer from
+    // after the build is in, view.sys is behind it (view.sysBehind) and is not handed to a planet.
+    async function refetchPlanets() {
+      view.sysBehind = refetchAgain = true;
       if (refetching) return;
       refetching = true;
-      AU.getSystem(projectId).then((ns) => {
-        refetching = false;
-        if (!ns) return;
+      while (refetchAgain && !scene.isDisposed) {
+        refetchAgain = false;
+        const ns = await AUR.settle(() => AU.getSystem(projectId));
+        if (!Array.isArray(ns.planets) || scene.isDisposed) break;
         view.sys = ns;
+        view.sysBehind = refetchAgain;
         ns.planets.forEach((pd, i) => {
-          if (!planets.has(pd.name)) {
-            const rec = view.buildPlanet(pd, i);
-            rec.appear = 0.01;
-          }
+          if (!planets.has(pd.name)) view.buildPlanet(pd, i).appear = 0.01;
         });
-      }).catch(() => { refetching = false; });
+      }
+      refetching = false;
     }
 
     return { buildShip, animateShips, update };
