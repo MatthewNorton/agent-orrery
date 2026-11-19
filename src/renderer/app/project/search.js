@@ -12,6 +12,7 @@
   const S = A.state;
   const LABEL = 'Go to a project, agent or folder';
   const ROW_ID = 'search-result-';
+  const entryKey = (entry) => entry.key;
 
   A.wireProjectSearch = function wireProjectSearch() {
     wireVcsFilter();
@@ -40,11 +41,12 @@
       updateProjectSearch();
     });
 
-    A.wireListboxKeys(els.input, S.projectSearch, {
+    A.wireListbox(els.results, els.input, S.projectSearch, {
       escape: A.clearProjectSearch,
       update: updateProjectSearch,
       activate: activateProjectSearchResult,
       select: () => A.selectListboxRow(els.results, els.input, S.projectSearch, ROW_ID),
+      keyOf: entryKey,
     });
   };
 
@@ -181,7 +183,7 @@
     ];
     // Rows found only fuzzily go after every row found otherwise, each part in the kinds' order.
     S.projectSearch.results = [...rows.filter((row) => !row.fuzzy), ...rows.filter((row) => row.fuzzy)].slice(0, 10);
-    A.keepSelection(S.projectSearch, previous, queryChanged, (entry) => entry.key);
+    A.keepSelection(S.projectSearch, previous, queryChanged, entryKey);
     renderProjectSearchResults();
     A.syncProjectMatches(found.map((hit) => hit.project));
     renderProjectVcsFilter();
@@ -203,9 +205,8 @@
       rowClass: 'search-result',
       emptyClass: 'search-empty',
       emptyText: 'Nothing found',
-      keyOf: (entry) => entry.key,
+      keyOf: entryKey,
       fill: A.searchRowFiller(S.projectSearch.results),
-      activate: activateProjectSearchResult,
     });
   }
 

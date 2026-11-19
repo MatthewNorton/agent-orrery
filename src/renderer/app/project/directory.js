@@ -9,6 +9,7 @@
   if (!A) throw new Error('app/state.js must load before app/project/directory.js');
   const S = A.state;
   const ROW_ID = 'project-directory-result-';
+  const projectKey = (project) => project.id;
 
   // ---------- searchable all-projects directory ----------
   A.wireProjectDirectory = function wireProjectDirectory() {
@@ -35,15 +36,16 @@
     els.input.addEventListener('input', () => {
       A.debounceListbox(S.projectDirectory, updateProjectDirectory);
     });
-    A.wireListboxKeys(els.input, S.projectDirectory, {
+    A.wireListbox(els.list, els.input, S.projectDirectory, {
       escape: () => A.closeProjectDirectory(),
       update: updateProjectDirectory,
       activate: activateProjectDirectoryResult,
       select: () => A.selectListboxRow(els.list, els.input, S.projectDirectory, ROW_ID),
+      keyOf: projectKey,
     });
     document.addEventListener('keydown', (event) => {
       // While an input method composes, Escape cancels its text.
-      if (event.key !== 'Escape' || event.isComposing || event.keyCode === 229 || !S.projectDirectory.open) return;
+      if (event.key !== 'Escape' || AUR.composing(event) || !S.projectDirectory.open) return;
       event.preventDefault();
       A.closeProjectDirectory();
     });
@@ -109,7 +111,7 @@
     } else {
       S.projectDirectory.results = projects;
     }
-    A.keepSelection(S.projectDirectory, previous, queryChanged, (project) => project.id);
+    A.keepSelection(S.projectDirectory, previous, queryChanged, projectKey);
     A.renderProjectDirectory();
     A.syncProjectMatches(query ? S.projectDirectory.results : undefined);
   }
@@ -146,12 +148,11 @@
     if (!els || !S.projectDirectory.open) return;
     A.renderListbox(els.list, els.input, S.projectDirectory, {
       idPrefix: ROW_ID,
-      keyOf: (project) => project.id,
+      keyOf: projectKey,
       rowClass: 'project-directory-row',
       emptyClass: 'project-directory-empty',
       emptyText: 'No projects found',
       fill: fillDirectoryRow,
-      activate: activateProjectDirectoryResult,
     });
   }
 

@@ -261,6 +261,8 @@
     return n;
   };
   AUR.clear = (node) => { while (node.firstChild) node.removeChild(node.firstChild); };
+  // A key press an input method takes to compose text (229 where it hides the key): not the app's.
+  AUR.composing = (event) => event.isComposing || event.keyCode === 229;
   // A group of choice buttons, each paired with its value: a click picks that value, and the
   // returned press(value) marks the chosen one with aria-pressed.
   AUR.choiceButtons = function choiceButtons(pairs, onPick) {

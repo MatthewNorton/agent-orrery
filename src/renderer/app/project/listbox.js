@@ -7,6 +7,7 @@
   const A = AUR.app;
   if (!A) throw new Error('app/state.js must load before app/project/listbox.js');
   const C = A.const;
+  const PRESS_SLOP = 4; // px a pointer may drift between press and release and still have stayed put
 
   // `state` is S.projectSearch or S.projectDirectory: { timer, results, selected }.
   A.cancelListboxTimer = function cancelListboxTimer(state) {
@@ -23,13 +24,32 @@
   };
 
   /**
-   * Escape runs `escape`; arrows move the selection (`select` shows it) and Enter activates it, once
-   * a pending query has run. While an input method composes text the keys are its own: Enter
-   * commits the text and Escape cancels it.
+   * The field's keys and the list's clicks. Escape runs `escape`; arrows move the selection
+   * (`select` shows it) and Enter activates it, once a pending query has run. While an input method
+   * composes text the keys are its own: Enter commits the text and Escape cancels it. A click
+   * activates the entry its row stands for (`keyOf`), at whatever index a refresh has put it since
+   * the press. When the refresh moved the rows under a pointer that stayed put, the release lands
+   * on another row or past the list, and the entry that was pressed is still the one meant: so the
+   * press and the click are heard on the document.
    */
-  A.wireListboxKeys = function wireListboxKeys(input, state, { escape, update, activate, select }) {
+  A.wireListbox = function wireListbox(list, input, state, { escape, update, activate, select, keyOf }) {
+    const rowKey = (event) => {
+      const target = /** @type {Element} */ (event.target);
+      const row = /** @type {HTMLElement | null} */ (target.closest ? target.closest('[role="option"]') : null);
+      return row && row.parentNode === list ? row.dataset.key : null;
+    };
+    /** @type {{ key: string | null, x: number, y: number } | null} the press the next click completes */
+    let pressed = null;
+    document.addEventListener('mousedown', (event) => { pressed = { key: rowKey(event), x: event.clientX, y: event.clientY }; });
+    document.addEventListener('click', (event) => {
+      const stayed = pressed && Math.abs(event.clientX - pressed.x) < PRESS_SLOP && Math.abs(event.clientY - pressed.y) < PRESS_SLOP;
+      const key = stayed ? pressed.key : rowKey(event);
+      pressed = null;
+      const index = key == null ? -1 : state.results.findIndex((entry) => String(keyOf(entry)) === key);
+      if (index >= 0) activate(index);
+    });
     input.addEventListener('keydown', (event) => {
-      if (event.isComposing || event.keyCode === 229) return;
+      if (AUR.composing(event)) return;
       if (event.key === 'Escape') {
         event.preventDefault();
         event.stopPropagation();
@@ -80,18 +100,31 @@
     if (row) row.scrollIntoView({ block: 'nearest' });
   };
 
-  /** Makes `row` read as `fresh` does, keeping the element: a press on it still ends in its click. */
-  function adoptRow(row, fresh) {
-    for (const { name } of [...row.attributes]) if (!fresh.hasAttribute(name)) row.removeAttribute(name);
-    for (const { name, value } of [...fresh.attributes]) if (row.getAttribute(name) !== value) row.setAttribute(name, value);
-    row.replaceChildren(...fresh.childNodes);
+  /**
+   * Makes `node` read as `fresh` does and keeps its elements, wherever their tags line up: a press
+   * on a row, or on a part of one, ends in no click once the pressed element has been replaced.
+   * @param {Element} node @param {Element} fresh
+   */
+  function adopt(node, fresh) {
+    for (const { name } of [...node.attributes]) if (!fresh.hasAttribute(name)) node.removeAttribute(name);
+    for (const { name, value } of [...fresh.attributes]) if (node.getAttribute(name) !== value) node.setAttribute(name, value);
+    const kids = [...node.childNodes], next = [...fresh.childNodes];
+    next.forEach((child, i) => {
+      const old = kids[i];
+      if (!old) node.appendChild(child);
+      else if (old.nodeName !== child.nodeName) node.replaceChild(child, old);
+      else if (old instanceof Element) adopt(old, /** @type {Element} */ (child));
+      else if (old.nodeValue !== child.nodeValue) old.nodeValue = child.nodeValue;
+    });
+    for (const extra of kids.slice(next.length)) extra.remove();
   }
 
   /**
    * One `rowClass` option button per result, completed by `fill`; the selected one is the active
-   * descendant. A row whose entry (`keyOf`) stays in its place keeps its element, changed only
-   * where its content did, so a refresh from the store neither drops a click that is under way nor
-   * moves the list; the selected row is brought into view only when the selection moved.
+   * descendant. An entry (`keyOf`) that was listed keeps its row's elements, changed only where
+   * their content did and left where they are unless the order changed, so a refresh from the store,
+   * also one that adds or drops a row above, neither loses a click that is under way nor moves the list.
+   * The selected row is brought into view only when the selection moved to another row.
    */
   A.renderListbox = function renderListbox(list, input, state, opts) {
     if (state.results.length === 0) {
@@ -101,22 +134,28 @@
       return;
     }
     const was = list.querySelector('[aria-selected="true"]');
-    const wasAt = was instanceof HTMLElement ? was.id + ' ' + was.dataset.key : '';
+    const rows = /** @type {HTMLElement[]} */ ([...list.children]);
+    const held = new Map(rows.map((row) => [row.dataset.key, row]));
+    const listed = new Set(state.results.map((entry) => String(opts.keyOf(entry))));
+    let at = 0; // the next row not yet placed
     state.results.forEach((entry, index) => {
-      const row = AUR.button(opts.rowClass, null, () => opts.activate(index));
+      // Rows of entries no longer listed (and the note of an empty list) leave first, so no row is moved past them.
+      while (at < rows.length && !listed.has(rows[at].dataset.key)) rows[at++].remove();
+      const row = AUR.button(opts.rowClass);
       row.id = opts.idPrefix + index;
       row.dataset.key = String(opts.keyOf(entry));
       row.setAttribute('role', 'option');
       opts.fill(row, entry);
       markRow(row, index === state.selected);
-      const old = list.children[index];
-      if (!old) list.appendChild(row);
-      else if (!(old instanceof HTMLButtonElement) || old.dataset.key !== row.dataset.key) list.replaceChild(row, old);
-      else if (!old.isEqualNode(row)) adoptRow(old, row);
+      const old = held.get(row.dataset.key);
+      if (!old) { list.insertBefore(row, rows[at] || null); return; }
+      if (old === rows[at]) at++;
+      else { list.insertBefore(old, rows[at] || null); rows.splice(rows.indexOf(old), 1); }
+      adopt(old, row);
     });
-    while (list.children.length > state.results.length) list.lastElementChild.remove();
+    while (at < rows.length) rows[at++].remove();
     input.setAttribute('aria-activedescendant', opts.idPrefix + state.selected);
-    const selectedRow = /** @type {HTMLElement} */ (list.children[state.selected]);
-    if (selectedRow.id + ' ' + selectedRow.dataset.key !== wasAt) selectedRow.scrollIntoView({ block: 'nearest' });
+    const selectedRow = list.children[state.selected];
+    if (selectedRow !== was) selectedRow.scrollIntoView({ block: 'nearest' });
   };
 })();

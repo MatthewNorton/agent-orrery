@@ -1,30 +1,28 @@
 'use strict';
 
-// src/renderer/app/project/listbox.js: the keys and the selection of the Go to palette and the
-// PROJECTS directory.
+// src/renderer/app/project/listbox.js: the keys, the clicks and the selection of the Go to palette
+// and the PROJECTS directory.
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { runRenderer } = require('./support/renderer-source');
+const { runApp } = require('./support/renderer-source');
 const { fakeDocument, fakeElement } = require('./support/fake-dom');
 
 function setup(results = ['a', 'b', 'c']) {
   const document = fakeDocument();
-  const window = {};
-  runRenderer('util.js', { window, document });
-  window.AUR.app = { state: {}, const: { SEARCH_DEBOUNCE_MS: 10 } };
-  runRenderer('app/project/listbox.js', { window, document });
-  const app = window.AUR.app;
+  const { app } = runApp(['app/project/listbox.js'], { state: {}, const: { SEARCH_DEBOUNCE_MS: 10 } }, { document });
   const input = fakeElement('input');
+  const list = fakeElement('div');
   const state = { timer: null, results, selected: 0 };
   const calls = [];
-  app.wireListboxKeys(input, state, {
+  app.wireListbox(list, input, state, {
     escape: () => calls.push('escape'),
     update: () => calls.push('update'),
     activate: (index) => calls.push('activate ' + index),
     select: () => calls.push('select ' + state.selected),
+    keyOf: (entry) => entry,
   });
-  return { app, input, state, calls };
+  return { app, document, input, list, state, calls };
 }
 
 test('listbox keys: arrows move the selection round the list and Enter activates it', (t) => {
@@ -59,6 +57,55 @@ test('listbox keys: while an input method composes text, its keys are its own', 
   assert.deepEqual([calls, state.selected], [[], 0], 'Enter commits the text and Escape cancels it; neither reaches the list');
   input.fire('keydown', { key: 'Enter', isComposing: false, keyCode: 13 });
   assert.deepEqual(calls, ['activate 0']);
+});
+
+// A row of `list` for entry `key`, and an event target inside it.
+function rowFor(list, key) {
+  const row = fakeElement('button');
+  row.dataset.key = key;
+  row.parentNode = list;
+  return { closest: (selector) => (selector === '[role="option"]' ? row : null) };
+}
+
+test('listbox clicks: a click opens the entry its row stands for, wherever a refresh has put it', () => {
+  const { document, list, state, calls } = setup();
+  const press = (target, x = 100, y = 50) => document.fire('mousedown', { target, clientX: x, clientY: y });
+  const release = (target, x = 100, y = 50) => document.fire('click', { target, clientX: x, clientY: y });
+  const onC = rowFor(list, 'c'), onB = rowFor(list, 'b');
+
+  press(onC);
+  release(onC);
+  // A row came in above between the press and the release: the entry is one further down, and
+  // the pointer, which stayed put, is over the row that took its place.
+  press(onC);
+  state.results = ['new', 'a', 'b', 'c'];
+  release(onB);
+  // A row above went: the release is past the end of the list.
+  press(onC);
+  state.results = ['b', 'c'];
+  release({ closest: () => null });
+  assert.deepEqual(calls, ['activate 2', 'activate 3', 'activate 1']);
+
+  calls.length = 0;
+  press(onC);
+  // The page sends the click of a press that ended on another row to the list that holds both.
+  release({ closest: () => null }, 100, 90);
+  assert.deepEqual(calls, [], 'a press dragged to another row is a click on neither');
+  press(onC);
+  release(onC, 103, 52);
+  assert.deepEqual(calls, ['activate 1'], 'a pointer that drifts a little has stayed put');
+  release(onB);
+  assert.deepEqual(calls, ['activate 1', 'activate 0'], 'a click without a press (a key on the row) opens its own row');
+
+  calls.length = 0;
+  press(onC);
+  state.results = ['a', 'b'];
+  release(onC);
+  press({ closest: () => null });
+  release({ closest: () => null });
+  press(rowFor(fakeElement('div'), 'a'));
+  release(rowFor(fakeElement('div'), 'a'), 300, 300);
+  assert.deepEqual(calls, [], 'an entry that is gone, a click off the rows and a row of another list open nothing');
 });
 
 test('listbox selection: an arrow key marks the rows as they stand and builds none', () => {
