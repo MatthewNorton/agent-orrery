@@ -7,7 +7,7 @@
 
 const { canonicalProjectPath } = require('../provider-adapters');
 const { localAbsolutePath } = require('../path-safety');
-const { setBucket } = require('../build-buckets');
+const { addBuckets, setBucket } = require('../build-buckets');
 const { hasControlChars, validProjectId } = require('../shared/ids');
 const { ownString } = require('../shared/values');
 const { plainObject } = require('../transcripts/fields');
@@ -108,14 +108,13 @@ function importProjects(model, backup) {
       added++;
       continue;
     }
-    for (const [bucket, builds] of Object.entries(saved.buckets)) {
-      // Security: an own count read and written, whatever the bucket is called.
-      setBucket(existing.buckets, bucket, Math.max(Object.hasOwn(existing.buckets, bucket) ? existing.buckets[bucket] : 0, builds));
-    }
+    const adopted = existing.path ? null : preferredProjectPath(model, target, saved.path);
+    // A folder has one bucket in whatever casing it was written, by the rule of the folder the
+    // project has or is about to take: the backup's count goes to the key that holds it here.
+    addBuckets({ path: existing.path || adopted, buckets: existing.buckets }, saved.buckets, Math.max);
     existing.totalBuilds = Math.max(existing.totalBuilds, saved.totalBuilds);
     if (saved.firstSeen && saved.firstSeen < existing.firstSeen) existing.firstSeen = saved.firstSeen;
     existing.lastActivity = Math.max(existing.lastActivity, saved.lastActivity);
-    const adopted = existing.path ? null : preferredProjectPath(model, target, saved.path);
     if (adopted) adoptProjectPath(model, existing, adopted);
     else announceProjectUpdated(model, existing);
   }

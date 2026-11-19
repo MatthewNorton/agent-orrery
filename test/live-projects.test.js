@@ -10,8 +10,9 @@ const os = require('node:os');
 const path = require('node:path');
 const { createLiveModel } = require('../src/main/live/model');
 const {
-  ensureProjectForPath, preferredProjectPath, refreshProjectExistence, remapProjectPath,
+  adoptProjectPath, ensureProjectForPath, preferredProjectPath, refreshProjectExistence, remapProjectPath, restoreProject,
 } = require('../src/main/live/projects');
+const { ignoresCase } = require('../src/main/path-safety');
 const { canonicalProjectPath } = require('../src/main/provider-adapters');
 const { hex8 } = require('./support/transcripts');
 
@@ -132,11 +133,38 @@ test('live projects: remapProjectPath rolls everything back when the state file 
   } });
   const moved = dir('moved');
   const gone = path.join(path.dirname(moved), 'gone');
-  model.projects.set('missing', record('missing', gone, false));
+  const buckets = { Docs: 5, docs: 7 };
+  model.projects.set('missing', { ...record('missing', gone, false), buckets });
 
   assert.throws(() => remapProjectPath(model, 'missing', moved), { code: 'FAILED' });
   const project = model.projects.get('missing');
   assert.deepEqual([project.path, project.name, project.exists], [gone, 'gone', false]);
+  assert.equal(project.buckets, buckets, 'the counts as they were');
+  assert.deepEqual(Object.entries(buckets), [['Docs', 5], ['docs', 7]]);
   assert.deepEqual([{ ...model.pathOverrides }, model.projectPathIndex.size, { ...model.pathIds }], [{}, 0, {}]);
   assert.deepEqual(take(), []);
+});
+
+test('live projects: a folder keeps one bucket by the rule of the path its project has', (t) => {
+  const { model, dir } = newModel(t);
+  const counts = () => JSON.parse('{ "Docs": 5, "docs": 7, "src": 1, "__proto__": 2 }');
+  // A temp folder is a Windows path on Windows only: there Docs and docs are one folder.
+  const kept = (project) => [Object.entries(project.buckets),
+    ignoresCase(project.path) ? [['Docs', 12], ['src', 1], ['__proto__', 2]] : Object.entries(counts())];
+  // From a state file or a backup.
+  const here = restoreProject(model, 'here', { path: dir('here'), buckets: counts(), totalBuilds: 15 });
+  assert.deepEqual(...kept(here));
+  assert.equal(here.totalBuilds, 15);
+  // No path tells no two names apart or together; the folder the project then gets decides.
+  const pathless = restoreProject(model, 'pathless', { name: 'pathless', buckets: counts() });
+  assert.deepEqual(Object.entries(pathless.buckets), Object.entries(counts()));
+  adoptProjectPath(model, pathless, dir('adopted'));
+  assert.deepEqual(...kept(pathless));
+  // Counted under a POSIX path, on another machine, and recovered to a folder here.
+  const moved = restoreProject(model, 'moved', { path: '/work/elsewhere', buckets: counts() });
+  assert.deepEqual([moved.path, Object.entries(moved.buckets)], ['/work/elsewhere', Object.entries(counts())]);
+  remapProjectPath(model, 'moved', dir('moved'));
+  assert.deepEqual(...kept(moved));
+  // Buckets that are no object count nothing.
+  assert.deepEqual(restoreProject(model, 'odd', { path: dir('odd'), buckets: /** @type {any} */ ('text') }).buckets, {});
 });

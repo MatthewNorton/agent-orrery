@@ -8,6 +8,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { parseBackup } = require('../src/main/live/backup');
+const { ignoresCase } = require('../src/main/path-safety');
 const { MIN, T0, createWorld, writeState } = require('./support/transcripts');
 
 function byId(tracker) {
@@ -115,6 +116,26 @@ test('a file that is not a backup is refused', () => {
     JSON.stringify({ format: 'agent-orrery-backup', version: 1, universe: { projects: [] } })]) {
     assert.equal(parseBackup(text), null, text);
   }
+});
+
+test('a backup\'s count for a folder goes to the bucket the folder has here, in whatever casing', (t) => {
+  const w = createWorld(t);
+  const other = path.join(w.root, 'workspace', 'other');
+  fs.mkdirSync(other);
+  writeState(w.statePath, { version: 2, projects: { kept: { path: w.projectDir, buckets: { Docs: 5, src: 3 }, totalBuilds: 8, firstSeen: T0 } } });
+  const tracker = w.live().tracker;
+  assert.deepEqual(tracker.importBackup(parseBackup(JSON.stringify({ format: 'agent-orrery-backup', version: 1, universe: { projects: {
+    kept: { path: w.projectDir, buckets: { docs: 7, SRC: 1, lib: 2 }, totalBuilds: 10 },
+    // A file may name one folder twice; a project it adds keeps one bucket for it all the same.
+    fresh: { path: other, buckets: { Docs: 5, docs: 7 }, totalBuilds: 12 },
+  } } }))), { added: 1, merged: 1 });
+  const buckets = (id) => Object.entries(tracker.model.projects.get(id).buckets);
+  // The temp folder is a Windows path on Windows only: there one folder is one bucket.
+  const oneFolder = ignoresCase(w.projectDir);
+  assert.deepEqual(buckets('kept'), oneFolder ? [['Docs', 7], ['src', 3], ['lib', 2]]
+    : [['Docs', 5], ['src', 3], ['docs', 7], ['SRC', 1], ['lib', 2]]);
+  assert.deepEqual(buckets('fresh'), oneFolder ? [['Docs', 12]] : [['Docs', 5], ['docs', 7]]);
+  assert.equal(byId(tracker).get('kept').planets.length, oneFolder ? 3 : 5);
 });
 
 test('hostile ids, names, bucket counts and paths never reach the model', () => {

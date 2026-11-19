@@ -6,6 +6,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { addBuckets } = require('../build-buckets');
 const { canonicalProjectPath, isLocalProjectPath } = require('../provider-adapters');
 const { localAbsolutePath } = require('../path-safety');
 const { hex8 } = require('../shared/hash');
@@ -56,14 +57,27 @@ function createProject(model, id, projPath, fields) {
     totalBytes: fields.totalBytes || 0,
     claudeBytes: fields.claudeBytes || 0,
     codexBytes: fields.codexBytes || 0,
-    buckets: fields.buckets || {},
+    buckets: fields.buckets && typeof fields.buckets === 'object' ? fields.buckets : {},
     totalBuilds: fields.totalBuilds || 0,
     firstSeen: fields.firstSeen || Date.now(),
   };
+  rebucket(project);
   model.projects.set(id, project);
   indexProjectPath(model, project);
   queue(model, { type: 'project-added', project: liveProject(project) });
   return project;
+}
+
+/**
+ * One bucket per folder by the rule of the path the project has now (build-buckets.js): keys that
+ * a folder ignoring case counts as one share the first of them, with their builds added up. Run
+ * wherever a project gets its buckets or its path from outside: a state file, a backup, a new path.
+ * @param {{ path: string | null, buckets: Record<string, number> }} project
+ */
+function rebucket(project) {
+  const counted = project.buckets;
+  project.buckets = {};
+  addBuckets(project, counted, (held, added) => held + added);
 }
 
 /**
@@ -74,6 +88,7 @@ function createProject(model, id, projPath, fields) {
  */
 function adoptProjectPath(model, project, projPath) {
   project.path = projPath;
+  rebucket(project);
   project.name = path.basename(projPath) || project.name;
   project.exists = isProjectDirectory(projPath);
   indexProjectPath(model, project);
@@ -215,6 +230,7 @@ function remapProjectPath(model, projectId, nextPath) {
     path: project.path,
     name: project.name,
     exists: project.exists,
+    buckets: project.buckets,
     hadOverride: Object.prototype.hasOwnProperty.call(model.pathOverrides, projectId),
     override: model.pathOverrides[projectId],
     hadIndex: model.projectPathIndex.has(key),
@@ -223,6 +239,7 @@ function remapProjectPath(model, projectId, nextPath) {
     pathIdOwner: model.pathIds[key],
   };
   project.path = real;
+  rebucket(project);
   project.name = path.basename(real) || project.name;
   project.exists = true;
   model.pathOverrides[projectId] = real;
@@ -233,6 +250,7 @@ function remapProjectPath(model, projectId, nextPath) {
     saveState(model, true);
   } catch {
     project.path = previous.path;
+    project.buckets = previous.buckets;
     project.name = previous.name;
     project.exists = previous.exists;
     if (previous.hadOverride) model.pathOverrides[projectId] = previous.override;
