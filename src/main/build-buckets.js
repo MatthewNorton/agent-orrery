@@ -9,6 +9,12 @@ const { ignoresCase } = require('./path-safety');
 
 /** @typedef {{ path: string | null, buckets: Record<string, number> }} BucketedProject */
 
+// Where a buckets object keeps its keys by their lower case (foldedKeys). Not enumerable and not a
+// string key, so it is in no JSON, spread, Object.assign copy or IPC message: a copy builds its own.
+const FOLDED = Symbol('bucket keys by lower case');
+// A name as every casing of it compares where the root ignores case: the one place that says how.
+const fold = (/** @type {string} */ name) => name.toLowerCase();
+
 /**
  * The bucket of a project-relative path.
  * @param {string} rel
@@ -26,7 +32,7 @@ function bucketOf(rel, separator) {
  * @param {string} name
  */
 function planetKey(project, name) {
-  return ignoresCase(project.path) ? name.toLowerCase() : name;
+  return ignoresCase(project.path) ? fold(name) : name;
 }
 
 /**
@@ -53,8 +59,31 @@ function matchingName(names, name, root) {
 function bucketKey(project, name) {
   if (Object.hasOwn(project.buckets, name)) return name;
   // Security: a transcript can start a bucket per edit. A case-sensitive root has the exact key
-  // or none, so a miss there scans nothing; only a root that ignores case looks through the keys.
-  return ignoresCase(project.path) ? matchingName(Object.keys(project.buckets), name, project.path) : null;
+  // or none, so a miss there looks nothing up; a root that ignores case asks the index of the
+  // keys, which is one lookup however many buckets there are.
+  return ignoresCase(project.path) ? foldedKeys(project.buckets).get(fold(name)) ?? null : null;
+}
+
+/**
+ * The first key of `buckets` for each folded key, as matchingName would find it. Built on the
+ * first miss and kept on the object, where setBucket adds each new key: so every write of a bucket
+ * goes through setBucket (test/build-buckets.test.js looks for one that does not).
+ * @param {Record<string, number>} buckets
+ * @returns {Map<string, string>}
+ */
+function foldedKeys(buckets) {
+  /** @type {Map<string, string> | undefined} */
+  let index = /** @type {any} */ (buckets)[FOLDED];
+  if (index) return index;
+  index = new Map();
+  for (const key of Object.keys(buckets)) addFolded(index, key);
+  if (Object.isExtensible(buckets)) Object.defineProperty(buckets, FOLDED, { value: index });
+  return index;
+}
+
+/** @param {Map<string, string>} index @param {string} key */
+function addFolded(index, key) {
+  if (!index.has(fold(key))) index.set(fold(key), key);
 }
 
 /**
@@ -79,6 +108,8 @@ function bucketFor(project, name) {
  */
 function setBucket(buckets, key, count) {
   Object.defineProperty(buckets, key, { value: count, writable: true, enumerable: true, configurable: true });
+  const index = /** @type {any} */ (buckets)[FOLDED];
+  if (index) addFolded(index, key);
 }
 
 /**
@@ -93,6 +124,22 @@ function countBuild(project, bucket) {
 }
 
 /**
+ * Adds `counts` to the project's buckets, each under the key its folder has there (bucketKey), so
+ * a folder keeps one bucket whatever casing the counts name it by. Where the folder has a count
+ * already, `both` makes one of the two.
+ * @param {BucketedProject} project
+ * @param {Record<string, number>} counts
+ * @param {(held: number, added: number) => number} both
+ */
+function addBuckets(project, counts, both) {
+  for (const [name, builds] of Object.entries(counts)) {
+    const key = bucketKey(project, name);
+    // Security: an own count read and written, whatever the bucket is called.
+    setBucket(project.buckets, key ?? name, key === null ? builds : both(project.buckets[key], builds));
+  }
+}
+
+/**
  * The builds counted for folder `name`.
  * @param {BucketedProject} project
  * @param {string} name
@@ -101,4 +148,4 @@ function bucketBuilds(project, name) {
   return bucketFor(project, name).builds;
 }
 
-module.exports = { bucketOf, bucketKey, bucketFor, countBuild, bucketBuilds, matchingName, planetKey, setBucket };
+module.exports = { addBuckets, bucketOf, bucketKey, bucketFor, countBuild, bucketBuilds, matchingName, planetKey, setBucket };
