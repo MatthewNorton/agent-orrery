@@ -1,8 +1,8 @@
 'use strict';
 
-// The live model (src/main/tracker.js) on a Claude transcript: drones, attention, sweeps and
-// sessions that resume.
-// Part of the characterization of the live model in tracker.test.js: it pins behaviour as it is.
+// src/main/live/claude-records.js, through the Tracker: what a Claude transcript's records do to
+// its ships: drones, attention, sweeps and sessions that resume. Part of the characterization of
+// the live model in tracker.test.js: it pins behaviour as it is.
 
 const test = require('node:test');
 const assert = require('node:assert/strict');

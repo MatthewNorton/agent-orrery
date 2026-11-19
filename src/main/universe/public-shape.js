@@ -2,7 +2,7 @@
 'use strict';
 
 // The project and ship shapes the renderer receives. Live and history differ on purpose;
-// test/tracker-replay-differences.test.js lists every difference.
+// test/tracker-replay-parity.test.js lists every difference.
 
 const { normalizeProvider } = require('../provider-adapters');
 const { fnv1a } = require('../shared/hash');

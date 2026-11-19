@@ -1,7 +1,7 @@
 'use strict';
 
-// The live model (src/main/tracker.js) on a Codex rollout.
-// Part of the characterization of the live model in tracker.test.js: it pins behaviour as it is.
+// src/main/live/codex-source.js, through the Tracker: a Codex rollout. Part of the
+// characterization of the live model in tracker.test.js: it pins behaviour as it is.
 
 const test = require('node:test');
 const assert = require('node:assert/strict');

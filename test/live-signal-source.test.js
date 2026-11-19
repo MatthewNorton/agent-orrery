@@ -1,7 +1,8 @@
 'use strict';
 
-// The live model (src/main/tracker.js) on Signal watch directories: files known by stat alone.
-// Part of the characterization of the live model in tracker.test.js: it pins behaviour as it is.
+// src/main/live/signal-source.js, through the Tracker: Signal watch directories, files known by
+// stat alone. Part of the characterization of the live model in tracker.test.js: it pins behaviour
+// as it is.
 
 const test = require('node:test');
 const assert = require('node:assert/strict');

@@ -4,7 +4,7 @@
 // cleanup. These pin current behaviour so the parser merge can prove it
 // changes nothing; tests marked `todo` encode suspected bugs, not intent.
 // Here: the derived views (snapshot, getSystem, getPlanet) and the state file. The providers are
-// in tracker-claude, tracker-claude-ships, tracker-codex and tracker-signal.
+// in live-claude-source, live-claude-records, live-codex-source and live-signal-source.
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
