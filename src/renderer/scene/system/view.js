@@ -66,7 +66,7 @@
     let lastPulseFactor = 1;
 
     // State shared with the parts in scene/system/.
-    const planets = new Map(); // planet key (what main compares a planet by) -> record
+    const planets = new Map(); // name -> record; a build finds its planet by key (AUR.planetOfBuild)
     const ships = new Map();
     // The asteroid belt sits between the middle orbits (past the last one in a small system),
     // `beltWidth` across; ships patrol outside it.
@@ -111,7 +111,7 @@
       const persistent = topNames.indexOf(pd.name) >= 0;
       const world = view.makeWorld(pd.name, dia, persistent);
       const mesh = world.globe;
-      mesh.metadata = { planetName: pd.name, planetKey: pd.key, isPlanet: true, worldType: world.spec.cls };
+      mesh.metadata = { planetName: pd.name, isPlanet: true, worldType: world.spec.cls };
       const a0 = rand() * Math.PI * 2;
       AUR.orbitPoint(a0, r, 0, mesh.position);
 
@@ -123,7 +123,7 @@
       label.isVisible = persistent;
 
       const rec = {
-        name: pd.name, mesh, ring, world, r, a: a0,
+        name: pd.name, key: pd.key, mesh, ring, world, r, a: a0,
         speed: AUR.MOTION.systemPlanetOrbitMin +
           rand() * AUR.MOTION.systemPlanetOrbitRange,
         axialSpeed: AUR.MOTION.systemPlanetAxialMin +
@@ -131,7 +131,7 @@
         dia, baseScale: 1,
         label, persistent, pulseUntil: 0, appear: 1,
       };
-      planets.set(pd.key, rec);
+      planets.set(pd.name, rec);
       return rec;
     }
     planetList.forEach(buildPlanet);
@@ -162,7 +162,7 @@
         if (m && m.metadata && m.metadata.isPlanet) ctx.openPlanet(projectId, m.metadata.planetName, view.sys);
       } else if (pi.type === BABYLON.PointerEventTypes.POINTERMOVE) {
         const pick = scene.pick(scene.pointerX, scene.pointerY, (mm) => mm.metadata && mm.metadata.isPlanet);
-        const hit = pick && pick.hit ? pick.pickedMesh.metadata.planetKey : null;
+        const hit = pick && pick.hit ? pick.pickedMesh.metadata.planetName : null;
         if (hit !== hovered) {
           leaveHover();
           const entered = hit && planets.get(hit);

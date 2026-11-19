@@ -261,6 +261,18 @@
     return n;
   };
   AUR.clear = (node) => { while (node.firstChild) node.removeChild(node.firstChild); };
+  // The planet a build belongs to: the one with the build's key, which main gives a folder in any
+  // casing. A case-sensitive folder under a Windows path (WSL) can hold two that differ only in
+  // case and so share a key: then the one the build spelled, else the first.
+  AUR.planetOfBuild = (planets, ev) => {
+    let first = null;
+    for (const planet of planets) {
+      if (planet.key !== ev.key) continue;
+      if (planet.name === ev.bucket) return planet;
+      first = first || planet;
+    }
+    return first;
+  };
   // A key press an input method takes to compose text (229 where it hides the key): not the app's.
   AUR.composing = (event) => event.isComposing || event.keyCode === 229;
   // A group of choice buttons, each paired with its value: a click picks that value, and the

@@ -149,7 +149,7 @@
         } else if (ev.type === 'ship-departed') {
           removeShip(ev.shipId);
         } else if (ev.type === 'build' && ev.project === projectId) {
-          const pr = planets.get(ev.key);
+          const pr = AUR.planetOfBuild(planets.values(), ev);
           const sh = ships.get(ev.shipId);
           if (ev.isNew && !pr) { refetchPlanets(); }
           if (pr) {
@@ -177,7 +177,7 @@
         if (!ns) return;
         view.sys = ns;
         ns.planets.forEach((pd, i) => {
-          if (!planets.has(pd.key)) {
+          if (!planets.has(pd.name)) {
             const rec = view.buildPlanet(pd, i);
             rec.appear = 0.01;
           }
