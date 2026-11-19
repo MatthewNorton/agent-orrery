@@ -39,6 +39,7 @@ function planetKey(project, name) {
  */
 function matchingName(names, name, root) {
   if (names.includes(name)) return name;
+  if (!ignoresCase(root)) return null;
   const project = { path: root }, key = planetKey(project, name);
   return names.find((entry) => planetKey(project, entry) === key) ?? null;
 }
@@ -50,7 +51,10 @@ function matchingName(names, name, root) {
  * @returns {string | null}
  */
 function bucketKey(project, name) {
-  return Object.hasOwn(project.buckets, name) ? name : matchingName(Object.keys(project.buckets), name, project.path);
+  if (Object.hasOwn(project.buckets, name)) return name;
+  // Security: a transcript can start a bucket per edit. A case-sensitive root has the exact key
+  // or none, so a miss there scans nothing; only a root that ignores case looks through the keys.
+  return ignoresCase(project.path) ? matchingName(Object.keys(project.buckets), name, project.path) : null;
 }
 
 /**
@@ -65,13 +69,26 @@ function bucketFor(project, name) {
 }
 
 /**
+ * Security: writes a bucket's count. A folder may be named '__proto__', and assigning that key to
+ * a plain object sets its prototype and records nothing, so every build there would start the
+ * planet again. Defining the key makes it an own count like any other; JSON keeps it through the
+ * state file.
+ * @param {Record<string, number>} buckets
+ * @param {string} key
+ * @param {number} count
+ */
+function setBucket(buckets, key, count) {
+  Object.defineProperty(buckets, key, { value: count, writable: true, enumerable: true, configurable: true });
+}
+
+/**
  * Counts one build of `bucket`; true when it starts a new bucket.
  * @param {BucketedProject} project
  * @param {string} bucket
  */
 function countBuild(project, bucket) {
   const key = bucketKey(project, bucket);
-  project.buckets[key ?? bucket] = (key === null ? 0 : project.buckets[key] || 0) + 1;
+  setBucket(project.buckets, key ?? bucket, (key === null ? 0 : project.buckets[key] || 0) + 1);
   return key === null;
 }
 
@@ -84,4 +101,4 @@ function bucketBuilds(project, name) {
   return bucketFor(project, name).builds;
 }
 
-module.exports = { bucketOf, bucketKey, bucketFor, countBuild, bucketBuilds, matchingName, planetKey };
+module.exports = { bucketOf, bucketKey, bucketFor, countBuild, bucketBuilds, matchingName, planetKey, setBucket };

@@ -135,6 +135,27 @@ test('saveState()/loadState() round-trip buckets, totals, firstSeen and path ids
   assert.deepEqual(restored.getSystem(SLUG).planets.find((planet) => planet.name === 'src').builds, 2);
 });
 
+test('a folder named __proto__ starts one planet, and its builds survive the state file', async (t) => {
+  const session = startClaude(t);
+  const { dir, world } = session;
+  const edit = (n) => claude.tool(dir, T0 + n * SEC, 'toolu_p' + n, 'Edit', { file_path: path.join(dir, '__proto__', `f${n}.js`) });
+  const events = appendAndPoll(session, [edit(1), edit(2), edit(3)], T0 + 3 * SEC);
+  assert.deepEqual(ofType(events, 'build').map(pick(['bucket', 'key', 'isNew'])), [
+    { bucket: '__proto__', key: '__proto__', isNew: true },
+    { bucket: '__proto__', key: '__proto__', isNew: false },
+    { bucket: '__proto__', key: '__proto__', isNew: false },
+  ]);
+  assert.equal(ofType(events, 'feed').filter((event) => event.entry.kind === 'form').length, 1, 'one planet formation in the feed');
+  assert.deepEqual(session.tracker.snapshot().projects[0].planets, ['__proto__']);
+
+  assert.equal(session.tracker.saveState(), true);
+  const saved = JSON.parse(fs.readFileSync(world.statePath, 'utf8')).projects[SLUG];
+  assert.deepEqual([Object.keys(saved.buckets), saved.buckets.__proto__, saved.totalBuilds], [['__proto__'], 3, 3]);
+  const restored = world.live({ claudeProjectsDir: path.join(world.root, 'no-claude') }).tracker;
+  restored.scan(true);
+  assert.deepEqual(pick(['name', 'builds'])(await restored.getPlanet(SLUG, '__proto__')), { name: '__proto__', builds: 3 });
+});
+
 test('loadState() treats an unreadable state file as empty', (t) => {
   const world = createWorld(t);
   fs.mkdirSync(path.dirname(world.statePath), { recursive: true });

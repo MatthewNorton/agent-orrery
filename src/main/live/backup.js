@@ -7,6 +7,7 @@
 
 const { canonicalProjectPath } = require('../provider-adapters');
 const { localAbsolutePath } = require('../path-safety');
+const { setBucket } = require('../build-buckets');
 const { hasControlChars, validProjectId } = require('../shared/ids');
 const { ownString } = require('../shared/values');
 const { plainObject } = require('../transcripts/fields');
@@ -28,7 +29,9 @@ const BACKUP_VERSION = 1;
 const MAX_BACKUP_BYTES = 8 * 1024 * 1024;
 const MAX_ENTRIES = 10_000;
 const MAX_KEY_LENGTH = 4096;
-// Security: keys that would reach an object's prototype instead of an own property.
+// Security: keys that would reach an object's prototype instead of an own property. A bucket is
+// not held to them: it is a folder's name, any of these can be one, and it is written as an own
+// count (setBucket).
 const RESERVED_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
 /**
@@ -106,7 +109,8 @@ function importProjects(model, backup) {
       continue;
     }
     for (const [bucket, builds] of Object.entries(saved.buckets)) {
-      existing.buckets[bucket] = Math.max(existing.buckets[bucket] || 0, builds);
+      // Security: an own count read and written, whatever the bucket is called.
+      setBucket(existing.buckets, bucket, Math.max(Object.hasOwn(existing.buckets, bucket) ? existing.buckets[bucket] : 0, builds));
     }
     existing.totalBuilds = Math.max(existing.totalBuilds, saved.totalBuilds);
     if (saved.firstSeen && saved.firstSeen < existing.firstSeen) existing.firstSeen = saved.firstSeen;
@@ -128,8 +132,12 @@ function importProjects(model, backup) {
  * @returns {value is string}
  */
 function validKey(value) {
-  return typeof value === 'string' && value.length > 0 && value.length <= MAX_KEY_LENGTH &&
-    !RESERVED_KEYS.has(value) && !hasControlChars(value);
+  return plainText(value) && !RESERVED_KEYS.has(value);
+}
+
+/** @param {unknown} value @returns {value is string} */
+function plainText(value) {
+  return typeof value === 'string' && value.length > 0 && value.length <= MAX_KEY_LENGTH && !hasControlChars(value);
 }
 
 function count(value) {
@@ -142,7 +150,7 @@ function buckets(value) {
   if (!plainObject(value)) return out;
   for (const [name, saved] of Object.entries(value).slice(0, MAX_ENTRIES)) {
     const builds = count(saved);
-    if (validKey(name) && builds > 0) out[name] = builds;
+    if (plainText(name) && builds > 0) setBucket(out, name, builds);
   }
   return out;
 }

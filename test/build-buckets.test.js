@@ -58,6 +58,33 @@ test('bucketFor answers a folder\'s key, builds and the name it goes by, in one 
   assert.deepEqual(bucketFor(project, 'constructor'), { key: null, name: 'constructor', builds: 0 });
 });
 
+test('a folder named __proto__ is a bucket like any other, and stays one through the state file', () => {
+  for (const root of ['/work/demo', 'C:\\Work\\Demo']) {
+    const project = { path: root, buckets: {} };
+    assert.deepEqual([1, 2, 3].map(() => countBuild(project, '__proto__')), [true, false, false], root);
+    assert.deepEqual([Object.hasOwn(project.buckets, '__proto__'), bucketBuilds(project, '__proto__'), Object.keys(project.buckets)],
+      [true, 3, ['__proto__']]);
+    assert.equal(Object.getPrototypeOf(project.buckets), Object.prototype, 'the object keeps its prototype');
+    // The state file is JSON: the key and its count come back, and counting goes on from them.
+    const loaded = { path: root, buckets: JSON.parse(JSON.stringify(project.buckets)) };
+    assert.deepEqual([countBuild(loaded, '__proto__'), bucketBuilds(loaded, '__proto__')], [false, 4]);
+  }
+  const others = { path: '/work/demo', buckets: {} };
+  assert.deepEqual(['constructor', 'toString', 'constructor'].map((name) => countBuild(others, name)), [true, true, false]);
+  assert.deepEqual(others.buckets, { constructor: 2, toString: 1 });
+});
+
+test('a miss under a case-sensitive root looks at no other bucket', () => {
+  const keys = { asked: 0 };
+  const watched = (buckets) => new Proxy(buckets, { ownKeys(target) { keys.asked++; return Reflect.ownKeys(target); } });
+  const posix = { path: '/work/demo', buckets: watched({ Docs: 1, src: 2 }) };
+  assert.deepEqual([bucketKey(posix, 'docs'), bucketKey(posix, 'Docs'), bucketBuilds(posix, 'lib'), countBuild(posix, 'lib')], [null, 'Docs', 0, true]);
+  assert.equal(keys.asked, 0, 'no scan of the keys');
+  const windows = { path: 'C:\\Work\\Demo', buckets: watched({ Docs: 1 }) };
+  assert.equal(bucketKey(windows, 'docs'), 'Docs');
+  assert.equal(keys.asked, 1, 'a root that ignores case looks through them');
+});
+
 test('only own keys name a bucket', () => {
   const project = { path: 'C:\\Work\\Demo', buckets: {} };
   for (const name of ['constructor', 'toString', '__proto__']) {

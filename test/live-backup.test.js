@@ -80,6 +80,35 @@ test('an import merges: larger counts win, nothing is removed, a forgotten proje
   assert.deepEqual({ ...tracker.model.forgotten }, {});
 });
 
+test('a folder named __proto__, constructor or prototype keeps its builds through a backup', (t) => {
+  const w = createWorld(t);
+  writeState(w.statePath, { version: 2, projects: { kept: { path: w.projectDir, buckets: { src: 3 }, totalBuilds: 3, firstSeen: T0 } } });
+  const tracker = w.live().tracker;
+  const backup = parseBackup(`{
+    "format": "agent-orrery-backup", "version": 1,
+    "universe": { "projects": {
+      "kept": { "buckets": { "__proto__": 4, "constructor": 2, "prototype": 1, "src": 1 }, "totalBuilds": 8 },
+      "fresh": { "buckets": { "__proto__": 5 }, "totalBuilds": 5 }
+    } }
+  }`);
+  assert.deepEqual(tracker.importBackup(backup), { added: 1, merged: 1 });
+  const own = (id) => {
+    const { buckets } = tracker.model.projects.get(id);
+    assert.equal(Object.getPrototypeOf(buckets), Object.prototype, id);
+    return Object.keys(buckets).sort().map((name) => [name, Object.getOwnPropertyDescriptor(buckets, name).value]);
+  };
+  assert.deepEqual(own('kept'), [['__proto__', 4], ['constructor', 2], ['prototype', 1], ['src', 3]]);
+  assert.deepEqual(own('fresh'), [['__proto__', 5]]);
+  assert.deepEqual(byId(tracker).get('fresh').planets, ['__proto__']);
+
+  // And out again: the export of that universe, imported into an empty one.
+  const exported = JSON.stringify(tracker.createBackup([]));
+  const empty = w.live({ statePath: path.join(w.root, 'fresh', 'universe-state.json') }).tracker;
+  empty.importBackup(parseBackup(exported));
+  assert.deepEqual(Object.entries(empty.model.projects.get('fresh').buckets), [['__proto__', 5]]);
+  assert.equal({}.polluted, undefined);
+});
+
 test('a file that is not a backup is refused', () => {
   for (const text of ['not json', '[]', '{}', JSON.stringify({ format: 'agent-orrery-backup', version: 2, universe: { projects: {} } }),
     JSON.stringify({ format: 'something-else', version: 1, universe: { projects: {} } }),
@@ -88,7 +117,7 @@ test('a file that is not a backup is refused', () => {
   }
 });
 
-test('hostile ids, names, buckets and paths never reach the model', () => {
+test('hostile ids, names, bucket counts and paths never reach the model', () => {
   const local = process.platform === 'win32' ? 'C:\\work\\demo' : '/work/demo';
   const backup = parseBackup(`{
     "format": "agent-orrery-backup", "version": 1,
@@ -116,7 +145,11 @@ test('hostile ids, names, buckets and paths never reach the model', () => {
   assert.equal(projects.get('relative').name, undefined);
   assert.equal(projects.get('fine').path, local);
   assert.equal(projects.get('fine').totalBuilds, 2);
-  assert.deepEqual(projects.get('fine').buckets, { src: 2 });
+  // A bucket is a folder's name, which may be one of those: an own count, and no prototype.
+  const { buckets } = projects.get('fine');
+  assert.deepEqual(Object.keys(buckets).sort().map((name) => [name, Object.getOwnPropertyDescriptor(buckets, name).value]),
+    [['__proto__', 9], ['constructor', 9], ['src', 2]]);
+  assert.equal(Object.getPrototypeOf(buckets), Object.prototype);
   assert.deepEqual(backup.pathIds, [['posix:/work/demo', 'fine']]);
   assert.deepEqual(backup.ideas, ['keep']);
 });
