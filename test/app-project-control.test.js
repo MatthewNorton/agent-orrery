@@ -3,7 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const vm = require('node:vm');
-const { readRenderer, runRenderer } = require('./support/renderer-source');
+const { readRenderer, runApp } = require('./support/renderer-source');
 const { fakeDocument, textOf, withClass } = require('./support/fake-dom');
 const { deferred } = require('./support/main-wiring');
 
@@ -63,26 +63,21 @@ test('a terminal kept in the background is reported as found, not missing', asyn
 function planetSetup(planet, { project = {}, system = null } = {}) {
   const document = fakeDocument();
   const window = { AUR_PANEL_LAYOUT: { panelsOn: () => [] }, AU: {} };
-  runRenderer('util.js', { window, document });
-  const { AUR } = window;
   const whole = { id: 'p', name: 'demo', path: '/work/demo', exists: true, totalBuilds: 0, ...project };
   const state = {
     current: { view: 'planet', projectId: 'p', planetName: planet.name },
     store: { projects: new Map([['p', whole]]), ships: new Map() },
-    activeView: { planetData: { project: whole, builds: 0, resources: [], ...planet }, systemData: system },
-    streamEpoch: 4, viewEpoch: 4, commandRail: {},
+    activeView: { planetData: { project: whole, builds: 0, resources: [], ...planet } },
+    planetSystem: { data: system, loading: false, stale: false },
+    commandRail: {},
     projectControl: { projectId: null }, terminalRequestSerial: 0, playback: { mode: 'live' },
   };
   const scheduled = [];
-  AUR.worldProfile = () => ({ key: 'rocky' });
-  AUR.app = {
+  const AUR = runApp(['app/chrome.js', 'app/project/control.js'], {
     state, const: { CHROME: { PROJECT: 1, FOCUS: 2, PLANET: 4 } },
-    moduleHead: (card, title) => card.appendChild(AUR.el('h2', 'mod-title', title)),
-    sameEpoch: (a, b) => a != null && b != null && String(a) === String(b),
+    moduleHead: (card, title) => card.appendChild(window.AUR.el('h2', 'mod-title', title)),
     scheduleChrome: (mask) => scheduled.push(mask),
-  };
-  runRenderer('app/chrome.js', { window, document });
-  runRenderer('app/project/control.js', { window, document });
+  }, { document, window, aur: { worldProfile: () => ({ key: 'rocky' }) } });
   const card = () => {
     AUR.app.renderPlanetCard();
     const node = document.getElementById('planet-card');
@@ -140,39 +135,47 @@ test('planet card: folder rows are dashes for a folder that is gone or unread; P
   assert.equal(rows({ folderRead: 'partial', sizeKb: 1590 }, null).SIZE, '1.5 MB+', 'a floor rounds down');
 });
 
-test('planet card: the system comes from the open view when it holds this project\'s, else from main', async () => {
-  const held = { project: { id: 'p' }, planets: [{ name: 'src', files: 1, builds: 0 }], beltDensity: 0 };
-  const fetched = { project: { id: 'p' }, planets: [], beltDensity: 0 };
-  const { app, state, window } = planetSetup({ name: 'src' }, { system: held });
-  const asked = [];
-  window.AU.getSystem = async (id) => { asked.push(id); return id === 'gone' ? null : fetched; };
-
-  assert.equal(await app.systemForPlanet('p'), held);
-  assert.deepEqual(asked, []);
-  assert.equal(await app.systemForPlanet('other'), fetched, 'another project\'s system is asked for');
-  state.viewEpoch = null;
-  assert.equal(await app.systemForPlanet('p'), fetched, 'after a reset the view\'s copy is from before it');
-  state.viewEpoch = 3;
-  assert.equal(await app.systemForPlanet('p'), fetched, 'as is one from another stream');
-  assert.equal(await app.systemForPlanet('gone'), null);
-  assert.deepEqual(asked, ['other', 'p', 'p', 'gone']);
+test('planet card: a project\'s system is fetched whole or not at all', async () => {
+  const { app, window } = planetSetup({ name: 'src' });
+  const system = { project: { id: 'p' }, planets: [], beltDensity: 0 };
+  window.AU.getSystem = async (id) => {
+    if (id === 'throws') throw new Error('main is away');
+    return id === 'p' ? system : id === 'odd' ? { planets: 'not a list' } : null;
+  };
+  assert.equal(await app.fetchSystem('p'), system);
+  for (const id of ['gone', 'throws', 'odd']) assert.equal(await app.fetchSystem(id), null, id);
 });
 
-test('planet card: a build that starts a planet fetches the system again for the open planet', async () => {
-  const planets = [{ name: 'src', files: 1, builds: 0 }];
-  const { app, state, window, card, scheduled } = planetSetup({ name: 'src', folderRead: 'full' },
-    { system: { project: { id: 'p' }, planets, beltDensity: 0 } });
-  window.AU.getSystem = async () => ({ project: { id: 'p' }, planets: [...planets, { name: 'docs', files: 0, builds: 1 }], beltDensity: 0 });
+test('planet card: a build that starts a planet fetches the system again, one request at a time', async () => {
+  const systemOf = (count) => ({
+    project: { id: 'p' }, beltDensity: 0,
+    planets: Array.from({ length: count }, (_, index) => ({ name: 'd' + index, key: 'd' + index, files: 1, builds: 0 })),
+  });
+  const { app, state, window, card, scheduled } = planetSetup({ name: 'src', folderRead: 'full' }, { system: systemOf(1) });
+  const asked = [];
+  window.AU.getSystem = () => { asked.push(deferred()); return asked.at(-1).promise; };
+  const settled = () => new Promise((done) => setImmediate(done));
   assert.equal(card().rows.PLANETS, '1');
-  await app.refreshPlanetSystem();
-  assert.deepEqual([card().rows.PLANETS, scheduled], ['2', [4]]);
 
-  // A view that was replaced while the answer was on its way keeps what it has.
-  const stale = state.activeView;
-  window.AU.getSystem = async () => { state.activeView = { planetData: stale.planetData, systemData: null }; return { planets: [] }; };
-  await app.refreshPlanetSystem();
-  assert.deepEqual([stale.systemData.planets.length, scheduled.length], [2, 1]);
+  // Three planets start in a row: the first asks, the others wait for its answer and share one more.
+  const first = app.refreshPlanetSystem();
+  app.refreshPlanetSystem();
+  app.refreshPlanetSystem();
+  assert.equal(asked.length, 1);
+  asked[0].resolve(systemOf(2));
+  await settled();
+  assert.deepEqual([card().rows.PLANETS, asked.length], ['2', 2], 'an answer from before the later builds is asked for again');
+  asked[1].resolve(systemOf(4));
+  await first;
+  assert.deepEqual([card().rows.PLANETS, asked.length, scheduled, state.planetSystem.loading], ['4', 2, [4, 4], false]);
+
+  // An answer for a route that has moved on to another project is dropped.
+  const late = app.refreshPlanetSystem();
+  state.current.projectId = 'other';
+  asked[2].resolve(systemOf(9));
+  await late;
+  assert.deepEqual([state.planetSystem.data.planets.length, scheduled.length, state.planetSystem.loading], [4, 2, false]);
   state.current.view = 'system';
-  window.AU.getSystem = async () => assert.fail('only a planet view keeps a copy to refresh');
+  window.AU.getSystem = async () => assert.fail('only an open planet has a system to refresh');
   await app.refreshPlanetSystem();
 });

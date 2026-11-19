@@ -109,9 +109,11 @@
     engine: null,
     canvas: null,
     activeView: null,   // what the view factory returned (kit/SPEC.md view contract)
-    viewEpoch: null,    // the stream epoch the active view's data came from; null once a reset outdates it
     activeScene: null,
     current: { view: 'universe', projectId: null, planetName: null },
+    // The open planet's system, for its card's solar-system rows: set as the planet opens, fetched
+    // again (one request at a time) when a build starts a planet (app/project/control.js).
+    planetSystem: { data: null, loading: false, stale: false },
     routeRequestGeneration: 0,
     booting: true,
     bootEventQueue: [],

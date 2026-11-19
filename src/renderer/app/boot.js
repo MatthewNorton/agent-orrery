@@ -240,7 +240,6 @@
     A.clearProjectSearch();
     if (S.agentFocus.shipId) A.exitAgentFocus(false);
     S.activeView = next;
-    S.viewEpoch = S.streamEpoch;
     S.activeScene = next.scene;
     S.current.view = name;
     document.body.dataset.view = name;
@@ -293,21 +292,23 @@
     setView('system', { system: data, projectId, store: S.store });
   };
 
-  A.openPlanet = async function openPlanet(projectId, name) {
+  /** @param {string} projectId @param {string} name @param {SystemData} [system] from a caller that holds it current (the system view) */
+  A.openPlanet = async function openPlanet(projectId, name, system) {
     const request = ++S.routeRequestGeneration;
     const requestedEpoch = S.streamEpoch;
     // The system rides along for the planet card's solar-system totals; without it they show dashes.
-    const systemRequest = A.systemForPlanet(projectId);
+    const systemRequest = system || A.fetchSystem(projectId);
     /** @type {PlanetData} */
     let data = null;
     try { data = await AU.getPlanet(projectId, name); } catch (e) { AUR.log('getPlanet err', e && e.message); }
-    const system = await systemRequest;
+    const held = await systemRequest;
     if (request !== S.routeRequestGeneration || !A.sameEpoch(requestedEpoch, S.streamEpoch)) return;
     S.current.projectId = projectId;
     // Main answers with the name the system view draws the planet under; its casing can differ.
     S.current.planetName = data ? data.name : name;
     if (!data) { AUR.log('no planet data for', projectId, name); return A.openSystem(projectId); }
-    setView('planet', { planet: data, system, projectId, name: data.name, store: S.store });
+    S.planetSystem.data = held;
+    setView('planet', { planet: data, projectId, name: data.name, store: S.store });
   };
 
   function back() {

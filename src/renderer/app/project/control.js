@@ -207,26 +207,33 @@
   }
 
   /**
-   * The project's system, for the planet card's solar-system rows: the open view's own copy when it
-   * holds this project's from this stream (a planet opened from its system view, or from another
-   * planet of the system), else fetched; null when that fails.
+   * A project's system as main has it now; null when it has none or the call fails.
    * @param {string} projectId @returns {Promise<SystemData | null>}
    */
-  A.systemForPlanet = async function systemForPlanet(projectId) {
-    const held = S.activeView && S.activeView.systemData;
-    if (held && held.project.id === projectId && A.sameEpoch(S.viewEpoch, S.streamEpoch)) return held;
+  A.fetchSystem = async function fetchSystem(projectId) {
     const system = await AUR.settle(() => AU.getSystem(projectId));
     return Array.isArray(system.planets) ? system : null;
   };
 
-  /** A build that starts a planet changes the open planet card's PLANETS row: its system is fetched again. */
+  /**
+   * A build that starts a planet changes the open planet card's PLANETS row: its system
+   * (S.planetSystem) is fetched again, one request at a time, and once more for a build that came
+   * while one was out.
+   */
   A.refreshPlanetSystem = async function refreshPlanetSystem() {
-    const view = S.activeView;
-    if (!view || S.current.view !== 'planet') return;
-    const system = await AUR.settle(() => AU.getSystem(S.current.projectId));
-    if (S.activeView !== view || !Array.isArray(system.planets)) return;
-    view.systemData = system;
-    A.scheduleChrome(C.CHROME.PLANET);
+    const held = S.planetSystem;
+    held.stale = true;
+    if (held.loading) return;
+    held.loading = true;
+    while (held.stale && S.current.view === 'planet') {
+      held.stale = false;
+      const projectId = S.current.projectId;
+      const system = await A.fetchSystem(projectId);
+      if (!system || S.current.view !== 'planet' || S.current.projectId !== projectId) continue;
+      held.data = system;
+      A.scheduleChrome(C.CHROME.PLANET);
+    }
+    held.loading = false;
   };
 
   A.renderPlanetCard = function renderPlanetCard() {
@@ -254,7 +261,7 @@
       ? pd.resources.map((ext) => (ext === 'MISC' ? 'other' : ext)).join(' · ') : '—';
     const planetBuilds = pd.builds || 0;
     const systemBuilds = project.totalBuilds || 0;
-    const system = S.activeView && S.activeView.systemData;
+    const system = S.planetSystem.data;
     const body = AUR.el('div', 'mod-b plc-body');
     body.append(
       AUR.el('div', 'plc-sub', planetLine(pd, project.name)),

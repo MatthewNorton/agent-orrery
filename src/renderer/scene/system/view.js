@@ -158,7 +158,8 @@
         view.orbitShipFocus(pi);
       } else if (pi.type === BABYLON.PointerEventTypes.POINTERPICK) {
         const m = pi.pickInfo && pi.pickInfo.pickedMesh;
-        if (m && m.metadata && m.metadata.isPlanet) ctx.openPlanet(projectId, m.metadata.planetName);
+        // The system rides along, as this view holds it now, for the planet card.
+        if (m && m.metadata && m.metadata.isPlanet) ctx.openPlanet(projectId, m.metadata.planetName, view.sys);
       } else if (pi.type === BABYLON.PointerEventTypes.POINTERMOVE) {
         const pick = scene.pick(scene.pointerX, scene.pointerY, (mm) => mm.metadata && mm.metadata.isPlanet);
         const hit = pick && pick.hit ? pick.pickedMesh.metadata.planetKey : null;
