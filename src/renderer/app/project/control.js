@@ -227,8 +227,8 @@
     status.append(sdot, active ? 'Active' : 'Dormant');
     A.moduleHead(card, 'PLANET: ' + String(pd.name).toUpperCase(), { extras: [status] });
 
-    const real = A.planetOnDisk(pd);
-    const types = real && pd.resources.length
+    const counts = A.planetFolderCounts(pd);
+    const types = counts && pd.resources.length
       ? pd.resources.map((ext) => (ext === 'MISC' ? 'other' : ext)).join(' · ') : '—';
     const planetBuilds = pd.builds || 0;
     const systemBuilds = project.totalBuilds || 0;
@@ -236,9 +236,9 @@
     const body = AUR.el('div', 'mod-b plc-body');
     body.append(
       AUR.el('div', 'plc-sub', planetLine(pd, project.name)),
-      pcRow('FILES', real ? String(pd.files) : '—'),
-      pcRow('SIZE', real ? sizeText(pd.sizeKb || 0, pd.files) : '—'),
-      pcRow('SUBFOLDERS', real ? String(pd.subdirs) : '—'),
+      pcRow('FILES', counts ? counts.files : '—'),
+      pcRow('SIZE', counts ? sizeText(pd.sizeKb || 0, pd.files) + counts.more : '—'),
+      pcRow('SUBFOLDERS', counts ? counts.subdirs : '—'),
       pcRow('FILE TYPES', types),
       AUR.el('div', 'plc-title', 'BUILDS (FILE EDITS)'),
       pcRow('THIS PLANET', String(planetBuilds)),

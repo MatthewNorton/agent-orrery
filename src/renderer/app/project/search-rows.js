@@ -22,7 +22,8 @@
       return String(project && project.path || '');
     }
     const base = String(entry.project.path || '');
-    if (entry.kind !== 'planet' || !base) return base;
+    // '(root)' stands for the project's top-level files, so its path is the project's own.
+    if (entry.kind !== 'planet' || !base || entry.planet === '(root)') return base;
     return base + (base.includes('\\') ? '\\' : '/') + entry.planet;
   }
 

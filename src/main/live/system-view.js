@@ -94,7 +94,7 @@ function getPlanet(model, projectId, planetName) {
     const walk = (d, depth) => {
       const entries = fs.readdirSync(d, { withFileTypes: true });
       for (const e of entries) {
-        if (files > 600) return;
+        if (files > 600) return; // the renderer shows a count past this as 600+ (app/chrome.js)
         if (e.isDirectory()) {
           if (IGNORE_DIRS.has(e.name) || e.name.startsWith('.')) continue;
           if (depth === 0) subdirs++;

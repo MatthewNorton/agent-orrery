@@ -235,13 +235,9 @@ Design tokens (put in `:root`):
 --accent: #6c8cff;        --radius: 10px;
 ```
 
-- **Top bar** (full width, ~56px): purple glowing dot logo, `AGENT ORRERY`
-  (letter-spaced, semibold), pill badge `MULTI-PROVIDER` (purple-tinted
-  border). Window controls are native — do not draw min/max/close.
-  Universe view only: a `RECENT` strip after the badge — up to 5 pills, the
-  most recently active projects sorted by `lastActivity`, each showing the
-  project name (ellipsized), a green dot when the project has live ships, and
-  jumping to that project's system view on click.
+- **Top bar** (full width, `--bar-h`): ring-and-star logo, `AGENT ORRERY`
+  (letter-spaced, semibold), mono badge `MULTI-PROVIDER`. Window controls are
+  native — do not draw min/max/close.
   The controls sit on the right, led by a square search button and the GitHub filter. The button
   (or `/`, or Ctrl K) opens the Go to palette (`app/project/search.js`, rows by
   `app/project/search-rows.js`, `styles/search.css`): a modal dialog near the top centre, up to
@@ -274,7 +270,7 @@ Design tokens (put in `:root`):
   the timeline from 20% to solid through one token, `--panel-fill`; 86%, the alpha of `--paper`, is
   the default, text and controls stay, and at 100% the panels drop their blur. Text size zooms the
   chrome around the star chart (top bar, rails, view title and hint, timeline,
-  directory, panels menu, toast and Settings) by 100 · 110 · 125 · 150%
+  directory, Go to palette, panels menu, toast and Settings) by 100 · 110 · 125 · 150%
   with CSS `zoom`; the star chart keeps its size. The zoom stops where the window would leave the
   chrome less than 1024 × 576 CSS px, the least room it was checked to lay out in without its parts
   overlapping (`C.TEXT_SIZE_ROOM`), and Settings says so under the sizes when it does. While a
@@ -557,7 +553,8 @@ card's solar-system totals (the view carries it as `systemData`; when it fails, 
      for (`a folder in <project>`, `the top-level files of <project>` for `(root)`, or `no folder on
      disk` when `procedural`); rows `FILES`, `SIZE` (KB, MB or GB), `SUBFOLDERS`, `FILE TYPES` (top
      extensions, `MISC` shown as `other`), each `—` when `procedural` (those numbers are
-     invented) or in REPLAY (history never reads the disk; `A.planetOnDisk`); then `BUILDS (FILE EDITS)`: `THIS PLANET`, `WHOLE SOLAR SYSTEM` (the project's
+     invented) or fetched in REPLAY (history never reads the disk; `A.planetFolderCounts`), and
+     ending in `+` past the 600 files the folder read stops at; then `BUILDS (FILE EDITS)`: `THIS PLANET`, `WHOLE SOLAR SYSTEM` (the project's
      `totalBuilds`) and a bar of the planet's share; then `SOLAR SYSTEM`: `PLANETS` (from
      `systemData`) and `AGENTS`. A `build` event on the open planet raises its count in place.
 - No tab bar: the mockup's `Overview … Scans` row was dropped because its tabs did nothing.

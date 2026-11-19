@@ -79,10 +79,19 @@
     return S.activeView && S.activeView.planetData ? S.activeView.planetData : null;
   };
 
-  /** Whether a planet's files, size and subfolders were read from its folder: a procedural planet's are
-   * invented (live/system-view.js) and history never reads the disk (history/model.js). */
-  A.planetOnDisk = function planetOnDisk(pd) {
-    return Boolean(pd && !pd.procedural && S.playback.mode !== 'replay');
+  // live/system-view.js stops reading a folder past 600 files, so a bigger folder's counts are floors.
+  const FOLDER_READ_CAP = 600;
+
+  /**
+   * A planet's folder counts as the cards show them, or null where none were read: a procedural
+   * planet's numbers are invented (live/system-view.js) and history never reads the disk, so
+   * A.openPlanet marks what it fetched in LIVE. Past the read's cap they end in `+`.
+   * @returns {{ files: string, subdirs: string, more: string } | null}
+   */
+  A.planetFolderCounts = function planetFolderCounts(pd) {
+    if (!pd || !pd.fromDisk) return null;
+    const more = pd.files > FOLDER_READ_CAP ? '+' : '';
+    return { files: (more ? FOLDER_READ_CAP : pd.files) + more, subdirs: pd.subdirs + more, more };
   };
 
   A.onlineProjectCount = function onlineProjectCount() {
@@ -221,9 +230,9 @@
   function planetSummaryStats() {
     const ships = A.shipsInProject(S.current.projectId);
     const pd = A.activePlanetData();
-    const disk = A.planetOnDisk(pd);
-    return [[ships.length, 'Agents'], [disk ? pd.files : '—', 'Files'],
-      [disk ? pd.subdirs : '—', 'Subfolders'], [pd ? pd.builds : 0, 'Builds']];
+    const counts = A.planetFolderCounts(pd);
+    return [[ships.length, 'Agents'], [counts ? counts.files : '—', 'Files'],
+      [counts ? counts.subdirs : '—', 'Subfolders'], [pd ? pd.builds : 0, 'Builds']];
   }
 
   A.renderBackButton = function renderBackButton() {

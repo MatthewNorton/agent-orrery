@@ -295,6 +295,8 @@
   A.openPlanet = async function openPlanet(projectId, name) {
     const request = ++S.routeRequestGeneration;
     const requestedEpoch = S.streamEpoch;
+    // History never reads the disk, so only a planet fetched in LIVE has folder counts.
+    const live = S.playback.mode === 'live';
     // The system rides along for the planet card's solar-system totals; without it they show dashes.
     const systemRequest = AUR.settle(() => AU.getSystem(projectId));
     /** @type {PlanetData} */
@@ -306,7 +308,8 @@
     S.current.planetName = name;
     if (!data) { AUR.log('no planet data for', projectId, name); return A.openSystem(projectId); }
     setView('planet', {
-      planet: data, system: Array.isArray(system.planets) ? system : null, projectId, name, store: S.store,
+      planet: { ...data, fromDisk: live && !data.procedural },
+      system: Array.isArray(system.planets) ? system : null, projectId, name, store: S.store,
     });
   };
 

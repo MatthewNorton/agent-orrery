@@ -114,7 +114,7 @@ Start here when you want to change something. Paths under "Main process" are rel
 | **Open folder / GitHub link** | `ipc/register.js` (inline handlers) | `open`, `open-external` | `app/project/control.js` | — | — |
 | **Per-project TASKS panel** (`GOALS.md`) | `ipc/tasks.js` → `goals.js` | `tasks-get`, `task-add`, `task-set-done`, `task-remove`, push `tasks-changed` | `app/project/tasks.js` | `<project>/GOALS.md` | `grade-tasks.mjs`, `task-runs.test.js` |
 | **IDEAS queue → start Codex** (LIVE only) | `ipc/root-tasks.js` → `root-task-coordinator.js`, `root-tasks.js`, `task-runs.js`, `agent-launcher.js`, `goals.js` | `root-tasks-get`, `root-task-create/remove/assign/retry`, push `root-tasks-changed` | `app/ideas.js`, `app/ideas-list.js` | `root-tasks.json`, `task-runs.json`, `GOALS.md` | 4 unit test files |
-| **Project search + ALL PROJECTS list** | — (renderer only) | — | `search-core.js`, `app/project/search.js`, `app/project/directory.js` | — | `grade-search.mjs` |
+| **Project search + ALL PROJECTS list** | — (renderer only) | — | `search-core.js`, `app/project/search.js`, `app/project/search-rows.js`, `app/project/directory.js` | — | `grade-search.mjs` |
 | **Git / GitHub status markers** | `vcs-status/`: `collector.js` (git), `github-metadata-provider.js` (`gh`), `service.js` (cache), `controller.js` (wiring) | push `project-vcs-status-changed` (from `replay-control.js`), `vcs` field in snapshot | `components/project-vcs-status.js` + `.css` | memory only | `vcs-status-*` tests |
 | **Find a moved project** (settings dialog) | `ipc/project-paths.js` → `project-paths.js` | `project-paths-scan`, `project-path-locate`, `project-path-apply` | `app/project/settings.js` | `universe-state.json` `pathOverrides` | **none** |
 | **First-person ship cockpit** | — | — | `app/agent-focus.js`, `scene/system/view.js` `focusShip`, `scene/system/focus.js`, `assets/*.png` | `localStorage` | `agent-focus-hologram.test.js` (source text) |
@@ -438,7 +438,7 @@ flowchart TB
   L["2 · Shared libraries — util.js creates window.AUR · util-scene · procedural-worlds · ship-assets · ship-assets-hulls · ship-assets-api · polish-math · galaxy-layout · search-core · components/project-vcs-status"]
   S["3 · Views — scene/common creates AUR.sceneParts · scene/universe/* parts · scene/universe · scene/system/* parts · scene/system · scene/planet → AUR.views.*"]
   ST["4 · app/state.js — the only file that creates AUR.app.state and AUR.app.const"]
-  M["5 · Feature modules — app/agent-focus · app/chrome · app/chrome-queue · app/history-metrics · app/ideas · app/ideas-list · app/playback · app/project/control · app/project/directory · app/project/search · app/project/settings · app/project/tasks · app/replay · app/store"]
+  M["5 · Feature modules — app/agent-focus · app/chrome · app/chrome-queue · app/history-metrics · app/ideas · app/ideas-list · app/playback · app/project/control · app/project/directory · app/project/search-rows · app/project/search · app/project/settings · app/project/tasks · app/replay · app/store"]
   A["6 · app/boot.js — boot, event routing, view switching, debug hooks"]
   V --> L --> S --> ST --> M --> A
 ```
@@ -466,7 +466,7 @@ contract), `AUR`, `AUR_POLISH` and `AUR_GALAXY` (all `any` for now).
 | `ship-assets-api.js` | 118 | `AUR.ships`: instantiate, upgrade a fallback dart, `refresh` in place on promotion, dispose a scene's hull state |
 | `galaxy-layout.js` | 284 | Pure: galaxy grouping, spiral placement, Graveyard |
 | `polish-math.js` | 67 | Pure: label overlap, sun pulse |
-| `search-core.js` | 87 | Pure: project ranking |
+| `search-core.js` | 165 | Pure: ranks projects, agents and folders (prefix, substring, path, then fuzzy) |
 | `components/project-vcs-status.js` | 268 | Pure presentation for git / GitHub markers and details |
 | `scene/common.js` | 70 | Creates `AUR.sceneParts`; the shared camera, ship mesh, teardown and mesh disposal |
 | `scene/universe/view.js` | 280 | Galaxy map: builds the `view` object and merges its parts |
@@ -486,8 +486,9 @@ contract), `AUR`, `AUR_POLISH` and `AUR_GALAXY` (all `any` for now).
 | `app/playback.js` | 232 | History bar |
 | `app/replay.js` | 164 | Stream epochs, playback state, `issueReplay` |
 | `app/history-metrics.js` | 96 | `AUR.historyTestMetrics` for the history harness |
-| `app/project/search.js` | 201 | Search box, GitHub filter, universe match highlighting, `rankedFirst` |
-| `app/project/listbox.js` | 83 | The listbox search results and ALL PROJECTS share: debounce, keys, selection, rows |
+| `app/project/search.js` | 257 | Go to palette (search button, `/` or Ctrl K), GitHub filter, universe match highlighting, `rankedFirst` |
+| `app/project/search-rows.js` | 114 | A Go to row: the name's matched characters, the path's telling tail, the kind |
+| `app/project/listbox.js` | 83 | The listbox the Go to palette and ALL PROJECTS share: debounce, keys, selection, rows |
 | `app/project/directory.js` | 191 | ALL PROJECTS dialog, its rows on the shared listbox |
 | `app/boot.js` | 384 | Boot, routing, view switching, debug hooks |
 | `app/ideas.js` | 152 | IDEAS panel |
@@ -525,7 +526,7 @@ contract), `AUR`, `AUR_POLISH` and `AUR_GALAXY` (all `any` for now).
 | Region | Element | Owner |
 |---|---|---|
 | 3D canvas | `#renderCanvas` | `app/boot.js` + active view |
-| Top bar: RECENT / search / ALL PROJECTS / settings | `#recent`, `#project-search`, `#project-directory-button`, `#settings-button` | chrome / search / search / settings |
+| Top bar: Go to / GitHub filter / ALL PROJECTS / settings | `#search-button` (opens `#search-dialog`), `#project-vcs-filter`, `#project-directory-button`, `#settings-button` | search / search / directory / settings |
 | Command rail: IDEAS, AGENTS, FEED | `#sidebar` (`#ideas-panel`, `#agents-panel`, `#feed-panel`) | chrome + ideas |
 | Project card, planet card | `#project-card`, `#planet-card` | project-control |
 | TASKS panel | `#tasks-panel` | project-tasks |
