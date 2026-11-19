@@ -29,26 +29,39 @@
   }
 
   const folders = (path) => path.split(/[\\/]/).filter(Boolean);
-  const lastOf = (parts, count) => parts.slice(-count).join('/');
 
   /** `items` grouped by `keyOf`, in the order their keys first appear. */
   function grouped(items, keyOf) {
     const groups = new Map();
     for (const item of items) {
-      const key = keyOf(item);
-      groups.set(key, [...(groups.get(key) || []), item]);
+      const key = keyOf(item), group = groups.get(key);
+      if (group) group.push(item);
+      else groups.set(key, [item]);
     }
     return [...groups.values()];
   }
 
-  /** How many of its last folders each path keeps: TAIL_MIN, or as many as part it from the others. */
+  /**
+   * How many of its last folders each path keeps: TAIL_MIN, or as many as part it from the others
+   * (one more than the longest ending it shares with any of them).
+   * Security: paths come from transcripts, as many and as long as a transcript cares to make them.
+   * Sorted by their folders read from the end, a path's nearest namesake is next to it, so each is
+   * compared with two others and not with all of them at every length.
+   */
   function tailsApart(paths) {
-    const parts = paths.map(folders);
-    return parts.map((own, i) => {
-      let count = Math.min(TAIL_MIN, own.length);
-      while (count < own.length && parts.some((other, j) => j !== i && lastOf(other, count) === lastOf(own, count))) count++;
-      return count;
+    const parts = paths.map((path) => folders(path).reverse());
+    const shared = (a, b) => { let n = 0; while (n < a.length && n < b.length && a[n] === b[n]) n++; return n; };
+    const order = parts.map((_, i) => i).sort((i, j) => {
+      const a = parts[i], b = parts[j], n = shared(a, b);
+      return n < a.length && n < b.length ? (a[n] < b[n] ? -1 : 1) : a.length - b.length;
     });
+    const counts = new Array(paths.length);
+    order.forEach((i, at) => {
+      const own = parts[i];
+      const nearest = Math.max(at > 0 ? shared(own, parts[order[at - 1]]) : 0, at + 1 < order.length ? shared(own, parts[order[at + 1]]) : 0);
+      counts[i] = Math.min(own.length, Math.max(TAIL_MIN, nearest + 1));
+    });
+    return counts;
   }
 
   /** Each row's tail, in folders, by its key: what parts it from the rows of the same name. */
@@ -63,11 +76,14 @@
 
   /** Where the last `count` folders of `path` start: the separator before them, or 0 for all of it. */
   function tailStart(path, count) {
-    let at = path.replace(/[\\/]+$/, '').length; // a root's own separator ends no folder
-    for (let n = 0; n < count && at > 0; n++) {
-      at = Math.max(path.lastIndexOf('\\', at - 1), path.lastIndexOf('/', at - 1));
+    const separator = (at) => path[at] === '/' || path[at] === '\\';
+    // Security: one pass from the end, however long the path. A root's own separator ends no folder.
+    let start = path.length;
+    for (let n = 0; n <= count && start > 0; n++) {
+      while (start > 0 && separator(start - 1)) start--;
+      if (n < count) while (start > 0 && !separator(start - 1)) start--;
     }
-    return Math.max(at, 0);
+    return start;
   }
 
   /** `text` in a span, with the characters at `positions` in <mark>. */
@@ -101,18 +117,25 @@
    * place of the whole path: a list cuts a long line short at its end, where the path was.
    */
   A.projectSubtitles = function projectSubtitles(projects) {
+    // What a line is made of: the id, the name it is grouped by, the path, then the rest of the line.
+    const facts = projects.map((project) => {
+      const vcs = VCS.normalize(project);
+      return [project.id, String(A.projectLabel(project)), String(project.path || ''), A.projectGalaxyLabel(project), vcs.nameWithOwner, vcs.branch];
+    });
+    // Security: the IDEAS panel asks on every render, before it knows whether anything changed.
+    // The lines are worked out again only when one of the facts they are made of has changed.
+    const kept = S.projectSubtitles;
+    if (kept.facts.length === facts.length && facts.every((fact, i) => fact.every((value, j) => value === kept.facts[i][j]))) return kept.lines;
     const lines = new Map();
-    for (const group of grouped(projects, (project) => String(A.projectLabel(project)))) {
-      const paths = group.map((project) => String(project.path || ''));
-      const apart = group.length > 1 ? tailsApart(paths) : null;
-      group.forEach((project, i) => {
-        const vcs = VCS.normalize(project);
-        const rest = [A.projectGalaxyLabel(project), vcs.nameWithOwner, vcs.branch];
-        const cut = apart ? tailStart(paths[i], apart[i]) : 0;
-        const detail = apart && paths[i] ? [(cut > 0 ? '…' : '') + paths[i].slice(cut), ...rest] : [...rest, paths[i]];
-        lines.set(project.id, detail.filter(Boolean).map(String).join(' · '));
+    for (const group of grouped(facts, (fact) => fact[1])) {
+      const apart = group.length > 1 ? tailsApart(group.map((fact) => fact[2])) : null;
+      group.forEach(([id, , path, ...rest], i) => {
+        const cut = apart ? tailStart(path, apart[i]) : 0;
+        const detail = apart && path ? [(cut > 0 ? '…' : '') + path.slice(cut), ...rest] : [...rest, path];
+        lines.set(id, detail.filter(Boolean).map(String).join(' · '));
       });
     }
+    S.projectSubtitles = { facts, lines };
     return lines;
   };
 
