@@ -1,5 +1,7 @@
 // @ts-check
-// Project search in every view: topbar query, GitHub filter, universe match highlighting, shared ranking.
+// Go to: the search palette, a dialog from the top bar's search button, / or Ctrl K. Its query ranks
+// projects, agents and folders (search-core.js) under the GitHub filter and brightens the matching
+// systems on the universe map; rows are filled by app/project/search-rows.js.
 'use strict';
 
 (function () {
@@ -8,6 +10,7 @@
   const A = AUR.app;
   if (!A) throw new Error('app/state.js must load before app/project/search.js');
   const S = A.state;
+  const LABEL = 'Go to a project, agent or folder';
 
   /** `ranked` first, then the rest of `matches`, sorted by `compareRest` when given. */
   A.rankedFirst = function rankedFirst(matches, ranked, compareRest) {
@@ -16,16 +19,26 @@
     return [...ranked, ...(compareRest ? rest.sort(compareRest) : rest)];
   };
 
-  // ---------- project search ----------
   A.wireProjectSearch = function wireProjectSearch() {
     S.projectSearch.els = {
-      input: document.getElementById('search-input'),
+      button: document.getElementById('search-button'),
+      dialog: /** @type {HTMLDialogElement | null} */ (document.getElementById('search-dialog')),
+      input: /** @type {HTMLInputElement | null} */ (document.getElementById('search-input')),
       results: document.getElementById('search-results'),
+      scope: document.getElementById('search-scope'),
       filter: document.getElementById('project-vcs-filter'),
       filterCount: document.getElementById('project-vcs-filter-count'),
     };
     const els = S.projectSearch.els;
-    if (!els.input || !els.results) return;
+    if (!els.button || !els.dialog || !els.input || !els.results) return;
+
+    A.titleWithKey(els.button, LABEL, 'search');
+    els.button.addEventListener('click', A.openProjectSearch);
+    // The dialog is the palette's box, so a click on the dialog itself fell on the backdrop.
+    els.dialog.addEventListener('click', (event) => {
+      if (event.target === els.dialog) A.clearProjectSearch();
+    });
+    els.dialog.addEventListener('close', finishClose);
 
     els.input.addEventListener('input', () => {
       if (els.input.value.trim()) {
@@ -35,8 +48,6 @@
       A.cancelListboxTimer(S.projectSearch);
       updateProjectSearch();
     });
-
-    els.input.addEventListener('focus', () => A.closeProjectDirectory(false));
 
     if (els.filter) {
       els.filter.addEventListener('click', () => {
@@ -55,21 +66,51 @@
     });
   };
 
+  /** Opens the palette (not over Settings), or puts the caret back in its field when it is open. */
+  A.openProjectSearch = function openProjectSearch() {
+    const els = S.projectSearch.els;
+    if (!els || !els.dialog || S.projectSettings.open) return;
+    if (!els.dialog.open) {
+      A.closeProjectDirectory(false);
+      const active = document.activeElement;
+      S.projectSearch.opener = active instanceof HTMLElement && active !== document.body ? active : null;
+      els.dialog.showModal();
+      els.button.setAttribute('aria-expanded', 'true');
+      renderProjectVcsFilter();
+    }
+    els.input.focus();
+    els.input.select();
+  };
+
+  /** Clears the query and closes the palette: Escape, a click outside, a pick, a view switch. */
   A.clearProjectSearch = function clearProjectSearch() {
+    resetQuery();
+    const dialog = S.projectSearch.els && S.projectSearch.els.dialog;
+    if (dialog && dialog.open) dialog.close();
+  };
+
+  function resetQuery() {
     A.cancelListboxTimer(S.projectSearch);
     S.projectSearch.query = '';
     S.projectSearch.results = [];
     S.projectSearch.selected = 0;
     const els = S.projectSearch.els;
-    if (els) {
+    if (els && els.input) {
       els.input.value = '';
-      els.input.setAttribute('aria-expanded', 'false');
-      els.input.removeAttribute('aria-activedescendant');
-      els.results.classList.add('hidden');
-      AUR.clear(els.results);
+      renderProjectSearchResults();
     }
     A.syncProjectMatches();
-  };
+  }
+
+  // However it closed, focus goes back where it was, unless a pick has moved on.
+  function finishClose() {
+    const els = S.projectSearch.els;
+    resetQuery();
+    els.button.setAttribute('aria-expanded', 'false');
+    const opener = S.projectSearch.opener;
+    S.projectSearch.opener = null;
+    if (opener && opener.isConnected && opener.getClientRects().length > 0) opener.focus();
+  }
 
   function renderProjectVcsFilter() {
     const els = S.projectSearch.els;
@@ -84,6 +125,7 @@
       : `Focus on the ${githubCount} projects with GitHub repositories`);
     els.filter.title = active ? 'Show all projects' : 'Focus on GitHub projects';
     if (els.filterCount) els.filterCount.textContent = String(githubCount);
+    if (els.scope) els.scope.textContent = active ? 'GitHub projects only' : '';
   }
 
   A.refreshProjectSearchFromStore = function refreshProjectSearchFromStore() {
@@ -93,21 +135,48 @@
     else { A.syncProjectMatches(); renderProjectVcsFilter(); }
   };
 
-  function matchingProjects(projects, query) {
-    return VCS.filterProjects(projects, { filter: S.projectSearch.filter, query });
+  const underFilter = (projects) => VCS.filterProjects(projects, { filter: S.projectSearch.filter });
+
+  // The palette's projects for a query: name, path and fuzzy ranks (search-core.js), with the
+  // projects whose repository or branch holds the query after the sure ranks and before the fuzzy.
+  function findProjects(projects, query) {
+    const filtered = underFilter(projects);
+    if (!query) return filtered;
+    const ranked = AUR.searchProjects(filtered, query, Math.max(filtered.length, 1));
+    const rankedIds = new Set(ranked.map((project) => project.id));
+    const sure = new Set(VCS.filterProjects(filtered, { query }).map((project) => project.id));
+    return [
+      ...ranked.filter((project) => sure.has(project.id)),
+      ...filtered.filter((project) => sure.has(project.id) && !rankedIds.has(project.id)).sort(A.byProjectName),
+      ...ranked.filter((project) => !sure.has(project.id)),
+    ];
   }
 
+  /**
+   * Brightens the matching systems on the view's map. With no query given, the palette's own
+   * matches; the directory gives its query, matched on name, path, branch and repository.
+   * @param {any[]} [projects] @param {string} [query]
+   */
   A.syncProjectMatches = function syncProjectMatches(projects, query) {
     if (!S.activeView) return;
-    const needle = query == null && S.projectSearch.els
-      ? S.projectSearch.els.input.value.trim() : String(query || '').trim();
+    const palette = query == null;
+    const needle = palette && S.projectSearch.els ? S.projectSearch.els.input.value.trim() : String(query || '').trim();
     if (!needle && S.projectSearch.filter === VCS.FILTERS.ALL) {
       S.activeView.setSearchMatches(null);
       return;
     }
     const source = projects || [...S.store.projects.values()];
-    S.activeView.setSearchMatches(new Set(matchingProjects(source, needle).map((project) => project.id)));
+    const found = palette ? findProjects(source, needle)
+      : VCS.filterProjects(source, { filter: S.projectSearch.filter, query: needle });
+    S.activeView.setSearchMatches(new Set(found.map((project) => project.id)));
   };
+
+  function onlyFuzzy(entry, query) {
+    if (entry.kind === 'project') return !VCS.matchesSearch(entry.project, query);
+    const hit = AUR.matchText(entry.kind === 'agent' ? entry.ship.name : entry.planet, query);
+    const status = entry.kind === 'agent' && String(entry.ship.status || '').toLowerCase().includes(query.toLowerCase());
+    return Boolean(hit && hit.rank === AUR.SEARCH_FUZZY && !status);
+  }
 
   function updateProjectSearch() {
     const els = S.projectSearch.els;
@@ -126,21 +195,23 @@
     }
 
     const projects = [...S.store.projects.values()];
-    const matches = matchingProjects(projects, query);
-    const projectEntries = A.rankedFirst(matches, AUR.searchProjects(matches, query), A.byProjectName)
-      .slice(0, 6)
+    const shown = new Set(underFilter(projects).map((project) => project.id));
+    const projectEntries = findProjects(projects, query).slice(0, 6)
       .map((project) => ({ kind: 'project', key: 'p:' + project.id, project }));
-    const agentEntries = AUR.searchAgents([...S.store.ships.values()], query, 4)
+    const agentEntries = AUR.searchAgents([...S.store.ships.values()].filter((ship) => shown.has(ship.project)), query, 4)
       .map((ship) => ({ kind: 'agent', key: 'a:' + ship.id, ship }));
-    const planetEntries = AUR.searchPlanets(projects, query, 4)
+    const planetEntries = AUR.searchPlanets(underFilter(projects), query, 4)
       .map((hit) => ({ kind: 'planet', key: 'f:' + hit.project.id + '/' + hit.planet, project: hit.project, planet: hit.planet }));
-    S.projectSearch.results = [...projectEntries, ...agentEntries, ...planetEntries].slice(0, 10);
+    // Rows found only fuzzily go after every row found otherwise; the sort keeps the kinds' order.
+    S.projectSearch.results = [...projectEntries, ...agentEntries, ...planetEntries]
+      .sort((a, b) => Number(onlyFuzzy(a, query)) - Number(onlyFuzzy(b, query))).slice(0, 10);
     A.keepSelection(S.projectSearch, previous, queryChanged, (entry) => entry.key);
     renderProjectSearchResults();
-    A.syncProjectMatches(projects, query);
+    A.syncProjectMatches(projects);
     renderProjectVcsFilter();
   }
 
+  /** A project's galaxy, repository, branch and path, joined: a project's line in other lists. */
   A.projectSearchSubtitle = function projectSearchSubtitle(project) {
     const galaxy = A.projectGalaxyLabel(project);
     const detail = [];
@@ -163,36 +234,21 @@
       els.input.removeAttribute('aria-activedescendant');
       return;
     }
+    const fill = A.searchRowFiller(S.projectSearch.results, S.projectSearch.query);
     A.renderListbox(els.results, els.input, S.projectSearch, {
       idPrefix: 'search-result-',
       rowClass: 'search-result',
       emptyClass: 'search-empty',
       emptyText: 'Nothing found',
-      fill: fillSearchRow,
+      fill,
       activate: activateProjectSearchResult,
     });
-  }
-
-  function fillSearchRow(row, entry) {
-    const live = entry.kind === 'project' && A.shipsInProject(entry.project.id).length > 0;
-    const dot = AUR.el('span', 'search-result-dot' + (live ? ' live' : ''));
-    if (entry.kind === 'agent') dot.style.background = AUR.providerMeta(entry.ship.provider).color;
-    const copy = AUR.el('span', 'search-result-copy');
-    let name, meta, kind;
-    if (entry.kind === 'agent') {
-      name = entry.ship.name; meta = entry.ship.status + ' · ' + A.projectName(entry.ship.project); kind = 'Agent';
-    } else if (entry.kind === 'planet') {
-      name = entry.planet; meta = A.projectLabel(entry.project); kind = 'Folder';
-    } else {
-      name = A.projectLabel(entry.project); meta = A.projectSearchSubtitle(entry.project); kind = 'Project';
-    }
-    copy.append(AUR.el('span', 'search-result-name', name), AUR.el('span', 'search-result-meta', meta));
-    row.append(dot, copy, AUR.el('span', 'search-result-kind', kind));
   }
 
   function activateProjectSearchResult(index) {
     const entry = S.projectSearch.results[index] || S.projectSearch.results[0];
     if (!entry) return;
+    S.projectSearch.opener = null;
     A.clearProjectSearch();
     if (entry.kind === 'agent') A.enterAgentFocus(entry.ship.id);
     else if (entry.kind === 'planet') A.openPlanet(entry.project.id, entry.planet);

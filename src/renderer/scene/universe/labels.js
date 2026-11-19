@@ -51,6 +51,12 @@
       return true;
     }
 
+    // The Go to palette's light backdrop lies over the map but hides none of it; the palette does.
+    function mapShowsAt(x, y) {
+      const hit = document.elementFromPoint(x, y);
+      return hit === canvas || (hit instanceof HTMLDialogElement && hit.classList.contains('search-dialog'));
+    }
+
     function labelPointIsClear(rect) {
       if (![rect.x, rect.y, rect.width, rect.height].every(Number.isFinite)) return false;
       const inset = 2;
@@ -61,7 +67,7 @@
         [rect.x + inset, rect.y + rect.height - inset],
         [rect.x + rect.width - inset, rect.y + rect.height - inset],
       ];
-      return points.every(([x, y]) => document.elementFromPoint(x, y) === canvas);
+      return points.every(([x, y]) => mapShowsAt(x, y));
     }
 
     function updateLabelLayout() {

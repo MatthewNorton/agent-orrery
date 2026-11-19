@@ -130,7 +130,8 @@
 .project-directory-vcs .project-vcs-marker { width: 18px; height: 18px; border-radius: var(--radius-0); }
 .project-directory-vcs .project-vcs-marker svg { width: 11px; height: 11px; }
 .project-directory-empty { padding: 34px 16px; color: var(--ink-3); font-size: 12.5px; text-align: center; }
-.project-directory-footer {
+/* the keys under the list, here and in the Go to palette (search.css) */
+.project-directory-footer, .search-footer {
   display: flex;
   gap: var(--space-4);
   padding: 8px var(--space-3);
@@ -138,11 +139,8 @@
   color: var(--ink-3);
   font-size: 12px;
 }
-.project-directory-footer span { display: flex; align-items: center; gap: 4px; }
+.project-directory-footer span, .search-footer span { display: flex; align-items: center; gap: 4px; }
 
-@media (max-width: 1260px) {
-  .project-directory-button span:not(.project-directory-button-icon):not(.project-directory-button-count) { display: none; }
-}
 @media (max-width: 1040px) {
   .project-directory { right: var(--space-3); }
 }

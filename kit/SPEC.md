@@ -241,10 +241,24 @@ Design tokens (put in `:root`):
   most recently active projects sorted by `lastActivity`, each showing the
   project name (ellipsized), a green dot when the project has live ships, and
   jumping to that project's system view on click.
-  A `SEARCH` glass field follows the strip: case-insensitive ranked project
-  matches appear in a keyboard-accessible dropdown and Enter/click opens the
-  existing guarded system route. It is present in every view; a view switch clears the
-  query, and the GitHub filter also narrows the PROJECTS directory.
+  The controls sit on the right, led by a square search button and the GitHub filter. The button
+  (or `/`, or Ctrl K) opens the Go to palette (`app/project/search.js`, rows by
+  `app/project/search-rows.js`, `styles/search.css`): a modal dialog near the top centre, up to
+  800 px wide, with its field first and the results below. The query ranks up to 6 projects, 4
+  agents and 4 folders (`search-core.js`): prefix, then substring, then the path (an agent's
+  status), then fuzzy matches, the query's characters in order (3 or more), scored by how close
+  they sit and whether they start words; a project whose repository or branch holds the query
+  comes after the sure ranks and before the fuzzy. Each row shows the live dot (an agent's is its
+  provider colour), the name with the matched characters marked, the full path, the repository
+  and branch (an agent's status) and its kind. Short of room the repository gives way first, then
+  the start of the path; the path's last two folders stay, or as many as tell it from a result of
+  the same name. Arrows, Enter and click pick a result through the existing guarded routes.
+  Escape, a click outside, a pick or a view switch closes the palette and clears the query; focus
+  goes back where it was unless a pick moved on, and stays in the dialog while it is open. The
+  backdrop is a light shade, so the universe's matching systems show behind. The GitHub filter
+  narrows the results (and their agents and folders), the map and the PROJECTS directory; the
+  palette's footer says so while it is on. A bar under 1100 layout px (text size counts) keeps
+  PROJECTS to its mark and count.
   A persistent gear opens Settings, one tab at a time: Graphics · Panels · Shortcuts · Projects · Backup
   (`app/settings-tabs.js`; arrow keys, Home and End move between the tabs, the last tab chosen
   stays chosen while the app runs, and Settings opens on Projects while a project folder is
@@ -308,11 +322,11 @@ Design tokens (put in `:root`):
     - **Keys and reset.** Arrow keys step 16 px, Shift 64; Home and End go to the least and greatest size; Enter or a double-click puts one size back; the panels menu's *Reset panel sizes* puts them all back. A hairline shows on hover and turns orange with a size badge while dragged or focused.
   - **Each run.** Every run starts from the At launch layout in Settings › Panels (`app/panels/launch.js`, stored in localStorage). By default Summary and Galaxies are hidden, Tasks and Ideas folded, and the rest open. The menu, the chevrons and the keys change only the run in progress. The first run with launch layouts carries over the panels folded before.
 - **Keyboard shortcuts** (`shortcuts.js`, a UMD table the Node tests share, run by `app/keys.js`). Settings › Shortcuts lists them and turns single keys on or off (`agent-universe.single-keys.v1`, on by default).
-  - **Go to and views.** `/` or Ctrl K focuses the search; Backspace goes back one level; N opens the first agent that needs you; Ctrl , opens Settings and ? opens it on Shortcuts. On macOS ⌘ stands in for Ctrl.
+  - **Go to and views.** `/` or Ctrl K opens the Go to palette (or returns to its field); Backspace goes back one level; N opens the first agent that needs you; Ctrl , opens Settings and ? opens it on Shortcuts. On macOS ⌘ stands in for Ctrl.
   - **Timeline.** Space plays or pauses history; L returns to live.
   - **Panels.** `[` and `]` fold or open the left and the right rail, `\` every panel, and Shift E expands the event feed or puts it back. A panel's `letter` in `panel-layout.js` hides or shows it: F Fleet, G Galaxies, E Event feed, I Ideas, S Summary, P Project, T Tasks. In a view without that panel, a toast says where it shows.
-  - **When a key is not a shortcut.** Single keys wait while a text field has focus, while Settings is open, with Alt held, and while they are off; Space on a focused button presses the button. Ctrl shortcuts always work. Escape closes the panels menu, then Settings, then the expanded feed, then the toast, unless the agent view, the directory or the search took it first, or a text field with text has focus.
-  - **Hints.** The panels menu and the At launch rows show each panel's key, the menu's actions theirs, the hiding toast says which key shows the panel again, the search shows `/`, the view hint ends with `? shortcuts`, and the panels button and the feed's expand button give theirs in their titles and `aria-keyshortcuts`. Single-key hints go while single keys are off.
+  - **When a key is not a shortcut.** Single keys wait while a text field has focus, while Settings is open, with Alt held, and while they are off; Space on a focused button presses the button. Ctrl shortcuts always work. Escape closes the panels menu, then Settings, then the expanded feed, then the toast, unless the Go to palette, the agent view or the directory took it first (the palette closes and nothing else does), or a text field with text has focus. While Settings is open, Ctrl K leaves the palette shut.
+  - **Hints.** The panels menu and the At launch rows show each panel's key, the menu's actions theirs, the hiding toast says which key shows the panel again, the view hint ends with `? shortcuts`, and the search button, the panels button and the feed's expand button give theirs in their titles and `aria-keyshortcuts` (the title names the first key that works, `aria-keyshortcuts` every one: the search button says `/` and Ctrl K, or Ctrl K alone). Single-key hints go while single keys are off.
 - **Back control** (system + planet views, top-left under the project card or
   above it): `← Universe` / `← Orion System` style button.
 - **History bar** (all views, fixed bottom): Play/Pause, `1x`/`10x`/`100x`/
@@ -422,9 +436,11 @@ Design tokens (put in `:root`):
 - States: system with ≥1 ship = "online" (brighter, sun pulse, label full
   opacity). Idle = normal dim. `exists: false` = derelict (very dim, ~40%
   opacity, no pulse).
-- While project search is active, matching system glyphs and labels brighten
-  through those same state materials and nonmatches dim; clearing or leaving
-  the universe restores the ordinary online/idle/derelict appearance.
+- While the Go to palette has a query (or the directory has one, or the GitHub
+  filter is on), matching system glyphs and labels brighten through those same
+  state materials and nonmatches dim, in view behind the palette's light
+  backdrop; closing the palette, clearing or leaving the universe restores the
+  ordinary online/idle/derelict appearance.
 - Ships: every live ship = its hull (a dart until it loads) cruising outside
   its project's glyph rings (slow orbit, gentle bob), instanced per provider.
   Drones smaller. On `ship-spawned`: warp-in grow; `ship-departed`: removed.

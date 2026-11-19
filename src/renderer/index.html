@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="styles/topbar.css" />
   <link rel="stylesheet" href="styles/settings.css" />
   <link rel="stylesheet" href="styles/directory.css" />
+  <link rel="stylesheet" href="styles/search.css" />
   <link rel="stylesheet" href="styles/rail.css" />
   <link rel="stylesheet" href="styles/focus.css" />
   <link rel="stylesheet" href="styles/focus-rooms.css" />
@@ -30,15 +31,11 @@
       <span class="brand-badge">MULTI-PROVIDER</span>
     </div>
     <div class="project-search" id="project-search">
-      <label class="search-label" for="search-input">Go to</label>
-      <div class="search-control">
+      <button class="settings-button search-button" id="search-button" type="button"
+        aria-label="Go to a project, agent or folder" aria-haspopup="dialog"
+        aria-controls="search-dialog" aria-expanded="false">
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
-        <input class="search-input" id="search-input" type="search"
-          placeholder="Go to a project, agent or folder" autocomplete="off" role="combobox"
-          aria-autocomplete="list" aria-controls="search-results" aria-expanded="false" />
-        <div class="panel search-results hidden" id="search-results" role="listbox"
-          aria-label="Project search results"></div>
-      </div>
+      </button>
       <button class="project-vcs-filter" id="project-vcs-filter" type="button"
         aria-label="Focus on projects with a GitHub repository" aria-pressed="false"
         title="Focus on GitHub projects">
@@ -53,7 +50,7 @@
       aria-haspopup="dialog" aria-controls="project-directory"
       aria-expanded="false" title="All projects">
       <span class="project-directory-button-icon" aria-hidden="true">☷</span>
-      <span>PROJECTS</span>
+      <span class="project-directory-button-label">PROJECTS</span>
       <span class="project-directory-button-count" id="project-directory-button-count">0</span>
     </button>
     <button class="btn btn--alarm needs-you-button hidden" id="needs-you" type="button"><i aria-hidden="true"></i><span id="needs-you-count">0</span> need you</button>
@@ -79,6 +76,26 @@
   </header>
   <!-- The panels menu, filled by app/panels/menu.js when it opens -->
   <div class="panels-menu" id="panels-menu" role="menu" aria-label="Panels" hidden></div>
+
+  <!-- Go to: the search palette, from the search button, / or Ctrl K (app/project/search.js) -->
+  <dialog class="search-dialog" id="search-dialog" aria-label="Go to">
+    <section class="search-palette">
+      <div class="search-field">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+        <input class="search-input" id="search-input" type="search" aria-label="Go to"
+          placeholder="Go to a project, agent or folder" autocomplete="off" role="combobox"
+          aria-autocomplete="list" aria-controls="search-results" aria-expanded="false" />
+      </div>
+      <div class="search-results hidden" id="search-results" role="listbox"
+        aria-label="Projects, agents and folders"></div>
+      <footer class="search-footer">
+        <span><kbd class="kbd kbd--sm">↑</kbd><kbd class="kbd kbd--sm">↓</kbd> Navigate</span>
+        <span><kbd class="kbd kbd--sm">Enter</kbd> Open</span>
+        <span><kbd class="kbd kbd--sm">Esc</kbd> Close</span>
+        <span class="search-scope" id="search-scope"></span>
+      </footer>
+    </section>
+  </dialog>
 
   <!-- Settings stay above the current scene; they are not a fourth view. One tab's pane shows at
        a time (app/settings-tabs.js). -->
@@ -541,6 +558,7 @@
   <script src="app/project/control.js"></script>
   <script src="app/project/listbox.js"></script>
   <script src="app/project/directory.js"></script>
+  <script src="app/project/search-rows.js"></script>
   <script src="app/project/search.js"></script>
   <script src="app/project/settings.js"></script>
   <script src="app/project/forget.js"></script>

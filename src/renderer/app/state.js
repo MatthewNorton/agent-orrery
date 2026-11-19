@@ -175,6 +175,7 @@
       filter: VCS.FILTERS.ALL,
       results: [],
       selected: 0,
+      opener: null,        // what had focus before the palette opened
       els: null,
     },
     projectDirectory: {

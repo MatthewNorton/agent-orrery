@@ -13,8 +13,12 @@
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--hair);
   pointer-events: none;
+  container-type: inline-size;
 }
 .topbar > * { pointer-events: auto; }
+/* A bar under 1100 layout px (its content box, so the text size counts) keeps PROJECTS to its mark
+   and count: Live with 12 needing you and 128 projects then leaves about 40 px beside the brand */
+@container (max-width: 1070px) { .project-directory-button-label { display: none; } }
 .brand { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; white-space: nowrap; }
 .logo-dot { width: 24px; height: 24px; display: block; }
 .logo-dot circle { fill: none; stroke: var(--ink); stroke-width: 1.2; }
@@ -29,93 +33,18 @@
   letter-spacing: 0.04em; color: var(--ink-3);
 }
 
-/* Go to: the project search, centred */
-.project-search {
-  position: relative;
-  display: flex;
-  align-items: center;
-  flex: 0 1 380px;
-  margin: 0 auto;
-  min-width: 0;
-}
-.search-label {
-  position: absolute; width: 1px; height: 1px; overflow: hidden;
-  clip: rect(0 0 0 0); white-space: nowrap;
-}
-.search-control { position: relative; width: 100%; }
-.search-kbd { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); pointer-events: none; }
-.search-control:is(:focus-within, :has(.search-input:not(:placeholder-shown))) .search-kbd { display: none; }
-.search-control:has(.search-kbd) .search-input:placeholder-shown { padding-right: 32px; }
-.search-control > svg {
-  position: absolute; left: 10px; top: 50%;
-  width: 16px; height: 16px; transform: translateY(-50%);
-  fill: none; stroke: var(--ink-3); stroke-width: 1.6; pointer-events: none;
-}
-.search-input {
-  width: 100%;
-  height: var(--control-h-lg);
-  padding: 0 10px 0 34px;
-  color: var(--ink);
-  background: var(--paper);
-  border: 1px solid var(--hair-2);
-  border-radius: var(--radius-0);
-  outline: none;
-  font: inherit;
-  font-size: 13px;
-  user-select: text;
-  appearance: none;
-}
-.search-input::-webkit-search-cancel-button { display: none; }
-.search-input::placeholder { color: var(--ink-3); }
-.search-input:hover { border-color: var(--ink-3); }
-.search-input:focus { border-color: var(--orange); box-shadow: 0 0 0 2px var(--plate); }
-.search-results {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0; right: 0;
-  max-height: 392px;
-  overflow-y: auto;
-  padding: 4px;
-  z-index: 30;
-}
-/* the top bar's dropdowns stand on a solid plate */
-.search-results, .panels-menu {
+/* Go to (it opens the search palette, search.css) and the GitHub filter lead the controls on the right */
+.project-search { display: flex; align-items: center; gap: var(--space-2); flex: 0 0 auto; margin-left: auto; }
+.search-button svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; }
+.search-button[aria-expanded="true"] { background: var(--plate); }
+/* the panels menu stands on a solid plate */
+.panels-menu {
   background: var(--paper-solid);
   border: 1px solid var(--hair-2);
   border-radius: var(--radius-0);
   backdrop-filter: none;
   box-shadow: none;
 }
-.search-result {
-  width: 100%;
-  display: grid;
-  grid-template-columns: 7px minmax(0, 1fr) auto;
-  gap: 10px;
-  align-items: center;
-  padding: 8px 10px;
-  color: var(--ink);
-  background: transparent;
-  border: 0;
-  border-radius: var(--radius-0);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.search-result:hover, .search-result.selected { background: var(--plate); }
-.search-result:focus-visible { outline: 2px solid var(--orange); outline-offset: -2px; }
-.search-result-dot { width: 7px; height: 7px; border-radius: var(--radius-dot); background: var(--hair-2); }
-.search-result-dot.live { background: var(--green); box-shadow: 0 0 0 3px var(--green-ring); }
-.search-result-copy { min-width: 0; }
-.search-result-name {
-  display: block; overflow: hidden; color: inherit;
-  font-size: 12.5px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap;
-}
-.search-result-meta {
-  display: block; margin-top: 2px; overflow: hidden; color: var(--ink-3);
-  font-family: var(--font-mono); font-size: 12px; text-overflow: ellipsis; white-space: nowrap;
-}
-.search-result-kind { color: var(--ink-3); font-family: var(--font-mono); font-size: 12px; }
-.search-empty { padding: 12px 10px; color: var(--ink-3); font-size: 12px; }
 
 /* the GitHub filter and the all-projects button: line buttons with a count */
 .project-vcs-filter, .project-directory-button {
@@ -134,7 +63,6 @@
   letter-spacing: 0.02em;
   cursor: pointer;
 }
-.project-vcs-filter { margin-left: 8px; }
 .project-vcs-filter:hover, .project-directory-button:hover,
 .project-directory-button[aria-expanded="true"] { color: var(--ink); background: var(--plate); }
 .project-vcs-filter[aria-pressed='true'] { color: var(--ink); border-color: var(--green); }
