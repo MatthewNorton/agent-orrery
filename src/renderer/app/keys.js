@@ -124,6 +124,8 @@
       singleKeys: singleKeys && !S.projectSettings.open,
     }, SHORTCUTS, MAC);
     if (!row) return;
+    // The Go to palette is modal: behind it only its own key works, putting the caret back in its field.
+    if (S.projectSearch.open && row.id !== 'search') return;
     if ((row.panel ? togglePanel(row.panel) : ACTIONS[row.id]()) !== false) event.preventDefault();
   }
 

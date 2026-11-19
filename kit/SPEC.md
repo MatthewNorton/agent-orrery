@@ -196,7 +196,8 @@ SystemData = { project: Project, planets: Planet[], beltDensity: number }
 Planet     = { name, files, builds, procedural? }   // name '(root)' possible
 
 PlanetData = { name, project: Project, builds, files, sizeKb, subdirs,
-               resources: string[], procedural? }   // resources = top file exts
+               resources: string[], procedural?, partial? }   // resources = top file exts;
+                                                    // partial: the folder read stopped short
 ```
 
 Event batch entries (from `AU.onEvents`):
@@ -322,7 +323,7 @@ Design tokens (put in `:root`):
   - **Go to and views.** `/` or Ctrl K opens the Go to palette (or returns to its field); Backspace goes back one level; N opens the first agent that needs you; Ctrl , opens Settings and ? opens it on Shortcuts. On macOS ⌘ stands in for Ctrl.
   - **Timeline.** Space plays or pauses history; L returns to live.
   - **Panels.** `[` and `]` fold or open the left and the right rail, `\` every panel, and Shift E expands the event feed or puts it back. A panel's `letter` in `panel-layout.js` hides or shows it: F Fleet, G Galaxies, E Event feed, I Ideas, S Summary, P Project, T Tasks. In a view without that panel, a toast says where it shows.
-  - **When a key is not a shortcut.** Single keys wait while a text field has focus, while Settings is open, with Alt held, and while they are off; Space on a focused button presses the button. Ctrl shortcuts always work. Escape closes the panels menu, then Settings, then the expanded feed, then the toast, unless the Go to palette, the agent view or the directory took it first (the palette closes and nothing else does), or a text field with text has focus. While Settings is open, Ctrl K leaves the palette shut.
+  - **When a key is not a shortcut.** Single keys wait while a text field has focus, while Settings is open, with Alt held, and while they are off; Space on a focused button presses the button. Ctrl shortcuts always work, except behind the Go to palette: while it is open only `/` and Ctrl K act, putting the caret back in its field. Escape closes the panels menu, then Settings, then the expanded feed, then the toast, unless the Go to palette, the agent view or the directory took it first (the palette closes and nothing else does), or a text field with text has focus. While Settings is open, or agent focus has made the top bar inert, `/` and Ctrl K leave the palette shut.
   - **Hints.** The panels menu and the At launch rows show each panel's key, the menu's actions theirs, the hiding toast says which key shows the panel again, the view hint ends with `? shortcuts`, and the search button, the panels button and the feed's expand button give theirs in their titles and `aria-keyshortcuts` (the title names the first key that works, `aria-keyshortcuts` every one: the search button says `/` and Ctrl K, or Ctrl K alone). Single-key hints go while single keys are off.
 - **Back control** (system + planet views, top-left under the project card or
   above it): `← Universe` / `← Orion System` style button.
@@ -553,10 +554,13 @@ card's solar-system totals (the view carries it as `systemData`; when it fails, 
      for (`a folder in <project>`, `the top-level files of <project>` for `(root)`, or `no folder on
      disk` when `procedural`); rows `FILES`, `SIZE` (KB, MB or GB), `SUBFOLDERS`, `FILE TYPES` (top
      extensions, `MISC` shown as `other`), each `—` when `procedural` (those numbers are
-     invented) or fetched in REPLAY (history never reads the disk; `A.planetFolderCounts`), and
-     ending in `+` past the 600 files the folder read stops at; then `BUILDS (FILE EDITS)`: `THIS PLANET`, `WHOLE SOLAR SYSTEM` (the project's
-     `totalBuilds`) and a bar of the planet's share; then `SOLAR SYSTEM`: `PLANETS` (from
-     `systemData`) and `AGENTS`. A `build` event on the open planet raises its count in place.
+     invented) or fetched in REPLAY (history never reads the disk; `A.planetFolderCounts`);
+     `FILES` and `SIZE` end in `+` when the folder read stopped short (`partial`: 600 files, 300
+     folders, five levels, or a folder it could not read); then `BUILDS (FILE EDITS)`:
+     `THIS PLANET`, `WHOLE SOLAR SYSTEM` (the project's `totalBuilds`) and a bar of the planet's
+     share; then `SOLAR SYSTEM`: `PLANETS` (the planets the system view draws, at most 8, from
+     `systemData`) and `AGENTS`. A `build` event on the open planet raises its count in place,
+     its folder matched as main matches buckets (case-insensitively under a Windows path).
 - No tab bar: the mockup's `Overview … Scans` row was dropped because its tabs did nothing.
 - Summary card: `PLANET SUMMARY` — Agents / Files / Subfolders / Builds.
 - Back button → system view.

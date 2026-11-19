@@ -96,7 +96,7 @@ async function runPolishMode(ctx, driver) {
     result.planetName = planetTarget.id;
     const planetInput = clickPoint(planetTarget);
     const planet = await waitForView('planet');
-    if (planet.camera !== 'pcam' || !planet.backVisible ||
+    if (planet.camera !== 'pcam' || !planet.backVisible || !planet.planetCardVisible ||
         planet.summary !== 'PLANET SUMMARY' || !planet.planetCard.includes('PLANET:')) {
       throw new Error(`bad planet chrome: ${JSON.stringify(planet)}`);
     }

@@ -158,7 +158,7 @@ async function runHistoryMode(ctx, driver, metrics) {
     ctx.win.webContents.send('au:debug-view', 'planet');
     const planetView = await waitForView('planet');
     const planetChrome = await readHistoryMetrics();
-    result.metrics.planetChromeClear = planetView.planetCard.includes('PLANET:') &&
+    result.metrics.planetChromeClear = planetView.planetCardVisible === true && planetView.planetCard.includes('PLANET:') &&
       planetChrome.layout?.inViewport === true &&
       (planetChrome.layout?.overlapIds?.length || 0) === 0;
 

@@ -17,6 +17,9 @@ const { liveProject } = require('../universe/public-shape');
  */
 
 const SYSTEM_CACHE_MS = 30000;
+// A planet's folder read: at most 600 files and 300 folders, five levels deep. Past any of those,
+// or at a folder it cannot read, its counts are floors and `partial` says so.
+const READ_FILES = 600, READ_FOLDERS = 300, READ_DEPTH = 4;
 const IGNORE_DIRS = new Set([
   'node_modules', '.git', '.next', '.venv', 'venv', 'dist', 'build', 'out',
   'release', 'coverage', 'target', '__pycache__', '.idea', '.vscode', 'bin', 'obj',
@@ -63,7 +66,7 @@ function getSystem(model, projectId) {
   return data;
 }
 
-// Planet close-up stats: honest numbers under fantasy labels.
+// Planet close-up stats: a folder's files, size and subfolders, read from disk.
 /**
  * @param {LiveModel} model
  * @param {string} projectId
@@ -88,31 +91,36 @@ function getPlanet(model, projectId, planetName) {
   if (planetName !== '(root)' && !isPlanetSegment(planetName)) return null;
   const dir = planetName === '(root)' ? project.path : path.join(project.path, planetName);
   if (planetName !== '(root)' && relativeInside(project.path, dir) === null) return null;
-  let files = 0, bytes = 0, subdirs = 0;
+  const root = planetName === '(root)';
+  let files = 0, bytes = 0, subdirs = 0, folders = 0, partial = false;
   const exts = new Map();
-  try {
-    const walk = (d, depth) => {
-      const entries = fs.readdirSync(d, { withFileTypes: true });
-      for (const e of entries) {
-        if (files > 600) return; // the renderer shows a count past this as 600+ (app/chrome.js)
-        if (e.isDirectory()) {
-          if (IGNORE_DIRS.has(e.name) || e.name.startsWith('.')) continue;
-          if (depth === 0) subdirs++;
-          if (depth < 2) walk(path.join(d, e.name), depth + 1);
-        } else {
-          if (planetName === '(root)' && depth !== 0) continue;
-          files++;
-          const ext = path.extname(e.name).slice(1).toUpperCase() || 'MISC';
-          exts.set(ext, (exts.get(ext) || 0) + 1);
-          // Bytes, rounded once at the end: rounding each file made a folder of small files read 0 KB.
-          try { bytes += fs.statSync(path.join(d, e.name)).size; } catch { /* ignore */ }
-        }
+  const walk = (d, depth) => {
+    if (folders >= READ_FOLDERS) { partial = true; return; }
+    folders++;
+    let entries;
+    try { entries = fs.readdirSync(d, { withFileTypes: true }); } catch { partial = true; return; }
+    for (const e of entries) {
+      if (e.isDirectory()) {
+        if (IGNORE_DIRS.has(e.name) || e.name.startsWith('.')) continue;
+        if (depth === 0) subdirs++;
+        // '(root)' stands for the top-level files alone, so it reads no folder below them.
+        if (root) continue;
+        if (depth < READ_DEPTH && files < READ_FILES) walk(path.join(d, e.name), depth + 1);
+        else partial = true;
+      } else if (files >= READ_FILES) {
+        partial = true;
+      } else {
+        files++;
+        const ext = path.extname(e.name).slice(1).toUpperCase() || 'MISC';
+        exts.set(ext, (exts.get(ext) || 0) + 1);
+        // Bytes, rounded once at the end: rounding each file made a folder of small files read 0 KB.
+        try { bytes += fs.statSync(path.join(d, e.name)).size; } catch { /* ignore */ }
       }
-    };
-    walk(dir, 0);
-  } catch { /* partial data is fine */ }
+    }
+  };
+  walk(dir, 0);
   const resources = [...exts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k]) => k);
-  return { ...base, files, sizeKb: Math.round(bytes / 1024), subdirs, resources };
+  return { ...base, files, sizeKb: Math.round(bytes / 1024), subdirs, resources, partial };
 }
 
 function isPlanetSegment(value) {

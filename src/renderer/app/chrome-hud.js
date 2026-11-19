@@ -10,7 +10,7 @@
   const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const pad = (n) => String(n).padStart(2, '0');
-  const count = (n, noun) => n + ' ' + noun + (n === 1 ? '' : 's');
+  const count = AUR.counted;
 
   // ---------- the view's name ----------
   A.renderViewTitle = function renderViewTitle() {

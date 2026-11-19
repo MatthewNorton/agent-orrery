@@ -234,7 +234,7 @@
     const count = S.ideaPanel.items.length;
     A.setRailCount('ideas', count, count === 0);
     els.panel.setAttribute('aria-busy', String(S.ideaPanel.busy));
-    els.count.textContent = `${count} idea${count === 1 ? '' : 's'}`;
+    els.count.textContent = AUR.counted(count, 'idea');
     const nextRenderKey = ideaRenderKey(S.ideaPanel.items, projects);
     if (nextRenderKey !== S.ideaPanel.renderKey) {
       const previousFocus = ideaFocusedControl(els.list);

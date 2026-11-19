@@ -88,6 +88,8 @@ export interface PlanetData {
   /** Top file extensions, upper case. */
   resources: string[];
   procedural?: boolean;
+  /** Live, read from disk: the folder read stopped short (live/system-view.js), so files and size are floors. */
+  partial?: boolean;
 }
 
 /** Bounded by main (replay-control.js): unknown times are null; in LIVE, playing is false and cursorTs is maxTs once known. */

@@ -66,14 +66,18 @@
     });
   };
 
-  /** Opens the palette (not over Settings), or puts the caret back in its field when it is open. */
+  /**
+   * Opens the palette, or puts the caret back in its field when it is open. Not over Settings, nor
+   * while agent focus has made the top bar, and so the search button, inert.
+   */
   A.openProjectSearch = function openProjectSearch() {
     const els = S.projectSearch.els;
-    if (!els || !els.dialog || S.projectSettings.open) return;
+    if (!els || !els.dialog || S.projectSettings.open || els.button.closest('[inert]')) return;
     if (!els.dialog.open) {
       A.closeProjectDirectory(false);
       const active = document.activeElement;
       S.projectSearch.opener = active instanceof HTMLElement && active !== document.body ? active : null;
+      S.projectSearch.open = true;
       els.dialog.showModal();
       els.button.setAttribute('aria-expanded', 'true');
       renderProjectVcsFilter();
@@ -105,6 +109,7 @@
   // However it closed, focus goes back where it was, unless a pick has moved on.
   function finishClose() {
     const els = S.projectSearch.els;
+    S.projectSearch.open = false;
     resetQuery();
     els.button.setAttribute('aria-expanded', 'false');
     const opener = S.projectSearch.opener;

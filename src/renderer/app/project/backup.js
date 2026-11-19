@@ -40,9 +40,7 @@
     ['INVALID', 'That file is not an Agent Orrery backup.'],
   ]);
 
-  function counted(n, noun) {
-    return `${n || 0} ${noun}${n === 1 ? '' : 's'}`;
-  }
+  const counted = AUR.counted;
 
   /** @type {BackupAction<UniverseExportResult>} */
   const EXPORT = {

@@ -31,6 +31,17 @@
     if (snap && Array.isArray(snap.warnings)) S.store.warnings = snap.warnings.filter((text) => typeof text === 'string');
   };
 
+  /**
+   * Whether a build's folder is the planet's: under a Windows path main counts a folder's casings as
+   * one bucket (build-buckets.js and path-safety.js ignoresCase), so the comparison folds case there too.
+   * @param {{ path?: string | null } | undefined} project @param {string} bucket @param {string} planet
+   */
+  function sameBucket(project, bucket, planet) {
+    if (bucket === planet) return true;
+    const root = String((project && project.path) || '');
+    return (/^[a-z]:[\\/]/i.test(root) || root.includes('\\')) && String(bucket).toLowerCase() === String(planet).toLowerCase();
+  }
+
   /** @param {AUEvent} ev */
   A.applyEvent = function applyEvent(ev) {
     switch (ev.type) {
@@ -61,7 +72,7 @@
         if (p) p.totalBuilds = (p.totalBuilds || 0) + 1;
         // The open planet's own count keeps pace, so its card compares like with like.
         const pd = A.activePlanetData();
-        if (pd && ev.project === S.current.projectId && ev.bucket === pd.name) pd.builds = (pd.builds || 0) + 1;
+        if (pd && ev.project === S.current.projectId && sameBucket(p, ev.bucket, pd.name)) pd.builds = (pd.builds || 0) + 1;
         // A ship-updated can precede the build it reports (and Codex patches
         // send none), so the stored count follows build events too.
         const ship = S.store.ships.get(ev.shipId);

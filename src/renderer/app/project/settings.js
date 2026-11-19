@@ -199,7 +199,7 @@
     const suffix = result.truncated ? ' The bounded scan stopped early.' : '';
     const root = S.projectSettings.scanRoot ? ` under ${S.projectSettings.scanRoot}` : '';
     setProjectSettingsStatus(
-      `Scanned ${visited.toLocaleString()} folders${root}; found matches for ${found} project${found === 1 ? '' : 's'}.${suffix}`
+      `Scanned ${visited.toLocaleString()} folders${root}; found matches for ${AUR.counted(found, 'project')}.${suffix}`
     );
     A.renderProjectSettings();
     focusProjectSettingsControl('first-candidate');

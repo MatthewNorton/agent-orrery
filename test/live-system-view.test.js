@@ -58,18 +58,33 @@ test('live system view: at most eight planets; a system is cached for 30 s', (t)
   assert.equal(fresh.planets.some((planet) => planet.name === 'dir0'), false);
 });
 
-test('live system view: a planet walks two levels down; the root planet counts top-level files only', (t) => {
+test('live system view: a planet reads its folder five levels down; the root planet counts top-level files only', (t) => {
   const { model } = projectOnDisk(t, [
     'src/a.js', 'src/b.ts', 'src/lib/c.js', 'src/lib/deeper/d.js', 'src/lib/deeper/deepest/e.js',
     'src/node_modules/x.js', 'README.md', 'NOTES.md', 'package.json',
   ], { src: 4 });
 
   const src = getPlanet(model, 'p', 'src');
-  assert.deepEqual([src.files, src.subdirs, src.builds, src.resources], [4, 1, 4, ['JS', 'TS']]);
+  assert.deepEqual([src.files, src.subdirs, src.builds, src.resources, src.partial], [5, 1, 4, ['JS', 'TS'], false]);
   const rootPlanet = getPlanet(model, 'p', '(root)');
-  assert.deepEqual([rootPlanet.files, rootPlanet.subdirs, rootPlanet.resources], [3, 1, ['MD', 'JSON']]);
+  assert.deepEqual([rootPlanet.files, rootPlanet.subdirs, rootPlanet.resources, rootPlanet.partial],
+    [3, 1, ['MD', 'JSON'], false]);
   assert.equal(getPlanet(model, 'p', 'src/lib'), null);
   assert.equal(getPlanet(model, 'missing', 'src'), null);
+});
+
+test('live system view: past five levels, 300 folders or 600 files the read stops short and says so', (t) => {
+  const { model } = projectOnDisk(t, [
+    'pkg/main/java/com/acme/App.java', 'pkg/main/java/com/acme/app/Service.java',
+    ...Array.from({ length: 301 }, (_, index) => `wide/d${index}/f.txt`),
+    ...Array.from({ length: 601 }, (_, index) => `many/f${index}.txt`),
+  ]);
+  const pkg = getPlanet(model, 'p', 'pkg');
+  assert.deepEqual([pkg.files, pkg.partial], [1, true], 'the fifth level counts; the folder below it is not read');
+  const wide = getPlanet(model, 'p', 'wide');
+  assert.deepEqual([wide.files, wide.subdirs, wide.partial], [299, 301, true], 'every subfolder counts; 300 are read');
+  const many = getPlanet(model, 'p', 'many');
+  assert.deepEqual([many.files, many.partial], [600, true]);
 });
 
 test('live system view: a planet name is one plain path segment', () => {

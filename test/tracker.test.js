@@ -949,10 +949,11 @@ test('snapshot(), getSystem() and getPlanet() public shapes for a project on dis
   assert.equal(tracker.getSystem('missing'), null);
 
   assert.deepEqual(tracker.getPlanet(SLUG, 'src'), {
-    name: 'src', project: snapshot.projects[0], builds: 2, files: 3, sizeKb: 0, subdirs: 1, resources: ['JS'],
+    name: 'src', project: snapshot.projects[0], builds: 2, files: 3, sizeKb: 0, subdirs: 1, resources: ['JS'], partial: false,
   });
   assert.deepEqual(tracker.getPlanet(SLUG, '(root)'), {
     name: '(root)', project: snapshot.projects[0], builds: 1, files: 3, sizeKb: 0, subdirs: 2, resources: ['MD', 'JSON'],
+    partial: false,
   });
   const sector = tracker.getPlanet(SLUG, 'Sector-1');
   assert.equal(sector.procedural, true);

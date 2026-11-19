@@ -217,6 +217,9 @@
     return Math.floor(h / 24) + 'd ago';
   };
 
+  // `n` and its noun, plural unless one: "1 agent", "3 agents".
+  AUR.counted = (n, noun) => `${n || 0} ${noun}${n === 1 ? '' : 's'}`;
+
   // ---- per-viewer preferences in localStorage; a missing or broken value is the fallback ----
   AUR.storedJson = function storedJson(key, fallback) {
     try {
