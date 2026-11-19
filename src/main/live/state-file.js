@@ -69,13 +69,17 @@ function loadState(statePath) {
  * @returns {PersistedState}
  */
 function serializeState(model) {
+  // Security: these are keyed by project ids and path keys, which come from folder names on disk.
+  // An object with no prototype takes any of them as an own key ('__proto__' too), here and where
+  // a caller writes to the result or deletes from it.
+  const bare = (/** @type {object} */ from = {}) => Object.assign(Object.create(null), from);
   /** @type {PersistedState} */
   const out = {
     version: STATE_VERSION,
-    projects: {},
-    pathIds: { ...model.pathIds },
-    pathOverrides: { ...model.pathOverrides },
-    forgotten: { ...model.forgotten },
+    projects: bare(),
+    pathIds: bare(model.pathIds),
+    pathOverrides: bare(model.pathOverrides),
+    forgotten: bare(model.forgotten),
   };
   for (const [id, p] of model.projects) {
     out.projects[id] = {

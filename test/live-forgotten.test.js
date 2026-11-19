@@ -150,3 +150,35 @@ test('a forget that cannot be saved leaves the project as it was', (t) => {
   assert.deepEqual(ids(tracker), [SLUG]);
   fs.rmSync(w.statePath, { recursive: true, force: true });
 });
+
+test('a project whose id is __proto__ is saved, restored and forgotten like any other', (t) => {
+  const w = createWorld(t);
+  appendJsonl(w.claudeFile('__proto__'), [claude.prompt(w.projectDir, T0 - 60 * MIN)], T0 - 60 * MIN);
+  const { tracker } = w.live();
+  tracker.scan(true);
+  assert.deepEqual(ids(tracker), ['__proto__']);
+
+  tracker.saveState();
+  assert.deepEqual(Object.keys(savedState(w).projects), ['__proto__'], 'saved as an own key of the file');
+  const restored = w.live({ claudeProjectsDir: path.join(w.root, 'none') }).tracker;
+  assert.deepEqual(restored.snapshot().projects.map((project) => [project.id, project.path]), [['__proto__', w.projectDir]]);
+  restored.stop();
+
+  tracker.forgetProject('__proto__');
+  const saved = savedState(w);
+  assert.deepEqual([Object.keys(saved.projects), Object.keys(saved.forgotten)], [[], ['__proto__']]);
+  assert.deepEqual(Object.getOwnPropertyDescriptor(saved.forgotten, '__proto__').value, { at: T0, path: w.projectDir });
+  tracker.scan(false);
+  assert.deepEqual(ids(tracker), []);
+  tracker.stop();
+
+  // Still gone after a restart, with its transcripts on disk; newer work brings it back.
+  const restarted = w.live().tracker;
+  restarted.scan(true);
+  assert.deepEqual(ids(restarted), []);
+  w.clock.set(T0 + 5 * MIN);
+  appendJsonl(w.claudeFile('__proto__'), [claude.prompt(w.projectDir, T0 + 4 * MIN)], T0 + 4 * MIN);
+  restarted.scan(false);
+  assert.deepEqual(ids(restarted), ['__proto__']);
+  assert.deepEqual([{}.at, {}.path], [undefined, undefined]);
+});

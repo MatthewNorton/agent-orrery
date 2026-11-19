@@ -9,7 +9,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { parseBackup } = require('../src/main/live/backup');
 const { ignoresCase } = require('../src/main/path-safety');
-const { MIN, T0, createWorld, writeState } = require('./support/transcripts');
+const { MIN, T0, appendJsonl, claude, createWorld, writeState } = require('./support/transcripts');
 
 function byId(tracker) {
   return new Map(tracker.snapshot().projects.map((project) => [project.id, project]));
@@ -138,6 +138,33 @@ test('a backup\'s count for a folder goes to the bucket the folder has here, in 
   assert.equal(byId(tracker).get('kept').planets.length, oneFolder ? 3 : 5);
 });
 
+test('a project whose id is __proto__ or constructor goes out in an export and comes back from it', (t) => {
+  const w = createWorld(t);
+  const dirs = { ['__proto__']: w.projectDir, constructor: path.join(w.root, 'workspace', 'other') };
+  fs.mkdirSync(dirs.constructor);
+  for (const id of ['__proto__', 'constructor']) {
+    appendJsonl(w.claudeFile(id), [claude.prompt(dirs[id], T0 - 60 * MIN)], T0 - 60 * MIN);
+  }
+  const { tracker } = w.live();
+  tracker.scan(true);
+  assert.deepEqual([...byId(tracker).keys()].sort(), ['__proto__', 'constructor']);
+
+  const exported = JSON.stringify(tracker.createBackup([]));
+  const universe = JSON.parse(exported).universe;
+  assert.deepEqual(Object.keys(universe.projects).sort(), ['__proto__', 'constructor'], 'both are in the file');
+  assert.deepEqual(Object.values(universe.pathIds).sort(), ['__proto__', 'constructor']);
+
+  const emptyState = path.join(w.root, 'fresh', 'universe-state.json');
+  const empty = w.live({ statePath: emptyState, claudeProjectsDir: path.join(w.root, 'none') }).tracker;
+  assert.deepEqual(empty.importBackup(parseBackup(exported)), { added: 2, merged: 0 });
+  assert.deepEqual([...byId(empty)].map(([id, project]) => [id, project.path]).sort(),
+    [['__proto__', dirs.__proto__], ['constructor', dirs.constructor]]);
+  // The import saved them, as own keys of the file.
+  const saved = JSON.parse(fs.readFileSync(emptyState, 'utf8'));
+  assert.deepEqual(Object.keys(saved.projects).sort(), ['__proto__', 'constructor']);
+  assert.deepEqual([{}.path, Object.getPrototypeOf(empty.model.pathIds), Object.getPrototypeOf(empty.model.forgotten)], [undefined, null, null]);
+});
+
 test('hostile ids, names, bucket counts and paths never reach the model', () => {
   const local = process.platform === 'win32' ? 'C:\\work\\demo' : '/work/demo';
   const backup = parseBackup(`{
@@ -158,7 +185,10 @@ test('hostile ids, names, bucket counts and paths never reach the model', () => 
     "ideas": [{ "text": "keep" }, { "text": 3 }, "loose"]
   }`);
   const projects = new Map(backup.projects);
-  assert.deepEqual([...projects.keys()].sort(), ['device', 'fine', 'relative', 'share']);
+  // An id is a key of a Map and of objects with no prototype, so '__proto__' and 'constructor' are
+  // ids like others; one with a control character is not an id.
+  assert.deepEqual([...projects.keys()].sort(), ['__proto__', 'constructor', 'device', 'fine', 'relative', 'share']);
+  assert.deepEqual([projects.get('__proto__').totalBuilds, projects.get('__proto__').path, {}.totalBuilds], [1, null, undefined]);
   assert.equal(projects.get('share').path, null);
   assert.equal(projects.get('share').totalBuilds, 0);
   assert.equal(projects.get('device').path, null);

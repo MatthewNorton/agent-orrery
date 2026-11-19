@@ -31,7 +31,7 @@ const MAX_ENTRIES = 10_000;
 const MAX_KEY_LENGTH = 4096;
 // Security: keys that would reach an object's prototype instead of an own property. A bucket is
 // not held to them: it is a folder's name, any of these can be one, and it is written as an own
-// count (setBucket).
+// count (setBucket). Nor is a project id (parseBackup).
 const RESERVED_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
 /**
@@ -63,7 +63,9 @@ function parseBackup(text) {
   /** @type {[string, ImportedProject][]} */
   const projects = [];
   for (const [id, saved] of Object.entries(raw.universe.projects).slice(0, MAX_ENTRIES)) {
-    if (!validKey(id) || !validProjectId(id) || !plainObject(saved)) continue;
+    // Security: an id is not held to RESERVED_KEYS. A folder of transcripts can be named
+    // '__proto__', and every map an id keys is a Map or an object with no prototype.
+    if (!validProjectId(id) || !plainObject(saved)) continue;
     // Security: a backup's path is later stat'd and opened; only a local absolute one may be.
     projects.push([id, {
       path: localAbsolutePath(saved.path),
