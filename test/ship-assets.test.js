@@ -550,16 +550,19 @@ test('the triangle budget steps near hulls down to far before falling back to th
   assert.equal(roots[1].metadata.assetLod, 'far');
 });
 
-test('the universe map has a hull budget of its own, above a near view\'s', async () => {
-  const assets = loadShipAssets(LADDER_MANIFEST, { 'small-near.glb': 250000, 'small-far.glb': 250000 });
+// The counts the budget comment, kit/SPEC.md and docs/TASK-LIST.md state, at the size Petrel was imported at.
+test('a near view holds fifty-one ships of the first rank and the universe map, with a budget of its own, seventy', async () => {
+  const petrel = JSON.parse(fs.readFileSync(path.join(RENDERER, 'ships', 'petrel', 'source', 'source.json'), 'utf8'));
+  const { triangles } = petrel.geometry;
+  const assets = loadShipAssets(LADDER_MANIFEST, { 'small-near.glb': triangles, 'small-far.glb': triangles });
   const hulled = async (view) => {
     const scene = assets.scene(view);
     let count = 0;
-    for (const id of ['a', 'b', 'c', 'd', 'e', 'f']) count += (await assets.ships.upgrade(scene, ship(id, 0), assets.fallback(view + id))) ? 1 : 0;
+    for (let n = 0; n < 80; n++) count += (await assets.ships.upgrade(scene, ship('s' + n, 0), assets.fallback(view + n))) ? 1 : 0;
     return count;
   };
-  assert.equal(await hulled('system'), 3, '900k triangles');
-  assert.equal(await hulled('universe'), 4, '1.24M triangles: its hulls are instances');
+  assert.equal(await hulled('system'), 51);
+  assert.equal(await hulled('universe'), 70);
 });
 
 test('a fleet hull keeps its baked tones and glass, and its trim lights and nozzles emit the ship color', async () => {

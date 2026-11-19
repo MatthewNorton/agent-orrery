@@ -349,8 +349,9 @@ Design tokens (put in `:root`):
   60); display length grows 1.9× over the ladder. A drone flies the first rank
   at `AUR.DRONE_SCALE` of its size. Each hull is one file: the universe map
   instances it from a per-provider template, the system and planet views clone
-  it (so focus mode can fade ships one by one; a hull material carries no
-  transparency mode, because with one set Babylon ignores a mesh's visibility);
+  it (so focus mode can fade ships one by one; an opaque hull material gives
+  its transparency mode up, because with one set Babylon ignores a mesh's
+  visibility; a cut-out keeps its own and does not fade, and no hull has one);
   a view steps down to the dart past its hull triangle budget: 900k in a
   system or planet view, which holds fifty-one ships of the first rank, and
   1.24M on the universe map, whose hulls are instances, which holds seventy. Ship size is one policy (`AUR.SHIP_SIZE` per
