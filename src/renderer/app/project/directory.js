@@ -99,7 +99,7 @@
     if (!els || !S.projectDirectory.open) return;
     const query = els.input.value.trim();
     const queryChanged = query !== S.projectDirectory.query;
-    const previous = queryChanged ? null : S.projectDirectory.results[S.projectDirectory.selected];
+    const previous = queryChanged ? null : A.selectedRowKey(S.projectDirectory, projectKey);
     const allProjects = projectsByActivity();
     const projects = VCS.filterProjects(allProjects, { filter: S.projectSearch.filter });
     S.projectDirectory.query = query;

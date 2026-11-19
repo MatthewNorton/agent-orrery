@@ -159,7 +159,7 @@
     if (!els) return;
     const query = els.input.value.trim();
     const queryChanged = query !== S.projectSearch.query;
-    const previous = queryChanged ? null : S.projectSearch.results[S.projectSearch.selected];
+    const previous = queryChanged ? null : A.selectedRowKey(S.projectSearch, entryKey);
     S.projectSearch.query = query;
     if (!query) {
       S.projectSearch.results = [];

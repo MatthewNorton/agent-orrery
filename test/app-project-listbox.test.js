@@ -186,3 +186,47 @@ test('listbox selection: an arrow key marks the rows as they stand and builds no
     [[false, 'false'], [false, 'false'], [true, 'true']]);
   assert.deepEqual([input.getAttribute('aria-activedescendant'), scrolled], ['row-2', ['row-2']]);
 });
+
+test('listbox rows: of entries that share a key, the one pressed or selected stays the one meant', () => {
+  const entries = () => [['a', 'A1'], ['a', 'A2'], ['a', 'A3'], ['b', 'B']].map(([id, label]) => ({ id, label }));
+  const [a1, a2, a3, b] = entries();
+  const { list, render, state, document, app, input } = drawn([a1, a2, a3, b]);
+  const keyOf = (entry) => entry.id;
+  const calls = [];
+  app.wireListbox(list, input, state, { escape() {}, update() {}, select() {}, activate: (index) => calls.push(state.results[index].label), keyOf });
+  render();
+  const [, rowA2] = list.children;
+  const onA2 = { closest: (selector) => (selector === '[role="option"]' ? rowA2 : null) };
+  const click = (target, change) => {
+    document.fire('mousedown', { target, clientX: 10, clientY: 10 });
+    change();
+    document.fire('click', { target, clientX: 10, clientY: 10 });
+    render([a1, a2, a3, b]);
+    return calls.splice(0);
+  };
+  // The first of the key leaves between the press and the click: the entry pressed is still the one opened.
+  assert.deepEqual(click(onA2, () => render([a2, a3, b])), ['A2']);
+  assert.deepEqual(click(onA2, () => render([b, a3, a2])), ['A2'], 'wherever it stands now');
+  assert.deepEqual(click(onA2, () => render([a1, a3, b])), [], 'gone: the others with its key are not it');
+  // A refresh that builds the entries anew: the one with the key, and none where several have it.
+  assert.deepEqual(click(onA2, () => { state.results = entries().slice(1, 2); }), ['A2']);
+  assert.deepEqual(click(onA2, () => { state.results = entries(); }), [], 'three with the key, and no telling which');
+
+  // The selection through a re-query goes by row: the second of a key stays the second.
+  state.results = [a1, a2, a3, b];
+  const requery = (selected, next) => {
+    state.selected = selected;
+    const previous = app.selectedRowKey(state, keyOf);
+    state.results = next;
+    app.keepSelection(state, previous, false, keyOf);
+    const label = state.results[state.selected].label;
+    state.results = [a1, a2, a3, b];
+    return label;
+  };
+  assert.deepEqual([requery(1, entries()), requery(2, entries()), requery(3, [b, ...entries().slice(0, 3)])], ['A2', 'A3', 'B']);
+  assert.equal(requery(3, entries().slice(0, 2)), 'A2', 'gone: the nearest row');
+  state.selected = 2;
+  app.keepSelection(state, app.selectedRowKey(state, keyOf), true, keyOf);
+  assert.equal(state.selected, 0, 'a new query starts at the top');
+  assert.equal(app.selectedRowKey({ results: [], selected: 0 }, keyOf), null);
+});

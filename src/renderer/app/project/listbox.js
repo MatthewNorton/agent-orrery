@@ -40,28 +40,44 @@
   }
 
   /**
+   * Where `entry` is among `results` now: itself, or, when a refresh built the entries anew, the
+   * one entry with its key. Security: several with that key are not told apart by where they
+   * stand, which a refresh changes, so then none of them is it.
+   * @returns {number}
+   */
+  function entryIndex(results, entry, keyOf) {
+    const same = results.indexOf(entry);
+    if (same >= 0) return same;
+    const key = String(keyOf(entry));
+    const first = results.findIndex((other) => String(keyOf(other)) === key);
+    return first >= 0 && !results.some((other, index) => index > first && String(keyOf(other)) === key) ? first : -1;
+  }
+
+  /**
    * The field's keys and the list's clicks. Escape runs `escape`; arrows move the selection
    * (`select` shows it) and Enter activates it, once a pending query has run. While an input method
    * composes text the keys are its own: Enter commits the text and Escape cancels it. A click
-   * activates the entry its row stands for (`keyOf`), at whatever index a refresh has put it since
-   * the press. When the refresh moved the rows under a pointer that stayed put, the release lands
-   * on another row or past the list, and the entry that was pressed is still the one meant: so the
-   * press and the click are heard on the document.
+   * activates the entry its row stood for at the press (entryIndex), at whatever index a refresh
+   * has put it since. When the refresh moved the rows under a pointer that stayed put, the release
+   * lands on another row or past the list, and the entry that was pressed is still the one meant:
+   * so the press and the click are heard on the document.
    */
   A.wireListbox = function wireListbox(list, input, state, { escape, update, activate, select, keyOf }) {
-    const rowKey = (event) => {
+    /** The entry the event's row stands for, in a box; null off the rows. */
+    const rowEntry = (event) => {
       const target = /** @type {Element} */ (event.target);
       const row = /** @type {HTMLElement | null} */ (target.closest ? target.closest('[role="option"]') : null);
-      return row && row.parentNode === list ? row.dataset.key : null;
+      const index = row && row.parentNode === list ? rowKeys(state.results, keyOf).indexOf(row.dataset.key) : -1;
+      return index < 0 ? null : { entry: state.results[index] };
     };
-    /** @type {{ key: string | null, x: number, y: number } | null} the press the next click completes */
+    /** @type {{ row: { entry: any } | null, x: number, y: number } | null} the press the next click completes */
     let pressed = null;
-    document.addEventListener('mousedown', (event) => { pressed = { key: rowKey(event), x: event.clientX, y: event.clientY }; });
+    document.addEventListener('mousedown', (event) => { pressed = { row: rowEntry(event), x: event.clientX, y: event.clientY }; });
     document.addEventListener('click', (event) => {
       const stayed = pressed && Math.abs(event.clientX - pressed.x) < PRESS_SLOP && Math.abs(event.clientY - pressed.y) < PRESS_SLOP;
-      const key = stayed ? pressed.key : rowKey(event);
+      const row = stayed ? pressed.row : rowEntry(event);
       pressed = null;
-      const index = key == null ? -1 : rowKeys(state.results, keyOf).indexOf(key);
+      const index = row ? entryIndex(state.results, row.entry, keyOf) : -1;
       if (index >= 0) activate(index);
     });
     input.addEventListener('keydown', (event) => {
@@ -90,11 +106,16 @@
     });
   };
 
-  /** After a re-query: the first row for a new query, else the same entry, else the nearest row. */
-  A.keepSelection = function keepSelection(state, previous, queryChanged, keyOf) {
-    const previousIndex = previous
-      ? state.results.findIndex((entry) => keyOf(entry) === keyOf(previous))
-      : -1;
+  /** The selected entry's row key, taken before a re-query for A.keepSelection; null with no rows. */
+  A.selectedRowKey = (state, keyOf) => rowKeys(state.results, keyOf)[state.selected] ?? null;
+
+  /**
+   * After a re-query: the first row for a new query, else the row of the entry that was selected
+   * (`previousKey`, its row key: of entries that share a key, the same one of them), else the
+   * nearest row.
+   */
+  A.keepSelection = function keepSelection(state, previousKey, queryChanged, keyOf) {
+    const previousIndex = previousKey == null ? -1 : rowKeys(state.results, keyOf).indexOf(previousKey);
     state.selected = queryChanged ? 0 : previousIndex >= 0
       ? previousIndex : Math.min(state.selected, Math.max(0, state.results.length - 1));
   };
