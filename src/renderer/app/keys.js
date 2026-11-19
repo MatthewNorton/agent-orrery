@@ -24,8 +24,10 @@
   /** @type {Map<HTMLElement, { label: string, id: string }>} controls whose title names their key */
   const titled = new Map();
 
+  /** Every key a shortcut has. @param {string} id @returns {string[][]} */
+  const allKeysOf = (id) => ROWS.find((r) => r.id === id)?.keys || [];
   /** @param {string} id */
-  const keysOf = (id) => ROWS.find((r) => r.id === id)?.keys[0] || null;
+  const keysOf = (id) => allKeysOf(id)[0] || null;
   /** @param {string[]} names */
   const kbds = (names, cls = 'kbd') => K.display(names, MAC).map((/** @type {string} */ n) => AUR.el('kbd', cls, n));
 
@@ -46,7 +48,7 @@
 
   /** The title names the first key that works now; aria-keyshortcuts lists every one. @param {HTMLElement} el @param {{ label: string, id: string }} t */
   function applyTitle(el, { label, id }) {
-    const working = (ROWS.find((r) => r.id === id)?.keys || []).filter((names) => singleKeys || !K.singleKey(names));
+    const working = allKeysOf(id).filter((names) => singleKeys || !K.singleKey(names));
     if (working.length) {
       el.title = `${label} (${K.display(working[0], MAC).join(' ')})`;
       el.setAttribute('aria-keyshortcuts', working

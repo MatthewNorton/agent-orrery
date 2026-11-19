@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { searchProjects, searchAgents, searchPlanets, matchText, FUZZY } = require('../src/renderer/search-core');
+const { searchProjects, rankProjects, searchAgents, searchPlanets, matchText, FUZZY } = require('../src/renderer/search-core');
 
 const projects = [
   { id: 'a', name: 'orion-api', path: 'C:\\work\\orion-api', planets: ['src', 'docs', 'migrations'] },
@@ -32,12 +32,31 @@ test('agents: by name, then status; the one that needs you first', () => {
   assert.deepEqual(agentIds(searchAgents(ships, 'c', 1)), ['s1']);
 });
 
-test('agent and planet hits say when only a fuzzy match found them', () => {
+test('agent and planet hits say when only a fuzzy match found them, and which name characters to mark', () => {
   assert.deepEqual(searchAgents(ships, 'cd1').map((hit) => hit.fuzzy), [true, true]);
-  assert.deepEqual(searchAgents(ships, 'build').map((hit) => hit.fuzzy), [false, false], 'a status match is not fuzzy');
-  assert.deepEqual(searchAgents(ships, 'cla').map((hit) => hit.fuzzy), [false, false]);
-  assert.deepEqual(searchPlanets(projects, 'mgr').map((hit) => hit.fuzzy), [true]);
+  assert.deepEqual(searchAgents(ships, 'build').map((hit) => [hit.fuzzy, hit.positions]), [[false, []], [false, []]],
+    'a status match is not fuzzy and marks nothing in the name');
+  assert.deepEqual(searchAgents(ships, 'cla').map((hit) => [hit.fuzzy, hit.positions]), [[false, [0, 1, 2]], [false, [0, 1, 2]]]);
+  assert.deepEqual(searchPlanets(projects, 'mgr').map((hit) => [hit.fuzzy, hit.positions]), [[true, [0, 2, 3]]]);
   assert.deepEqual(searchPlanets(projects, 'mig').map((hit) => hit.fuzzy), [false]);
+});
+
+test('rankProjects: other text (the palette passes repository and branch) ranks with the path, before fuzzy', () => {
+  const pool = [
+    { id: 'p', name: 'wonky-orbit-kit', path: 'C:\\work\\wonky', branch: 'main' },
+    { id: 'q', name: 'zeta', path: 'C:\\apps\\zeta', branch: 'feat/orbit' },
+    { id: 'r', name: 'o-r-b-i-t-x', path: 'C:\\apps\\x', branch: 'feat/orbit' },
+    { id: 's', name: 'orbital', path: 'C:\\apps\\orbital', branch: 'main' },
+    { id: 't', name: 'other-rabbit', path: 'C:\\apps\\t', branch: 'main' },
+  ];
+  const hits = rankProjects(pool, 'orbit', (project) => [project.path, project.branch]);
+  assert.deepEqual(hits.map((hit) => [hit.project.id, hit.fuzzy, hit.positions.length]), [
+    ['s', false, 5], ['p', false, 5], ['r', false, 0], ['q', false, 0], ['t', true, 5],
+  ], 'prefix, substring, then the branch matches by name (the fuzzy name of r marks nothing), then fuzzy');
+  assert.deepEqual(rankProjects(pool, 'work').map((hit) => [hit.project.id, hit.positions]), [['p', []]],
+    'found by its path, so nothing in the name is marked');
+  assert.deepEqual(searchProjects(pool, 'orbit').map((project) => project.id), ['s', 'p', 'r', 't'],
+    'searchProjects keeps the path as its only other text');
 });
 
 test('queries are plain text: regex characters and huge strings neither match wrongly nor throw', () => {
@@ -69,6 +88,17 @@ test('matchText: rank and the matched characters for marking', () => {
   assert.deepEqual(matchText('orion-api', 'oap').positions, [0, 6, 7]);
   assert.equal(matchText('orion-api', 'oap').rank, FUZZY);
   assert.deepEqual(matchText('cart-rack', 'crk').positions, [0, 5, 8], 'a word start wins over an earlier letter');
+  // 'İ' lowers to two code units; the marks must still land on the name's own characters, and a
+  // plain 'i' typed on any keyboard must still find it.
+  assert.deepEqual(matchText('İstanbul-api', 'api').positions, [9, 10, 11]);
+  assert.deepEqual(matchText('İstanbul-api', 'İST'), { rank: 0, score: 0, positions: [0, 1, 2] });
+  assert.deepEqual(matchText('İstanbul-api', 'istanbul'), { rank: 0, score: 0, positions: [0, 1, 2, 3, 4, 5, 6, 7] });
+  assert.deepEqual(matchText('İstanbul-api-gateway', 'apg').positions, [9, 10, 13]);
+  assert.deepEqual(searchProjects([{ id: 'z', name: 'İzmir-tools', path: 'C:\\x' }], 'izmir').map((p) => p.id), ['z']);
+  // Σ lowers to ς at a word's end; both fold to σ, whichever way the name is lowered.
+  assert.deepEqual(matchText('Οδυσσέας', 'ΟΔΥΣ'), { rank: 0, score: 0, positions: [0, 1, 2, 3] });
+  assert.deepEqual(matchText('İ-Οδυσσέας', 'ΟΔΥΣ').positions, [2, 3, 4, 5]);
+  assert.deepEqual(matchText('λόγος', 'λόγος').positions, [0, 1, 2, 3, 4]);
   assert.equal(matchText('orion-api', 'xyz'), null);
   assert.equal(matchText('orion-api', ''), null);
   assert.equal(matchText(null, 'or'), null);

@@ -14,32 +14,25 @@
   /** @type {HTMLElement | null} what had focus before the palette opened; a pick clears it */
   let opener = null;
 
-  /** `ranked` first, then the rest of `matches`, sorted by `compareRest` when given. */
-  A.rankedFirst = function rankedFirst(matches, ranked, compareRest) {
-    const rankedIds = new Set(ranked.map((project) => project.id));
-    const rest = matches.filter((project) => !rankedIds.has(project.id));
-    return [...ranked, ...(compareRest ? rest.sort(compareRest) : rest)];
-  };
-
   A.wireProjectSearch = function wireProjectSearch() {
-    S.projectSearch.els = {
+    const dialog = /** @type {HTMLDialogElement | null} */ (document.getElementById('search-dialog'));
+    const els = {
       button: document.getElementById('search-button'),
-      dialog: /** @type {HTMLDialogElement | null} */ (document.getElementById('search-dialog')),
+      dialog,
+      palette: dialog && dialog.querySelector('.search-palette'),
       input: /** @type {HTMLInputElement | null} */ (document.getElementById('search-input')),
       results: document.getElementById('search-results'),
       scope: document.getElementById('search-scope'),
       filter: document.getElementById('project-vcs-filter'),
       filterCount: document.getElementById('project-vcs-filter-count'),
     };
-    const els = S.projectSearch.els;
-    if (!els.button || !els.dialog || !els.input || !els.results) return;
+    // Wired whole or not at all: everything below takes a missing els for a palette that is not there.
+    if (!els.button || !els.dialog || !els.palette || !els.input || !els.results) return;
+    S.projectSearch.els = els;
 
     A.titleWithKey(els.button, LABEL, 'search');
     els.button.addEventListener('click', A.openProjectSearch);
-    // The dialog is the palette's box, so a click on the dialog itself fell on the backdrop.
-    els.dialog.addEventListener('click', (event) => {
-      if (event.target === els.dialog) A.clearProjectSearch();
-    });
+    AUR.closeOnBackdrop(els.dialog, els.palette, A.clearProjectSearch);
     els.dialog.addEventListener('close', finishClose);
 
     els.input.addEventListener('input', () => {
@@ -69,12 +62,13 @@
   };
 
   /**
-   * Opens the palette, or puts the caret back in its field when it is open. Not over Settings, nor
-   * while agent focus has made the top bar, and so the search button, inert.
+   * Opens the palette, or puts the caret back in its field when it is open; false when it cannot:
+   * over Settings, or while agent focus has made the top bar, and so the search button, inert.
+   * @returns {boolean}
    */
   A.openProjectSearch = function openProjectSearch() {
     const els = S.projectSearch.els;
-    if (!els || !els.dialog || S.projectSettings.open || els.button.closest('[inert]')) return;
+    if (!els || !els.dialog || S.projectSettings.open || els.button.closest('[inert]')) return false;
     if (!els.dialog.open) {
       A.closeProjectDirectory(false);
       const active = document.activeElement;
@@ -85,6 +79,7 @@
     }
     els.input.focus();
     els.input.select();
+    return true;
   };
 
   /** Clears the query and closes the palette: Escape, a click outside, a pick, a view switch. */
@@ -144,20 +139,6 @@
 
   const underFilter = (projects) => VCS.filterProjects(projects, { filter: S.projectSearch.filter });
 
-  // The palette's projects for a query, as `{ project, fuzzy }`: name, path and fuzzy ranks
-  // (search-core.js), with the projects whose repository or branch holds the query after the sure
-  // ranks and before the ones only a fuzzy match found.
-  function findProjects(visible, query) {
-    const sure = VCS.filterProjects(visible, { query });
-    const sureIds = new Set(sure.map((project) => project.id));
-    const ranked = AUR.searchProjects(visible, query, Math.max(visible.length, 1));
-    return [
-      ...A.rankedFirst(sure, ranked.filter((project) => sureIds.has(project.id)), A.byProjectName)
-        .map((project) => ({ project, fuzzy: false })),
-      ...ranked.filter((project) => !sureIds.has(project.id)).map((project) => ({ project, fuzzy: true })),
-    ];
-  }
-
   /**
    * Brightens `found`'s systems on the view's map; with none given, the projects under the GitHub
    * filter, or no system singled out while it shows all.
@@ -188,13 +169,14 @@
 
     const visible = underFilter([...S.store.projects.values()]);
     const shown = new Set(visible.map((project) => project.id));
-    const found = findProjects(visible, query);
+    // After its name, a project's path, branch and repository rank together (VCS.searchTexts).
+    const found = AUR.rankProjects(visible, query, VCS.searchTexts);
     const rows = [
-      ...found.slice(0, 6).map(({ project, fuzzy }) => ({ kind: 'project', key: 'p:' + project.id, project, fuzzy })),
+      ...found.slice(0, 6).map((hit) => ({ kind: 'project', key: 'p:' + hit.project.id, ...hit })),
       ...AUR.searchAgents([...S.store.ships.values()].filter((ship) => shown.has(ship.project)), query, 4)
-        .map(({ ship, fuzzy }) => ({ kind: 'agent', key: 'a:' + ship.id, ship, fuzzy })),
+        .map((hit) => ({ kind: 'agent', key: 'a:' + hit.ship.id, ...hit })),
       ...AUR.searchPlanets(visible, query, 4)
-        .map(({ project, planet, fuzzy }) => ({ kind: 'planet', key: 'f:' + project.id + '/' + planet, project, planet, fuzzy })),
+        .map((hit) => ({ kind: 'planet', key: 'f:' + hit.project.id + '/' + hit.planet, ...hit })),
     ];
     // Rows found only fuzzily go after every row found otherwise, each part in the kinds' order.
     S.projectSearch.results = [...rows.filter((row) => !row.fuzzy), ...rows.filter((row) => row.fuzzy)].slice(0, 10);
@@ -227,7 +209,7 @@
       els.input.removeAttribute('aria-activedescendant');
       return;
     }
-    const fill = A.searchRowFiller(S.projectSearch.results, S.projectSearch.query);
+    const fill = A.searchRowFiller(S.projectSearch.results);
     A.renderListbox(els.results, els.input, S.projectSearch, {
       idPrefix: 'search-result-',
       rowClass: 'search-result',

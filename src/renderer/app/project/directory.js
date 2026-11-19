@@ -100,10 +100,10 @@
     const projects = VCS.filterProjects(allProjects, { filter: S.projectSearch.filter });
     S.projectDirectory.query = query;
     if (query) {
-      const matches = VCS.filterProjects(projects, { query });
-      S.projectDirectory.results = A.rankedFirst(
-        matches, AUR.searchProjects(matches, query, Math.max(matches.length, 8))
-      );
+      // Ranked as the palette ranks them, by name, then path, branch or repository (search-core.js),
+      // but only the projects that hold the query whole: the list filters, it does not guess.
+      S.projectDirectory.results = AUR.rankProjects(projects, query, VCS.searchTexts)
+        .filter((hit) => !hit.fuzzy).map((hit) => hit.project);
     } else {
       S.projectDirectory.results = projects;
     }

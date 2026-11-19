@@ -191,12 +191,17 @@
     rocky: 'Rocky world', gas: 'Gas giant', ice: 'Ice world', volcanic: 'Volcanic world', oceanic: 'Oceanic world',
   });
 
-  /** What the globe is drawn as, and what the planet stands for. @param {PlanetData} pd @param {string} projectName */
+  /**
+   * What the globe is drawn as, what the planet stands for, and why its folder rows are dashes.
+   * @param {PlanetData} pd @param {string} projectName
+   */
   function planetLine(pd, projectName) {
     const world = WORLD_NAMES[AUR.worldProfile(S.current.projectId, pd.name).key] || 'World';
     if (pd.procedural) return world + ' · no folder on disk';
-    if (pd.name === '(root)') return world + ' · the top-level files of ' + projectName;
-    return world + ' · a folder in ' + projectName;
+    const line = world + (pd.name === '(root)' ? ' · the top-level files of ' : ' · a folder in ') + projectName;
+    // From the planet's own data, not the mode, which moves first when LIVE and REPLAY switch.
+    if (pd.folderRead === 'none') return line + ' · could not be read';
+    return pd.folderRead ? line : line + ' · history keeps no file counts';
   }
 
   A.renderPlanetCard = function renderPlanetCard() {

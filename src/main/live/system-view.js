@@ -18,7 +18,8 @@ const { liveProject } = require('../universe/public-shape');
 
 const SYSTEM_CACHE_MS = 30000;
 // A planet's folder read: at most 600 files and 300 folders, five levels deep. Past any of those,
-// or at a folder it cannot read, its counts are floors and `folderRead` says 'partial'.
+// or at a folder below it that it cannot read, its counts are floors and `folderRead` says
+// 'partial'; when the planet's own folder cannot be read, 'none'.
 const READ_FILES = 600, READ_FOLDERS = 300, READ_LEVELS = 5;
 const IGNORE_DIRS = new Set([
   'node_modules', '.git', '.next', '.venv', 'venv', 'dist', 'build', 'out',
@@ -92,13 +93,15 @@ function getPlanet(model, projectId, planetName) {
   const dir = planetName === '(root)' ? project.path : path.join(project.path, planetName);
   if (planetName !== '(root)' && relativeInside(project.path, dir) === null) return null;
   const root = planetName === '(root)';
-  let files = 0, bytes = 0, subdirs = 0, folders = 0, partial = false;
+  let files = 0, bytes = 0, subdirs = 0, folders = 0, partial = false, ownRead = false;
   const exts = new Map();
+  // A failed read counts toward the folder limit too.
   const walk = (d, depth) => {
     if (folders >= READ_FOLDERS) { partial = true; return; }
     folders++;
     let entries;
     try { entries = fs.readdirSync(d, { withFileTypes: true }); } catch { partial = true; return; }
+    if (depth === 0) ownRead = true;
     for (const e of entries) {
       if (e.isDirectory()) {
         if (IGNORE_DIRS.has(e.name) || e.name.startsWith('.')) continue;
@@ -120,7 +123,10 @@ function getPlanet(model, projectId, planetName) {
   };
   walk(dir, 0);
   const resources = [...exts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k]) => k);
-  return { ...base, files, sizeKb: Math.round(bytes / 1024), subdirs, resources, folderRead: partial ? 'partial' : 'full' };
+  // A planet whose own folder is gone (a build bucket outlives its folder) or locked read nothing,
+  // which is no counts at all rather than a floor of none.
+  const folderRead = !ownRead ? 'none' : partial ? 'partial' : 'full';
+  return { ...base, files, sizeKb: Math.round(bytes / 1024), subdirs, resources, folderRead };
 }
 
 function isPlanetSegment(value) {

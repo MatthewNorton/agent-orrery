@@ -90,10 +90,11 @@ export interface PlanetData {
   procedural?: boolean;
   /**
    * Live only, how far main read the folder (live/system-view.js): 'partial' when a read limit or an
-   * unreadable folder cut it short, so files and size are floors. Absent when nothing was read: a
-   * procedural planet's numbers are invented and history never reads the disk.
+   * unreadable folder below it cut it short, so files and size are floors; 'none' when the folder
+   * itself is gone or locked. Absent when there was no folder to read: a procedural planet's numbers
+   * are invented, and history never reads the disk.
    */
-  folderRead?: 'full' | 'partial';
+  folderRead?: 'full' | 'partial' | 'none';
 }
 
 /** Bounded by main (replay-control.js): unknown times are null; in LIVE, playing is false and cursorTs is maxTs once known. */

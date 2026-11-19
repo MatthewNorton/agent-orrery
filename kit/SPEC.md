@@ -197,8 +197,9 @@ Planet     = { name, files, builds, procedural? }   // name '(root)' possible
 
 PlanetData = { name, project: Project, builds, files, sizeKb, subdirs,
                resources: string[], procedural?, folderRead? }   // resources = top file exts;
-                                  // folderRead: live only, 'full' or 'partial' (the read stopped short);
-                                  // absent when no folder was read (procedural, or history)
+                                  // folderRead: live only, 'full', 'partial' (the read stopped
+                                  // short) or 'none' (the folder is gone or locked); absent
+                                  // when there was no folder to read (procedural, or history)
 ```
 
 Event batch entries (from `AU.onEvents`):
@@ -244,16 +245,21 @@ Design tokens (put in `:root`):
   (or `/`, or Ctrl K) opens the Go to palette (`app/project/search.js`, rows by
   `app/project/search-rows.js`, `styles/search.css`): a modal dialog near the top centre, up to
   800 px wide, with its field first and the results below. The query ranks up to 6 projects, 4
-  agents and 4 folders (`search-core.js`): prefix, then substring, then the path (an agent's
-  status), then fuzzy matches, the query's characters in order (3 or more), scored by how close
-  they sit and whether they start words; a project whose repository or branch holds the query
-  comes after the sure ranks and before the fuzzy. Each row shows the live dot (an agent's is its
-  provider colour), the name with the matched characters marked, the full path, the repository
-  and branch (an agent's status) and its kind. Short of room the repository gives way first, then
-  the start of the path; the path's last two folders stay, or as many as tell it from a result of
-  the same name. Arrows, Enter and click pick a result through the existing guarded routes.
-  Escape, a click outside, a pick or a view switch closes the palette and clears the query; focus
-  goes back where it was unless a pick moved on, and stays in the dialog while it is open. The
+  agents and 4 folders (`search-core.js`): prefix, then substring, then a project's path,
+  repository or branch (an agent's status) holding the query, then fuzzy matches, the query's
+  characters in order (3 or more), scored by how close they sit and whether they start words.
+  PROJECTS ranks its query the same way, without the fuzzy matches. Both match real values only:
+  the `Unnamed project`, `Branch unavailable` and `Detached HEAD` labels match nothing, and case
+  folds letter by letter (`İ` as `i`, `ς` as `σ`). Each row shows the live dot (an agent's is its
+  provider colour), the name with the characters its match found marked (none when the path,
+  repository, branch or status found it), the full path, the repository and branch (an agent's
+  status) and its kind. Short of room the repository gives way first, then the start of the
+  path; the path's last two folders stay, or as many as tell it from a result of the same name.
+  Arrows, Enter and click pick a result through the existing guarded routes. Escape, a click
+  outside (pressed and released there with the main button, so a drag out of the field selecting
+  text keeps it; Settings follows the same rule, `AUR.closeOnBackdrop`), a pick or a view switch
+  closes the palette and clears the query; focus goes back where it was unless a pick moved on,
+  and stays in the dialog while it is open. The
   backdrop is a light shade, so the universe's matching systems show behind. The GitHub filter
   narrows the results (and their agents and folders), the map and the PROJECTS directory; the
   palette's footer says so while it is on. A bar under 1100 layout px (text size counts) keeps
@@ -554,11 +560,12 @@ card's solar-system totals (the view carries it as `systemData`; when it fails, 
      Rocky world, Gas giant, Ice world, Volcanic world, Oceanic world) and what the planet stands
      for (`a folder in <project>`, `the top-level files of <project>` for `(root)`, or `no folder on
      disk` when `procedural`); rows `FILES`, `SIZE` (KB, MB or GB), `SUBFOLDERS`, `FILE TYPES` (top
-     extensions, `MISC` shown as `other`), each `—` where main read no folder (`folderRead`
-     absent: a `procedural` planet's numbers are invented, and in REPLAY history never reads the
-     disk; `A.planetFolderCounts`); `FILES` and `SIZE` end in `+` when the read stopped short
-     (`folderRead: 'partial'`: 600 files, 300 folders, five levels, or a folder it could not
-     read); then `BUILDS (FILE EDITS)`:
+     extensions, `MISC` shown as `other`), each `—` where main read no folder (`A.planetFolderCounts`),
+     and the line says why from the planet's own data: `no folder on disk` (`procedural`, its
+     numbers invented), `· could not be read` (`folderRead: 'none'`: a build bucket's folder gone
+     or locked), or `· history keeps no file counts` (`folderRead` absent: REPLAY never reads the
+     disk); `FILES` and `SIZE` end in `+` when the read stopped short (`folderRead: 'partial'`:
+     600 files, 300 folders, five levels, or a folder it could not read); then `BUILDS (FILE EDITS)`:
      `THIS PLANET`, `WHOLE SOLAR SYSTEM` (the project's `totalBuilds`) and a bar of the planet's
      share; then `SOLAR SYSTEM`: `PLANETS` (the planets the system view draws, at most 8, from
      `systemData`) and `AGENTS`. A `build` event on the open planet raises its count in place,

@@ -87,8 +87,25 @@ test('live system view: past five levels, 300 folders or 600 files the read stop
   assert.deepEqual([many.files, many.folderRead], [600, 'partial']);
 });
 
-test('live system view: a procedural planet reads no folder, so it has no folderRead', (t) => {
-  const { project, model } = projectOnDisk(t, ['src/a.js']);
+test('live system view: a folder it cannot read counts toward the 300', (t) => {
+  const { root, model } = projectOnDisk(t, Array.from({ length: 400 }, (_, index) => `locked/d${index}/f.txt`));
+  const locked = path.join(root, 'locked');
+  const readdir = fs.readdirSync;
+  let tried = 0;
+  t.mock.method(fs, 'readdirSync', (dir, options) => {
+    if (path.dirname(String(dir)) !== locked) return readdir.call(fs, dir, options);
+    tried++;
+    throw Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' });
+  });
+  const planet = getPlanet(model, 'p', 'locked');
+  assert.deepEqual([planet.files, planet.subdirs, planet.folderRead, tried], [0, 400, 'partial', 299],
+    'its own folder and 299 failed reads make 300; the other 101 are not tried');
+});
+
+test('live system view: a planet whose folder is gone says it read none; a procedural one has no folderRead', (t) => {
+  const { project, model } = projectOnDisk(t, ['src/a.js'], { gone: 3 });
+  const gone = getPlanet(model, 'p', 'gone');
+  assert.deepEqual([gone.files, gone.builds, gone.folderRead], [0, 3, 'none'], 'a build bucket whose folder was deleted');
   project.exists = false;
   const planet = getPlanet(model, 'p', 'src');
   assert.equal(planet.procedural, true);

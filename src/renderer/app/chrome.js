@@ -91,12 +91,13 @@
 
   /**
    * A planet's folder counts as the cards show them, or null where main read no folder (a
-   * procedural planet, or history). Where the read stopped short, files and size end in `+`.
+   * procedural planet, a folder gone or locked, or history). Where the read stopped short, files
+   * and size end in `+`.
    * @param {PlanetData | null} pd
    * @returns {{ files: string, size: string, subdirs: string } | null}
    */
   A.planetFolderCounts = function planetFolderCounts(pd) {
-    if (!pd || !pd.folderRead) return null;
+    if (!pd || (pd.folderRead !== 'full' && pd.folderRead !== 'partial')) return null;
     const more = pd.folderRead === 'partial' ? '+' : '';
     return { files: pd.files + more, size: sizeText(pd.sizeKb || 0, pd.files) + more, subdirs: String(pd.subdirs) };
   };

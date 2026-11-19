@@ -198,7 +198,7 @@ in a closure, and anything shared is a field of `ctx`.
 | `live/events.js` | 53 | functions | Event queue (`seq` assigned on queue), feed, one flush per scan / poll / sweep | — |
 | `live/attention.js` | 81 | functions | `classifyAttention` | `live/events`, `universe/public-shape` |
 | `live/state-file.js` | 50 | functions | Load / save `universe-state.json` | `shared/atomic-write` |
-| `live/system-view.js` | 148 | functions | `getSystem`, `getPlanet` from the project folder on disk | `universe/planets`, `universe/public-shape`, `build-buckets`, `path-safety`, `shared/hash` |
+| `live/system-view.js` | 154 | functions | `getSystem`, `getPlanet` from the project folder on disk | `universe/planets`, `universe/public-shape`, `build-buckets`, `path-safety`, `shared/hash` |
 | `live/projects.js` | 235 | functions | Project registry: path → id, display path, folder still exists | `provider-adapters`, `shared/hash`, `universe/public-shape`, `live/events`, `live/state-file` |
 | `live/ships.js` | 180 | functions | Ships and drones: spawn, pending tool calls, departure | `provider-adapters`, `universe/ships`, `universe/public-shape`, `live/events` |
 | `live/builds.js` | 60 | functions | One verified edit → one build in its top-level folder | `build-buckets`, `path-safety`, `live/events` |
@@ -443,9 +443,9 @@ flowchart TB
   V --> L --> S --> ST --> M --> A
 ```
 
-Exceptions to "everything on `AUR`": `polish-math.js` publishes `window.AUR_POLISH`,
-`galaxy-layout.js` publishes `window.AUR_GALAXY`, and `search-core.js` also leaks a bare
-global `searchProjects`. These three plus the VCS component are UMD so Node can load them.
+Exceptions to "everything on `AUR`": `polish-math.js` publishes `window.AUR_POLISH` and
+`galaxy-layout.js` publishes `window.AUR_GALAXY`. These two, `search-core.js` (on `AUR`, from an
+IIFE) and the VCS component are UMD so Node can load them.
 The split views follow one pattern: `scene/common.js` creates `AUR.sceneParts` (and the
 helpers every view shares: `viewCamera`, `shipMesh`, `disposeView`, `disposeMeshAndMaterial`),
 each part in `scene/<view>/` registers its builders on `AUR.sceneParts.<view>` and loads
@@ -458,7 +458,7 @@ contract), `AUR`, `AUR_POLISH` and `AUR_GALAXY` (all `any` for now).
 
 | File | Lines | Job |
 |---|---|---|
-| `util.js` | 305 | Creates `AUR`; hashes, colours, provider metadata, motion tuning, asset paths, DOM helpers |
+| `util.js` | 321 | Creates `AUR`; hashes, colours, provider metadata, motion tuning, asset paths, DOM helpers |
 | `util-scene.js` | 274 | Babylon helpers on `AUR`: skybox (PhotoDome), starfield, orbit rings, ship and signal markers, GUI labels |
 | `procedural-worlds.js` | 329 | Planet and asteroid surfaces (authored textures + generated normal maps) |
 | `ship-assets.js` | 252 | Manifest, per-scene state, hull choice by rank (`builds` against the manifest ladder), container loading; procedural dart fallback |
@@ -466,8 +466,8 @@ contract), `AUR`, `AUR_POLISH` and `AUR_GALAXY` (all `any` for now).
 | `ship-assets-api.js` | 118 | `AUR.ships`: instantiate, upgrade a fallback dart, `refresh` in place on promotion, dispose a scene's hull state |
 | `galaxy-layout.js` | 284 | Pure: galaxy grouping, spiral placement, Graveyard |
 | `polish-math.js` | 67 | Pure: label overlap, sun pulse |
-| `search-core.js` | 175 | Pure: ranks projects, agents and folders (prefix, substring, path, then fuzzy) |
-| `components/project-vcs-status.js` | 268 | Pure presentation for git / GitHub markers and details |
+| `search-core.js` | 206 | Pure: ranks projects, agents and folders (prefix, substring, path or other text, then fuzzy) |
+| `components/project-vcs-status.js` | 271 | Pure presentation for git / GitHub markers and details |
 | `scene/common.js` | 70 | Creates `AUR.sceneParts`; the shared camera, ship mesh, teardown and mesh disposal |
 | `scene/universe/view.js` | 280 | Galaxy map: builds the `view` object and merges its parts |
 | `scene/universe/galaxies.js` | 208 | Galaxy discs, outlines, labels, glyph placement, camera framing |
@@ -486,18 +486,18 @@ contract), `AUR`, `AUR_POLISH` and `AUR_GALAXY` (all `any` for now).
 | `app/playback.js` | 232 | History bar |
 | `app/replay.js` | 164 | Stream epochs, playback state, `issueReplay` |
 | `app/history-metrics.js` | 96 | `AUR.historyTestMetrics` for the history harness |
-| `app/project/search.js` | 250 | Go to palette (search button, `/` or Ctrl K), GitHub filter, universe match highlighting, `rankedFirst` |
-| `app/project/search-rows.js` | 114 | A Go to row: the name's matched characters, the path's telling tail, the kind |
+| `app/project/search.js` | 232 | Go to palette (search button, `/` or Ctrl K), GitHub filter, universe match highlighting |
+| `app/project/search-rows.js` | 113 | A Go to row: the name's matched characters, the path's telling tail, the kind |
 | `app/project/listbox.js` | 83 | The listbox the Go to palette and ALL PROJECTS share: debounce, keys, selection, rows |
 | `app/project/directory.js` | 191 | ALL PROJECTS dialog, its rows on the shared listbox |
 | `app/boot.js` | 394 | Boot, routing, view switching, debug hooks |
 | `app/ideas.js` | 152 | IDEAS panel |
 | `app/ideas-list.js` | 263 | IDEAS list rendering |
-| `app/chrome.js` | 253 | Command rail, project-name helpers, agent list, feed, summary, back button |
+| `app/chrome.js` | 254 | Command rail, project-name helpers, agent list, feed, summary, back button |
 | `app/agent-focus.js` | 306 | Cockpit overlay, hologram mini-map |
-| `app/project/settings.js` | 314 | Moved-project dialog |
+| `app/project/settings.js` | 332 | Moved-project dialog |
 | `app/project/tasks.js` | 267 | TASKS panel |
-| `app/project/control.js` | 258 | Project card, Open Terminal button, planet card |
+| `app/project/control.js` | 263 | Project card, Open Terminal button, planet card |
 | `index.html` | 429 | All panels exist in the HTML up front; modules show / hide them |
 | `styles/*.css` | 1,865 | All styles, in 12 files; `focus.css` and `focus-rooms.css` (474) are the cockpit |
 

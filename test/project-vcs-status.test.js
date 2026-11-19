@@ -87,6 +87,24 @@ test('filters by GitHub presence and searches project, branch, path, or reposito
   );
 });
 
+test('search matches a real name and branch, never the placeholder label of a project without one', () => {
+  const none = { id: 'none', name: 'Plain', path: 'C:\\work\\plain' };
+  const detached = { id: 'detached', name: 'Pinned', path: 'C:\\work\\pinned', git: { detached: true } };
+  assert.equal(statusUi.normalize(none).branchLabel, 'Branch unavailable');
+  for (const query of ['branch', 'unavailable', 'detached', 'head']) {
+    assert.equal(statusUi.matchesSearch(none, query), false, query);
+    assert.equal(statusUi.matchesSearch(detached, query), false, query);
+  }
+  assert.equal(statusUi.matchesSearch({ ...detached, git: { detached: true, branch: 'fix/head' } }, 'fix/head'), true);
+  const nameless = { id: 'nameless', path: 'C:\\work\\x' };
+  assert.equal(statusUi.normalize(nameless).projectName, 'Unnamed project');
+  assert.equal(statusUi.matchesSearch(nameless, 'unnamed'), false);
+  assert.equal(statusUi.matchesSearch(none, 'plain'), true);
+  assert.deepEqual(statusUi.searchTexts(detached), ['Pinned', 'C:\\work\\pinned', '', ''], 'the palette ranks on these too');
+  assert.deepEqual(statusUi.searchTexts({ ...nameless, git: { branch: 'main' }, github: { nameWithOwner: 'acme/pin' } }),
+    ['', 'C:\\work\\x', 'main', 'acme/pin']);
+});
+
 test('reads the live renderer project shape with status nested under vcs', () => {
   const project = {
     id: 'nested', name: 'Nested Status', path: 'C:\\work\\nested',

@@ -1,5 +1,5 @@
 // @ts-check
-// A Go to palette row: the live dot, the name with the query's characters marked, the full path, what
+// A Go to palette row: the live dot, the name with its match's characters marked, the full path, what
 // the row adds (repository and branch, or the agent's status) and its kind. Where the path has to
 // give way, its tail stays: the folders that tell it from a namesake in the same results.
 'use strict';
@@ -84,8 +84,8 @@
     return [vcs.nameWithOwner, vcs.branch, !named && galaxy].filter(Boolean).join(' · ');
   }
 
-  /** A fill for A.renderListbox over the palette's `entries`, marking `query` in the names. */
-  A.searchRowFiller = function searchRowFiller(entries, query) {
+  /** A fill for A.renderListbox over the palette's `entries`, with the characters their match found marked. */
+  A.searchRowFiller = function searchRowFiller(entries) {
     const tails = tailCounts(entries);
     return function fillSearchRow(row, entry) {
       // Focus stays in the field; the field's arrows move the selection.
@@ -94,7 +94,6 @@
       const dot = AUR.el('span', 'search-result-dot' + (live ? ' live' : ''));
       if (entry.kind === 'agent') dot.style.background = AUR.providerMeta(entry.ship.provider).color;
       const name = rowName(entry);
-      const hit = AUR.matchText(name, query);
       const path = rowPath(entry);
       const line = AUR.el('span', 'search-result-path');
       if (path) {
@@ -107,7 +106,7 @@
         : entry.kind === 'project' ? projectMore(entry.project, path) : '';
       if (more) line.append(AUR.el('span', 'search-path-more', (path ? ' · ' : '') + more));
       const copy = AUR.el('span', 'search-result-copy');
-      copy.append(marked('search-result-name', name, hit ? hit.positions : []), line);
+      copy.append(marked('search-result-name', name, entry.positions), line);
       row.append(dot, copy, AUR.el('span', 'search-result-kind', KIND[entry.kind]));
     };
   };

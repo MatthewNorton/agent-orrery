@@ -86,16 +86,18 @@
     return true;
   }
 
+  // What search reads of a project: its name, path, branch and repository, real values only. The
+  // "Unnamed project", "Branch unavailable" and "Detached HEAD" labels would match every project
+  // without a name or a branch.
+  function searchTexts(input) {
+    const source = input && typeof input === 'object' ? input : {};
+    const status = normalize(source);
+    return [text(source.projectName || source.name), status.projectPath, status.branch || '', status.nameWithOwner || ''];
+  }
+
   function matchesSearch(input, query) {
-    const status = normalize(input);
     const needle = text(query).toLowerCase();
-    if (!needle) return true;
-    return [
-      status.projectName,
-      status.projectPath,
-      status.branchLabel,
-      status.nameWithOwner || '',
-    ].join('\n').toLowerCase().includes(needle);
+    return !needle || searchTexts(input).join('\n').toLowerCase().includes(needle);
   }
 
   function filterProjects(projects, options) {
@@ -254,6 +256,7 @@
     githubIdentity,
     matchesFilter,
     matchesSearch,
+    searchTexts,
     filterProjects,
     pullRequestLabel,
     createMarkers,

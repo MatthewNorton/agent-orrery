@@ -273,6 +273,22 @@
       for (const [button, value] of pairs) button.setAttribute('aria-pressed', String(value === current));
     };
   };
+  // A modal dialog closes on a click on its backdrop: on the dialog itself, outside its `box`. The
+  // press must land there too, or a drag from inside (selecting text) would close it on release.
+  AUR.closeOnBackdrop = function closeOnBackdrop(dialog, box, close) {
+    const outside = (event) => {
+      if (event.target !== dialog) return false;
+      const r = box.getBoundingClientRect();
+      return event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom;
+    };
+    let pressed = false;
+    dialog.addEventListener('pointerdown', (event) => { pressed = event.button === 0 && outside(event); });
+    dialog.addEventListener('click', (event) => {
+      const wasPressed = pressed;
+      pressed = false; // one press, one click
+      if (wasPressed && outside(event)) close();
+    });
+  };
 
   // Inline fleet/signal glyph used in the sidebar rows.
   AUR.shipSvg = function shipSvg(hex, signal) {

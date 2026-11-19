@@ -35,13 +35,7 @@
     els.close.addEventListener('click', closeProjectSettings);
     els.scan.addEventListener('click', scanForProjectPaths);
     els.dialog.addEventListener('close', finishProjectSettingsClose);
-    els.dialog.addEventListener('click', (event) => {
-      if (event.target !== els.dialog || !els.shell) return;
-      const rect = els.shell.getBoundingClientRect();
-      const inside = event.clientX >= rect.left && event.clientX <= rect.right &&
-        event.clientY >= rect.top && event.clientY <= rect.bottom;
-      if (!inside) closeProjectSettings();
-    });
+    if (els.shell) AUR.closeOnBackdrop(els.dialog, els.shell, closeProjectSettings);
     A.wireUniverseBackup();
     A.wireSettingsTabs();
     A.renderProjectSettings();
