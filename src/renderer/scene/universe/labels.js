@@ -77,11 +77,11 @@
       chromeUnder = { overlay, width, height, at, boxes };
       return boxes;
     }
-    // An overlay that opens or closes changes where a label may sit.
-    const overlays = [...document.querySelectorAll('dialog[data-see-through]')];
-    const overlayToggled = () => { chromeUnder = NO_CHROME; markLabelLayoutDirty(); };
-    for (const overlay of overlays) overlay.addEventListener('toggle', overlayToggled);
-    scene.onDisposeObservable.add(() => { for (const overlay of overlays) overlay.removeEventListener('toggle', overlayToggled); });
+    // A dialog that opens or closes changes where a label may sit, see-through or not.
+    const dialogs = [...document.querySelectorAll('dialog')];
+    const dialogToggled = () => { chromeUnder = NO_CHROME; markLabelLayoutDirty(); };
+    for (const dialog of dialogs) dialog.addEventListener('toggle', dialogToggled);
+    scene.onDisposeObservable.add(() => { for (const dialog of dialogs) dialog.removeEventListener('toggle', dialogToggled); });
 
     // An overlay marked data-see-through (the Go to palette's light backdrop) hides none of the map;
     // the chrome behind it still does.
