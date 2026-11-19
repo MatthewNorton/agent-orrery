@@ -86,18 +86,34 @@
     return true;
   }
 
-  // What search reads of a project: its name, path, branch and repository, real values only. The
-  // "Unnamed project", "Branch unavailable" and "Detached HEAD" labels would match every project
-  // without a name or a branch.
+  // Lower case letter by letter, so 'izmir' finds 'İzmir' and 'ΟΔΥΣ' finds 'Οδυσσέας': a copy of
+  // search-core.js lowerOf, which the app's search uses (test/project-vcs-status.test.js checks they agree).
+  function foldCase(value) {
+    const raw = typeof value === 'string' ? value : '';
+    const low = raw.toLowerCase();
+    const kept = low.length === raw.length ? low : Array.from(raw, (ch) => {
+      const one = ch.toLowerCase();
+      return one.length === ch.length ? one : one.length > ch.length ? one.slice(0, ch.length) : ch;
+    }).join('');
+    return kept.replace(/ς/g, 'σ');
+  }
+
+  // What search reads of a project besides its name: path, branch and repository, real values only.
+  // The "Branch unavailable" and "Detached HEAD" labels would match every project without a branch.
+  function otherSearchTexts(input) {
+    const status = normalize(input);
+    return [status.projectPath, status.branch || '', status.nameWithOwner || ''];
+  }
+
+  // The name first; "Unnamed project" would match every project without one.
   function searchTexts(input) {
     const source = input && typeof input === 'object' ? input : {};
-    const status = normalize(source);
-    return [text(source.projectName || source.name), status.projectPath, status.branch || '', status.nameWithOwner || ''];
+    return [text(source.projectName || source.name), ...otherSearchTexts(source)];
   }
 
   function matchesSearch(input, query) {
-    const needle = text(query).toLowerCase();
-    return !needle || searchTexts(input).join('\n').toLowerCase().includes(needle);
+    const needle = foldCase(text(query));
+    return !needle || foldCase(searchTexts(input).join('\n')).includes(needle);
   }
 
   function filterProjects(projects, options) {
@@ -257,6 +273,8 @@
     matchesFilter,
     matchesSearch,
     searchTexts,
+    otherSearchTexts,
+    foldCase,
     filterProjects,
     pullRequestLabel,
     createMarkers,

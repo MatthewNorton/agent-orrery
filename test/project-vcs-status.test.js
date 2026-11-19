@@ -100,9 +100,28 @@ test('search matches a real name and branch, never the placeholder label of a pr
   assert.equal(statusUi.normalize(nameless).projectName, 'Unnamed project');
   assert.equal(statusUi.matchesSearch(nameless, 'unnamed'), false);
   assert.equal(statusUi.matchesSearch(none, 'plain'), true);
-  assert.deepEqual(statusUi.searchTexts(detached), ['Pinned', 'C:\\work\\pinned', '', ''], 'the palette ranks on these too');
-  assert.deepEqual(statusUi.searchTexts({ ...nameless, git: { branch: 'main' }, github: { nameWithOwner: 'acme/pin' } }),
-    ['', 'C:\\work\\x', 'main', 'acme/pin']);
+  assert.deepEqual(statusUi.searchTexts(detached), ['Pinned', 'C:\\work\\pinned', '', '']);
+  const full = { ...nameless, git: { branch: 'main' }, github: { nameWithOwner: 'acme/pin' } };
+  assert.deepEqual(statusUi.searchTexts(full), ['', 'C:\\work\\x', 'main', 'acme/pin']);
+  assert.deepEqual(statusUi.otherSearchTexts(full), ['C:\\work\\x', 'main', 'acme/pin'],
+    'Go to and PROJECTS rank the name themselves and read these after it');
+  assert.deepEqual(statusUi.otherSearchTexts(detached), ['C:\\work\\pinned', '', '']);
+  assert.deepEqual(statusUi.otherSearchTexts(null), ['', '', '']);
+});
+
+test('search folds case letter by letter, as the app\'s own search does (search-core.js lowerOf)', () => {
+  const { lowerOf } = require('../src/renderer/search-core');
+  for (const value of ['Orion-API', 'İzmir-tools', 'İ-Οδυσσέας', 'ΟΔΥΣ', 'λόγος', 'ǅ', 'ß', 'straße', '', 'a\u0307b', 'İİ', 'ΣΑΣ']) {
+    assert.equal(statusUi.foldCase(value), lowerOf(value), value);
+  }
+  assert.equal(statusUi.foldCase(null), '');
+  const izmir = { id: 'i', name: 'İzmir-tools', path: 'C:\\work\\izmir' };
+  const greek = { id: 'g', name: 'Οδυσσέας', path: 'C:\\work\\greek' };
+  assert.equal(statusUi.matchesSearch(izmir, 'izmir-t'), true, 'a plain i finds İ');
+  assert.equal(statusUi.matchesSearch(izmir, 'İZMİR'), true);
+  assert.equal(statusUi.matchesSearch(greek, 'ΟΔΥΣ'), true, 'capitals find the final sigma');
+  assert.equal(statusUi.matchesSearch(greek, 'οδυσσέασ'), true);
+  assert.deepEqual(statusUi.filterProjects([izmir, greek], { query: 'IZMIR' }).map((p) => p.id), ['i']);
 });
 
 test('reads the live renderer project shape with status nested under vcs', () => {

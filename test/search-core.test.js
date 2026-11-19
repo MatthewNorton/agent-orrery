@@ -41,7 +41,7 @@ test('agent and planet hits say when only a fuzzy match found them, and which na
   assert.deepEqual(searchPlanets(projects, 'mig').map((hit) => hit.fuzzy), [false]);
 });
 
-test('rankProjects: other text (the palette passes repository and branch) ranks with the path, before fuzzy', () => {
+test('rankProjects: other text (Go to and PROJECTS pass the branch and repository) ranks with the path, before fuzzy', () => {
   const pool = [
     { id: 'p', name: 'wonky-orbit-kit', path: 'C:\\work\\wonky', branch: 'main' },
     { id: 'q', name: 'zeta', path: 'C:\\apps\\zeta', branch: 'feat/orbit' },
@@ -49,7 +49,7 @@ test('rankProjects: other text (the palette passes repository and branch) ranks 
     { id: 's', name: 'orbital', path: 'C:\\apps\\orbital', branch: 'main' },
     { id: 't', name: 'other-rabbit', path: 'C:\\apps\\t', branch: 'main' },
   ];
-  const hits = rankProjects(pool, 'orbit', (project) => [project.path, project.branch]);
+  const hits = rankProjects(pool, 'orbit', { othersOf: (project) => [project.path, project.branch] });
   assert.deepEqual(hits.map((hit) => [hit.project.id, hit.fuzzy, hit.positions.length]), [
     ['s', false, 5], ['p', false, 5], ['r', false, 0], ['q', false, 0], ['t', true, 5],
   ], 'prefix, substring, then the branch matches by name (the fuzzy name of r marks nothing), then fuzzy');
@@ -57,6 +57,35 @@ test('rankProjects: other text (the palette passes repository and branch) ranks 
     'found by its path, so nothing in the name is marked');
   assert.deepEqual(searchProjects(pool, 'orbit').map((project) => project.id), ['s', 'p', 'r', 't'],
     'searchProjects keeps the path as its only other text');
+});
+
+test('rankProjects: ranks and marks the name its caller shows, so a project without one is found by its id', () => {
+  const pool = [
+    { id: '-work-orion-api', name: '', path: 'C:\\work\\orion-api' },
+    { id: 'z', name: 'orion-tools', path: 'C:\\work\\tools' },
+    { id: 'y', name: 'atlas', path: 'C:\\work\\orion\\atlas' },
+  ];
+  const label = (project) => project.name || project.id;
+  const hits = rankProjects(pool, 'orion', { nameOf: label });
+  assert.deepEqual(hits.map((hit) => [hit.project.id, hit.positions]), [
+    ['z', [0, 1, 2, 3, 4]], ['-work-orion-api', [6, 7, 8, 9, 10]], ['y', []],
+  ], 'the id is marked where its row shows it, and it ranks as a name match, not first among the path matches');
+  assert.deepEqual(rankProjects(pool, 'orion').map((hit) => [hit.project.id, hit.positions]), [
+    ['z', [0, 1, 2, 3, 4]], ['-work-orion-api', []], ['y', []],
+  ], 'without nameOf the name is project.name, and the nameless project is a path match');
+  assert.deepEqual(rankProjects([{ id: 7, name: null, path: null }], '7', { nameOf: (project) => project.name || project.id })
+    .map((hit) => hit.positions), [[0]], 'a name that is not a string is read as text');
+});
+
+test('rankProjects: fuzzy false keeps the whole matches only, as PROJECTS lists them', () => {
+  const pool = [
+    { id: 'a', name: 'node-config-builder', path: 'C:\\y\\tools' },
+    { id: 'b', name: 'ncb-site', path: 'C:\\y\\site' },
+    { id: 'c', name: 'misc', path: 'C:\\ncb\\misc' },
+  ];
+  assert.deepEqual(rankProjects(pool, 'ncb').map((hit) => [hit.project.id, hit.fuzzy]), [['b', false], ['c', false], ['a', true]]);
+  assert.deepEqual(rankProjects(pool, 'ncb', { fuzzy: false }).map((hit) => [hit.project.id, hit.fuzzy]), [['b', false], ['c', false]]);
+  assert.deepEqual(rankProjects(pool, 'nfg', { fuzzy: false }), [], 'a query only a fuzzy match finds lists nothing');
 });
 
 test('queries are plain text: regex characters and huge strings neither match wrongly nor throw', () => {
@@ -80,6 +109,25 @@ test('fuzzy: the query in order ranks below prefix, substring and path matches, 
   assert.equal(matchText('there-is-a-folder-called-something-quite-long', 'orion'), null, 'letters strewn across a long name');
   assert.deepEqual(agentIds(searchAgents(ships, 'cd1')), ['s3', 's2'], 'Codex-1 holds c, d and 1 closer');
   assert.deepEqual(searchPlanets(projects, 'mgr').map((h) => h.planet), ['migrations']);
+});
+
+test('fuzzy: an abbreviation of a later word matches like one of the first word, and ranks after it', () => {
+  for (const [name, query, positions] of [
+    ['dashboard', 'dsb', [0, 2, 4]], ['web-dashboard', 'dsb', [4, 6, 8]], ['my-config', 'cfg', [3, 6, 8]],
+    ['api-gateway', 'gtw', [4, 6, 8]], ['my-packages', 'pkg', [3, 6, 8]], ['webDashboard', 'dsb', [3, 5, 7]],
+  ]) {
+    const hit = matchText(name, query);
+    assert.ok(hit, `${query} in ${name}`);
+    assert.deepEqual([hit.rank, hit.positions], [FUZZY, positions], `${query} in ${name}`);
+  }
+  const far = 'there-is-a-folder-called-something-quite-long-' + 'x'.repeat(60) + '-dashboard';
+  assert.ok(matchText(far, 'dsb'), 'however far along the name the word starts');
+  assert.deepEqual(searchProjects([
+    { id: 'late', name: 'web-dashboard', path: '' }, { id: 'first', name: 'dashboard', path: '' },
+  ], 'dsb').map((p) => p.id), ['first', 'late'], 'the earlier match ranks first');
+  assert.equal(matchText('undashboard', 'dsb'), null, 'letters that start no word are still strewn');
+  assert.equal(matchText('web-madesobig', 'dsb'), null);
+  assert.equal(matchText(far, 'orion'), null);
 });
 
 test('matchText: rank and the matched characters for marking', () => {

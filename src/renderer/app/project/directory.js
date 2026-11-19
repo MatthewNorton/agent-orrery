@@ -8,6 +8,7 @@
   const A = AUR.app;
   if (!A) throw new Error('app/state.js must load before app/project/directory.js');
   const S = A.state;
+  const ROW_ID = 'project-directory-result-';
 
   // ---------- searchable all-projects directory ----------
   A.wireProjectDirectory = function wireProjectDirectory() {
@@ -38,10 +39,11 @@
       escape: () => A.closeProjectDirectory(),
       update: updateProjectDirectory,
       activate: activateProjectDirectoryResult,
-      render: renderProjectDirectoryResults,
+      select: () => A.selectListboxRow(els.list, els.input, S.projectDirectory, ROW_ID),
     });
     document.addEventListener('keydown', (event) => {
-      if (event.key !== 'Escape' || !S.projectDirectory.open) return;
+      // While an input method composes, Escape cancels its text.
+      if (event.key !== 'Escape' || event.isComposing || event.keyCode === 229 || !S.projectDirectory.open) return;
       event.preventDefault();
       A.closeProjectDirectory();
     });
@@ -102,8 +104,8 @@
     if (query) {
       // Ranked as the palette ranks them, by name, then path, branch or repository (search-core.js),
       // but only the projects that hold the query whole: the list filters, it does not guess.
-      S.projectDirectory.results = AUR.rankProjects(projects, query, VCS.searchTexts)
-        .filter((hit) => !hit.fuzzy).map((hit) => hit.project);
+      S.projectDirectory.results = AUR.rankProjects(projects, query,
+        { nameOf: A.projectLabel, othersOf: VCS.otherSearchTexts, fuzzy: false }).map((hit) => hit.project);
     } else {
       S.projectDirectory.results = projects;
     }
@@ -143,7 +145,8 @@
     const els = S.projectDirectory.els;
     if (!els || !S.projectDirectory.open) return;
     A.renderListbox(els.list, els.input, S.projectDirectory, {
-      idPrefix: 'project-directory-result-',
+      idPrefix: ROW_ID,
+      keyOf: (project) => project.id,
       rowClass: 'project-directory-row',
       emptyClass: 'project-directory-empty',
       emptyText: 'No projects found',

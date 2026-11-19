@@ -177,6 +177,8 @@
       results: [],
       selected: 0,
       els: null,
+      filterEls: null, // the top bar's GitHub filter, wired with or without the palette
+      opener: null,    // what had focus before the palette opened; a pick clears it
     },
     projectDirectory: {
       open: false,

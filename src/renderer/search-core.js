@@ -2,17 +2,19 @@
 'use strict';
 
 // Go to: pure ranking over projects, agents and planets (top-level folders). Prefix matches rank
-// first, then substring matches, then a match in other text (a project's path, and in the palette
-// its repository and branch; an agent's status), then fuzzy matches: the query's characters in
+// first, then substring matches, then a match in other text (a project's path, and in Go to and
+// PROJECTS its branch and repository; an agent's status), then fuzzy matches: the query's characters in
 // order, scored by how closely they sit and whether they start words. Ties break alphabetically.
 // A classic script and a Node module: nothing leaks past the IIFE but AUR and module.exports.
 
 (function () {
   const PREFIX = 0, SUBSTRING = 1, FALLBACK = 2, FUZZY = 3;
   // A fuzzy match scores a point a character, more where it starts a word or follows the last match,
-  // less for each character it skips. Shorter queries would match nearly every name, and a match
-  // under FLOOR points a character is letters strewn across a long name.
-  const WORD_START = 2, STRING_START = 1, RUN = 3, GAP = 0.1, LEAD = 0.05;
+  // less for each character it skips, and FIRST more where the query's first character starts a
+  // word, the way an abbreviation does. Shorter queries would match nearly every name, and a match
+  // under FLOOR points a character is letters strewn across a long name. Where the match starts
+  // does not count toward the floor: LEAD only ranks an earlier match above a later one.
+  const WORD_START = 2, FIRST = 1, RUN = 3, GAP = 0.1, LEAD = 0.05;
   const FUZZY_MIN = 3, FLOOR = 1.75;
   const BOUNDARY = /[\s\-_./\\:]/;
 
@@ -38,9 +40,9 @@
     return Number.isSafeInteger(limit) && limit > 0 ? limit : fallback;
   }
 
-  /** @param {string} value @param {number} i */
+  /** WORD_START where `value[i]` starts a word: the string, after a separator, or a capital after a small letter. @param {string} value @param {number} i */
   function bonusAt(value, i) {
-    if (i === 0) return WORD_START + STRING_START;
+    if (i === 0) return WORD_START;
     const prev = value[i - 1], here = value[i];
     if (BOUNDARY.test(prev)) return WORD_START;
     if (prev === prev.toLowerCase() && here !== here.toLowerCase()) return WORD_START;
@@ -48,7 +50,8 @@
   }
 
   /**
-   * The best placing of `needle`'s characters, in order, within `value`: the score and the indices.
+   * The placing of `needle`'s characters, in order, within `value` that hangs together best: its
+   * indices, and its score less LEAD for each character before it.
    * @param {string} value @param {string} needle lower case
    * @returns {{ score: number, positions: number[] } | null}
    */
@@ -69,8 +72,9 @@
           if (prev[i - 2] - GAP > carry) { carry = prev[i - 2] - GAP; carryAt = i - 2; }
         }
         if (hay[i] !== needle[j]) continue;
-        const gain = 1 + bonusAt(value, i);
-        if (j === 0) { row[i] = gain - LEAD * i; continue; }
+        const bonus = bonusAt(value, i);
+        const gain = 1 + bonus;
+        if (j === 0) { row[i] = gain + (bonus ? FIRST : 0); continue; }
         const run = i > 0 ? prev[i - 1] + RUN : -Infinity;
         const [score, at] = run >= carry ? [run, i - 1] : [carry, carryAt];
         if (score === -Infinity) continue;
@@ -85,7 +89,7 @@
     if (end < 0 || best[m - 1][end] < FLOOR * m) return null;
     const positions = [];
     for (let j = m - 1, i = end; j >= 0; i = from[j][i], j--) positions.unshift(i);
-    return { score: best[m - 1][end], positions };
+    return { score: best[m - 1][end] - LEAD * positions[0], positions };
   }
 
   /**
@@ -117,12 +121,18 @@
 
   /**
    * `name` holding the needle whole; else a FALLBACK match where a text `othersOf` gives does (its
-   * positions mark nothing); else `name`'s fuzzy match. `othersOf` runs only when the name falls short.
+   * positions mark nothing); else, unless `withFuzzy` is false, `name`'s fuzzy match. `othersOf`
+   * runs only when the name falls short.
    * @param {string} name @param {() => unknown[]} othersOf @param {string} needle lower case
+   * @param {boolean} [withFuzzy]
    */
-  function hitOf(name, othersOf, needle) {
-    const inOthers = () => othersOf().some((other) => typeof other === 'string' && lowerOf(other).includes(needle));
-    return wholeHit(name, needle) || (inOthers() ? { rank: FALLBACK, score: 0, positions: [] } : fuzzyHit(name, needle));
+  function hitOf(name, othersOf, needle, withFuzzy = true) {
+    const whole = wholeHit(name, needle);
+    if (whole) return whole;
+    if (othersOf().some((other) => typeof other === 'string' && lowerOf(other).includes(needle))) {
+      return { rank: FALLBACK, score: 0, positions: [] };
+    }
+    return withFuzzy ? fuzzyHit(name, needle) : null;
   }
 
   /** Rank, then (fuzzy) score, then `name`, then the given tie-breaks. */
@@ -135,18 +145,26 @@
   const hitMarks = (match) => ({ fuzzy: match.rank === FUZZY, positions: match.positions });
 
   /**
-   * Every matching project, as `{ project, fuzzy, positions }`: by name, then by path or any other
-   * text `othersOf` gives (held whole), then fuzzy.
-   * @param {unknown} projects @param {unknown} query @param {(project: any) => unknown[]} [othersOf]
+   * @typedef {object} RankHow
+   * @property {(project: any) => unknown} [nameOf] the name ranked and marked: the one the row shows
+   * @property {(project: any) => unknown[]} [othersOf] the other texts, held whole: path by default
+   * @property {boolean} [fuzzy] false for whole matches only
    */
-  function rankProjects(projects, query, othersOf = (project) => [project.path]) {
+
+  /**
+   * Every matching project, as `{ project, fuzzy, positions }`: by name, then by any other text
+   * `othersOf` gives (held whole), then, unless `fuzzy` is false, by a fuzzy match on the name.
+   * @param {unknown} projects @param {unknown} query @param {RankHow} [how]
+   */
+  function rankProjects(projects, query, how = {}) {
+    const { nameOf = (project) => project.name, othersOf = (project) => [project.path], fuzzy: withFuzzy = true } = how;
     const needle = needleOf(query);
     if (!Array.isArray(projects) || !needle) return [];
     const matches = [];
     for (const project of projects) {
       if (!project || typeof project !== 'object') continue;
-      const name = typeof project.name === 'string' ? project.name : '';
-      const hit = hitOf(name, () => othersOf(project), needle);
+      const name = String(nameOf(project) ?? '');
+      const hit = hitOf(name, () => othersOf(project), needle, withFuzzy);
       if (hit) matches.push({ project, ...hit, name: name.toLowerCase() });
     }
     matches.sort((a, b) => byRank(a, b) ||
@@ -202,5 +220,5 @@
     window.AUR.searchAgents = searchAgents;
     window.AUR.searchPlanets = searchPlanets;
   }
-  if (typeof module !== 'undefined') module.exports = { searchProjects, rankProjects, searchAgents, searchPlanets, matchText, FUZZY };
+  if (typeof module !== 'undefined') module.exports = { searchProjects, rankProjects, searchAgents, searchPlanets, matchText, lowerOf, FUZZY };
 })();

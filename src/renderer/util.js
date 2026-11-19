@@ -276,12 +276,13 @@
       for (const [button, value] of pairs) button.setAttribute('aria-pressed', String(value === current));
     };
   };
-  // A modal dialog closes on a click on its backdrop: on the dialog itself, outside its `box`. The
-  // press must land there too, or a drag from inside (selecting text) would close it on release.
-  AUR.closeOnBackdrop = function closeOnBackdrop(dialog, box, close) {
+  // A modal dialog closes on a click on its backdrop, outside the dialog's own box (its padding or
+  // scrollbar is inside). The press must land there too, or a drag from inside (selecting text)
+  // would close it on release.
+  AUR.closeOnBackdrop = function closeOnBackdrop(dialog, close) {
     const outside = (event) => {
       if (event.target !== dialog) return false;
-      const r = box.getBoundingClientRect();
+      const r = dialog.getBoundingClientRect();
       return event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom;
     };
     let pressed = false;

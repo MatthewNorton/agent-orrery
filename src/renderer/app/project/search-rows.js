@@ -24,35 +24,46 @@
     const base = String(entry.project.path || '');
     // '(root)' stands for the project's top-level files, so its path is the project's own.
     if (entry.kind !== 'planet' || !base || entry.planet === '(root)') return base;
-    return base + (base.includes('\\') ? '\\' : '/') + entry.planet;
+    // A drive or filesystem root ends in its separator already.
+    return base + (/[\\/]$/.test(base) ? '' : base.includes('\\') ? '\\' : '/') + entry.planet;
   }
 
   const folders = (path) => path.split(/[\\/]/).filter(Boolean);
   const lastOf = (parts, count) => parts.slice(-count).join('/');
 
-  /** Each row's tail, in folders: TAIL_MIN, or as many as part it from the rows of the same name. */
-  function tailCounts(entries) {
+  /** `items` grouped by `keyOf`, in the order their keys first appear. */
+  function grouped(items, keyOf) {
     const groups = new Map();
-    for (const entry of entries) {
-      const key = entry.kind + '\n' + rowName(entry);
-      groups.set(key, [...(groups.get(key) || []), entry]);
+    for (const item of items) {
+      const key = keyOf(item);
+      groups.set(key, [...(groups.get(key) || []), item]);
     }
+    return [...groups.values()];
+  }
+
+  /** How many of its last folders each path keeps: TAIL_MIN, or as many as part it from the others. */
+  function tailsApart(paths) {
+    const parts = paths.map(folders);
+    return parts.map((own, i) => {
+      let count = Math.min(TAIL_MIN, own.length);
+      while (count < own.length && parts.some((other, j) => j !== i && lastOf(other, count) === lastOf(own, count))) count++;
+      return count;
+    });
+  }
+
+  /** Each row's tail, in folders, by its key: what parts it from the rows of the same name. */
+  function tailCounts(entries) {
     const counts = new Map();
-    for (const group of groups.values()) {
-      const parts = group.map((entry) => folders(rowPath(entry)));
-      group.forEach((entry, i) => {
-        const own = parts[i];
-        let count = Math.min(TAIL_MIN, own.length);
-        while (count < own.length && parts.some((other, j) => j !== i && lastOf(other, count) === lastOf(own, count))) count++;
-        counts.set(entry.key, count);
-      });
+    for (const group of grouped(entries, (entry) => entry.kind + '\n' + rowName(entry))) {
+      const apart = tailsApart(group.map(rowPath));
+      group.forEach((entry, i) => counts.set(entry.key, apart[i]));
     }
     return counts;
   }
 
   /** Where the last `count` folders of `path` start: the separator before them, or 0 for all of it. */
   function tailStart(path, count) {
-    let at = path.length;
+    let at = path.replace(/[\\/]+$/, '').length; // a root's own separator ends no folder
     for (let n = 0; n < count && at > 0; n++) {
       at = Math.max(path.lastIndexOf('\\', at - 1), path.lastIndexOf('/', at - 1));
     }
@@ -83,6 +94,28 @@
     const named = folders(path.toLowerCase()).includes(galaxy.toLowerCase());
     return [vcs.nameWithOwner, vcs.branch, !named && galaxy].filter(Boolean).join(' · ');
   }
+
+  /**
+   * Each project's line in a plain list (the IDEAS picker), by id: its galaxy, repository, branch
+   * and path. Projects that share a name lead with the end of the path that tells them apart, in
+   * place of the whole path: a list cuts a long line short at its end, where the path was.
+   */
+  A.projectSubtitles = function projectSubtitles(projects) {
+    const lines = new Map();
+    for (const group of grouped(projects, (project) => String(A.projectLabel(project)))) {
+      const paths = group.map((project) => String(project.path || ''));
+      const apart = group.length > 1 ? tailsApart(paths) : [];
+      group.forEach((project, i) => {
+        const vcs = VCS.normalize(project);
+        const rest = [A.projectGalaxyLabel(project), vcs.nameWithOwner, vcs.branch];
+        const cut = tailStart(paths[i], apart[i] || 0);
+        const detail = group.length > 1 && paths[i]
+          ? [(cut > 0 ? '…' : '') + paths[i].slice(cut), ...rest] : [...rest, paths[i]];
+        lines.set(project.id, detail.filter(Boolean).map(String).join(' · '));
+      });
+    }
+    return lines;
+  };
 
   /** A fill for A.renderListbox over the palette's `entries`, with the characters their match found marked. */
   A.searchRowFiller = function searchRowFiller(entries) {

@@ -21,7 +21,6 @@
       button: document.getElementById('settings-button'),
       count: document.getElementById('settings-count'),
       dialog: document.getElementById('settings-dialog'),
-      shell: document.querySelector('#settings-dialog .settings-shell'),
       close: document.getElementById('settings-close'),
       summary: document.getElementById('settings-summary'),
       scan: document.getElementById('settings-scan'),
@@ -35,7 +34,7 @@
     els.close.addEventListener('click', closeProjectSettings);
     els.scan.addEventListener('click', scanForProjectPaths);
     els.dialog.addEventListener('close', finishProjectSettingsClose);
-    if (els.shell) AUR.closeOnBackdrop(els.dialog, els.shell, closeProjectSettings);
+    AUR.closeOnBackdrop(els.dialog, closeProjectSettings);
     A.wireUniverseBackup();
     A.wireSettingsTabs();
     A.renderProjectSettings();
