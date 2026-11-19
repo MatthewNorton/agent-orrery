@@ -8,12 +8,10 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const { canonicalProjectPath } = require('../src/main/provider-adapters');
 const {
-  SEC, MIN, T0, SLUG, CLAUDE_SESSION, CODEX_SESSION,
-  fnv1a, hex8, appendJsonl, createWorld, ofType, claude, codex,
+  SEC, MIN, T0, SLUG, CLAUDE_SESSION, CODEX_SESSION, SHIP_ID, CODEX_SHIP_ID, fnv1a, hex8,
+  appendJsonl, createWorld, ofType, pick, claude, codex,
 } = require('./support/transcripts');
 
-const SHIP_ID = `ship:${SLUG}:${CLAUDE_SESSION}`;
-const CODEX_SHIP_ID = `ship:codex:${CODEX_SESSION}`;
 const DRONE_ID = `drone:claude:${CLAUDE_SESSION}:toolu_task`;
 const END = T0 + 10 * MIN;
 
@@ -56,7 +54,6 @@ function historyGalaxy(projectDir) {
   return { key: `history:${hex8(flavor.dirname(raw))}`, label: 'Workspace' };
 }
 
-const pick = (keys) => (event) => Object.fromEntries(keys.map((key) => [key, event[key]]));
 
 test('replay: index() reports the history range and leaves the model empty', async (t) => {
   const { source, states } = await historyAt(t);

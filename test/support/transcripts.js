@@ -18,6 +18,8 @@ const SLUG = 'C--workspace-demo';
 const CLAUDE_SESSION = '7c0d5f8e-1111-4222-8333-444455556666';
 const CODEX_SESSION = '019f0000-0000-7000-8000-000000000201';
 const TASK_ID = '3f2a6c1e-8b4d-4e5f-9a6b-7c8d9e0f1a2b';
+const SHIP_ID = `ship:${SLUG}:${CLAUDE_SESSION}`;
+const CODEX_SHIP_ID = `ship:codex:${CODEX_SESSION}`;
 
 // Independent oracle for the fnv1a id/seed contract shared by both models.
 function fnv1a(value) {
@@ -187,6 +189,9 @@ const codex = {
   event: (ts, type) => ({ timestamp: iso(ts), type: 'event_msg', payload: { type } }),
 };
 
+// pick(keys)(item): the item's `keys` only, to compare a few fields of an event or a record.
+const pick = (keys) => (item) => Object.fromEntries(keys.map((key) => [key, item[key]]));
+
 module.exports = {
   SEC,
   MIN,
@@ -195,6 +200,8 @@ module.exports = {
   CLAUDE_SESSION,
   CODEX_SESSION,
   TASK_ID,
+  SHIP_ID,
+  CODEX_SHIP_ID,
   fnv1a,
   hex8,
   iso,
@@ -204,6 +211,7 @@ module.exports = {
   createWorld,
   ofType,
   countTypes,
+  pick,
   claude,
   codex,
 };
