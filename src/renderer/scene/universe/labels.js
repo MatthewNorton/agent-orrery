@@ -51,10 +51,10 @@
       return true;
     }
 
-    // The Go to palette's light backdrop lies over the map but hides none of it; the palette does.
+    // An overlay marked data-see-through (the Go to palette's light backdrop) hides none of the map.
     function mapShowsAt(x, y) {
       const hit = document.elementFromPoint(x, y);
-      return hit === canvas || (hit instanceof HTMLDialogElement && hit.classList.contains('search-dialog'));
+      return hit === canvas || Boolean(hit && hit.hasAttribute('data-see-through'));
     }
 
     function labelPointIsClear(rect) {

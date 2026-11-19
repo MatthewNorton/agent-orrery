@@ -88,8 +88,12 @@ export interface PlanetData {
   /** Top file extensions, upper case. */
   resources: string[];
   procedural?: boolean;
-  /** Live, read from disk: the folder read stopped short (live/system-view.js), so files and size are floors. */
-  partial?: boolean;
+  /**
+   * Live only, how far main read the folder (live/system-view.js): 'partial' when a read limit or an
+   * unreadable folder cut it short, so files and size are floors. Absent when nothing was read: a
+   * procedural planet's numbers are invented and history never reads the disk.
+   */
+  folderRead?: 'full' | 'partial';
 }
 
 /** Bounded by main (replay-control.js): unknown times are null; in LIVE, playing is false and cursorTs is maxTs once known. */

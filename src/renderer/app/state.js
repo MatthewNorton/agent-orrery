@@ -175,8 +175,6 @@
       filter: VCS.FILTERS.ALL,
       results: [],
       selected: 0,
-      open: false,         // the Go to palette is showing
-      opener: null,        // what had focus before the palette opened
       els: null,
     },
     projectDirectory: {

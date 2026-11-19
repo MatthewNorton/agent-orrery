@@ -98,7 +98,7 @@
       const path = rowPath(entry);
       const line = AUR.el('span', 'search-result-path');
       if (path) {
-        const cut = tailStart(path, tails.get(entry.key) || TAIL_MIN);
+        const cut = tailStart(path, tails.get(entry.key));
         if (cut > 0) line.append(AUR.el('span', 'search-path-head', path.slice(0, cut)));
         line.append(AUR.el('span', 'search-path-tail', path.slice(cut)));
         row.title = path;

@@ -65,10 +65,10 @@ test('live system view: a planet reads its folder five levels down; the root pla
   ], { src: 4 });
 
   const src = getPlanet(model, 'p', 'src');
-  assert.deepEqual([src.files, src.subdirs, src.builds, src.resources, src.partial], [5, 1, 4, ['JS', 'TS'], false]);
+  assert.deepEqual([src.files, src.subdirs, src.builds, src.resources, src.folderRead], [5, 1, 4, ['JS', 'TS'], 'full']);
   const rootPlanet = getPlanet(model, 'p', '(root)');
-  assert.deepEqual([rootPlanet.files, rootPlanet.subdirs, rootPlanet.resources, rootPlanet.partial],
-    [3, 1, ['MD', 'JSON'], false]);
+  assert.deepEqual([rootPlanet.files, rootPlanet.subdirs, rootPlanet.resources, rootPlanet.folderRead],
+    [3, 1, ['MD', 'JSON'], 'full']);
   assert.equal(getPlanet(model, 'p', 'src/lib'), null);
   assert.equal(getPlanet(model, 'missing', 'src'), null);
 });
@@ -80,11 +80,19 @@ test('live system view: past five levels, 300 folders or 600 files the read stop
     ...Array.from({ length: 601 }, (_, index) => `many/f${index}.txt`),
   ]);
   const pkg = getPlanet(model, 'p', 'pkg');
-  assert.deepEqual([pkg.files, pkg.partial], [1, true], 'the fifth level counts; the folder below it is not read');
+  assert.deepEqual([pkg.files, pkg.folderRead], [1, 'partial'], 'the fifth level counts; the folder below it is not read');
   const wide = getPlanet(model, 'p', 'wide');
-  assert.deepEqual([wide.files, wide.subdirs, wide.partial], [299, 301, true], 'every subfolder counts; 300 are read');
+  assert.deepEqual([wide.files, wide.subdirs, wide.folderRead], [299, 301, 'partial'], 'every subfolder counts; 300 are read');
   const many = getPlanet(model, 'p', 'many');
-  assert.deepEqual([many.files, many.partial], [600, true]);
+  assert.deepEqual([many.files, many.folderRead], [600, 'partial']);
+});
+
+test('live system view: a procedural planet reads no folder, so it has no folderRead', (t) => {
+  const { project, model } = projectOnDisk(t, ['src/a.js']);
+  project.exists = false;
+  const planet = getPlanet(model, 'p', 'src');
+  assert.equal(planet.procedural, true);
+  assert.equal('folderRead' in planet, false);
 });
 
 test('live system view: a planet name is one plain path segment', () => {

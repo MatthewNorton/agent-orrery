@@ -158,7 +158,9 @@ async function runHistoryMode(ctx, driver, metrics) {
     ctx.win.webContents.send('au:debug-view', 'planet');
     const planetView = await waitForView('planet');
     const planetChrome = await readHistoryMetrics();
+    // History never reads the disk, so the REPLAY planet card shows no folder counts.
     result.metrics.planetChromeClear = planetView.planetCardVisible === true && planetView.planetCard.includes('PLANET:') &&
+      /FILES\s*—/.test(planetView.planetCard) &&
       planetChrome.layout?.inViewport === true &&
       (planetChrome.layout?.overlapIds?.length || 0) === 0;
 

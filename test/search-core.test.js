@@ -22,12 +22,22 @@ test('projects: prefix before substring before path, alphabetical within a rank'
   assert.deepEqual(searchProjects(projects, '  '), []);
 });
 
+const agentIds = (hits) => hits.map((hit) => hit.ship.id);
+
 test('agents: by name, then status; the one that needs you first', () => {
-  assert.deepEqual(searchAgents(ships, 'cl').map((s) => s.id), ['s1', 's2']);
-  assert.deepEqual(searchAgents(ships, 'build').map((s) => s.id), ['s1', 's2']);
-  assert.deepEqual(searchAgents(ships, 'explor').map((s) => s.id), ['s3']);
+  assert.deepEqual(agentIds(searchAgents(ships, 'cl')), ['s1', 's2']);
+  assert.deepEqual(agentIds(searchAgents(ships, 'build')), ['s1', 's2']);
+  assert.deepEqual(agentIds(searchAgents(ships, 'explor')), ['s3']);
   assert.deepEqual(searchAgents(ships, 'zzz'), []);
-  assert.deepEqual(searchAgents(ships, 'c', 1).map((s) => s.id), ['s1']);
+  assert.deepEqual(agentIds(searchAgents(ships, 'c', 1)), ['s1']);
+});
+
+test('agent and planet hits say when only a fuzzy match found them', () => {
+  assert.deepEqual(searchAgents(ships, 'cd1').map((hit) => hit.fuzzy), [true, true]);
+  assert.deepEqual(searchAgents(ships, 'build').map((hit) => hit.fuzzy), [false, false], 'a status match is not fuzzy');
+  assert.deepEqual(searchAgents(ships, 'cla').map((hit) => hit.fuzzy), [false, false]);
+  assert.deepEqual(searchPlanets(projects, 'mgr').map((hit) => hit.fuzzy), [true]);
+  assert.deepEqual(searchPlanets(projects, 'mig').map((hit) => hit.fuzzy), [false]);
 });
 
 test('queries are plain text: regex characters and huge strings neither match wrongly nor throw', () => {
@@ -49,7 +59,7 @@ test('fuzzy: the query in order ranks below prefix, substring and path matches, 
   assert.deepEqual(searchProjects(more, 'ora').map((p) => p.id), ['a'], 'or-a: orion-api, not the path fallback');
   assert.deepEqual(searchProjects(more, 'zq'), [], 'two characters do not match fuzzily');
   assert.equal(matchText('there-is-a-folder-called-something-quite-long', 'orion'), null, 'letters strewn across a long name');
-  assert.deepEqual(searchAgents(ships, 'cd1').map((s) => s.id), ['s3', 's2'], 'Codex-1 holds c, d and 1 closer');
+  assert.deepEqual(agentIds(searchAgents(ships, 'cd1')), ['s3', 's2'], 'Codex-1 holds c, d and 1 closer');
   assert.deepEqual(searchPlanets(projects, 'mgr').map((h) => h.planet), ['migrations']);
 });
 

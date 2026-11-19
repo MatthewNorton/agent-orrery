@@ -191,14 +191,6 @@
     rocky: 'Rocky world', gas: 'Gas giant', ice: 'Ice world', volcanic: 'Volcanic world', oceanic: 'Oceanic world',
   });
 
-  /** @param {number} kb @param {number} files */
-  function sizeText(kb, files) {
-    if (kb === 0) return files > 0 ? '< 1 KB' : '0 KB';
-    if (kb < 1024) return kb + ' KB';
-    const mb = kb / 1024;
-    return mb < 1024 ? mb.toFixed(1) + ' MB' : (mb / 1024).toFixed(1) + ' GB';
-  }
-
   /** What the globe is drawn as, and what the planet stands for. @param {PlanetData} pd @param {string} projectName */
   function planetLine(pd, projectName) {
     const world = WORLD_NAMES[AUR.worldProfile(S.current.projectId, pd.name).key] || 'World';
@@ -237,7 +229,7 @@
     body.append(
       AUR.el('div', 'plc-sub', planetLine(pd, project.name)),
       pcRow('FILES', counts ? counts.files : '—'),
-      pcRow('SIZE', counts ? sizeText(pd.sizeKb || 0, pd.files) + counts.more : '—'),
+      pcRow('SIZE', counts ? counts.size : '—'),
       pcRow('SUBFOLDERS', counts ? counts.subdirs : '—'),
       pcRow('FILE TYPES', types),
       AUR.el('div', 'plc-title', 'BUILDS (FILE EDITS)'),

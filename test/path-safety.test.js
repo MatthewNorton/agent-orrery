@@ -7,6 +7,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { isLocalProjectPath, canonicalProjectPath } = require('../src/main/provider-adapters');
 const { Tracker } = require('../src/main/tracker');
+const { runRenderer } = require('./support/renderer-source');
 
 test('isLocalProjectPath accepts drive-rooted and POSIX-rooted paths only', () => {
   for (const ok of ['C:\\Work\\proj', 'c:/work/proj', '/Users/coder/proj', '/']) {
@@ -190,6 +191,15 @@ test('relativeInside ignores case only under a Windows-style root and keeps the 
   assert.equal(relativeInside('/Work/Demo', '/work/demo/Docs/Guide.md'), null);
   assert.deepEqual(['C:\\Work', 'c:/work', 'relative\\dir', '/Work', null].map(ignoresCase),
     [true, true, true, false, false]);
+});
+
+test('the renderer copy of ignoresCase (util.js) agrees with the main process', () => {
+  const window = {};
+  runRenderer('util.js', { window });
+  for (const root of ['C:\\Work\\Demo', 'c:/work', 'Z:\\', 'relative\\dir', '\\\\server\\share', '/Work/Demo',
+    '/srv/odd\\name', 'C:', 'C:relative', '', null, undefined, 7]) {
+    assert.equal(window.AUR.ignoresCase(root), pathSafety.ignoresCase(root), String(root));
+  }
 });
 
 test('pathFlavor names drive-rooted and POSIX paths and rejects UNC and //host/share', () => {

@@ -3,6 +3,8 @@
 // app/panels/feed.js.
 'use strict';
 
+/** @import { PlanetData } from '../../types/contract' */
+
 (function () {
   const AUR = window.AUR;
   const A = AUR.app;
@@ -79,16 +81,24 @@
     return S.activeView && S.activeView.planetData ? S.activeView.planetData : null;
   };
 
+  /** @param {number} kb @param {number} files */
+  function sizeText(kb, files) {
+    if (kb === 0) return files > 0 ? '< 1 KB' : '0 KB';
+    if (kb < 1024) return kb + ' KB';
+    const mb = kb / 1024;
+    return mb < 1024 ? mb.toFixed(1) + ' MB' : (mb / 1024).toFixed(1) + ' GB';
+  }
+
   /**
-   * A planet's folder counts as the cards show them, or null where none were read: a procedural
-   * planet's numbers are invented (live/system-view.js) and history never reads the disk, so
-   * A.openPlanet marks what it fetched in LIVE. Where the read stopped short, files and size end in `+`.
-   * @returns {{ files: string, subdirs: string, more: string } | null}
+   * A planet's folder counts as the cards show them, or null where main read no folder (a
+   * procedural planet, or history). Where the read stopped short, files and size end in `+`.
+   * @param {PlanetData | null} pd
+   * @returns {{ files: string, size: string, subdirs: string } | null}
    */
   A.planetFolderCounts = function planetFolderCounts(pd) {
-    if (!pd || !pd.fromDisk) return null;
-    const more = pd.partial ? '+' : '';
-    return { files: pd.files + more, subdirs: String(pd.subdirs), more };
+    if (!pd || !pd.folderRead) return null;
+    const more = pd.folderRead === 'partial' ? '+' : '';
+    return { files: pd.files + more, size: sizeText(pd.sizeKb || 0, pd.files) + more, subdirs: String(pd.subdirs) };
   };
 
   A.onlineProjectCount = function onlineProjectCount() {

@@ -18,8 +18,8 @@ const { liveProject } = require('../universe/public-shape');
 
 const SYSTEM_CACHE_MS = 30000;
 // A planet's folder read: at most 600 files and 300 folders, five levels deep. Past any of those,
-// or at a folder it cannot read, its counts are floors and `partial` says so.
-const READ_FILES = 600, READ_FOLDERS = 300, READ_DEPTH = 4;
+// or at a folder it cannot read, its counts are floors and `folderRead` says 'partial'.
+const READ_FILES = 600, READ_FOLDERS = 300, READ_LEVELS = 5;
 const IGNORE_DIRS = new Set([
   'node_modules', '.git', '.next', '.venv', 'venv', 'dist', 'build', 'out',
   'release', 'coverage', 'target', '__pycache__', '.idea', '.vscode', 'bin', 'obj',
@@ -105,7 +105,7 @@ function getPlanet(model, projectId, planetName) {
         if (depth === 0) subdirs++;
         // '(root)' stands for the top-level files alone, so it reads no folder below them.
         if (root) continue;
-        if (depth < READ_DEPTH && files < READ_FILES) walk(path.join(d, e.name), depth + 1);
+        if (depth + 1 < READ_LEVELS && files < READ_FILES) walk(path.join(d, e.name), depth + 1);
         else partial = true;
       } else if (files >= READ_FILES) {
         partial = true;
@@ -120,7 +120,7 @@ function getPlanet(model, projectId, planetName) {
   };
   walk(dir, 0);
   const resources = [...exts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k]) => k);
-  return { ...base, files, sizeKb: Math.round(bytes / 1024), subdirs, resources, partial };
+  return { ...base, files, sizeKb: Math.round(bytes / 1024), subdirs, resources, folderRead: partial ? 'partial' : 'full' };
 }
 
 function isPlanetSegment(value) {

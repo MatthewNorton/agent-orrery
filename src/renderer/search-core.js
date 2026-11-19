@@ -91,6 +91,18 @@ function matchText(value, query) {
   return hit && { rank: FUZZY, score: hit.score, positions: hit.positions };
 }
 
+/**
+ * `name`'s match, unless that is only fuzzy and one of `others` holds the needle whole: then a
+ * FALLBACK match, which marks nothing in the name.
+ * @param {string} name @param {unknown[]} others @param {string} needle lower case
+ */
+function hitOf(name, others, needle) {
+  const hit = matchText(name, needle);
+  if (hit && hit.rank !== FUZZY) return hit;
+  const whole = others.some((other) => typeof other === 'string' && other.toLowerCase().includes(needle));
+  return whole ? { rank: FALLBACK, score: 0, positions: [] } : hit;
+}
+
 /** Rank, then (fuzzy) score, then `name`, then the given tie-breaks. */
 function byRank(a, b) {
   return a.rank - b.rank || b.score - a.score || a.name.localeCompare(b.name);
@@ -104,9 +116,7 @@ function searchProjects(projects, query, limit = 8) {
   for (const project of projects) {
     if (!project || typeof project !== 'object') continue;
     const name = typeof project.name === 'string' ? project.name : '';
-    const projectPath = typeof project.path === 'string' ? project.path : '';
-    let hit = matchText(name, needle);
-    if ((!hit || hit.rank === FUZZY) && projectPath.toLowerCase().includes(needle)) hit = { rank: FALLBACK, score: 0, positions: [] };
+    const hit = hitOf(name, [project.path], needle);
     if (hit) matches.push({ project, rank: hit.rank, score: hit.score, name: name.toLowerCase() });
   }
 
@@ -116,7 +126,10 @@ function searchProjects(projects, query, limit = 8) {
   return matches.slice(0, limitOf(limit, 8)).map((match) => match.project);
 }
 
-/** Agents by name, then by status; the ones that need you first within a rank. */
+/**
+ * Agents by name, then by status, as `{ ship, fuzzy }` (found only by a fuzzy match); the ones that
+ * need you first within a rank.
+ */
 function searchAgents(ships, query, limit = 6) {
   const needle = needleOf(query);
   if (!Array.isArray(ships) || !needle) return [];
@@ -124,18 +137,15 @@ function searchAgents(ships, query, limit = 6) {
   for (const ship of ships) {
     if (!ship || typeof ship !== 'object') continue;
     const name = typeof ship.name === 'string' ? ship.name : '';
-    let hit = matchText(name, needle);
-    if ((!hit || hit.rank === FUZZY) && typeof ship.status === 'string' && ship.status.toLowerCase().includes(needle)) {
-      hit = { rank: FALLBACK, score: 0, positions: [] };
-    }
+    const hit = hitOf(name, [ship.status], needle);
     if (hit) matches.push({ ship, rank: hit.rank, score: hit.score, attention: ship.attention ? 0 : 1, name: name.toLowerCase() });
   }
   matches.sort((a, b) => a.rank - b.rank || a.attention - b.attention || byRank(a, b) ||
     String(a.ship.id || '').localeCompare(String(b.ship.id || '')));
-  return matches.slice(0, limitOf(limit, 6)).map((match) => match.ship);
+  return matches.slice(0, limitOf(limit, 6)).map((match) => ({ ship: match.ship, fuzzy: match.rank === FUZZY }));
 }
 
-/** Planets (top-level folders with builds) across every project that lists them. */
+/** Planets (top-level folders with builds) across every project that lists them, as `{ project, planet, fuzzy }`. */
 function searchPlanets(projects, query, limit = 6) {
   const needle = needleOf(query);
   if (!Array.isArray(projects) || !needle) return [];
@@ -151,7 +161,8 @@ function searchPlanets(projects, query, limit = 6) {
   matches.sort((a, b) => byRank(a, b) ||
     String(a.project.name || '').localeCompare(String(b.project.name || '')) ||
     String(a.project.id || '').localeCompare(String(b.project.id || '')));
-  return matches.slice(0, limitOf(limit, 6)).map((match) => ({ project: match.project, planet: match.planet }));
+  return matches.slice(0, limitOf(limit, 6))
+    .map((match) => ({ project: match.project, planet: match.planet, fuzzy: match.rank === FUZZY }));
 }
 
 if (typeof window !== 'undefined') {
@@ -160,6 +171,5 @@ if (typeof window !== 'undefined') {
   window.AUR.searchAgents = searchAgents;
   window.AUR.searchPlanets = searchPlanets;
   window.AUR.matchText = matchText;
-  window.AUR.SEARCH_FUZZY = FUZZY;
 }
 if (typeof module !== 'undefined') module.exports = { searchProjects, searchAgents, searchPlanets, matchText, FUZZY };

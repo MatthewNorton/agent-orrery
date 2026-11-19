@@ -27,6 +27,10 @@
     };
   };
 
+  // ---- copy of src/main/path-safety.js ignoresCase (test/path-safety.test.js checks they agree) ----
+  // Under a Windows path main matches folder names in any case.
+  AUR.ignoresCase = (root) => typeof root === 'string' && (/^[a-z]:[\\/]/i.test(root) || root.includes('\\'));
+
   // ---- palettes / tokens ----
   AUR.STATUS_DOT = {
     Building: '#4da3ff',

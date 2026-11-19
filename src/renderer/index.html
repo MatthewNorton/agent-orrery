@@ -30,7 +30,7 @@
       <span class="brand-name">Agent Orrery</span>
       <span class="brand-badge">MULTI-PROVIDER</span>
     </div>
-    <div class="project-search" id="project-search">
+    <div class="project-search">
       <button class="settings-button search-button" id="search-button" type="button"
         aria-label="Go to a project, agent or folder" aria-haspopup="dialog"
         aria-controls="search-dialog" aria-expanded="false">
@@ -77,8 +77,9 @@
   <!-- The panels menu, filled by app/panels/menu.js when it opens -->
   <div class="panels-menu" id="panels-menu" role="menu" aria-label="Panels" hidden></div>
 
-  <!-- Go to: the search palette, from the search button, / or Ctrl K (app/project/search.js) -->
-  <dialog class="search-dialog" id="search-dialog" aria-label="Go to">
+  <!-- Go to: the search palette, from the search button, / or Ctrl K (app/project/search.js). Its
+       backdrop is see-through, so the map's labels stay up behind it (scene/universe/labels.js). -->
+  <dialog class="search-dialog" id="search-dialog" aria-label="Go to" data-see-through>
     <section class="search-palette">
       <div class="search-field">
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>

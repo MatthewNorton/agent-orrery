@@ -33,13 +33,12 @@
 
   /**
    * Whether a build's folder is the planet's: under a Windows path main counts a folder's casings as
-   * one bucket (build-buckets.js and path-safety.js ignoresCase), so the comparison folds case there too.
+   * one bucket (build-buckets.js), so the comparison folds case there too.
    * @param {{ path?: string | null } | undefined} project @param {string} bucket @param {string} planet
    */
   function sameBucket(project, bucket, planet) {
     if (bucket === planet) return true;
-    const root = String((project && project.path) || '');
-    return (/^[a-z]:[\\/]/i.test(root) || root.includes('\\')) && String(bucket).toLowerCase() === String(planet).toLowerCase();
+    return AUR.ignoresCase(project && project.path) && String(bucket).toLowerCase() === String(planet).toLowerCase();
   }
 
   /** @param {AUEvent} ev */

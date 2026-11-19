@@ -11,6 +11,8 @@
   if (!A) throw new Error('app/state.js must load before app/project/search.js');
   const S = A.state;
   const LABEL = 'Go to a project, agent or folder';
+  /** @type {HTMLElement | null} what had focus before the palette opened; a pick clears it */
+  let opener = null;
 
   /** `ranked` first, then the rest of `matches`, sorted by `compareRest` when given. */
   A.rankedFirst = function rankedFirst(matches, ranked, compareRest) {
@@ -76,8 +78,7 @@
     if (!els.dialog.open) {
       A.closeProjectDirectory(false);
       const active = document.activeElement;
-      S.projectSearch.opener = active instanceof HTMLElement && active !== document.body ? active : null;
-      S.projectSearch.open = true;
+      opener = active instanceof HTMLElement && active !== document.body ? active : null;
       els.dialog.showModal();
       els.button.setAttribute('aria-expanded', 'true');
       renderProjectVcsFilter();
@@ -88,6 +89,7 @@
 
   /** Clears the query and closes the palette: Escape, a click outside, a pick, a view switch. */
   A.clearProjectSearch = function clearProjectSearch() {
+    // At once, not on the close event: a view switch reads the field straight after.
     resetQuery();
     const dialog = S.projectSearch.els && S.projectSearch.els.dialog;
     if (dialog && dialog.open) dialog.close();
@@ -106,15 +108,15 @@
     A.syncProjectMatches();
   }
 
-  // However it closed, focus goes back where it was, unless a pick has moved on.
+  // However it closed (Escape on a clicked row closes it natively), the query goes and focus goes
+  // back where it was, unless a pick has moved on.
   function finishClose() {
     const els = S.projectSearch.els;
-    S.projectSearch.open = false;
-    resetQuery();
+    if (els.input.value || S.projectSearch.query) resetQuery();
     els.button.setAttribute('aria-expanded', 'false');
-    const opener = S.projectSearch.opener;
-    S.projectSearch.opener = null;
-    if (opener && opener.isConnected && opener.getClientRects().length > 0) opener.focus();
+    const back = opener;
+    opener = null;
+    if (back && back.isConnected && back.getClientRects().length > 0) back.focus();
   }
 
   function renderProjectVcsFilter() {
@@ -142,46 +144,31 @@
 
   const underFilter = (projects) => VCS.filterProjects(projects, { filter: S.projectSearch.filter });
 
-  // The palette's projects for a query: name, path and fuzzy ranks (search-core.js), with the
-  // projects whose repository or branch holds the query after the sure ranks and before the fuzzy.
-  function findProjects(projects, query) {
-    const filtered = underFilter(projects);
-    if (!query) return filtered;
-    const ranked = AUR.searchProjects(filtered, query, Math.max(filtered.length, 1));
-    const rankedIds = new Set(ranked.map((project) => project.id));
-    const sure = new Set(VCS.filterProjects(filtered, { query }).map((project) => project.id));
+  // The palette's projects for a query, as `{ project, fuzzy }`: name, path and fuzzy ranks
+  // (search-core.js), with the projects whose repository or branch holds the query after the sure
+  // ranks and before the ones only a fuzzy match found.
+  function findProjects(visible, query) {
+    const sure = VCS.filterProjects(visible, { query });
+    const sureIds = new Set(sure.map((project) => project.id));
+    const ranked = AUR.searchProjects(visible, query, Math.max(visible.length, 1));
     return [
-      ...ranked.filter((project) => sure.has(project.id)),
-      ...filtered.filter((project) => sure.has(project.id) && !rankedIds.has(project.id)).sort(A.byProjectName),
-      ...ranked.filter((project) => !sure.has(project.id)),
+      ...A.rankedFirst(sure, ranked.filter((project) => sureIds.has(project.id)), A.byProjectName)
+        .map((project) => ({ project, fuzzy: false })),
+      ...ranked.filter((project) => !sureIds.has(project.id)).map((project) => ({ project, fuzzy: true })),
     ];
   }
 
   /**
-   * Brightens the matching systems on the view's map. With no query given, the palette's own
-   * matches; the directory gives its query, matched on name, path, branch and repository.
-   * @param {any[]} [projects] @param {string} [query]
+   * Brightens `found`'s systems on the view's map; with none given, the projects under the GitHub
+   * filter, or no system singled out while it shows all.
+   * @param {any[]} [found]
    */
-  A.syncProjectMatches = function syncProjectMatches(projects, query) {
+  A.syncProjectMatches = function syncProjectMatches(found) {
     if (!S.activeView) return;
-    const palette = query == null;
-    const needle = palette && S.projectSearch.els ? S.projectSearch.els.input.value.trim() : String(query || '').trim();
-    if (!needle && S.projectSearch.filter === VCS.FILTERS.ALL) {
-      S.activeView.setSearchMatches(null);
-      return;
-    }
-    const source = projects || [...S.store.projects.values()];
-    const found = palette ? findProjects(source, needle)
-      : VCS.filterProjects(source, { filter: S.projectSearch.filter, query: needle });
-    S.activeView.setSearchMatches(new Set(found.map((project) => project.id)));
+    const projects = found ||
+      (S.projectSearch.filter === VCS.FILTERS.ALL ? null : underFilter([...S.store.projects.values()]));
+    S.activeView.setSearchMatches(projects && new Set(projects.map((project) => project.id)));
   };
-
-  function onlyFuzzy(entry, query) {
-    if (entry.kind === 'project') return !VCS.matchesSearch(entry.project, query);
-    const hit = AUR.matchText(entry.kind === 'agent' ? entry.ship.name : entry.planet, query);
-    const status = entry.kind === 'agent' && String(entry.ship.status || '').toLowerCase().includes(query.toLowerCase());
-    return Boolean(hit && hit.rank === AUR.SEARCH_FUZZY && !status);
-  }
 
   function updateProjectSearch() {
     const els = S.projectSearch.els;
@@ -199,20 +186,21 @@
       return;
     }
 
-    const projects = [...S.store.projects.values()];
-    const shown = new Set(underFilter(projects).map((project) => project.id));
-    const projectEntries = findProjects(projects, query).slice(0, 6)
-      .map((project) => ({ kind: 'project', key: 'p:' + project.id, project }));
-    const agentEntries = AUR.searchAgents([...S.store.ships.values()].filter((ship) => shown.has(ship.project)), query, 4)
-      .map((ship) => ({ kind: 'agent', key: 'a:' + ship.id, ship }));
-    const planetEntries = AUR.searchPlanets(underFilter(projects), query, 4)
-      .map((hit) => ({ kind: 'planet', key: 'f:' + hit.project.id + '/' + hit.planet, project: hit.project, planet: hit.planet }));
-    // Rows found only fuzzily go after every row found otherwise; the sort keeps the kinds' order.
-    S.projectSearch.results = [...projectEntries, ...agentEntries, ...planetEntries]
-      .sort((a, b) => Number(onlyFuzzy(a, query)) - Number(onlyFuzzy(b, query))).slice(0, 10);
+    const visible = underFilter([...S.store.projects.values()]);
+    const shown = new Set(visible.map((project) => project.id));
+    const found = findProjects(visible, query);
+    const rows = [
+      ...found.slice(0, 6).map(({ project, fuzzy }) => ({ kind: 'project', key: 'p:' + project.id, project, fuzzy })),
+      ...AUR.searchAgents([...S.store.ships.values()].filter((ship) => shown.has(ship.project)), query, 4)
+        .map(({ ship, fuzzy }) => ({ kind: 'agent', key: 'a:' + ship.id, ship, fuzzy })),
+      ...AUR.searchPlanets(visible, query, 4)
+        .map(({ project, planet, fuzzy }) => ({ kind: 'planet', key: 'f:' + project.id + '/' + planet, project, planet, fuzzy })),
+    ];
+    // Rows found only fuzzily go after every row found otherwise, each part in the kinds' order.
+    S.projectSearch.results = [...rows.filter((row) => !row.fuzzy), ...rows.filter((row) => row.fuzzy)].slice(0, 10);
     A.keepSelection(S.projectSearch, previous, queryChanged, (entry) => entry.key);
     renderProjectSearchResults();
-    A.syncProjectMatches(projects);
+    A.syncProjectMatches(found.map((hit) => hit.project));
     renderProjectVcsFilter();
   }
 
@@ -253,7 +241,7 @@
   function activateProjectSearchResult(index) {
     const entry = S.projectSearch.results[index] || S.projectSearch.results[0];
     if (!entry) return;
-    S.projectSearch.opener = null;
+    opener = null; // the pick moves on, and focus with it
     A.clearProjectSearch();
     if (entry.kind === 'agent') A.enterAgentFocus(entry.ship.id);
     else if (entry.kind === 'planet') A.openPlanet(entry.project.id, entry.planet);

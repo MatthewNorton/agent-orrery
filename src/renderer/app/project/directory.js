@@ -109,7 +109,7 @@
     }
     A.keepSelection(S.projectDirectory, previous, queryChanged, (project) => project.id);
     A.renderProjectDirectory();
-    A.syncProjectMatches(allProjects, query);
+    A.syncProjectMatches(query ? S.projectDirectory.results : undefined);
   }
 
   A.refreshProjectDirectoryFromStore = function refreshProjectDirectoryFromStore() {

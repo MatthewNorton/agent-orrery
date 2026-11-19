@@ -196,8 +196,9 @@ SystemData = { project: Project, planets: Planet[], beltDensity: number }
 Planet     = { name, files, builds, procedural? }   // name '(root)' possible
 
 PlanetData = { name, project: Project, builds, files, sizeKb, subdirs,
-               resources: string[], procedural?, partial? }   // resources = top file exts;
-                                                    // partial: the folder read stopped short
+               resources: string[], procedural?, folderRead? }   // resources = top file exts;
+                                  // folderRead: live only, 'full' or 'partial' (the read stopped short);
+                                  // absent when no folder was read (procedural, or history)
 ```
 
 Event batch entries (from `AU.onEvents`):
@@ -553,10 +554,11 @@ card's solar-system totals (the view carries it as `systemData`; when it fails, 
      Rocky world, Gas giant, Ice world, Volcanic world, Oceanic world) and what the planet stands
      for (`a folder in <project>`, `the top-level files of <project>` for `(root)`, or `no folder on
      disk` when `procedural`); rows `FILES`, `SIZE` (KB, MB or GB), `SUBFOLDERS`, `FILE TYPES` (top
-     extensions, `MISC` shown as `other`), each `—` when `procedural` (those numbers are
-     invented) or fetched in REPLAY (history never reads the disk; `A.planetFolderCounts`);
-     `FILES` and `SIZE` end in `+` when the folder read stopped short (`partial`: 600 files, 300
-     folders, five levels, or a folder it could not read); then `BUILDS (FILE EDITS)`:
+     extensions, `MISC` shown as `other`), each `—` where main read no folder (`folderRead`
+     absent: a `procedural` planet's numbers are invented, and in REPLAY history never reads the
+     disk; `A.planetFolderCounts`); `FILES` and `SIZE` end in `+` when the read stopped short
+     (`folderRead: 'partial'`: 600 files, 300 folders, five levels, or a folder it could not
+     read); then `BUILDS (FILE EDITS)`:
      `THIS PLANET`, `WHOLE SOLAR SYSTEM` (the project's `totalBuilds`) and a bar of the planet's
      share; then `SOLAR SYSTEM`: `PLANETS` (the planets the system view draws, at most 8, from
      `systemData`) and `AGENTS`. A `build` event on the open planet raises its count in place,
