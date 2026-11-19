@@ -352,8 +352,8 @@ Design tokens (put in `:root`):
   it (so focus mode can fade ships one by one; a hull material carries no
   transparency mode, because with one set Babylon ignores a mesh's visibility);
   a view steps down to the dart past its hull triangle budget: 900k in a
-  system or planet view, which holds fifty ships of the first rank, and 1.25M
-  on the universe map, whose hulls are instances, which holds seventy. Ship size is one policy (`AUR.SHIP_SIZE` per
+  system or planet view, which holds fifty-one ships of the first rank, and
+  1.24M on the universe map, whose hulls are instances, which holds seventy. Ship size is one policy (`AUR.SHIP_SIZE` per
   view, `AUR.fitShip` with a pixel floor so a hull sized to its planets still
   reads from the default orbit). `AUR.ships.refresh(scene, ship)` swaps the hull
   inside the asset root the scene already holds; `app/boot.js` calls it after

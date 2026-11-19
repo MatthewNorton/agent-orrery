@@ -13,13 +13,10 @@
   };
 
   // Babylon ignores a mesh's visibility while its material has a transparency mode set, and focus
-  // mode fades ships by visibility: an opaque or cut-out material gives the mode up (without one, a
-  // cut-out still tests against its texture's alpha).
+  // mode fades ships by visibility: an opaque material gives the mode up. A cut-out keeps its own:
+  // without it Babylon stops alpha-testing a faded mesh, which would fill its holes (no hull has one).
   AUR.fadeWithMesh = function (material) {
-    const { MATERIAL_OPAQUE, MATERIAL_ALPHATEST } = BABYLON.Material;
-    if (material.transparencyMode === MATERIAL_OPAQUE || material.transparencyMode === MATERIAL_ALPHATEST) {
-      material.transparencyMode = null;
-    }
+    if (material.transparencyMode === BABYLON.Material.MATERIAL_OPAQUE) material.transparencyMode = null;
   };
 
   // A light that reaches only the meshes carrying a layer bit.

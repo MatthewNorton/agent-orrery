@@ -559,7 +559,7 @@ test('the universe map has a hull budget of its own, above a near view\'s', asyn
     return count;
   };
   assert.equal(await hulled('system'), 3, '900k triangles');
-  assert.equal(await hulled('universe'), 4, '1.25M triangles: its hulls are instances');
+  assert.equal(await hulled('universe'), 4, '1.24M triangles: its hulls are instances');
 });
 
 test('a fleet hull keeps its baked tones and glass, and its trim lights and nozzles emit the ship color', async () => {

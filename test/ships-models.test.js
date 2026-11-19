@@ -192,7 +192,7 @@ test('the nozzles sit at the stern in the fleet frame', () => {
   assert.ok(port.radius > 0.02 && port.radius < 0.05);
 });
 
-test('an opaque or cut-out material fades with its mesh once it gives its transparency mode up', () => onNullScene(BABYLON, (scene) => {
+test('an opaque material fades with its mesh once it gives its transparency mode up; a cut-out keeps its own', () => onNullScene(BABYLON, (scene) => {
   const AUR = load();
   const mesh = new BABYLON.Mesh('hull', scene);
   const made = (name, mode) => Object.assign(new BABYLON.PBRMaterial(name, scene), { transparencyMode: mode });
@@ -200,15 +200,15 @@ test('an opaque or cut-out material fades with its mesh once it gives its transp
   const cutOut = made('cut-out', BABYLON.Material.MATERIAL_ALPHATEST);
   cutOut.albedoTexture = Object.assign(new BABYLON.Texture(null, scene), { hasAlpha: true });
   mesh.visibility = 0.16;
-  for (const material of [opaque, cutOut]) {
-    assert.equal(material.needAlphaBlendingForMesh(mesh), false, material.name + ': with a mode set, Babylon ignores visibility');
-    AUR.fadeWithMesh(material);
-    assert.equal(material.needAlphaBlendingForMesh(mesh), true, material.name + ' fades');
-    mesh.visibility = 1;
-    assert.equal(material.needAlphaBlendingForMesh(mesh), false, material.name + ' is solid at full visibility');
-    mesh.visibility = 0.16;
-  }
-  assert.equal(cutOut.needAlphaTesting(), true, 'a cut-out still tests against its texture');
-  AUR.fadeWithMesh(glass);
+  assert.equal(opaque.needAlphaBlendingForMesh(mesh), false, 'with a mode set, Babylon ignores visibility');
+  for (const material of [opaque, cutOut, glass]) AUR.fadeWithMesh(material);
+  assert.equal(opaque.needAlphaBlendingForMesh(mesh), true, 'it fades');
+  mesh.visibility = 1;
+  assert.equal(opaque.needAlphaBlendingForMesh(mesh), false, 'and is solid at full visibility');
   assert.equal(glass.transparencyMode, BABYLON.Material.MATERIAL_ALPHABLEND, 'a blended material keeps its mode');
+  // Without its mode a faded cut-out would blend and no longer be tested: its holes would fill.
+  assert.equal(cutOut.transparencyMode, BABYLON.Material.MATERIAL_ALPHATEST);
+  mesh.visibility = 0.16;
+  cutOut.transparencyMode = null;
+  assert.deepEqual([cutOut.needAlphaBlendingForMesh(mesh), cutOut.needAlphaTestingForMesh(mesh)], [true, false]);
 }));

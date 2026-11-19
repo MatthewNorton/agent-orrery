@@ -158,7 +158,9 @@
       const copy = copyMaterial(base, base.name + ' ' + palette);
       if (typeof role !== 'number') {
         // The map times the emissive color is what shows: with the painted color divided out, that
-        // is the ship color, at the level the model lights its lamps to.
+        // is the ship color, at the level the model lights its lamps to. (The glow pass reads the
+        // map without linearizing it, so a lamp's halo is a paler tint; on Petrel's hairline
+        // lamps no halo shows, even with the chase camera at its closest.)
         const painted = AUR.color3(role.lamps).toLinearSpace();
         const shown = tint.toLinearSpace();
         copy.emissiveColor = base.emissiveColor.multiply(new BABYLON.Color3(

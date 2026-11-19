@@ -21,8 +21,8 @@ entry in that pull request.
   hulls a dozen pixels long. Hulls still arrive sooner than the GLB they replaced (about 200 ms
   after a system opens against about 340 ms), but for those six or more frames nothing
   else draws.
-- **Where.** `container` in `src/renderer/ships/models.js:65`, called per scene by
-  `ensureContainer` in `src/renderer/ship-assets.js:197`. The work is inside the generated
+- **Where.** `container` in `src/renderer/ships/models.js:70`, called per scene by
+  `ensureContainer` in `src/renderer/ship-assets.js:198`. The work is inside the generated
   modules: `createSurfaces` in `src/renderer/ships/petrel/source/surfaces.js:147` paints the
   canvases and `createInspectionProbe` in `src/renderer/ships/petrel/source/light-probe.js:38`
   fills the cube faces.
@@ -41,13 +41,13 @@ entry in that pull request.
 
 - **What.** In the system and planet views every ship of a model is its own mesh with a sub-mesh
   per finish: Petrel is 24 draws per ship, and the glow pass draws them again. A system with
-  fifty Petrels took about 14 ms a frame on an integrated GPU, which is why the hull budget stops
-  there and later ships stay darts; before ship models the budget held seventy ships of the first
-  rank. The universe map instances one template per provider, draws its ships in 24 draws per
+  fifty-one Petrels took about 14 ms a frame on an integrated GPU, which is why the hull budget
+  stops there and later ships stay darts; before ship models the budget held seventy ships of the
+  first rank. The universe map instances one template per provider, draws its ships in 24 draws per
   provider and has its own budget (seventy ships of the first rank, about 4 ms). The budget
   itself counts triangles (`TRIANGLE_BUDGET`, 900k in these views), though what
   it guards is CPU time per ship and per draw. The number fits the hulls that fly today: it admits
-  fifty Petrels (24 draws each, measured), or 92 of the smallest later-rank hull file (9.7k
+  fifty-one Petrels (24 draws each, measured), or 92 of the smallest later-rank hull file (9.7k
   triangles in 6 draws), which by the 0.13 ms a ship the old Scout file measured comes to about
   the same frame; that second case is an estimate, not a measurement. It has to be set again for
   each model that takes a rank.
@@ -56,12 +56,12 @@ entry in that pull request.
   (`:210`). The copy exists because focus mode fades the other ships by mesh visibility
   (`applyShipFocusVisual` in `src/renderer/scene/system/focus.js:45`), and an instance shares
   its source's visibility. The budget is `TRIANGLE_BUDGET` and `fitsBudget` in
-  `src/renderer/ship-assets.js:49` and `:230`.
+  `src/renderer/ship-assets.js:50` and `:231`.
 - **Why not in the pull request that added ship models.** Instancing in those views changes how
   focus mode fades and restores a ship (a second, faded template per provider that a ship's
   instance moves to, in place of a visibility set on its meshes), which reaches the system view's
   focus code, the planet view and `AUR.ships.refresh`, which waits while a ship is faded.
-- **How to verify.** In a system with fifty ships of one provider the hulls take about 50 draws
+- **How to verify.** In a system with fifty-one ships of one provider the hulls take about 50 draws
   in total, not about 2,500 (`BABYLON.SceneInstrumentation`, `drawCallsCounter`). Following one
   ship still fades the others to 0.16 and hides the followed one from inside, leaving focus
   restores every ship, and a ship promoted while faded takes its new hull once focus ends. Once
