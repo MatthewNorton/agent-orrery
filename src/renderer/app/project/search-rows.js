@@ -104,13 +104,12 @@
     const lines = new Map();
     for (const group of grouped(projects, (project) => String(A.projectLabel(project)))) {
       const paths = group.map((project) => String(project.path || ''));
-      const apart = group.length > 1 ? tailsApart(paths) : [];
+      const apart = group.length > 1 ? tailsApart(paths) : null;
       group.forEach((project, i) => {
         const vcs = VCS.normalize(project);
         const rest = [A.projectGalaxyLabel(project), vcs.nameWithOwner, vcs.branch];
-        const cut = tailStart(paths[i], apart[i] || 0);
-        const detail = group.length > 1 && paths[i]
-          ? [(cut > 0 ? '…' : '') + paths[i].slice(cut), ...rest] : [...rest, paths[i]];
+        const cut = apart ? tailStart(paths[i], apart[i]) : 0;
+        const detail = apart && paths[i] ? [(cut > 0 ? '…' : '') + paths[i].slice(cut), ...rest] : [...rest, paths[i]];
         lines.set(project.id, detail.filter(Boolean).map(String).join(' · '));
       });
     }

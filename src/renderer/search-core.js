@@ -216,6 +216,7 @@
 
   if (typeof window !== 'undefined') {
     window.AUR = window.AUR || {};
+    window.AUR.lowerOf = lowerOf;
     window.AUR.rankProjects = rankProjects;
     window.AUR.searchAgents = searchAgents;
     window.AUR.searchPlanets = searchPlanets;

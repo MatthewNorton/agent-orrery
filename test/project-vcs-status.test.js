@@ -110,11 +110,6 @@ test('search matches a real name and branch, never the placeholder label of a pr
 });
 
 test('search folds case letter by letter, as the app\'s own search does (search-core.js lowerOf)', () => {
-  const { lowerOf } = require('../src/renderer/search-core');
-  for (const value of ['Orion-API', 'İzmir-tools', 'İ-Οδυσσέας', 'ΟΔΥΣ', 'λόγος', 'ǅ', 'ß', 'straße', '', 'a\u0307b', 'İİ', 'ΣΑΣ']) {
-    assert.equal(statusUi.foldCase(value), lowerOf(value), value);
-  }
-  assert.equal(statusUi.foldCase(null), '');
   const izmir = { id: 'i', name: 'İzmir-tools', path: 'C:\\work\\izmir' };
   const greek = { id: 'g', name: 'Οδυσσέας', path: 'C:\\work\\greek' };
   assert.equal(statusUi.matchesSearch(izmir, 'izmir-t'), true, 'a plain i finds İ');

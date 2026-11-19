@@ -7,13 +7,15 @@
 'use strict';
 
 (function exposeProjectVcsStatus(root, factory) {
-  const api = factory();
-  if (typeof module === 'object' && module.exports) module.exports = api;
+  const node = typeof module === 'object' && module.exports;
+  // Search folds case as the app's own search does: search-core.js, loaded first in a page.
+  const api = factory(node ? require('../search-core').lowerOf : root.AUR.lowerOf);
+  if (node) module.exports = api;
   if (root) {
     const AUR = (root.AUR = root.AUR || {});
     AUR.ProjectVcsStatus = api;
   }
-})(typeof window !== 'undefined' ? window : null, function createProjectVcsStatusApi() {
+})(typeof window !== 'undefined' ? window : null, function createProjectVcsStatusApi(lowerOf) {
   const FILTERS = Object.freeze({
     ALL: 'all',
     GITHUB: 'github',
@@ -86,18 +88,6 @@
     return true;
   }
 
-  // Lower case letter by letter, so 'izmir' finds 'İzmir' and 'ΟΔΥΣ' finds 'Οδυσσέας': a copy of
-  // search-core.js lowerOf, which the app's search uses (test/project-vcs-status.test.js checks they agree).
-  function foldCase(value) {
-    const raw = typeof value === 'string' ? value : '';
-    const low = raw.toLowerCase();
-    const kept = low.length === raw.length ? low : Array.from(raw, (ch) => {
-      const one = ch.toLowerCase();
-      return one.length === ch.length ? one : one.length > ch.length ? one.slice(0, ch.length) : ch;
-    }).join('');
-    return kept.replace(/ς/g, 'σ');
-  }
-
   // What search reads of a project besides its name: path, branch and repository, real values only.
   // The "Branch unavailable" and "Detached HEAD" labels would match every project without a branch.
   function otherSearchTexts(input) {
@@ -112,8 +102,8 @@
   }
 
   function matchesSearch(input, query) {
-    const needle = foldCase(text(query));
-    return !needle || foldCase(searchTexts(input).join('\n')).includes(needle);
+    const needle = lowerOf(text(query));
+    return !needle || lowerOf(searchTexts(input).join('\n')).includes(needle);
   }
 
   function filterProjects(projects, options) {
@@ -274,7 +264,6 @@
     matchesSearch,
     searchTexts,
     otherSearchTexts,
-    foldCase,
     filterProjects,
     pullRequestLabel,
     createMarkers,

@@ -88,8 +88,8 @@
 .history-scrubber:disabled { opacity: 0.38; cursor: default; }
 
 /* The dock of a window 1280 px wide or less at 100% text, or as narrow at a larger text size: its
-   content box is measured (1280 less the margins, the padding and two borders of up to 1 px), so
-   the text size counts, which a media query on the window would not. */
+   content box is measured, so the text size counts, which a media query on the window would not.
+   1243 is the first whole px over 1280 - 24 (side margins) - 12 (padding) - 1.6 (borders that snap to 0.8 px) = 1242.4. */
 @container (width < 1243px) {
   .history-bar > * + * { margin-left: 0; }
   .history-range-labels span { display: none; }
