@@ -51,13 +51,19 @@
       return true;
     }
 
-    // The chrome over the map, as boxes, for the one frame `overlay` is laid out in. A modal dialog
-    // makes the page behind it inert, and a hit test skips what is inert, so behind one the chrome
-    // is found the way a hit test would find it: every element that takes the pointer, by its box.
-    let chromeUnder = { overlay: null, frame: -1, boxes: [] };
+    // The chrome over the map, as boxes, behind `overlay`. A modal dialog makes the page behind it
+    // inert, and a hit test skips what is inert, so behind one the chrome is found the way a hit
+    // test would find it: every element that takes the pointer, by its box. The walk is kept until
+    // the overlay opens or closes or the window changes size, and CHROME_BOXES_MS at most, since a
+    // panel behind the overlay can still grow.
+    const CHROME_BOXES_MS = 300;
+    const NO_CHROME = { overlay: null, width: 0, height: 0, at: 0, boxes: [] };
+    let chromeUnder = NO_CHROME;
     function chromeBoxes(overlay) {
-      const frame = scene.getFrameId();
-      if (chromeUnder.overlay === overlay && chromeUnder.frame === frame) return chromeUnder.boxes;
+      const { innerWidth: width, innerHeight: height } = window;
+      const at = performance.now();
+      if (chromeUnder.overlay === overlay && chromeUnder.width === width && chromeUnder.height === height &&
+        at - chromeUnder.at < CHROME_BOXES_MS) return chromeUnder.boxes;
       const boxes = [];
       const collect = (el) => {
         if (el === canvas || el === overlay) return;
@@ -68,9 +74,14 @@
         else for (const child of el.children) collect(child);
       };
       for (const child of document.body.children) collect(child);
-      chromeUnder = { overlay, frame, boxes };
+      chromeUnder = { overlay, width, height, at, boxes };
       return boxes;
     }
+    // An overlay that opens or closes changes where a label may sit.
+    const overlays = [...document.querySelectorAll('dialog[data-see-through]')];
+    const overlayToggled = () => { chromeUnder = NO_CHROME; markLabelLayoutDirty(); };
+    for (const overlay of overlays) overlay.addEventListener('toggle', overlayToggled);
+    scene.onDisposeObservable.add(() => { for (const overlay of overlays) overlay.removeEventListener('toggle', overlayToggled); });
 
     // An overlay marked data-see-through (the Go to palette's light backdrop) hides none of the map;
     // the chrome behind it still does.
