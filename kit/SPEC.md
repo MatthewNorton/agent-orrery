@@ -65,7 +65,7 @@ loaders), then:
 
 View contract: each `scene/<view>/view.js` registers
 `AUR.views.<name> = (engine, data, ctx) => ({ scene, update(eventBatch), dispose() })`
-where `ctx` provides `openSystem(projectId)`, `openPlanet(projectId, name)`, the
+where `ctx` provides `openSystem(projectId)`, `openPlanet(projectId, name, system?)`, the
 shared `store`, the graphics `quality` tier, the `galaxyFields` cache and `worldMaps`, the generated
 planet maps (`worlds/textures.js`: a view opens an epoch on its scene and requests maps in it; disposing the scene closes the epoch),
 and the Settings `skyLook` and `orbitRings` (§4).
@@ -80,8 +80,8 @@ environment re-seats it) or one of the first-person rooms, each a `camera: 'room
 the scene gets it, and the view spends it on the chase camera's orbit or, in a room, ignores it.
 Three more members are optional and have no default: the `planetData` field, read through
 `A.activePlanetData()`, and the `systemData` field and `clearShipFocus()` method, which
-`app/agent-focus.js` checks for before using them. The system view and the planet view both carry
-`systemData` (the planet view's is its planet's system, for the planet card).
+`app/agent-focus.js` checks for before using them. The system view carries `systemData`, its
+system as it stands, and hands it to a planet it opens.
 
 ## 3. The `window.AU` bridge (matches `src/preload.js`)
 
@@ -195,9 +195,12 @@ FeedEntry = { kind, text, project, ts }
 SystemData = { project: Project, planets: Planet[], beltDensity: number, planetTotal? }
 // planets: the project's biggest, at most 8, which the system view draws; planetTotal: how many
 //   it has, present only when that is more
-Planet     = { name, files, builds, procedural? }   // name '(root)' possible
+Planet     = { name, key, files, builds, procedural? }   // name '(root)' possible
+// key: which planet this is, decided by main (`planetKey` in `src/main/build-buckets.js`): one
+//   key for every casing main counts as the folder. A Planet, a PlanetData and a `build` event
+//   are of one planet when their keys are equal; the renderer compares them and never reads them.
 
-PlanetData = { name, project: Project, builds, files, sizeKb, subdirs,
+PlanetData = { name, key, project: Project, builds, files, sizeKb, subdirs,
                resources: string[], procedural?, folderRead? }   // resources = top file exts;
 // name: the planet as the system view draws it, which seeds its globe: live, the folder as the
 //   disk spells it; in history, its bucket's key. Under a Windows path it can differ in case from
@@ -218,10 +221,11 @@ Event batch entries (from `AU.onEvents`):
 { type: 'ship-spawned',   ship }
 { type: 'ship-updated',   ship }           // status/detail changed
 { type: 'ship-departed',  shipId, ts }
-{ type: 'build', project, bucket, file, shipId, isNew, ts }
+{ type: 'build', project, bucket, key, file, shipId, isNew, ts }
    // project is the ID string; bucket = the edit's top-level folder as the edit wrote it, or
    // '(root)'; isNew => planet formation. Under a Windows path main keeps one bucket for a
-   // folder's casings, so the renderer matches a bucket to a planet with `AUR.folderKey`.
+   // folder's casings, so the planet is found by `key` (the Planet's and PlanetData's), not by
+   // the bucket's spelling.
 { type: 'activity', project, shipId, tool, status, detail, ts }
 { type: 'feed', entry: FeedEntry }
 ```
@@ -272,10 +276,12 @@ Design tokens (put in `:root`):
   path; the path's last two folders stay, or as many as tell it from a result of the same name (a
   folder of a project at a drive or filesystem root reads `D:\src`, with one separator).
   Arrows, Enter and click pick a result through the existing guarded routes. The arrows move the
-  selection on the rows as they stand, and a refresh from the store keeps the element of every row
-  whose entry stays in its place (`A.renderListbox`), so a click that is under way still lands and
-  the list stays scrolled where it was; PROJECTS shares both. While an input method composes text,
-  Enter, Escape and the arrows are its own. Escape, a click
+  selection on the rows as they stand, and a refresh from the store keeps the elements of every
+  row whose entry is still listed, also when a row comes in or goes above it (`A.renderListbox`),
+  and the list stays scrolled where it was. A click opens the entry that was pressed
+  (`A.wireListbox`): when the rows moved under a pointer that stayed put, the release lands on
+  another row and the pressed entry still opens. PROJECTS shares all of it. While an input method
+  composes text (`AUR.composing`), Enter, Escape and the arrows are its own. Escape, a click
   outside (pressed and released outside the dialog's own box with the main button, so a drag out
   of the field selecting text keeps it; Settings follows the same rule, `AUR.closeOnBackdrop`), a
   pick or a view switch closes the palette and clears the query; focus goes back where it was,
@@ -475,7 +481,8 @@ Design tokens (put in `:root`):
   ordinary online/idle/derelict appearance. Behind the backdrop a label still
   keeps clear of the chrome, as it does with the palette shut, and of the
   palette's own box: a hit test skips the page a modal dialog makes inert, so
-  `scene/universe/labels.js` tests the boxes of the elements that take the pointer.
+  `scene/universe/labels.js` tests the boxes of the elements that take the pointer (measured
+  when the dialog opens or closes or the window changes size, and again every 300 ms it stays open).
 - Ships: every live ship = its hull (a dart until it loads) cruising outside
   its project's glyph rings (slow orbit, gentle bob), instanced per provider.
   Drones smaller. On `ship-spawned`: warp-in grow; `ship-departed`: removed.
@@ -533,8 +540,8 @@ Data: `AU.getSystem(projectId)`.
   belt; on `build` → `flyto` (`AUR.MOTION.flyToSeconds`, arcing over the belt
   and the largest planet) to a standoff beside the `bucket` planet → `hold`
   (~2.4s, a thin emissive beam, planet pulses 1 → 1.15 → 1) → `return` to the
-  ring (`AUR.MOTION.returnSeconds`). The `bucket` planet is the one of that folder, in any
-  casing under a Windows path (`AUR.folderKey`). On `build` with `isNew: true` and no
+  ring (`AUR.MOTION.returnSeconds`). The `bucket` planet is the one whose `key` the build
+  carries. On `build` with `isNew: true` and no
   such planet: re-fetch `AU.getSystem` (the view's `systemData` follows), grow the new
   planet in from zero, feed shows planet formation.
   On `activity`: brief thruster flash.
@@ -577,10 +584,11 @@ Data: `AU.getSystem(projectId)`.
 ## 7. Planet view (`1.planet-view.png`)
 
 Data: `AU.getPlanet(projectId, name)`, and the project's system alongside it for the planet
-card's solar-system totals: the open view's own `systemData` when it holds this project's from
-this stream and no reset has come since, else `AU.getSystem(projectId)` (`A.systemForPlanet`).
-The view carries it as `systemData`; when it fails, those rows show `—`; a `build` with
-`isNew: true` in the open planet's project fetches it again. The view and the route take the
+card's solar-system totals: the system view hands over its own when the planet is clicked there
+(`ctx.openPlanet(projectId, name, system)`), and any other way in fetches it
+(`A.fetchSystem`: `AU.getSystem`, or `null`). The app holds it in `S.planetSystem`; when there is
+none, those rows show `—`; a `build` with `isNew: true` in the open planet's project fetches it
+again, one request at a time (`A.refreshPlanetSystem`). The view and the route take the
 planet's name from the answer (`PlanetData.name`), not from the name asked for.
 
 - Large generated world (same class rule) filling ~60% of view height, slow
@@ -612,9 +620,8 @@ planet's name from the answer (`PlanetData.name`), not from the name asked for.
      `THIS PLANET`, `WHOLE SOLAR SYSTEM` (the project's `totalBuilds`) and a bar of the planet's
      share, a whole percent that is never `0%` of a planet with builds (`< 1%`) nor `100%` of one
      without them all (`> 99%`); then `SOLAR SYSTEM`: `PLANETS` (the planets the system view
-     draws, `8 of <planetTotal>` when the project has more, from `systemData`) and `AGENTS`. A
-     `build` event on the open planet raises its count in place, its folder matched as main
-     matches buckets (`AUR.folderKey`: case-insensitively under a Windows path).
+     draws, `8 of <planetTotal>` when the project has more, from `S.planetSystem`) and `AGENTS`. A
+     `build` event with the open planet's `key` raises its count in place.
 - No tab bar: the mockup's `Overview … Scans` row was dropped because its tabs did nothing.
 - Summary card: `PLANET SUMMARY` — Agents / Files / Subfolders / Builds.
 - Back button → system view.

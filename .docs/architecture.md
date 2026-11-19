@@ -198,7 +198,7 @@ in a closure, and anything shared is a field of `ctx`.
 | `live/events.js` | 53 | functions | Event queue (`seq` assigned on queue), feed, one flush per scan / poll / sweep | — |
 | `live/attention.js` | 81 | functions | `classifyAttention` | `live/events`, `universe/public-shape` |
 | `live/state-file.js` | 50 | functions | Load / save `universe-state.json` | `shared/atomic-write` |
-| `live/system-view.js` | 226 | functions | `getSystem`, `getPlanet` from the project folder on disk | `universe/planets`, `universe/public-shape`, `build-buckets`, `path-safety`, `shared/hash` |
+| `live/system-view.js` | 210 | functions | `getSystem`, `getPlanet` from the project folder on disk | `universe/planets`, `universe/public-shape`, `build-buckets`, `path-safety`, `shared/hash` |
 | `live/projects.js` | 235 | functions | Project registry: path → id, display path, folder still exists | `provider-adapters`, `shared/hash`, `universe/public-shape`, `live/events`, `live/state-file` |
 | `live/ships.js` | 180 | functions | Ships and drones: spawn, pending tool calls, departure | `provider-adapters`, `universe/ships`, `universe/public-shape`, `live/events` |
 | `live/builds.js` | 60 | functions | One verified edit → one build in its top-level folder | `build-buckets`, `path-safety`, `live/events` |
@@ -222,10 +222,10 @@ in a closure, and anything shared is a field of `ctx`.
 | `history/checkpoint-plan.js` | 79 | function | Up to 32 checkpoint times that split the indexed bytes evenly | — |
 | `history/checkpoints.js` | 277 | factory | In-memory seek checkpoints: capture, restore, a 64 MB budget, and a guard that redoes a seek cold when a checkpoint is stale | `history/checkpoint-plan`, `history/model` |
 | `universe/galaxy.js` | 157 | functions | `deriveGalaxy` (live), `historyGalaxy` (history) | `provider-adapters`, `shared/hash` |
-| `universe/planets.js` | 47 | function | `proceduralSystem` | `shared/hash` |
+| `universe/planets.js` | 49 | function | `proceduralSystem` | `shared/hash` |
 | `universe/ships.js` | 33 | function | `createShipRecord` | — |
 | `universe/public-shape.js` | 79 | functions | `liveProject` / `liveShip`, `historyProject` / `historyShip`: the shapes the renderer receives | `universe/galaxy`, `provider-adapters`, `shared/hash` |
-| `build-buckets.js` | 55 | functions | Build counts per top-level folder, one bucket per folder under a case-insensitive root | `path-safety` |
+| `build-buckets.js` | 87 | functions | Build counts per top-level folder; one bucket and one planet key (`planetKey`) per folder under a case-insensitive root | `path-safety` |
 | `signal-sources.js` | 76 | functions | Which files a `providers.json` watch entry covers (listings and stats only) | `provider-adapters`, `shared/hash` |
 | `provider-adapters.js` | 368 | pure functions | Provider names, project path keys, the cross-provider tool vocabulary (`classifyTool`), Signal config, `adaptLine` | `transcripts/codex`, `transcripts/fields` |
 | `transcripts/codex.js` | 237 | pure functions | One Codex record → structural signals; rollout ownership; parent thread id | `transcripts/fields` |
@@ -458,7 +458,7 @@ contract), `AUR`, `AUR_POLISH` and `AUR_GALAXY` (all `any` for now).
 
 | File | Lines | Job |
 |---|---|---|
-| `util.js` | 325 | Creates `AUR`; hashes, colours, provider metadata, motion tuning, asset paths, DOM helpers |
+| `util.js` | 320 | Creates `AUR`; hashes, colours, provider metadata, motion tuning, asset paths, DOM helpers |
 | `util-scene.js` | 274 | Babylon helpers on `AUR`: skybox (PhotoDome), starfield, orbit rings, ship and signal markers, GUI labels |
 | `procedural-worlds.js` | 329 | Planet and asteroid surfaces (authored textures + generated normal maps) |
 | `ship-assets.js` | 252 | Manifest, per-scene state, hull choice by rank (`builds` against the manifest ladder), container loading; procedural dart fallback |
@@ -466,39 +466,39 @@ contract), `AUR`, `AUR_POLISH` and `AUR_GALAXY` (all `any` for now).
 | `ship-assets-api.js` | 118 | `AUR.ships`: instantiate, upgrade a fallback dart, `refresh` in place on promotion, dispose a scene's hull state |
 | `galaxy-layout.js` | 284 | Pure: galaxy grouping, spiral placement, Graveyard |
 | `polish-math.js` | 67 | Pure: label overlap, sun pulse |
-| `search-core.js` | 224 | Pure: ranks projects, agents and folders (prefix, substring, path or other text, then fuzzy) |
-| `components/project-vcs-status.js` | 289 | Pure presentation for git / GitHub markers and details |
+| `search-core.js` | 225 | Pure: ranks projects, agents and folders (prefix, substring, path or other text, then fuzzy) |
+| `components/project-vcs-status.js` | 278 | Pure presentation for git / GitHub markers and details |
 | `scene/common.js` | 70 | Creates `AUR.sceneParts`; the shared camera, ship mesh, teardown and mesh disposal |
 | `scene/universe/view.js` | 280 | Galaxy map: builds the `view` object and merges its parts |
 | `scene/universe/galaxies.js` | 208 | Galaxy discs, outlines, labels, glyph placement, camera framing |
-| `scene/universe/glyphs.js` | 141 | A project glyph's live state: dimming, search focus, attention halo, VCS markers, sun pulse |
-| `scene/universe/labels.js` | 253 | Dirty-driven label layout (`updateLabelLayout`) |
+| `scene/universe/glyphs.js` | 144 | A project glyph's live state: dimming, search focus, attention halo, VCS markers, sun pulse |
+| `scene/universe/labels.js` | 264 | Dirty-driven label layout (`updateLabelLayout`) |
 | `scene/universe/ships.js` | 54 | Ships orbiting their project's glyph |
 | `scene/universe/stats.js` | 165 | Measured metrics for the harness and gates |
-| `scene/system/view.js` | 227 | Solar system + first-person focus camera (`focusShip`) |
+| `scene/system/view.js` | 228 | Solar system + first-person focus camera (`focusShip`) |
 | `scene/system/belt.js` | 45 | Asteroid belt (thin instances) |
 | `scene/system/focus.js` | 54 | Fades the other ships and hides the ship labels while one is followed |
-| `scene/system/ships.js` | 201 | Ships: build / remove, patrols, fly-to-planet builds, `refetchPlanets`, the view's `update` |
-| `scene/planet/view.js` | 195 | Planet close-up |
-| `app/state.js` | 231 | Shared state and constants (including the chrome dirty bits, `AUR.app.const.CHROME`) |
-| `app/store.js` | 132 | `seedStore`, `applyEvent`, `maybeNotifyAttention`, `refreshShipHulls`, `workedShipIds` |
+| `scene/system/ships.js` | 190 | Ships: build / remove, patrols, fly-to-planet builds, `refetchPlanets`, the view's `update` |
+| `scene/planet/view.js` | 194 | Planet close-up |
+| `app/state.js` | 233 | Shared state and constants (including the chrome dirty bits, `AUR.app.const.CHROME`) |
+| `app/store.js` | 131 | `seedStore`, `applyEvent`, `maybeNotifyAttention`, `refreshShipHulls`, `workedShipIds` |
 | `app/chrome-queue.js` | 75 | `chromeMaskFor`, `scheduleChrome`, `renderChrome`, `renderChromeNow`: one panel redraw per frame, or now |
 | `app/playback.js` | 232 | History bar |
-| `app/replay.js` | 170 | Stream epochs, playback state, `issueReplay` |
+| `app/replay.js` | 169 | Stream epochs, playback state, `issueReplay` |
 | `app/history-metrics.js` | 94 | `AUR.historyTestMetrics` for the history harness |
-| `app/project/search.js` | 225 | Go to palette (search button, `/` or Ctrl K), GitHub filter, universe match highlighting |
-| `app/project/search-rows.js` | 146 | A Go to row: the name's matched characters, the path's telling tail, the kind; a project's line in the IDEAS picker |
-| `app/project/listbox.js` | 122 | The listbox the Go to palette and ALL PROJECTS share: debounce, keys, selection, rows kept in place across a refresh |
-| `app/project/directory.js` | 194 | ALL PROJECTS dialog, its rows on the shared listbox |
-| `app/boot.js` | 394 | Boot, routing, view switching, debug hooks |
+| `app/project/search.js` | 226 | Go to palette (search button, `/` or Ctrl K), GitHub filter, universe match highlighting |
+| `app/project/search-rows.js` | 145 | A Go to row: the name's matched characters, the path's telling tail, the kind; a project's line in the IDEAS picker |
+| `app/project/listbox.js` | 161 | The listbox the Go to palette and ALL PROJECTS share: debounce, keys, clicks by pressed entry, selection, rows kept across a refresh |
+| `app/project/directory.js` | 195 | ALL PROJECTS dialog, its rows on the shared listbox |
+| `app/boot.js` | 395 | Boot, routing, view switching, debug hooks |
 | `app/ideas.js` | 152 | IDEAS panel |
 | `app/ideas-list.js` | 264 | IDEAS list rendering |
 | `app/chrome.js` | 258 | Command rail, project-name helpers, agent list, feed, summary, back button |
 | `app/agent-focus.js` | 324 | Cockpit overlay, hologram mini-map |
 | `app/project/settings.js` | 331 | Moved-project dialog |
 | `app/project/tasks.js` | 267 | TASKS panel |
-| `app/project/control.js` | 296 | Project card, Open Terminal button, planet card |
-| `index.html` | 583 | All panels exist in the HTML up front; modules show / hide them |
+| `app/project/control.js` | 303 | Project card, Open Terminal button, planet card |
+| `index.html` | 580 | All panels exist in the HTML up front; modules show / hide them |
 | `styles/*.css` | 1,865 | All styles, in 12 files; `focus.css` and `focus-rooms.css` (474) are the cockpit |
 
 ### 6.3 Shared state and routing
@@ -519,7 +519,8 @@ contract), `AUR`, `AUR_POLISH` and `AUR_GALAXY` (all `any` for now).
   `resize`, `setQuality`, `setSearchMatches`, `setShipFocusVantage`, `focusShip`,
   `shipFocusState`). Three optional members have no default: `planetData`, read through
   `A.activePlanetData()`, and `systemData` and `clearShipFocus()`, which `app/agent-focus.js`
-  checks for first. `ctx` carries `store`, `galaxyFields`, `quality`, `openSystem` and `openPlanet`.
+  checks for first. `ctx` carries `store`, `galaxyFields`, `quality`, `openSystem` and `openPlanet`
+  (the system view hands `openPlanet` its own system for the planet card, held in `S.planetSystem`).
 
 ### 6.4 Who owns which part of the screen
 
