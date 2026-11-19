@@ -4,6 +4,18 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const statusUi = require('../src/renderer/components/project-vcs-status');
 
+test('in a page, the component says which script it needs when search-core.js has not loaded', () => {
+  const { runRenderer } = require('./support/renderer-source');
+  for (const window of [{}, { AUR: {} }]) {
+    assert.throws(() => runRenderer('components/project-vcs-status.js', { window, module: undefined }),
+      /search-core\.js must load before components\/project-vcs-status\.js/);
+  }
+  const window = {};
+  runRenderer('search-core.js', { window, module: undefined });
+  runRenderer('components/project-vcs-status.js', { window, module: undefined });
+  assert.equal(typeof window.AUR.ProjectVcsStatus.matchesSearch, 'function');
+});
+
 test('normalizes GitHub HTTPS and SSH remotes without mutating source data', () => {
   const httpsInput = {
     id: 'one', name: 'One',

@@ -9,12 +9,11 @@
 (function exposeProjectVcsStatus(root, factory) {
   const node = typeof module === 'object' && module.exports;
   // Search folds case as the app's own search does: search-core.js, loaded first in a page.
-  const api = factory(node ? require('../search-core').lowerOf : root.AUR.lowerOf);
+  const lowerOf = node ? require('../search-core').lowerOf : root && root.AUR && root.AUR.lowerOf;
+  if (!lowerOf) throw new Error('search-core.js must load before components/project-vcs-status.js');
+  const api = factory(lowerOf);
   if (node) module.exports = api;
-  if (root) {
-    const AUR = (root.AUR = root.AUR || {});
-    AUR.ProjectVcsStatus = api;
-  }
+  else root.AUR.ProjectVcsStatus = api;
 })(typeof window !== 'undefined' ? window : null, function createProjectVcsStatusApi(lowerOf) {
   const FILTERS = Object.freeze({
     ALL: 'all',
