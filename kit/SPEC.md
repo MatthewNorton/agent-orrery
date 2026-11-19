@@ -85,7 +85,8 @@ system as it stands, and hands it to a planet it opens.
 
 ## 3. The `window.AU` bridge (matches `src/preload.js`)
 
-`src/types/contract.d.ts` is the type-checked version of this section; where they differ, it wins.
+`src/types/contract.d.ts` (with `calls.d.ts`, which it exports again) is the type-checked version of
+this section; where they differ, it wins.
 
 ```js
 AU.snapshot()  -> Promise<{ projects: Project[], ships: Ship[], feed: FeedEntry[],
@@ -141,6 +142,7 @@ AU.universeImport()                    -> Promise<{ok, canceled, added, merged, 
    // One JSON file: universe-state.json as the model stands plus the IDEAS queue's texts.
    // Import merges (larger build counts, earlier firstSeen, later lastActivity) and never
    // removes; new projects arrive as project-added events, imported ideas as new items.
+   // A bucket is a folder's name and is kept whatever it is (`__proto__`, `constructor`).
 ```
 
 ```js
@@ -199,6 +201,9 @@ Planet     = { name, key, files, builds, procedural? }   // name '(root)' possib
 // key: which planet this is, decided by main (`planetKey` in `src/main/build-buckets.js`): one
 //   key for every casing main counts as the folder. A Planet, a PlanetData and a `build` event
 //   are of one planet when their keys are equal; the renderer compares them and never reads them.
+//   Names are unique in a system and keys almost always are: a case-sensitive folder under a
+//   Windows path (WSL) can hold `Docs` and `docs`, two planets with one key and one build count.
+//   A build then goes to the one it spelled (`bucket`), else the first (`AUR.planetOfBuild`).
 
 PlanetData = { name, key, project: Project, builds, files, sizeKb, subdirs,
                resources: string[], procedural?, folderRead? }   // resources = top file exts;
@@ -206,11 +211,15 @@ PlanetData = { name, key, project: Project, builds, files, sizeKb, subdirs,
 //   disk spells it; in history, its bucket's key. Under a Windows path it can differ in case from
 //   the name asked for, and the renderer takes it as the planet's name.
 // procedural: a stand-in with invented folder numbers. Live: the project has no folder on disk,
-//   or the planet is a `Sector-N` stand-in with no folder and no builds. History: no builds at
-//   the cursor.
+//   or the planet is a `Sector-N` stand-in with no builds and either no folder or a project
+//   folder that cannot be listed (when getSystem draws stand-ins). History: no builds at the cursor.
 // folderRead: live only. 'full'; 'partial' (the read stopped short, so files and size are
 //   floors); 'gone' (the folder is not there); 'none' (it is there and could not be read: locked,
-//   or a passing error). Absent when there was no folder to read (procedural, or history).
+//   a passing error, or a link, which a planet read never follows out of the project: a linked
+//   folder is not opened, and a link inside one counts as a file of the link's own size).
+//   Absent when there was no folder to read (procedural, or history).
+// builds, project: as they stand when the answer is made, after the folder was read. A project
+//   forgotten meanwhile answers null.
 ```
 
 Event batch entries (from `AU.onEvents`):
@@ -277,7 +286,8 @@ Design tokens (put in `:root`):
   folder of a project at a drive or filesystem root reads `D:\src`, with one separator).
   Arrows, Enter and click pick a result through the existing guarded routes. The arrows move the
   selection on the rows as they stand, and a refresh from the store keeps the elements of every
-  row whose entry is still listed, also when a row comes in or goes above it (`A.renderListbox`),
+  row whose entry is still listed, also when a row comes in or goes above it (`A.renderListbox`;
+  entries that share a key each keep a row of their own),
   and the list stays scrolled where it was. A click opens the entry that was pressed
   (`A.wireListbox`): when the rows moved under a pointer that stayed put, the release lands on
   another row and the pressed entry still opens. PROJECTS shares all of it. While an input method
@@ -541,8 +551,9 @@ Data: `AU.getSystem(projectId)`.
   and the largest planet) to a standoff beside the `bucket` planet → `hold`
   (~2.4s, a thin emissive beam, planet pulses 1 → 1.15 → 1) → `return` to the
   ring (`AUR.MOTION.returnSeconds`). The `bucket` planet is the one whose `key` the build
-  carries. On `build` with `isNew: true` and no
-  such planet: re-fetch `AU.getSystem` (the view's `systemData` follows), grow the new
+  carries (`AUR.planetOfBuild`; the view keeps its planets by name). On `build` with
+  `isNew: true` and no such planet: re-fetch `AU.getSystem` (the view's `systemData` follows),
+  one request at a time and once more for a planet that started while one was out, grow the new
   planet in from zero, feed shows planet formation.
   On `activity`: brief thruster flash.
 - Project card (top-left, panel): `PROJECT: <NAME>`; rows: `STATE` (any ship
@@ -586,10 +597,13 @@ Data: `AU.getSystem(projectId)`.
 Data: `AU.getPlanet(projectId, name)`, and the project's system alongside it for the planet
 card's solar-system totals: the system view hands over its own when the planet is clicked there
 (`ctx.openPlanet(projectId, name, system)`), and any other way in fetches it
-(`A.fetchSystem`: `AU.getSystem`, or `null`). The app holds it in `S.planetSystem`; when there is
+(`A.fetchSystem`: `AU.getSystem`, or `null`). The system view hands over none while its own is
+behind a planet that has just started. The app holds it in `S.planetSystem`; when there is
 none, those rows show `—`; a `build` with `isNew: true` in the open planet's project fetches it
-again, one request at a time (`A.refreshPlanetSystem`). The view and the route take the
-planet's name from the answer (`PlanetData.name`), not from the name asked for.
+again, one request at a time (`A.refreshPlanetSystem`), and one that arrives while the planet
+is still opening does so as soon as it has opened (`A.requestPlanetSystem`,
+`A.planetSystemOpened`). The view and the route take the planet's name from the answer
+(`PlanetData.name`), not from the name asked for.
 
 - Large generated world (same class rule) filling ~60% of view height, slow
   rotation about a tilted axis, the atmosphere shell, clouds on oceanic worlds on
