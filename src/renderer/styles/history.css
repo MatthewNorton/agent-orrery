@@ -7,9 +7,12 @@
   z-index: 19;
   flex-direction: row;
   align-items: center;
-  gap: var(--space-4);
+  gap: var(--space-2);
   padding: 0 var(--space-3) 0 0;
+  container-type: inline-size;
 }
+/* With room, a further space between the dock's parts (the narrow dock, at the end, drops it). */
+.history-bar > * + * { margin-left: var(--space-2); }
 .history-bar > .mod-i { align-self: stretch; }
 .history-bar[data-mode='replay'] { border-color: var(--orange); }
 .history-bar.busy { cursor: wait; }
@@ -84,8 +87,11 @@
 }
 .history-scrubber:disabled { opacity: 0.38; cursor: default; }
 
-@media (max-width: 1280px) {
-  .history-bar { gap: var(--space-2); }
+/* The dock of a window 1280 px wide or less at 100% text, or as narrow at a larger text size: its
+   content box is measured (1280 less the margins, the padding and two borders of up to 1 px), so
+   the text size counts, which a media query on the window would not. */
+@container (width < 1243px) {
+  .history-bar > * + * { margin-left: 0; }
   .history-range-labels span { display: none; }
   .history-btn { min-width: 40px; padding-inline: 8px; }
 }

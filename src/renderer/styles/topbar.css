@@ -19,8 +19,13 @@
 /* A bar under 1100 layout px (its content box, so the text size counts) keeps PROJECTS to its mark
    and count: Live with 12 needing you and 128 projects then leaves about 40 px beside the brand */
 @container (max-width: 1070px) { .project-directory-button-label { display: none; } }
-.brand { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; white-space: nowrap; }
-.logo-dot { width: 24px; height: 24px; display: block; }
+/* Nothing else in the bar can shrink, so a bar short of room takes it from the brand: the badge
+   gives way to an ellipsis first, then the name, and the controls on the right stay on screen */
+.brand { display: flex; align-items: center; gap: 10px; flex: 0 1 auto; min-width: 0; white-space: nowrap; }
+.brand-name, .brand-badge { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.brand-name { flex: 0 1 auto; }
+.brand-badge { flex: 0 1000 auto; }
+.logo-dot { flex: none; width: 24px; height: 24px; display: block; }
 .logo-dot circle { fill: none; stroke: var(--ink); stroke-width: 1.2; }
 .logo-dot path { fill: var(--ink); }
 .logo-dot circle.core { fill: var(--orange); stroke: none; }

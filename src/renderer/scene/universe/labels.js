@@ -51,10 +51,34 @@
       return true;
     }
 
-    // An overlay marked data-see-through (the Go to palette's light backdrop) hides none of the map.
+    // The chrome over the map, as boxes, for the one frame `overlay` is laid out in. A modal dialog
+    // makes the page behind it inert, and a hit test skips what is inert, so behind one the chrome
+    // is found the way a hit test would find it: every element that takes the pointer, by its box.
+    let chromeUnder = { overlay: null, frame: -1, boxes: [] };
+    function chromeBoxes(overlay) {
+      const frame = scene.getFrameId();
+      if (chromeUnder.overlay === overlay && chromeUnder.frame === frame) return chromeUnder.boxes;
+      const boxes = [];
+      const collect = (el) => {
+        if (el === canvas || el === overlay) return;
+        const style = getComputedStyle(el);
+        if (style.display === 'none') return;
+        const box = style.pointerEvents !== 'none' && style.visibility === 'visible' && el.getBoundingClientRect();
+        if (box && box.width > 0 && box.height > 0) boxes.push(box);
+        else for (const child of el.children) collect(child);
+      };
+      for (const child of document.body.children) collect(child);
+      chromeUnder = { overlay, frame, boxes };
+      return boxes;
+    }
+
+    // An overlay marked data-see-through (the Go to palette's light backdrop) hides none of the map;
+    // the chrome behind it still does.
     function mapShowsAt(x, y) {
       const hit = document.elementFromPoint(x, y);
-      return hit === canvas || Boolean(hit && hit.hasAttribute('data-see-through'));
+      if (hit === canvas) return true;
+      if (!hit || !hit.hasAttribute('data-see-through')) return false;
+      return !chromeBoxes(hit).some((box) => x >= box.left && x <= box.right && y >= box.top && y <= box.bottom);
     }
 
     function labelPointIsClear(rect) {

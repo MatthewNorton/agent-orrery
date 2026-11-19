@@ -1,5 +1,5 @@
 /* search.css — Go to: the search palette, a dialog near the top centre with the field, the
-   results and the keys (the footer is styled with the directory's, directory.css).
+   results and the keys (the rows and the footer are styled with the directory's, directory.css).
    Values come from tokens.css only. */
 .search-dialog {
   width: min(800px, calc(100vw / var(--ui-zoom) - 48px));
@@ -52,33 +52,8 @@
 .search-input::placeholder { color: var(--ink-3); }
 
 .search-results { flex: 1 1 auto; min-height: 0; overflow-y: auto; scrollbar-width: thin; }
-.search-result {
-  width: 100%;
-  display: grid;
-  grid-template-columns: 7px minmax(0, 1fr) auto;
-  gap: var(--space-3);
-  align-items: center;
-  padding: 8px var(--space-3);
-  border: 0;
-  border-bottom: 1px solid var(--hair);
-  border-radius: var(--radius-0);
-  background: transparent;
-  color: var(--ink);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.search-result:last-child { border-bottom: 0; }
-.search-result:hover, .search-result.selected { background: var(--plate); }
-.search-result.selected { box-shadow: inset 2px 0 var(--orange); }
-.search-result-dot { width: 7px; height: 7px; border-radius: var(--radius-dot); background: var(--hair-2); }
-.search-result-dot.live { background: var(--green); box-shadow: 0 0 0 3px var(--green-ring); }
-.search-result-copy { min-width: 0; }
-.search-result-name {
-  display: block; overflow: hidden;
-  font-size: 12.5px; font-weight: 600; line-height: 15px;
-  text-overflow: ellipsis; white-space: nowrap;
-}
+/* A row is the directory's (directory.css), with more room between its parts. */
+.search-result { gap: var(--space-3); color: var(--ink); }
 .search-result-name mark { background: transparent; color: var(--orange-ink); }
 /* The path, then what the row adds (repository and branch, or the agent's status) in the room the
    path leaves. Short of room the addition goes first, then the start of the path; its tail, the
