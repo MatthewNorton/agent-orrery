@@ -12,6 +12,7 @@
     const SIZE = AUR.SHIP_SIZE.system;
     const STANDOFF = 0.9;        // clear water between a planet's surface and a ship at work
     const BELT_CLEARANCE = 0.9;  // and between the belt's outer edge and the patrol ring
+    const REFETCH_TRIES = 3;     // fetches of the system that may fail in a row before the refetch rests
     const shipLookTarget = new BABYLON.Vector3();
     const standoff = new BABYLON.Vector3();
     let refetching = false, refetchAgain = false;
@@ -172,21 +173,49 @@
     // A build started a planet this view does not draw: the system is fetched again, one request
     // at a time, and once more for a planet that started while one was out. Until an answer from
     // after the build is in, view.sys is behind it (view.sysBehind) and is not handed to a planet.
+    // A fetch that fails keeps a refetch queued behind it, and after REFETCH_TRIES failures in a
+    // row the loop rests until the next such build. Whatever goes wrong, it ends not fetching.
     async function refetchPlanets() {
       view.sysBehind = refetchAgain = true;
       if (refetching) return;
       refetching = true;
-      while (refetchAgain && !scene.isDisposed) {
-        refetchAgain = false;
-        const ns = await AUR.settle(() => AU.getSystem(projectId));
-        if (!Array.isArray(ns.planets) || scene.isDisposed) break;
-        view.sys = ns;
-        view.sysBehind = refetchAgain;
-        ns.planets.forEach((pd, i) => {
-          if (!planets.has(pd.name)) view.buildPlanet(pd, i).appear = 0.01;
-        });
+      try {
+        for (let failures = 0; refetchAgain && !scene.isDisposed;) {
+          refetchAgain = false;
+          const ns = await AUR.settle(() => AU.getSystem(projectId));
+          if (scene.isDisposed) break;
+          if (!Array.isArray(ns.planets)) {
+            if (++failures >= REFETCH_TRIES) break;
+            continue;
+          }
+          failures = 0;
+          view.sys = ns;
+          view.sysBehind = refetchAgain;
+          drawNewPlanets(ns.planets);
+        }
+      } finally {
+        refetching = false;
       }
-      refetching = false;
+    }
+
+    // Draws the planets of `listed` the view lacks. A folder is one planet whatever its casing
+    // (its key): one renamed in case only is the globe already drawn, which keeps the name, look
+    // and orbit it was built with until the view is built again, as a folder renamed any other way
+    // or removed does. Only a key the answer lists more often than the view draws it gets a globe:
+    // two folders of a case-sensitive directory that differ in case alone.
+    function drawNewPlanets(listed) {
+      const count = (counts, key) => counts.set(key, (counts.get(key) || 0) + 1);
+      const drawn = new Map(), wanted = new Map();
+      for (const planet of planets.values()) count(drawn, planet.key);
+      for (const pd of listed) count(wanted, pd.key);
+      listed.forEach((pd, i) => {
+        if (planets.has(pd.name) || (drawn.get(pd.key) || 0) >= wanted.get(pd.key)) return;
+        // One planet that cannot be built does not stop the others.
+        try {
+          view.buildPlanet(pd, i).appear = 0.01;
+          count(drawn, pd.key);
+        } catch (e) { AUR.log('planet not drawn', pd.name, e && e.message); }
+      });
     }
 
     return { buildShip, animateShips, update };
