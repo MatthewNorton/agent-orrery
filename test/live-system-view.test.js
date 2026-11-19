@@ -7,6 +7,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { getSystem, getPlanet, isPlanetSegment, IGNORE_DIRS } = require('../src/main/live/system-view');
+const { countBuild } = require('../src/main/build-buckets');
 const { liveProject, tempDir } = require('./support/main-wiring');
 
 // `files` are written; a path ending in '/' is an empty folder. `under` nests the project below the
@@ -25,17 +26,22 @@ function projectOnDisk(t, files, buckets = {}, under = '') {
   return { root, project, model };
 }
 
-// Fails the folder reads `refuse` picks, counting them, with an error of `code`.
+// Fails the folder reads `refuse` picks, counting them, with an error of `code`. `seen.dirs` is
+// every folder a read was asked for.
 function refuseReads(t, refuse, code = 'EACCES') {
   const readdir = fs.promises.readdir;
-  const seen = { tried: 0 };
+  const seen = { tried: 0, dirs: [] };
   t.mock.method(fs.promises, 'readdir', async (dir, options) => {
+    seen.dirs.push(String(dir));
     if (!refuse(String(dir))) return readdir.call(fs.promises, dir, options);
     seen.tried++;
     throw Object.assign(new Error(code), { code });
   });
   return seen;
 }
+
+// A link to `target` at `link`: a junction on Windows, which needs no privilege.
+const linkTo = (target, link) => fs.symlinkSync(target, link, 'junction');
 
 test('live system view: planets are top-level folders ranked by files plus five per build', (t) => {
   const { model } = projectOnDisk(t, [
@@ -155,10 +161,10 @@ test('live system view: a file whose size cannot be read leaves the size a floor
   const whole = await getPlanet(model, 'p', 'src');
   assert.deepEqual([whole.files, whole.sizeKb, whole.folderRead], [2, 4, 'full']);
 
-  const stat = fs.promises.stat;
-  t.mock.method(fs.promises, 'stat', async (file, options) => {
+  const lstat = fs.promises.lstat;
+  t.mock.method(fs.promises, 'lstat', async (file, options) => {
     if (path.basename(String(file)) === 'a.js') throw Object.assign(new Error('EPERM'), { code: 'EPERM' });
-    return stat.call(fs.promises, file, options);
+    return lstat.call(fs.promises, file, options);
   });
   const short = await getPlanet(model, 'p', 'src');
   assert.deepEqual([short.files, short.sizeKb, short.folderRead], [2, 0, 'partial'], 'both files count; one size is missing');
@@ -202,6 +208,79 @@ test('live system view: a stand-in planet is one without a folder or builds, wha
   assert.equal((await getPlanet(model, 'p', 'Sector-9')).procedural, true);
 });
 
+test('live system view: a stand-in planet stays one when the project folder cannot be listed', async (t) => {
+  const { root, model } = projectOnDisk(t, ['src/a.js', 'Sector-9/a.js'], { 'Sector-7': 2, src: 1 });
+  // macOS without the Files and Folders permission: the folder is there and no read of it is allowed.
+  for (const code of ['EPERM', 'EACCES', 'EIO']) {
+    refuseReads(t, (dir) => dir.startsWith(root), code);
+    assert.deepEqual(getSystem({ ...model, systemCache: new Map() }, 'p').planets.map((planet) => planet.name).slice(0, 1), ['src'],
+      'the system is listed by readdirSync, which is not refused here');
+    const standIn = await getPlanet(model, 'p', 'Sector-1');
+    assert.deepEqual([standIn.procedural, standIn.builds, 'folderRead' in standIn], [true, 0, false], code);
+    const built = await getPlanet(model, 'p', 'Sector-7');
+    assert.deepEqual([built.builds, built.folderRead, 'procedural' in built], [2, 'none', false], code + ': builds make it a folder');
+    const src = await getPlanet(model, 'p', 'src');
+    assert.deepEqual([src.folderRead, 'procedural' in src], ['none', false], code + ': another name is a folder that could not be read');
+    t.mock.restoreAll();
+  }
+  // The project folder lists, and the planet's own folder does not: a real folder, unread.
+  refuseReads(t, (dir) => dir === path.join(root, 'Sector-9'), 'EPERM');
+  const real = await getPlanet(model, 'p', 'Sector-9');
+  assert.deepEqual([real.folderRead, 'procedural' in real], ['none', false]);
+});
+
+test('live system view: builds counted while a planet\'s folder is read are in the answer', async (t) => {
+  const { root, project, model } = projectOnDisk(t, ['src/a.js', 'README.md'], { src: 1 });
+  const readdir = fs.promises.readdir;
+  let during = () => {};
+  t.mock.method(fs.promises, 'readdir', async (dir, options) => {
+    if (String(dir) === path.join(root, 'src') || (String(dir) === root && options)) during();
+    return readdir.call(fs.promises, dir, options);
+  });
+  during = () => { countBuild(project, 'src'); project.totalBuilds += 1; during = () => {}; };
+  const planet = await getPlanet(model, 'p', 'src');
+  assert.deepEqual([planet.builds, planet.project.totalBuilds, planet.files], [2, 1, 1], 'the build that came during the read counts');
+  during = () => { countBuild(project, '(root)'); during = () => {}; };
+  assert.equal((await getPlanet(model, 'p', '(root)')).builds, 1, 'and on the root planet');
+  // A stand-in name that gains its first build during the read is a folder with builds, not a stand-in.
+  during = () => {};
+  t.mock.method(fs.promises, 'lstat', async () => { countBuild(project, 'Sector-3'); throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' }); });
+  const formed = await getPlanet(model, 'p', 'Sector-3');
+  assert.deepEqual([formed.builds, formed.folderRead, 'procedural' in formed], [1, 'gone', false]);
+  t.mock.restoreAll();
+
+  // A project forgotten during the read has no planet to answer with.
+  t.mock.method(fs.promises, 'readdir', async (dir, options) => { model.projects.delete('p'); return readdir.call(fs.promises, dir, options); });
+  assert.equal(await getPlanet(model, 'p', 'src'), null);
+});
+
+test('live system view: a planet read follows no link out of the project', async (t) => {
+  const { root, model } = projectOnDisk(t, ['src/a.js', 'README.md'], { linked: 1, src: 1 });
+  const outside = path.join(tempDir(t, 'au-live-outside-'), 'secrets');
+  fs.mkdirSync(path.join(outside, 'deep'), { recursive: true });
+  for (const file of ['one.txt', 'two.txt', path.join('deep', 'three.txt')]) fs.writeFileSync(path.join(outside, file), 'x'.repeat(2048));
+  // A top-level link, with a build bucket of its name (one edit under it makes one).
+  linkTo(outside, path.join(root, 'linked'));
+  const seen = refuseReads(t, () => false);
+  const linked = await getPlanet(model, 'p', 'linked');
+  assert.deepEqual([linked.files, linked.sizeKb, linked.subdirs, linked.resources, linked.folderRead, linked.builds],
+    [0, 0, 0, [], 'none', 1], 'nothing behind the link is listed');
+  assert.equal(seen.dirs.some((dir) => dir.includes('linked') || dir.startsWith(outside)), false, seen.dirs.join(' | '));
+  assert.equal(getSystem(model, 'p').planets.some((planet) => planet.name === 'linked'), false, 'the system lists folders, not links');
+  t.mock.restoreAll();
+
+  // A link inside a planet's folder counts as the one file it is; its target is not opened.
+  linkTo(outside, path.join(root, 'src', 'out'));
+  t.mock.method(fs.promises, 'stat', async () => assert.fail('stat follows a link'));
+  const inside = refuseReads(t, () => false);
+  const src = await getPlanet(model, 'p', 'src');
+  assert.deepEqual([src.files, src.subdirs, src.sizeKb, src.folderRead], [2, 0, 0, 'full']);
+  assert.equal(inside.dirs.some((dir) => dir.startsWith(outside) || dir.endsWith('out')), false, inside.dirs.join(' | '));
+  // The root planet counts the top-level link as a file too, and reads no folder below.
+  const top = await getPlanet(model, 'p', '(root)');
+  assert.deepEqual([top.files, top.subdirs, top.folderRead], [2, 1, 'full']);
+});
+
 test('live system view: under a Windows path a planet answers to any casing, by the name on disk', async (t) => {
   const { model } = projectOnDisk(t, ['Docs/a.md', 'Docs/b.md', 'src/a.js'], { docs: 3, Gone: 2 }, 'case\\root');
   // One key for the folder, in the system and in the planet, whatever casing asked for it.
@@ -224,6 +303,17 @@ test('live system view: under a POSIX path a planet keeps the name it was asked 
   assert.deepEqual([(await getPlanet(model, 'p', 'Docs')).name, getSystem(model, 'p').planets[0].key], ['Docs', 'Docs']);
   const other = await getPlanet(model, 'p', 'docs');
   assert.deepEqual([other.name, other.key, other.builds], ['docs', 'docs', 0]);
+});
+
+test('live system view: a case-sensitive project folder is not listed to find a planet\'s name', async (t) => {
+  const { root, model } = projectOnDisk(t, ['Docs/a.md'], { Docs: 1 });
+  if (path.sep === '\\') return t.skip('a temp folder on Windows has a Windows path');
+  const seen = refuseReads(t, () => false);
+  const planet = await getPlanet(model, 'p', 'Docs');
+  assert.deepEqual([planet.name, planet.key, planet.files, planet.builds], ['Docs', 'Docs', 1, 1]);
+  assert.deepEqual(seen.dirs, [path.join(root, 'Docs')], 'only the planet\'s own folder is read');
+  const other = await getPlanet(model, 'p', 'docs');
+  assert.deepEqual([other.name, other.key, other.builds], ['docs', 'docs', 0], 'another casing is another planet');
 });
 
 test('live system view: a planet name is one plain path segment', () => {
