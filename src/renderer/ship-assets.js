@@ -33,6 +33,7 @@
  *   `apart` the one ship focus mode shows at a visibility of its own (AUR.ships.fade)
  * @typedef {object} ShipAssetsCore shared by the ship-assets*.js files as AUR.shipAssets
  * @property {(key: string, message: string) => void} logOnce
+ * @property {(failure: string, error: any, outcome: string) => void} logFailure
  * @property {Promise<ShipManifest | null>} manifestPromise
  * @property {() => ShipManifest | null} settledManifest null until the manifest has loaded
  * @property {WeakMap<object, SceneState>} sceneStates
@@ -67,6 +68,13 @@
     if (logged.has(key)) return;
     logged.add(key);
     AUR.log(message);
+  }
+
+  // A failure and its cause, logged once per failure and cause: one that every ship meets is
+  // logged once, and a different cause is logged too.
+  function logFailure(failure, error, outcome) {
+    const cause = String((error && error.message) || error);
+    logOnce(failure + ' (' + cause + ')', failure + ' (' + cause + '); ' + outcome);
   }
 
   function loadWithFetch() {
@@ -294,8 +302,8 @@
 
   /** @type {ShipAssetsCore} */
   const core = {
-    logOnce, manifestPromise, sceneStates, stateFor, isSceneDisposed, apartVisibility, ownVisibility,
-    settledManifest: () => (manifestSettled ? manifestValue : null),
+    logOnce, logFailure, manifestPromise, sceneStates, stateFor, isSceneDisposed, apartVisibility,
+    ownVisibility, settledManifest: () => (manifestSettled ? manifestValue : null),
     viewLod, selectHull, hullFiles, ensureContainer, fitsBudget, resolveAsset,
   };
   AUR.shipAssets = core;

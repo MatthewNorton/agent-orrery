@@ -5,7 +5,7 @@
 
 /**
  * @import { Ship } from '../types/contract'
- * @import { ShipAssetsCore } from './ship-assets.js'
+ * @import { HullEntry, ShipAssetsCore } from './ship-assets.js'
  * @import { ShipAssetsHulls } from './ship-assets-hulls.js'
  */
 
@@ -14,9 +14,18 @@
   /** @type {ShipAssetsCore & ShipAssetsHulls} */
   const assets = AUR.shipAssets;
   const {
-    manifestPromise, settledManifest, sceneStates, stateFor, isSceneDisposed, apartVisibility, ownVisibility,
-    viewLod, selectHull, hullFiles, ensureContainer, fitsBudget, resolveAsset, lookOf, createShipEntry, swapHull,
+    logFailure, manifestPromise, settledManifest, sceneStates, stateFor, isSceneDisposed, apartVisibility,
+    ownVisibility, viewLod, selectHull, hullFiles, ensureContainer, fitsBudget, resolveAsset, lookOf,
+    createShipEntry, swapHull,
   } = assets;
+
+  // A hull request that throws past buildHull's own catch is logged and resolves null.
+  /** @param {HullEntry | null} hull null when the throw came before it was chosen */
+  function failed(hull, error) {
+    logFailure(hull ? 'Hull ' + hull.id + ' request failed' : 'A hull request failed', error,
+      'the ship keeps the hull or dart it has.');
+    return null;
+  }
 
   function instantiate(scene, ship) {
     const state = stateFor(scene);
@@ -39,10 +48,13 @@
 
   function upgrade(scene, ship, fallback) {
     const state = stateFor(scene);
+    /** @type {HullEntry | null} */
+    let chosen = null;
     return manifestPromise.then((manifest) => {
       if (!manifest || isSceneDisposed(scene, state)) return null;
       const hull = selectHull(manifest, ship);
       if (!hull) return null;
+      chosen = hull;
       return resolveAsset(scene, state, hull, () => 0, () => !AUR.isNodeDisposed(fallback), (asset) => {
         const entry = createShipEntry(scene, state, hull, asset, ship);
         if (!entry) return null;
@@ -60,7 +72,7 @@
         };
         return assetRoot;
       });
-    }).catch(() => null);
+    }).catch((error) => failed(chosen, error));
   }
 
   /**
@@ -111,8 +123,8 @@
    * new request that ends the ones before it, so only the latest builds: a call
    * for the look already loading takes over from the one before, and the hull
    * is built once; a call for the look the ship has builds nothing. Resolves to
-   * the root once this request swapped it, else null (no model, the same look,
-   * or ended).
+   * the root once this request has swapped it in full, else null (no model, the
+   * same look, ended, or a throw, which is logged).
    * @param {Ship} ship
    * @returns {Promise<BABYLON.Mesh | null>}
    */
@@ -125,7 +137,8 @@
     if (!hull || lookOf(hull, ship) === lookOf(entry.hull, entry.ship)) return Promise.resolve(null);
     const live = () => entry.request === request && !AUR.isNodeDisposed(entry.root);
     return resolveAsset(scene, state, hull, () => entry.asset.record.triangles, live,
-      (asset) => (swapHull(scene, state, entry, hull, asset, ship) ? entry.root : null)).catch(() => null);
+      (asset) => (swapHull(scene, state, entry, hull, asset, ship) ? entry.root : null))
+      .catch((error) => failed(hull, error));
   }
 
   function dispose(scene) {

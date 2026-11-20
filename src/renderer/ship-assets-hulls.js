@@ -16,7 +16,7 @@
   const AUR = window.AUR;
   /** @type {ShipAssetsCore} */
   const core = AUR.shipAssets;
-  const { logOnce, viewLod, apartVisibility, ownVisibility } = core;
+  const { logOnce, logFailure, viewLod, apartVisibility, ownVisibility } = core;
   // The universe map has no lights, so far hulls carry a faint tint of their
   // own; without it they read as black cut-outs behind their accent lights.
   const FAR_SELF_LIGHT = 0.1;
@@ -332,19 +332,37 @@
     return entry;
   }
 
+  // Lets a replaced hull go: off its ship and drawn by nothing before it is disposed, so a dispose
+  // that throws leaves the ship the one hull that replaced it. The swap is done by then, so what
+  // cannot be disposed is logged, not thrown.
+  /** @param {HullEntry} hull @param {BABYLON.TransformNode} correction @param {HullTemplate | null} own */
+  function releaseHull(hull, correction, own) {
+    correction.setEnabled(false);
+    correction.parent = null;
+    const steps = [() => correction.dispose(false, false), () => own && disposeTemplate(own)];
+    for (const step of steps) {
+      try {
+        step();
+      } catch (error) {
+        logFailure('Replaced hull ' + hull.id + ' could not be disposed', error, 'it is hidden.');
+      }
+    }
+  }
+
   /**
    * Builds a hull in place of the entry's own, under the same root, on the template and in the
    * state focus mode's fade gives the ship, so a promotion lands as the hull it replaces showed.
+   * The new hull takes the root and the triangle count before the old one is let go.
    * @param {ShipEntry} entry @param {HullEntry} hull @param {HullAsset} asset
    */
   function swapHull(scene, state, entry, hull, asset, ship) {
     const built = buildHull(scene, state, hull, asset, ship);
     if (!built) return false;
+    const old = { hull: entry.hull, correction: entry.correction, own: entry.own };
     built.correction.parent = entry.root;
-    entry.correction.dispose(false, false);
-    if (entry.own) disposeTemplate(entry.own); // its instances went with the old hull
     state.triangles += asset.record.triangles - entry.asset.record.triangles;
     Object.assign(entry, { correction: built.correction, own: built.own, hull, asset, ship });
+    releaseHull(old.hull, old.correction, old.own);
     entry.root.material = built.evidence;
     entry.root.metadata = { ...(entry.root.metadata || {}), ...hullMetadata(hull, asset, ship) };
     if (entry.fallback && entry.fallback.metadata) {
