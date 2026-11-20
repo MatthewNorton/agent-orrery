@@ -1,8 +1,9 @@
 'use strict';
 
 // src/renderer/app/boot.js A.setView, under the routes of app/route.js: a view takes the place of
-// the one shown, and its route becomes the app's, once it is built. One that cannot be built
-// leaves the view shown, its route and the page as they were.
+// the one shown, and its route becomes the app's, once it is built. A system or planet view that
+// cannot be built falls back to the universe; a universe that cannot be built leaves the view
+// shown, its route and the page as they were.
 
 const assert = require('node:assert/strict');
 const test = require('node:test');
@@ -42,7 +43,7 @@ function loadApp() {
   return { AUR: window.AUR, app: window.AUR.app, state, old, calls, logged, document };
 }
 
-test('setView: a view that cannot be built leaves the one shown and its route, whichever route asked', async () => {
+test('setView: when no view can be built, the one shown and its route stay, whichever route asked', async () => {
   const { AUR, app, state, old, calls, logged, document } = loadApp();
   const failing = (engine) => {
     const half = { dispose: () => engine.scenes.splice(engine.scenes.indexOf(half), 1) };
@@ -57,6 +58,18 @@ test('setView: a view that cannot be built leaves the one shown and its route, w
     [{ view: 'system', projectId: 'p', planetName: null }, old, 0, 'system', [], []]);
   // A route whose view fails falls back to the universe, which fails here too.
   assert.deepEqual(logged.map((line) => line.split(':')[1]), [' universe no glyphs', ' system no glyphs', ' universe no glyphs', ' planet no glyphs', ' universe no glyphs']);
+});
+
+test('setView: a system or planet view that cannot be built falls back to the universe', async () => {
+  for (const failing of ['system', 'planet']) {
+    const { AUR, app, state, old, logged, document } = loadApp();
+    const built = (name) => () => ({ scene: { name }, update() {}, dispose() {} });
+    Object.assign(AUR.views, { universe: built('universe'), system: built('system'), planet: built('planet') });
+    AUR.views[failing] = () => { throw new Error('no glyphs'); };
+    await (failing === 'system' ? app.openSystem('q') : app.openPlanet('q', 'src'));
+    assert.deepEqual([state.current, state.activeScene.name, old.disposed, document.body.dataset.view, logged],
+      [{ view: 'universe', projectId: null, planetName: null }, 'universe', 1, 'universe', [`view build failed: ${failing} no glyphs`]], failing);
+  }
 });
 
 test('setView: a view that is built takes the place of the one shown, and only then its route', async () => {

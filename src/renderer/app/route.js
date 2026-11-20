@@ -14,9 +14,7 @@
 
   // ---------- routes ----------
   /**
-   * The route view `name` built from `data` is at: the view, and the project and planet its data
-   * names. A.setView makes it S.current once the view is built, and not before, so a view that
-   * cannot be built leaves the route of the one shown.
+   * Where view `name` built from `data` is: its route, which A.setView makes the app's (kit/SPEC.md view contract).
    * @param {string} name @param {{ projectId?: string, name?: string }} data
    */
   A.viewRoute = function viewRoute(name, data) {

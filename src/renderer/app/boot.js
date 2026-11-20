@@ -217,11 +217,7 @@
     };
   }
 
-  /**
-   * The view `name` built from `data` takes the place of the one shown (kit/SPEC.md view contract),
-   * and the route is then its own: the view, and the project and planet its data names. A view that
-   * cannot be built leaves the one shown, and its route, as they were.
-   */
+  /** View `name` built from `data` takes the place of the one shown, with its route, or falls back (kit/SPEC.md view contract). */
   A.setView = function setView(name, data) {
     const factory = AUR.views[name];
     if (typeof factory !== 'function') {

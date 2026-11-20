@@ -78,7 +78,8 @@ on the page, a timer) it ties to the scene's `onDisposeObservable`, so it goes w
 whether the build failed or the view was disposed; `AUR.disposeView` disposes the scene even when a
 step before it throws. `A.setView` makes the route (`AUR.app.state.current`: the view, and the
 project and planet its data names, `A.viewRoute` in `app/route.js`) the new view's only once the
-view is built; a view that cannot be built leaves the one shown, and its route, as they were.
+view is built. A system or planet view that cannot be built falls back to the universe; a universe
+that cannot be built leaves the view shown, and its route, as they were.
 Views may also implement `resize`,
 `setQuality`, `setSkyLook`, `setOrbitRings`, `setSearchMatches`, `setShipFocus`, `focusShip` and `shipFocusState`;
 the app fills in a no-op default for any they leave out (`VIEW_DEFAULTS` in `app/boot.js`).

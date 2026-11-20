@@ -523,8 +523,9 @@ contract), `AUR`, `AUR_POLISH` and `AUR_GALAXY` (all `any` for now).
   `AUR.app.const.CHROME` bits, and one `requestAnimationFrame` re-renders only those panels.
 - **View switch** (`A.setView`, `app/boot.js`): build the new scene first, swap, then dispose the old one —
   after polling up to 4 s for Babylon's BRDF texture, because disposing too early throws. The route
-  (`S.current`) becomes the new view's at the swap; a view that cannot be built leaves the one
-  shown and its route, and what it had made, scene and page elements alike, goes with its scene.
+  (`S.current`) becomes the new view's at the swap. A system or planet view that cannot be built
+  falls back to the universe; a universe that cannot be built leaves the view shown and its route;
+  what a failed view had made, scene and page elements alike, goes with its scene.
 - **Routes** (`app/route.js`): `openSystem` and `openPlanet` ask main, then build their view
   through `A.setView`, unless a route (`showUniverse` included) or a new stream came before the
   answer; `showUniverse` builds the universe at once. A system read goes through
