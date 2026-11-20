@@ -21,18 +21,20 @@ function loadWorld() {
   const BABYLON = {
     ShaderMaterial, Matrix, Vector2: class {}, Constants: { ALPHA_COMBINE: 2 },
     Color3: { White: () => ({}), Lerp: () => ({}) },
-    MeshBuilder: { CreateSphere: (name) => ({ name, setEnabled() {} }) },
+    MeshBuilder: { CreateSphere: (name) => ({ name, gone: false, setEnabled() {}, isDisposed() { return this.gone; } }) },
   };
   const AUR = { color3: () => ({}), worlds: { shaders: {} } };
   runRenderer('worlds/material.js', { window: { AUR }, BABYLON });
 
   const pending = new Map(); // width → resolve, for the latest request at that width
+  let uploads = 0;
   const mapsOf = (width) => ({ width, height: width / 2 });
   const service = {
     widthFor: (width) => width,
     best: (spec, maxWidth, placeholderWidth) => ({ maps: mapsOf(placeholderWidth), source: 'placeholder' }),
     request: (spec, width) => new Promise((resolve) => pending.set(width, resolve)),
     upload(scene, maps) {
+      uploads++;
       const own = [];
       const texture = (layer) => { const made = { layer, width: maps.width, disposed: false }; own.push(made); return made; };
       let clouds = null;
@@ -53,7 +55,7 @@ function loadWorld() {
     .filter(([, texture]) => texture.disposed)
     .map(([sampler, texture]) => `${material.name}.${sampler}: ${texture.layer} ${texture.width}`));
   const cloudMap = (name) => materials.find((material) => material.name === name).textures.cloudMap;
-  return { world, finish, stale, cloudMap };
+  return { world, finish, stale, cloudMap, uploads: () => uploads };
 }
 
 test('hiding the clouds after the detail map binds leaves no disposed texture on the shell', async () => {
@@ -83,4 +85,14 @@ test('hiding the clouds while the placeholder is bound leaves no disposed textur
   finish(2048);
   assert.equal(await balanced, true);
   assert.deepEqual(stale(), [], 'the hidden shell gave up the placeholder\'s cloud layer when the 2048 replaced it');
+});
+
+test('a map that lands for a globe that was disposed is not bound', async () => {
+  const { world, finish, uploads } = loadWorld();
+  const opened = world.show(2048, 3, 128);
+  const bound = uploads();
+  world.globe.gone = true; // a planet that could not be finished: its builder took the globe back
+  finish(2048);
+  assert.equal(await opened, false);
+  assert.deepEqual([uploads(), world.mapWidth], [bound, 128], 'no texture is made for it');
 });

@@ -156,7 +156,8 @@
     }
     // True once a map as wide as the result is bound: this one, or one bound before it.
     function land(result) {
-      if (!result || scene.isDisposed) return false;
+      // A globe its owner took back (a planet that could not be finished) binds nothing more.
+      if (!result || scene.isDisposed || globe.isDisposed()) return false;
       if (result.maps.width === world.mapWidth) return true;
       if (!closer(result.maps.width)) return false;
       bind(result);
