@@ -211,7 +211,11 @@
    * One tinted, hidden copy of a hull per provider and visibility: every ship of that look draws
    * as its instances. An instance takes its source's material, visibility and lights, so a ship
    * that focus mode fades is moved to the template at its visibility (fadeHull), and the template
-   * carries the layer of the lights that reach the hull.
+   * carries the layer of the lights that reach the hull. Its ships are also sorted as one, at the
+   * template's place (the scene origin, where the sun is), not each at its own, so the template
+   * takes an alphaIndex past Babylon's default (Number.MAX_VALUE), which every other blended mesh
+   * keeps: its blended parts (a faded fleet) draw after them all, over the sun's glow and the
+   * planets' shells, as a ship in front of them.
    */
   function providerTemplate(scene, state, asset, ship, visibility, layer) {
     const key = asset.file + '|' + paletteKey(ship) + '|' + visibility;
@@ -230,6 +234,7 @@
       mesh.isVisible = false;
       mesh.visibility = visibility;
       mesh.layerMask |= layer;
+      mesh.alphaIndex = Number.POSITIVE_INFINITY;
     }
     roots = entries.rootNodes;
     state.templates.set(key, roots);

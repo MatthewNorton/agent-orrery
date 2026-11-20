@@ -359,8 +359,11 @@ Design tokens (put in `:root`):
   is; an opaque hull material gives its transparency mode up, because Babylon
   ignores a mesh's visibility while its material is set opaque or cut-out;
   blended glass fades as it is; a cut-out keeps its mode and does not fade,
-  and no hull has one;
-  a view steps down to the dart past its hull triangle budget (checked again
+  and no hull has one. Babylon sorts a template's ships as one, at the
+  template's place (the scene origin, where the sun is), so every template
+  carries an `alphaIndex` of `Infinity`, past the default (`Number.MAX_VALUE`)
+  that every other blended mesh keeps: a faded fleet draws after them all,
+  over the sun's corona and glow and the planets' shells. A view steps down to the dart past its hull triangle budget (checked again
   in the step that builds a hull, so ships waiting on one container keep to
   it): 900k in a
   system or planet view, which holds fifty-one ships of the first rank, and

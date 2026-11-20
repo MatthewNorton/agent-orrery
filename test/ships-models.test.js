@@ -123,6 +123,42 @@ test('in a system every Petrel of a provider is an instance of one template, lit
     assert.equal(hullOf(a).sourceMesh, template, 'restored');
   })));
 
+// Babylon sorts a frame's blended sub-meshes by alphaIndex, then back to front; an instance batch
+// is sorted as its template's sub-mesh, at the template's place (the origin, like the sun's glow).
+test('a faded fleet draws after every other blended mesh, from either side of the sun', () =>
+  withCanvas(() => onNullScene(BABYLON, async (scene) => {
+    const AUR = loadShips();
+    scene.metadata = { view: 'system' };
+    const fly = (id) => AUR.ships.upgrade(scene, { id, provider: 'claude', kind: 'main', project: 'p', builds: 0 }, new BABYLON.Mesh('dart ' + id, scene));
+    const ship = await fly('a');
+    AUR.ships.fade(scene, 'a', 0.16);
+    const template = ship.getChildMeshes(false).find((mesh) => mesh.isAnInstance).sourceMesh;
+    const glow = Object.assign(BABYLON.MeshBuilder.CreatePlane('sun-glow', { size: 40 }, scene), { material: new BABYLON.StandardMaterial('glow', scene) });
+    const camera = new BABYLON.UniversalCamera('camera', BABYLON.Vector3.Zero(), scene);
+    const drawn = (z) => {
+      camera.position.set(3, 2, z);
+      camera.getViewMatrix(true);
+      for (const mesh of [template, glow]) mesh.computeWorldMatrix(true);
+      const queue = new BABYLON.SmartArray(64);
+      for (const subMesh of [...template.subMeshes, ...glow.subMeshes]) queue.push(subMesh);
+      const names = [];
+      const render = BABYLON.SubMesh.prototype.render;
+      BABYLON.SubMesh.prototype.render = function () { names.push(this.getMesh().name); };
+      try {
+        BABYLON.RenderingGroup._RenderSorted(queue, BABYLON.RenderingGroup.defaultTransparentSortCompare, camera, true);
+      } finally {
+        BABYLON.SubMesh.prototype.render = render;
+      }
+      return names;
+    };
+    for (const z of [-30, 30]) {
+      const names = drawn(z);
+      assert.equal(names.length, template.subMeshes.length + 1);
+      assert.equal(names[0], 'sun-glow', `the glow first, the faded finishes after it, with the camera at z ${z}`);
+    }
+    assert.equal(glow.alphaIndex, Number.MAX_VALUE, 'every other mesh keeps Babylon\'s default');
+  })));
+
 test('the model sits in the fleet frame its correction claims: one unit long, centred', () => {
   onScene((scene, models, petrel) => {
     const { scale, offset } = petrel.correction;
