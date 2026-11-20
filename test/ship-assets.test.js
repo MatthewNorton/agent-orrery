@@ -628,6 +628,15 @@ test('the triangle budget steps near hulls down to far before falling back to th
   assert.equal(roots[1].metadata.assetLod, 'far');
 });
 
+test('ships that open together, waiting on one container, keep to the budget as ships that come one by one do', async () => {
+  const assets = loadShipAssets(LADDER_MANIFEST, { 'small-near.glb': 300000, 'small-far.glb': 100000 }); // a 900k budget
+  const scene = assets.scene('system');
+  const roots = await Promise.all(['a', 'b', 'c', 'd', 'e', 'f'].map((id) => assets.ships.upgrade(scene, ship(id, 0), assets.fallback(id))));
+  assert.deepEqual(roots.map((root) => root ? root.metadata.assetLod : 'dart'), ['near', 'near', 'far', 'far', 'dart', 'dart'],
+    '300k + 300k + 100k + 100k: the next file of either size reaches the 900k budget, which a hull must stay under');
+  assert.equal(assets.triangles(scene), 800000);
+});
+
 // The counts the budget comment and kit/SPEC.md state, at the size Petrel was imported at.
 test('a near view holds fifty-one ships of the first rank and the universe map, with a budget of its own, seventy', async () => {
   const petrel = JSON.parse(fs.readFileSync(path.join(RENDERER, 'ships', 'petrel', 'source', 'source.json'), 'utf8'));

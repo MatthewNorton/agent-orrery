@@ -359,7 +359,9 @@ Design tokens (put in `:root`):
   ignores a mesh's visibility while its material is set opaque or cut-out;
   blended glass fades as it is; a cut-out keeps its mode and does not fade,
   and no hull has one;
-  a view steps down to the dart past its hull triangle budget: 900k in a
+  a view steps down to the dart past its hull triangle budget (checked again
+  in the step that builds a hull, so ships waiting on one container keep to
+  it): 900k in a
   system or planet view, which holds fifty-one ships of the first rank, and
   1.24M on the universe map, which holds seventy. Ship size is one policy (`AUR.SHIP_SIZE` per
   view, `AUR.fitShip` with a pixel floor so a hull sized to its planets still
