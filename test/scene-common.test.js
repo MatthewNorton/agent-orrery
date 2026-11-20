@@ -7,7 +7,7 @@ const assert = require('node:assert/strict');
 const test = require('node:test');
 const { fakeDocument, fakeElement } = require('./support/fake-dom');
 const { readRenderer, runRenderer } = require('./support/renderer-source');
-const { anything, fakeScene, fakeTimers } = require('./support/scene-fakes');
+const { anything, assertNoDisposeErrors, fakeScene, fakeTimers } = require('./support/scene-fakes');
 
 function loadCommon() {
   const window = {}, logged = [], hullsReleased = [];
@@ -135,6 +135,7 @@ test('buildView: a universe view that fails leaves nothing of its own on the pag
     assert.throws(build, new RegExp('no ' + failAt));
     assert.deepEqual([engine.scenes, document.body.children, timers.delays(), dialog.listeners], [[], [], [], 0],
       `no scene, no repository status layer, no label layout timer, no dialog listener (${failAt})`);
+    assertNoDisposeErrors(engine);
   }
 });
 
@@ -144,12 +145,14 @@ test('a built universe view takes what it put on the page and on the clock along
   assert.deepEqual([document.body.children.map((el) => el.className), timers.delays(), dialog.listeners], [['universe-vcs-layer'], [16], 1]);
   view.dispose();
   assert.deepEqual([engine.scenes, document.body.children, timers.delays(), dialog.listeners], [[], [], [], 0]);
+  assertNoDisposeErrors(engine);
 });
 
 test('buildView: a planet view that fails after it holds its scene unready leaves no timer to release it', () => {
   const { engine, timers, made, build } = loadPlanet(true);
   assert.throws(build, /no map/);
   assert.deepEqual([engine.scenes, timers.delays(), made[0].pendingData.size], [[], [], 0]);
+  assertNoDisposeErrors(engine);
 });
 
 test('a built planet view releases the scene it holds unready when it is disposed', () => {
@@ -158,9 +161,10 @@ test('a built planet view releases the scene it holds unready when it is dispose
   assert.deepEqual([timers.delays(), made[0].pendingData.size], [[6000], 1], 'held until the detail map is bound');
   view.dispose();
   assert.deepEqual([engine.scenes, timers.delays(), made[0].pendingData.size], [[], [], 0]);
+  assertNoDisposeErrors(engine);
 });
 
-test('the stand-in scene disposes as Babylon 9.36 does: once, and past an observer that throws', () => {
+test('the stand-in scene disposes as Babylon 9.36 does: once, and past an observer that throws, whose error it keeps', () => {
   const engine = { scenes: [] };
   const [first, other] = [fakeScene(engine), fakeScene(engine)];
   const ran = [];
@@ -170,6 +174,8 @@ test('the stand-in scene disposes as Babylon 9.36 does: once, and past an observ
   first.dispose();
   // The error is not thrown and the observers after it are skipped; the scene leaves the list once.
   assert.deepEqual([ran, engine.scenes], [['throws'], [other]]);
+  assert.deepEqual(engine.disposeErrors.map((error) => error.message), ['observer failed']);
+  assert.throws(() => assertNoDisposeErrors(engine), /a dispose observer threw/);
 });
 
 test('disposeView: the scene goes, and what was tied to it, also when a step before it throws', () => {

@@ -6,7 +6,7 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 const { runRenderer } = require('./support/renderer-source');
-const { fakeScene, fakeTimers } = require('./support/scene-fakes');
+const { assertNoDisposeErrors, fakeScene, fakeTimers } = require('./support/scene-fakes');
 
 function loadPart(timers = {}) {
   const requests = [], closed = [], foreground = [];
@@ -76,4 +76,5 @@ test('a prefetch still waiting goes with the scene', () => {
   assert.deepEqual(timers.delays(), [250]);
   scene.dispose();
   assert.deepEqual(timers.delays(), []);
+  assertNoDisposeErrors(scene.getEngine());
 });
