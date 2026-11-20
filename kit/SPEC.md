@@ -380,8 +380,9 @@ Design tokens (put in `:root`):
     Babylon ignores a mesh's visibility while its material is set opaque or
     cut-out. No flown hull has a blended material in full, its glass included;
     a cut-out would keep its mode and not fade, and no hull has one.
-  - **Triangle budget.** Past its budget a view flies the dart, a near view
-    first trying the hull's far file: 900k in a system or planet view, which
+  - **Triangle budget.** Past its budget a ship keeps its dart, or its current
+    hull when a promotion does not fit, a near view first trying the hull's far
+    file when it has one: 900k in a system or planet view, which
     holds fifty-one ships of the first rank, and 1.24M on the universe map,
     which holds seventy. A hull is checked in the step that builds it, so ships
     waiting on one container keep to the budget, and a request that ends while
@@ -400,7 +401,9 @@ Design tokens (put in `:root`):
     culled once per ship. From there it goes the way of a hull file's
     container (the hull entry `inPlaceOf` returns carries the `model`, which
     tells the two apart), so all the Petrels of a palette draw in one draw per
-    finish.
+    finish. Like a file's container it owns the materials and textures it was
+    built with, so disposing it releases them; the BRDF lookup texture a
+    scene's first PBR material makes stays the scene's.
   - **Finishes and light.** A model keeps the finishes it was authored with:
     its materials reflect its own probe and use their own tone curve (ACES).
     In the views that light their ships, three fixed lights are all that
