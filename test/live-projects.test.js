@@ -1,51 +1,23 @@
 'use strict';
 
-// src/main/live/projects.js: project ids for Codex/Signal paths, path overrides, existence and
-// moved-project recovery.
+// src/main/live/projects.js: project ids for Codex/Signal paths, path overrides, existence, and
+// the one way a project takes a path.
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { createLiveModel } = require('../src/main/live/model');
+const { remapProjectPath } = require('../src/main/live/project-edits');
 const {
-  adoptProjectPath, ensureProjectForPath, preferredProjectPath, refreshProjectExistence, remapProjectPath, restoreProject,
+  adoptProjectPath, createProject, ensureProjectForPath, preferredProjectPath, refreshProjectExistence, restoreProject, takeProjectPath,
 } = require('../src/main/live/projects');
 const { ignoresCase } = require('../src/main/path-safety');
 const { canonicalProjectPath } = require('../src/main/provider-adapters');
 const { casedCounts, KEPT_APART, KEPT_AS_ONE, KEPT_LARGER } = require('./support/bucket-cases');
+const { newModel, record } = require('./support/live-model');
 const { projectsById } = require('./support/live-session');
 const { createWorld, hex8, readState, writeState } = require('./support/transcripts');
-
-function newModel(t, { statePath, persisted } = {}) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'au-live-projects-'));
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  const file = statePath ? statePath(root) : path.join(root, 'state', 'universe-state.json');
-  if (persisted) {
-    fs.mkdirSync(path.dirname(file), { recursive: true });
-    fs.writeFileSync(file, JSON.stringify(persisted));
-  }
-  const published = [];
-  const model = createLiveModel(file, { claudeProjectsDir: path.join(root, 'none'), codexSessionDirs: [],
-    providerConfigPath: path.join(root, 'providers.json') }, (batch) => published.push(...batch));
-  // Flushed events first, then whatever is still queued: seq order either way.
-  const take = () => [...published.splice(0), ...model.pending.splice(0)].map((event) => event.type === 'feed'
-    ? ['feed', event.entry.text] : [event.type, event.project.id]);
-  const dir = (name) => {
-    const full = path.join(root, name);
-    fs.mkdirSync(full, { recursive: true });
-    return full;
-  };
-  return { root, file, model, take, dir };
-}
-
-function record(id, projectPath, exists) {
-  return {
-    id, path: projectPath, name: projectPath ? path.basename(projectPath) : id, exists,
-    lastActivity: 0, totalBytes: 0, buckets: {}, totalBuilds: 0, firstSeen: 0,
-  };
-}
 
 test('live projects: a path keeps one id; a fallback id taken by another path gets a hash suffix', (t) => {
   const { model, take, dir } = newModel(t);
@@ -103,48 +75,32 @@ test('live projects: refreshProjectExistence announces a folder that disappeared
   assert.equal(model.systemCache.has('p'), false);
 });
 
-test('live projects: remapProjectPath refuses with a code, then recovers and saves the new path', (t) => {
-  const { root, file, model, take, dir } = newModel(t);
-  const moved = dir('moved');
-  const here = dir('here');
-  fs.writeFileSync(path.join(root, 'file.txt'), 'x');
-  model.projects.set('missing', record('missing', path.join(root, 'gone'), false));
-  model.projects.set('here', record('here', here, true));
-  const code = (id, next) => {
-    try { remapProjectPath(model, id, next); return 'OK'; } catch (error) { return error.code; }
-  };
+test('live projects: a project takes a path in one step, and gives it back as everything was', (t) => {
+  const { model, dir } = newModel(t);
+  const first = dir('first');
+  const key = canonicalProjectPath(first);
+  // A new project goes by its folder's name; the name it was saved under is for one with no folder.
+  const created = createProject(model, 'made', first, { name: 'saved name' });
+  assert.deepEqual([created.path, created.name, created.exists, model.projectPathIndex.get(key), model.pathIds[key]], [first, 'first', true, 'made', 'made']);
+  assert.deepEqual([createProject(model, 'bare', null, { name: 'saved name' }).name, createProject(model, 'unnamed', null, {}).name], ['saved name', 'unnamed']);
 
-  assert.deepEqual([
-    code('nope', moved), code('here', moved), code('missing', 'relative/dir'),
-    code('missing', path.join(root, 'absent')), code('missing', path.join(root, 'file.txt')), code('missing', here),
-  ], ['NOT_FOUND', 'NOT_MISSING', 'INVALID', 'NOT_FOUND', 'INVALID', 'IN_USE']);
-  assert.deepEqual(take(), []);
-
-  const real = path.normalize(fs.realpathSync.native(moved));
-  const visible = remapProjectPath(model, 'missing', moved);
-  assert.deepEqual([visible.path, visible.name, visible.exists], [real, 'moved', true]);
-  assert.deepEqual(take(), [['project-updated', 'missing'], ['feed', 'Project path recovered: moved']]);
-  assert.equal(readState(file).pathOverrides.missing, real);
-  assert.equal(code('missing', moved), 'NOT_MISSING');
-});
-
-test('live projects: remapProjectPath rolls everything back when the state file cannot be saved', (t) => {
-  const { model, take, dir } = newModel(t, { statePath: (root) => {
-    fs.writeFileSync(path.join(root, 'blocker'), 'x');
-    return path.join(root, 'blocker', 'universe-state.json');
-  } });
-  const moved = dir('moved');
-  const gone = path.join(path.dirname(moved), 'gone');
+  // Taking the folder another project holds, then giving it back: the path, the name, the very
+  // buckets, whether it exists, and the index entries as they were (the other project's).
   const buckets = { Docs: 5, docs: 7 };
-  model.projects.set('missing', { ...record('missing', gone, false), buckets });
-
-  assert.throws(() => remapProjectPath(model, 'missing', moved), { code: 'FAILED' });
-  const project = model.projects.get('missing');
-  assert.deepEqual([project.path, project.name, project.exists], [gone, 'gone', false]);
-  assert.equal(project.buckets, buckets, 'the counts as they were');
+  const project = { ...record('p', null, false), name: 'by name', buckets };
+  model.projects.set('p', project);
+  const giveBack = takeProjectPath(model, project, first);
+  assert.deepEqual([project.path, project.name, project.exists, model.projectPathIndex.get(key), model.pathIds[key]], [first, 'first', true, 'p', 'p']);
+  assert.notEqual(project.buckets, buckets);
+  giveBack();
+  assert.deepEqual([project.path, project.name, project.exists, model.projectPathIndex.get(key), model.pathIds[key]], [null, 'by name', false, 'made', 'made']);
+  assert.equal(project.buckets, buckets);
   assert.deepEqual(Object.entries(buckets), [['Docs', 5], ['docs', 7]]);
-  assert.deepEqual([{ ...model.pathOverrides }, model.projectPathIndex.size, { ...model.pathIds }], [{}, 0, {}]);
-  assert.deepEqual(take(), []);
+
+  // A path no project had leaves no index entry behind.
+  const second = dir('second');
+  takeProjectPath(model, project, second)();
+  assert.deepEqual([project.path, model.projectPathIndex.has(canonicalProjectPath(second)), Object.hasOwn(model.pathIds, canonicalProjectPath(second))], [null, false, false]);
 });
 
 test('live projects: a folder keeps one bucket by the rule of the path its project has', (t) => {

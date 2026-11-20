@@ -18,9 +18,10 @@ const { classifyAttention, evaluateAttention } = require('./live/attention');
 const { saveState } = require('./live/state-file');
 const { getSystem, getPlanet } = require('./live/system-view');
 const {
-  refreshProjectExistence, preferredProjectPath, remapProjectPath, forgetProject, ensureProjectForPath,
+  refreshProjectExistence, preferredProjectPath, ensureProjectForPath,
   restoreRememberedProjects,
 } = require('./live/projects');
+const { remapProjectPath, forgetProject } = require('./live/project-edits');
 const { createBackup, importProjects } = require('./live/backup');
 const { departIdleShips } = require('./live/ships');
 const { pollProviderFile, applyProviderSignals } = require('./live/provider-records');

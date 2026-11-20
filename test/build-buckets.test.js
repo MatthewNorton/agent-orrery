@@ -288,6 +288,18 @@ test('every write of a project\'s path in src/main goes through setProjectPath',
   }
 });
 
+test('in the live model one function sets a project\'s path: takeProjectPath', () => {
+  // It sets the name, the folder check and the path index with the path; a call past it leaves one of them behind.
+  const calls = (source) => matched(codeLines(source), [/\bsetProjectPath\s*\(/]);
+  assert.deepEqual(mainLines(calls).filter((line) => line.startsWith('live/')), [
+    'live/projects.js: setProjectPath(project, projPath, counted);',
+    'live/projects.js: setProjectPath(project, was.path);', // giving the path back
+  ]);
+  const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'main', 'live', 'projects.js'), 'utf8');
+  const taken = source.slice(source.indexOf('\nfunction takeProjectPath('), source.indexOf('\n}\n', source.indexOf('\nfunction takeProjectPath(')));
+  assert.equal(calls(taken).length, 2, 'both inside takeProjectPath');
+});
+
 // The lines of `source` that write or remove a key of a buckets object: through a name that ends
 // in `buckets`, or through another name the object was given (`const b = project.buckets`,
 // `{ buckets: b }`, and a name given one of those).
