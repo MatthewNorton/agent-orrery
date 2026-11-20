@@ -42,14 +42,15 @@ function isProjectDirectory(projectPath) {
 
 /**
  * A new project record, announced. Build counts and first sight come from `fields` when an
- * earlier run saved them.
+ * earlier run saved them; `counted` is false when it saved those counts for a project with no path.
  * @param {LiveModel} model
  * @param {string} id
  * @param {string | null} projPath
  * @param {Partial<LiveProject>} fields
+ * @param {boolean} [counted]
  * @returns {LiveProject}
  */
-function createProject(model, id, projPath, fields) {
+function createProject(model, id, projPath, fields, counted = true) {
   /** @type {LiveProject} */
   const project = {
     id,
@@ -65,7 +66,7 @@ function createProject(model, id, projPath, fields) {
     firstSeen: fields.firstSeen || Date.now(),
   };
   // One bucket per folder by the rule of the path, every count a whole one (build-buckets.js).
-  setProjectPath(project, projPath);
+  setProjectPath(project, projPath, counted);
   model.projects.set(id, project);
   indexProjectPath(model, project);
   queue(model, { type: 'project-added', project: liveProject(project) });
@@ -85,6 +86,7 @@ function adoptProjectPath(model, project, projPath) {
 
 /**
  * Gives a project that had no folder one, with what follows from it; the caller announces it.
+ * The buckets it held were not counted here (setProjectPath): of a folder's casings the larger stays.
  * @param {LiveModel} model
  * @param {LiveProject} project
  * @param {string} projPath
@@ -126,14 +128,15 @@ function restoreRememberedProjects(model) {
  * @returns {LiveProject}
  */
 function restoreProject(model, id, saved) {
-  const projPath = preferredProjectPath(model, id, typeof saved.path === 'string' ? saved.path : null);
+  const savedPath = typeof saved.path === 'string' && saved.path ? saved.path : null;
+  const projPath = preferredProjectPath(model, id, savedPath);
   return createProject(model, id, projPath, {
     // A state file is read as it is: only a string is a name or a path, its counts are made whole
     // here (shared/values.js), and its buckets by createProject.
     name: !projPath && typeof saved.name === 'string' ? saved.name : undefined,
     lastActivity: wholeCount(saved.lastActivity) || wholeCount(saved.firstSeen),
     buckets: saved.buckets, totalBuilds: wholeCount(saved.totalBuilds), firstSeen: wholeCount(saved.firstSeen),
-  });
+  }, savedPath !== null);
 }
 
 /**

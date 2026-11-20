@@ -160,28 +160,35 @@ function addBuckets(project, counts, both) {
 
 /**
  * `counts` as the buckets of a project at `root`: one bucket per folder by that root's rule, under
- * the first key that names it, with the counts of its casings added up. What counts from outside
- * (a state file, a backup) go through before they are a project's.
+ * the first key that names it. What counts from outside (a state file, a backup) go through before
+ * they are a project's. Counts made under a path (`counted`) hold each build once, so the casings
+ * of a folder are added up. A project with no path counts no build, since a build is bucketed
+ * relative to the path: what it holds came from files, merged name by name, where two casings can
+ * be two records of the same builds. Of those the larger is kept, so a folder never gets more
+ * builds than its project has.
  * @param {string | null} root
  * @param {Record<string, unknown>} counts
+ * @param {boolean} [counted] whether the counts were made under a path
  * @returns {Record<string, number>}
  */
-function foldBuckets(root, counts) {
+function foldBuckets(root, counts, counted = true) {
   const project = { path: root, buckets: {} };
-  addBuckets(project, counts, (held, added) => held + added);
+  addBuckets(project, counts, counted ? (held, added) => held + added : Math.max);
   return project.buckets;
 }
 
 /**
  * Gives a project its path: the one way a project's path is written. The path decides which names
  * are one folder, so the buckets are folded by it in the same step, and are always as their
- * project's path counts them.
+ * project's path counts them. `counted` says whether they were counted under a path (foldBuckets);
+ * left out, it is whether the project has a path now.
  * @param {BucketedProject} project
  * @param {string | null} projectPath
+ * @param {boolean} [counted]
  */
-function setProjectPath(project, projectPath) {
+function setProjectPath(project, projectPath, counted = project.path !== null) {
   project.path = projectPath;
-  project.buckets = foldBuckets(projectPath, project.buckets);
+  project.buckets = foldBuckets(projectPath, project.buckets, counted);
 }
 
 /**

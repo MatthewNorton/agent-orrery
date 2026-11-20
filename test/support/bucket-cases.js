@@ -11,8 +11,11 @@ const CASED_COUNTS = '{ "Docs": 5, "docs": 7, "Odd": "4", "odd": 6, "src": 2.9, 
   + ' "neg": -1, "none": null, "zero": 0, "__proto__": 3 }';
 const casedCounts = () => JSON.parse(CASED_COUNTS);
 
-// What a project keeps of them where two casings are two folders, and where they are one.
+// What a project keeps of them where two casings are two folders, and where they are one: added
+// up when they were counted under a path, the larger alone when they came from a record with no
+// path, which counted nothing itself.
 const KEPT_APART = [['Docs', 5], ['docs', 7], ['odd', 6], ['src', 2], ['big', MAX], ['BIG', MAX], ['__proto__', 3]];
 const KEPT_AS_ONE = [['Docs', 12], ['odd', 6], ['src', 2], ['big', MAX], ['__proto__', 3]];
+const KEPT_LARGER = [['Docs', 7], ['odd', 6], ['src', 2], ['big', MAX], ['__proto__', 3]];
 
-module.exports = { CASED_COUNTS, casedCounts, KEPT_APART, KEPT_AS_ONE };
+module.exports = { CASED_COUNTS, casedCounts, KEPT_APART, KEPT_AS_ONE, KEPT_LARGER };

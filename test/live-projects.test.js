@@ -14,7 +14,7 @@ const {
 } = require('../src/main/live/projects');
 const { ignoresCase } = require('../src/main/path-safety');
 const { canonicalProjectPath } = require('../src/main/provider-adapters');
-const { casedCounts, KEPT_APART, KEPT_AS_ONE } = require('./support/bucket-cases');
+const { casedCounts, KEPT_APART, KEPT_AS_ONE, KEPT_LARGER } = require('./support/bucket-cases');
 const { projectsById } = require('./support/live-session');
 const { createWorld, hex8, readState, writeState } = require('./support/transcripts');
 
@@ -155,11 +155,20 @@ test('live projects: a folder keeps one bucket by the rule of the path its proje
   const here = restoreProject(model, 'here', { path: dir('here'), buckets: casedCounts(), totalBuilds: 15 });
   assert.deepEqual(...kept(here));
   assert.equal(here.totalBuilds, 15);
-  // No path tells no two names apart or together; the folder the project then gets decides.
+  // No path tells no two names apart or together; the folder the project then gets decides. It
+  // counted no build without a path, so two casings may be two records of the same builds: the
+  // larger stays, by adoption and by recovery alike.
+  const larger = (project) => [Object.entries(project.buckets), ignoresCase(project.path) ? KEPT_LARGER : KEPT_APART];
   const pathless = restoreProject(model, 'pathless', { name: 'pathless', buckets: casedCounts() });
   assert.deepEqual(Object.entries(pathless.buckets), KEPT_APART);
   adoptProjectPath(model, pathless, dir('adopted'));
-  assert.deepEqual(...kept(pathless));
+  assert.deepEqual(...larger(pathless));
+  const recovered = restoreProject(model, 'recovered', { name: 'recovered', buckets: casedCounts() });
+  remapProjectPath(model, 'recovered', dir('recovered'));
+  assert.deepEqual(...larger(recovered));
+  // A saved project with no path of its own that an override gives a folder.
+  model.pathOverrides.overridden = dir('overridden');
+  assert.deepEqual(...larger(restoreProject(model, 'overridden', { buckets: casedCounts() })));
   // Counted under a POSIX path, on another machine, and recovered to a folder here.
   const moved = restoreProject(model, 'moved', { path: '/work/elsewhere', buckets: casedCounts() });
   assert.deepEqual([moved.path, Object.entries(moved.buckets)], ['/work/elsewhere', KEPT_APART]);

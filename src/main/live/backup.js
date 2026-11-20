@@ -107,11 +107,12 @@ function importProjects(model, backup) {
       added++;
       continue;
     }
-    // The project takes its folder first: both sides are then counted by that folder's rule (each
-    // side's casings of a folder added up), and the larger count of each folder is kept.
+    // The project takes its folder first: both sides are then counted by that folder's rule, and
+    // the larger count of each folder is kept. A side that counted under a path has its casings of
+    // a folder added up; one that had no path counted nothing itself, and keeps the larger casing.
     const adopted = existing.path ? null : preferredProjectPath(model, target, saved.path);
     if (adopted) takeProjectPath(model, existing, adopted);
-    addBuckets(existing, foldBuckets(existing.path, saved.buckets), Math.max);
+    addBuckets(existing, foldBuckets(existing.path, saved.buckets, saved.path !== null), Math.max);
     existing.totalBuilds = Math.max(existing.totalBuilds, saved.totalBuilds);
     if (saved.firstSeen && saved.firstSeen < existing.firstSeen) existing.firstSeen = saved.firstSeen;
     existing.lastActivity = Math.max(existing.lastActivity, saved.lastActivity);

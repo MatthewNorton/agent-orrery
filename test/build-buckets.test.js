@@ -7,7 +7,7 @@ const path = require('node:path');
 const {
   addBuckets, bucketOf, bucketKey, bucketFor, countBuild, bucketBuilds, foldBuckets, matchingName, planetKey, setBucket, setProjectPath,
 } = require('../src/main/build-buckets');
-const { casedCounts, KEPT_APART, KEPT_AS_ONE } = require('./support/bucket-cases');
+const { casedCounts, KEPT_APART, KEPT_AS_ONE, KEPT_LARGER } = require('./support/bucket-cases');
 
 const own = (buckets) => Object.keys(buckets).map((name) => [name, Object.getOwnPropertyDescriptor(buckets, name).value]);
 
@@ -207,6 +207,23 @@ test('setProjectPath writes the path and counts the buckets by it in one step', 
   assert.deepEqual([bucketKey(project, 'DOCS'), countBuild(project, 'docs'), project.buckets.Docs], ['Docs', false, 6]);
   setProjectPath(project, null);
   assert.deepEqual([project.path, own(project.buckets), bucketKey(project, 'docs')], [null, [['Docs', 6], ['__proto__', 4]], null]);
+});
+
+test('casings counted under a path are added up; those of a project that had no path keep the larger', () => {
+  // Under a path each build is in one bucket, so two casings joined by a new path are all its builds.
+  const counted = { path: '/work/demo', buckets: { Docs: 3, docs: 3, src: 1 } };
+  setProjectPath(counted, 'C:\\Work\\Demo');
+  assert.deepEqual(own(counted.buckets), [['Docs', 6], ['src', 1]]);
+  // With no path a project counts no build: its casings are records from files, maybe of the same builds.
+  const pathless = { path: null, buckets: { Docs: 3, docs: 3, src: 1 } };
+  setProjectPath(pathless, 'C:\\Work\\Demo');
+  assert.deepEqual(own(pathless.buckets), [['Docs', 3], ['src', 1]]);
+  // The caller says so where the project's own path does not: a saved record, a backup's entry.
+  assert.deepEqual(own(foldBuckets('C:\\Work\\Demo', casedCounts(), false)), KEPT_LARGER);
+  assert.deepEqual(own(foldBuckets(null, casedCounts(), false)), KEPT_APART);
+  const restored = { path: null, buckets: { docs: 2, Docs: 5 } };
+  setProjectPath(restored, 'C:\\Work\\Demo', true);
+  assert.deepEqual(own(restored.buckets), [['docs', 7]]);
 });
 
 test('every write of a project\'s path in src/main goes through setProjectPath', () => {
