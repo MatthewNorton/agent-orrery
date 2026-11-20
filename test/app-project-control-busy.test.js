@@ -57,6 +57,21 @@ test('a forget whose card render throws as it goes up leaves the card\'s Forget 
   assert.deepEqual([shown('pc-forget'), asked], [['Forget…', false], []], 'and main was not asked');
 });
 
+test('an Open Terminal answer that comes back after the card moved on leaves the next project\'s request on Opening…', async () => {
+  const { app, state, asked, shown } = page();
+  const first = app.requestProjectTerminal('p');
+  state.current.projectId = 'q';
+  app.renderProjectCard();
+  const second = app.requestProjectTerminal('q');
+  asked[0].held.resolve({ ok: true });
+  await first;
+  app.renderProjectCard();
+  assert.deepEqual(shown('project-terminal'), ['Opening…', true], 'q\'s request holds the button');
+  asked[1].held.resolve({ ok: true });
+  await second;
+  assert.deepEqual(shown('project-terminal'), ['Open Terminal', false]);
+});
+
 // A card button's click whose render throws as its action goes up (`raise`) or once main answers.
 const THROWN_CLICKS = [
   { button: 'project-terminal', render: 'renderAgentFocus', at: 'raise' },
