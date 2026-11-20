@@ -28,6 +28,9 @@ const FOLDED = Symbol('bucket keys by lower case');
 const SIZE = Symbol('bucket key count');
 // A name as every casing of it compares where the root ignores case: the one place that says how.
 const fold = (/** @type {string} */ name) => name.toLowerCase();
+// Whether a project at `root` takes every casing of a folder's name for one folder: the one place
+// that says when. A Windows-style path does (path-safety.js ignoresCase), on every host.
+const joinsCasings = (/** @type {string | null | undefined} */ root) => ignoresCase(root);
 
 /**
  * The bucket of a project-relative path.
@@ -69,7 +72,7 @@ function isBucketName(name) {
  * @param {string} name
  */
 function planetKey(project, name) {
-  return ignoresCase(project.path) ? fold(name) : name;
+  return joinsCasings(project.path) ? fold(name) : name;
 }
 
 /**
@@ -82,7 +85,7 @@ function planetKey(project, name) {
  * @returns {T | null}
  */
 function matchingEntry(entries, name, root) {
-  const folded = ignoresCase(root) ? fold(name) : null;
+  const folded = joinsCasings(root) ? fold(name) : null;
   let other = null;
   for (const entry of entries) {
     if (entry.name === name) return entry;
@@ -119,7 +122,7 @@ function bucketKey(project, name) {
   // Security: a transcript can start a bucket per edit. A case-sensitive root has the exact key
   // or none, so a miss there looks nothing up; a root that ignores case asks the index of the
   // keys, which is one lookup however many buckets there are.
-  if (!ignoresCase(project.path)) return null;
+  if (!joinsCasings(project.path)) return null;
   return foldedKeys(project.buckets).get(fold(name)) ?? null;
 }
 
@@ -276,7 +279,7 @@ function foldBuckets(root, counts, counted, total) {
 function setProjectPath(project, projectPath) {
   project.path = projectPath;
   project.buckets = foldBuckets(projectPath, project.buckets, project.bucketsCounted === true, project.totalBuilds);
-  if (ignoresCase(projectPath)) project.bucketsCounted = true;
+  if (joinsCasings(projectPath)) project.bucketsCounted = true;
 }
 
 /**
@@ -290,7 +293,7 @@ function setProjectPath(project, projectPath) {
  */
 function mergeBuckets(project, saved) {
   if (bucketCount(saved.buckets) > 0) {
-    project.bucketsCounted = ignoresCase(project.path) || saved.bucketsCounted
+    project.bucketsCounted = joinsCasings(project.path) || saved.bucketsCounted
       || (project.bucketsCounted === true && bucketCount(project.buckets) > 0);
   }
   addBuckets(project, foldBuckets(project.path, saved.buckets, saved.bucketsCounted, saved.totalBuilds), Math.max);

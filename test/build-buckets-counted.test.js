@@ -8,6 +8,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { mergeBuckets, planetKey, setProjectPath } = require('../src/main/build-buckets');
 const { parseBackup } = require('../src/main/live/backup');
 const { remapProjectPath } = require('../src/main/live/project-edits');
 const { adoptProjectPath, restoreProject, takeProjectPath } = require('../src/main/live/projects');
@@ -125,6 +126,18 @@ test('the flag goes out in the state file and a backup and comes back, and stays
   }
   const shown = first.snapshot().projects;
   assert.deepEqual([shown.length, shown.some((p) => Object.hasOwn(p, 'bucketsCounted'))], [2, false]);
+});
+
+test('a path that joins a folder\'s casings has its buckets counted from then on, given to a project or merged into one', () => {
+  for (const [root, joins] of [['C:\\Work\\Demo', true], ['c:/work/demo', true], ['/work/demo', false], [null, false]]) {
+    const given = { path: null, buckets: { Docs: 1, docs: 1 }, bucketsCounted: false, totalBuilds: 2 };
+    setProjectPath(given, root);
+    const merged = { path: root, buckets: {}, bucketsCounted: false };
+    mergeBuckets(merged, { buckets: { Docs: 1 }, bucketsCounted: false, totalBuilds: 1 });
+    // By the rule the planet keys go by: a path joins a folder's casings exactly when they share a key.
+    const oneKey = planetKey({ path: root }, 'Docs') === planetKey({ path: root }, 'docs');
+    assert.deepEqual([given.bucketsCounted, merged.bucketsCounted, oneKey], [joins, joins, joins], String(root));
+  }
 });
 
 test('a path given back leaves the flag as it was', (t) => {

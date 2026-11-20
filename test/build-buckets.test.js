@@ -81,11 +81,13 @@ test('planetKey is one key for every casing main counts as the folder, and the n
   assert.deepEqual(['Docs', 'docs', 'DOCS', '(root)'].map((name) => planetKey(windows, name)), ['docs', 'docs', 'docs', '(root)']);
   assert.deepEqual(['Docs', 'docs', '(root)'].map((name) => planetKey(posix, name)), ['Docs', 'docs', '(root)']);
   assert.equal(planetKey({ path: null }, 'Docs'), 'Docs', 'a project without a path folds nothing');
-  // The key and the bucket lookup are one rule: two names share a bucket exactly when they share a key.
+  // The key and both lookups are one rule: two names share a bucket, and one finds the other's folder,
+  // exactly when they share a key.
   for (const project of [windows, posix, { path: 'relative\\dir' }, { path: null }]) {
     for (const [saved, asked] of [['Docs', 'docs'], ['docs', 'DOCS'], ['Docs', 'Docs'], ['src', 'Src2'], ['(root)', '(root)']]) {
       const shared = bucketKey({ ...project, buckets: { [saved]: 1 } }, asked) !== null;
       assert.equal(planetKey(project, saved) === planetKey(project, asked), shared, `${project.path}: ${saved} / ${asked}`);
+      assert.equal(matchingName([saved], asked, project.path) !== null, shared, `${project.path}: ${saved} / ${asked} on disk`);
     }
   }
 });
