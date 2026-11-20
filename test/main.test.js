@@ -1,8 +1,8 @@
 'use strict';
 
 // src/main/main.js, the main process's entry: what it does before anything else is loaded, as
-// every other file Electron is started with does. kit/grade.mjs checks the flag in the running
-// app (M7), as the shots run reports it.
+// each file under scripts/ that Electron is started with does. kit/grade.mjs checks the flag in
+// the running app (M7), as the shots run reports it.
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
