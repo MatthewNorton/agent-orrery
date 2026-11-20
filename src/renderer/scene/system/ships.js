@@ -201,11 +201,10 @@
       for (const pd of listed) count(wanted, pd.key);
       listed.forEach((pd, i) => {
         if (planets.has(pd.name) || (drawn.get(pd.key) || 0) >= wanted.get(pd.key)) return;
-        // One planet that cannot be built does not stop the others.
-        try {
-          view.buildPlanet(pd, i).appear = 0.01;
-          count(drawn, pd.key);
-        } catch (e) { AUR.log('planet not drawn', pd.name, e && e.message); }
+        const built = view.buildPlanet(pd, i);
+        if (!built) return; // it could not be built, which does not stop the others
+        built.appear = 0.01;
+        count(drawn, pd.key);
       });
     }
 

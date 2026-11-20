@@ -94,6 +94,23 @@
     return { mesh, tint, providerKey: provider.key, scale };
   };
 
+  // The view `factory` builds. A factory that throws leaves no scene behind: what it had made of
+  // one (its sky, its sun, its planets, the map requests it opened) goes before the error is passed on.
+  AUR.buildView = function (factory, engine, data, ctx) {
+    const before = new Set(engine.scenes);
+    try {
+      return factory(engine, data, ctx);
+    } catch (error) {
+      for (const scene of engine.scenes.filter((made) => !before.has(made))) {
+        try {
+          AUR.ships.dispose(scene);
+          scene.dispose();
+        } catch (e) { AUR.log('half-built scene not removed:', e && e.message); }
+      }
+      throw error;
+    }
+  };
+
   // The teardown every view ends with, after its own.
   AUR.disposeView = function (scene, gui) {
     scene.onBeforeRenderObservable.clear();

@@ -1,3 +1,4 @@
+// @ts-check
 // A solar system's planets: each one's orbit ring, generated world and label, built whole or not
 // at all.
 'use strict';
@@ -8,9 +9,9 @@
   AUR.sceneParts.system.planets = function (view) {
     const { scene, gui, projectId, orbitR, planets, topNames, ringRoot } = view;
 
-    // The planet `pd` on orbit `i`, added to the view's planets. One that cannot be finished
-    // throws and leaves nothing in the scene: a ring or a globe left behind would be drawn a
-    // second time when the planet is built again.
+    // The planet `pd` on orbit `i`, added to the view's planets. One that cannot be finished is
+    // logged and answered with null, and leaves nothing in the scene: a ring or a globe left
+    // behind would be drawn a second time when the planet is built again.
     function buildPlanet(pd, i) {
       /** @type {(() => void)[]} how to take back each thing made so far */
       const undo = [];
@@ -23,8 +24,8 @@
         const dia = AUR.clamp(AUR.PLANET_DIA.min + Math.sqrt(AUR.planetWeight(pd)) * 0.18, AUR.PLANET_DIA.min, AUR.PLANET_DIA.max);
         const persistent = topNames.indexOf(pd.name) >= 0;
         const world = view.makeWorld(pd.name, dia, persistent);
+        undo.push(() => world.dispose()); // its globe, shells and materials, and its maps back to the service
         const mesh = world.globe;
-        undo.push(() => mesh.dispose(false, true)); // its shells are its children; materials and maps go with it
         mesh.metadata = { planetName: pd.name, isPlanet: true, worldType: world.spec.cls };
         const a0 = rand() * Math.PI * 2;
         AUR.orbitPoint(a0, r, 0, mesh.position);
@@ -52,7 +53,8 @@
         for (const takeBack of undo.reverse()) {
           try { takeBack(); } catch (e) { AUR.log('planet part not removed', pd.name, e && e.message); }
         }
-        throw error;
+        AUR.log('planet not drawn', pd.name, error && error.message);
+        return null;
       }
     }
 

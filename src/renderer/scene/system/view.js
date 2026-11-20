@@ -104,7 +104,7 @@
       },
     };
 
-    planetList.forEach(view.buildPlanet);
+    planetList.forEach(view.buildPlanet); // one that cannot be built is left out, and its orbit stays empty
 
     const belt = parts.belt(view);
 

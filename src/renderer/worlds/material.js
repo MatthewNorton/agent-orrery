@@ -65,8 +65,9 @@
     if (uniforms.includes('exposure')) material.setFloat('exposure', EXPOSURE);
     return material;
   }
-  // A flat annulus from RING_IN to RING_OUT radii; u runs outward, which is all the ring map varies by.
-  function ringMesh(scene, name, radius) {
+  // A flat annulus from RING_IN to RING_OUT radii, put on `mesh`; u runs outward, which is all the
+  // ring map varies by.
+  function ringMesh(mesh, radius) {
     const seg = 160, positions = [], normals = [], uvs = [], indices = [];
     for (let i = 0; i <= seg; i++) {
       const a = (i / seg) * Math.PI * 2, c = Math.cos(a) * radius, s = Math.sin(a) * radius;
@@ -75,21 +76,40 @@
       uvs.push(0, i / seg, 1, i / seg);
     }
     for (let i = 0; i < seg; i++) { const k = i * 2; indices.push(k, k + 1, k + 2, k + 1, k + 3, k + 2); }
-    const mesh = new BABYLON.Mesh(name, scene);
     Object.assign(new BABYLON.VertexData(), { positions, normals, uvs, indices }).applyToMesh(mesh);
     return mesh;
   }
+  // Disposes a world's parts, last made first. A mesh goes without its material and a material
+  // without its textures: the maps are the service's to release, and the blank one is shared by
+  // the whole scene. One part that will not go does not keep the others.
+  function discard(parts) {
+    for (const part of parts.splice(0).reverse()) {
+      try { part.dispose(); } catch (error) { AUR.log('[worlds] a world part was not removed:', part.name, error && error.message); }
+    }
+  }
 
   // opts = { name, radius, segments, clouds (build the cloud shell), glow, maps (the service), epoch }.
-  // The caller places, spins and scales world.globe; the world binds maps and keeps uniforms current.
+  // The caller places, spins and scales world.globe; the world binds maps and keeps uniforms current,
+  // and world.dispose() takes it out of the scene. A world that cannot be made leaves nothing there.
   function createWorld(scene, spec, opts) {
+    const parts = []; // every mesh and material of the world, from the moment it exists
+    try {
+      return buildWorld(scene, spec, opts, parts);
+    } catch (error) {
+      discard(parts);
+      throw error;
+    }
+  }
+  function buildWorld(scene, spec, opts, parts) {
     const { radius, segments, glow, maps: service, epoch } = opts;
-    const sphere = (name, scale) => BABYLON.MeshBuilder.CreateSphere(name, {
+    const own = (part) => { parts.push(part); return part; };
+    const ownShader = (name, fragment, more) => own(shader(scene, name, fragment, more));
+    const sphere = (name, scale) => own(BABYLON.MeshBuilder.CreateSphere(name, {
       diameterX: 2 * radius * scale, diameterY: 2 * radius * scale * spec.flattening, diameterZ: 2 * radius * scale, segments,
-    }, scene);
+    }, scene));
     const sunColor = lightColor(spec.sunHex);
     const globe = sphere(opts.name, 1);
-    const surface = shader(scene, opts.name + '-surface', worlds.shaders.SURFACE_FRAGMENT, { samplers: ['surfaceMap', 'nightMap', 'cloudMap', 'ringMap'] });
+    const surface = ownShader(opts.name + '-surface', worlds.shaders.SURFACE_FRAGMENT, { samplers: ['surfaceMap', 'nightMap', 'cloudMap', 'ringMap'] });
     surface.setColor3('sunColor', sunColor);
     surface.setColor3('atmosphereColor', AUR.color3(spec.air));
     surface.setFloat('haze', spec.haze);
@@ -105,31 +125,34 @@
       mesh.parent = globe;
       mesh.isPickable = false;
       mesh.material = material;
-      if (glow) glow.addExcludedMesh(mesh); // the glow pass would draw a translucent shell as an occluder
+      if (glow) {
+        glow.addExcludedMesh(mesh); // the glow pass would draw a translucent shell as an occluder
+        own({ name: mesh.name + ' glow exclusion', dispose: () => glow.removeExcludedMesh(mesh) });
+      }
       mats.push(material);
       return mesh;
     }
     let clouds = null, cloudMat = null, ringMat = null;
     if (spec.clouds && opts.clouds) {
-      cloudMat = shader(scene, opts.name + '-clouds', worlds.shaders.CLOUD_FRAGMENT, { samplers: ['cloudMap'], alpha: true });
+      cloudMat = ownShader(opts.name + '-clouds', worlds.shaders.CLOUD_FRAGMENT, { samplers: ['cloudMap'], alpha: true });
       cloudMat.setColor3('sunColor', sunColor);
       clouds = shell(sphere(opts.name + '-clouds', CLOUD_SHELL), cloudMat);
     }
     if (spec.haze > 0.005) {
-      const atmoMat = shader(scene, opts.name + '-atmo', worlds.shaders.ATMO_FRAGMENT, { alpha: true });
+      const atmoMat = ownShader(opts.name + '-atmo', worlds.shaders.ATMO_FRAGMENT, { alpha: true });
       atmoMat.setColor3('atmosphereColor', AUR.color3(spec.air));
       atmoMat.setFloat('haze', spec.haze);
       shell(sphere(opts.name + '-atmo', spec.shell), atmoMat);
     }
     if (spec.rings) {
-      ringMat = shader(scene, opts.name + '-ring', worlds.shaders.RING_FRAGMENT, { samplers: ['ringMap'], alpha: true, doubleSided: true });
+      ringMat = ownShader(opts.name + '-ring', worlds.shaders.RING_FRAGMENT, { samplers: ['ringMap'], alpha: true, doubleSided: true });
       ringMat.setColor3('sunColor', sunColor);
-      shell(ringMesh(scene, opts.name + '-ring', radius), ringMat);
+      shell(ringMesh(own(new BABYLON.Mesh(opts.name + '-ring', scene)), radius), ringMat);
     }
 
     const toUnit = BABYLON.Matrix.Scaling(1 / radius, 1 / radius, 1 / radius);
     const inverse = new BABYLON.Matrix(), ringSpace = new BABYLON.Matrix();
-    let textures = null, target = 0, cloudOffset = 0, cloudsOn = false;
+    let textures = null, target = 0, cloudOffset = 0, cloudsOn = false, gone = false;
     // Nearer the wanted width in octaves: a late 512 never replaces a 2048 that landed first.
     const closer = (width) => !world.mapWidth || Math.abs(Math.log2(width / target)) < Math.abs(Math.log2(world.mapWidth / target));
     // While the clouds are hidden, the surface and the disabled shell take the emission texture.
@@ -156,8 +179,7 @@
     }
     // True once a map as wide as the result is bound: this one, or one bound before it.
     function land(result) {
-      // A globe its owner took back (a planet that could not be finished) binds nothing more.
-      if (!result || scene.isDisposed || globe.isDisposed()) return false;
+      if (!result || gone || scene.isDisposed) return false;
       if (result.maps.width === world.mapWidth) return true;
       if (!closer(result.maps.width)) return false;
       bind(result);
@@ -171,6 +193,7 @@
       // workers) now, 512 on the way to a wider map when nothing that good is cached, then that
       // map when it lands. Resolves true once a map that wide is bound.
       show(width, priority, placeholderWidth) {
+        if (gone) return Promise.resolve(false);
         target = service.widthFor(width);
         land(service.best(spec, target, placeholderWidth));
         if (world.mapWidth === target) return Promise.resolve(true);
@@ -184,6 +207,15 @@
         bindClouds();
       },
       setSun(position) { for (const m of mats) m.setVector3('sunPosition', position); },
+      // Takes the world out of the scene, for good: its maps go back to the service, and one
+      // still on its way binds nothing.
+      dispose() {
+        if (gone) return;
+        gone = true;
+        if (textures) textures.dispose();
+        textures = null;
+        discard(parts);
+      },
       update(dt) {
         if (cloudMat) {
           cloudOffset = (cloudOffset + dt * 0.0016) % 1;

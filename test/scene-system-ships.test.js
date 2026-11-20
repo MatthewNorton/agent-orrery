@@ -100,16 +100,13 @@ test('system ships: an answer is drawn only while the app still shows the view, 
 });
 
 test('system ships: a planet that cannot be built stops neither the others nor the next refetch', async () => {
-  const { view, asked, built, logged, build } = loadPart([{ name: 'src', key: 'src' }]);
+  const { view, asked, built, build } = loadPart([{ name: 'src', key: 'src' }]);
   const buildPlanet = view.buildPlanet;
-  view.buildPlanet = (pd, i) => {
-    if (pd.name === 'bad') throw new Error('no globe');
-    return buildPlanet(pd, i);
-  };
+  view.buildPlanet = (pd, i) => (pd.name === 'bad' ? null : buildPlanet(pd, i)); // null: it took itself back and logged why
   build('bad', 'bad', { isNew: true });
   asked[0].resolve(systemOf('src', 'bad', 'docs'));
   await settled();
-  assert.deepEqual([built, view.sysBehind, logged], [['docs'], false, ['planet not drawn bad no globe']]);
+  assert.deepEqual([built, view.sysBehind, [...view.planets.keys()]], [['docs'], false, ['src', 'docs']]);
 
   build('lib', 'lib', { isNew: true });
   assert.equal(asked.length, 2, 'the refetch is not left fetching');

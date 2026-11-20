@@ -229,7 +229,7 @@
     }
     let next;
     try {
-      next = factory(S.engine, data, makeCtx());
+      next = AUR.buildView(factory, S.engine, data, makeCtx());
     } catch (e) {
       AUR.log('view build failed:', name, e && e.message);
       if (name !== 'universe') return A.showUniverse();

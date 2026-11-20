@@ -71,7 +71,9 @@ a view compares it around a call of its own that it awaits, and drops an answer 
 a change), the
 shared `store`, the graphics `quality` tier, the `galaxyFields` cache and `worldMaps`, the generated
 planet maps (`worlds/textures.js`: a view opens an epoch on its scene and requests maps in it; disposing the scene closes the epoch),
-and the Settings `skyLook` and `orbitRings` (§4).
+and the Settings `skyLook` and `orbitRings` (§4). The app builds every view through
+`AUR.buildView` (`scene/common.js`): a factory that throws leaves no scene behind, since any scene it
+had made is disposed before the error is passed on.
 Views may also implement `resize`,
 `setQuality`, `setSkyLook`, `setOrbitRings`, `setSearchMatches`, `setShipFocus`, `focusShip` and `shipFocusState`;
 the app fills in a no-op default for any they leave out (`VIEW_DEFAULTS` in `app/boot.js`).
@@ -572,8 +574,11 @@ Data: `AU.getSystem(projectId)`.
   planet in from zero, feed shows planet formation. An answer is drawn only while the app still
   shows the view in the stream it was asked in (`ctx.shown`). A fetch that fails is not tried
   again: the view stays behind (its system is not handed to a planet, which fetches its own)
-  until the next planet starts or the view is built again. A planet that cannot be built leaves
-  no ring, globe or label behind, and does not stop the others. A folder is one planet whatever its casing:
+  until the next planet starts or the view is built again. A planet that cannot be built, when
+  the view opens or later, leaves no ring, globe, shell, material or label behind and gives its
+  maps back to the map service (a world's own `dispose()`, `worlds/material.js`, which never
+  disposes the blank texture its scene shares); it is logged once and does not stop the others,
+  and the next re-fetch builds it again. A folder is one planet whatever its casing:
   one renamed in case only keeps the globe it has, under the name it was drawn with, until the
   view is built again; a key gets a second globe only when the answer lists it twice.
   On `activity`: brief thruster flash.

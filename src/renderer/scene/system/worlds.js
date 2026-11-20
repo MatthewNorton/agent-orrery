@@ -25,13 +25,19 @@
 
     const showSystemMaps = (world, first) => world.show(SIZES[tier.key].system, first ? 2 : 1, PLACEHOLDER.system);
 
-    // The world for a planet `dia` across, named pl_<name> for picking and the polish harness.
+    // The world for a planet `dia` across, named pl_<name> for picking and the polish harness. One
+    // whose first map cannot be made (the service's best() throws) is taken out of the scene again.
     function makeWorld(name, dia, first) {
       const world = W.createWorld(scene, W.worldSpec(projectId, name, sunHex), {
         name: 'pl_' + name, radius: dia / 2, segments: 32, clouds: false, glow, maps, epoch,
       });
-      world.setSun(origin);
-      showSystemMaps(world, first);
+      try {
+        world.setSun(origin);
+        showSystemMaps(world, first);
+      } catch (error) {
+        world.dispose();
+        throw error;
+      }
       return world;
     }
 

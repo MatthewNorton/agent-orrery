@@ -8,9 +8,10 @@ const vm = require('node:vm');
 
 const RENDERER = path.join(__dirname, '..', 'src', 'renderer');
 
-// util.js creates window.AUR; util-scene.js adds the Babylon-facing helpers to it.
-function loadUtilLayer() {
-  const sandbox = { window: {} };
+// util.js creates window.AUR; util-scene.js adds the Babylon-facing helpers to it. `globals` are
+// the page's other globals (BABYLON, say).
+function loadUtilLayer(globals = {}) {
+  const sandbox = { window: {}, ...globals };
   for (const file of ['util.js', 'util-scene.js']) {
     vm.runInNewContext(fs.readFileSync(path.join(RENDERER, file), 'utf8'), sandbox, { filename: file });
   }
@@ -108,4 +109,22 @@ test('memo builds an entry once and hands the same one back after', () => {
   const build = () => ({ build: ++builds });
   assert.equal(AUR.memo(map, 'k', build), AUR.memo(map, 'k', build));
   assert.equal(builds, 1);
+});
+
+test('label: one that cannot be linked to its mesh is taken out of the layer again', () => {
+  const controls = new Set();
+  class TextBlock {
+    linkWithMesh(mesh) {
+      if (mesh.gone) throw new Error('no mesh');
+      this.linked = mesh;
+    }
+    dispose() { controls.delete(this); }
+  }
+  const AUR = loadUtilLayer({ BABYLON: { GUI: { TextBlock } } });
+  const gui = { addControl: (control) => controls.add(control) };
+  const mesh = {};
+  const label = AUR.label(gui, 'src', { mesh, offsetY: -20 });
+  assert.deepEqual([controls.has(label), label.text, label.linked === mesh, label.linkOffsetY], [true, 'src', true, -20]);
+  assert.throws(() => AUR.label(gui, 'docs', { mesh: { gone: true } }), /no mesh/);
+  assert.deepEqual([...controls], [label], 'the layer holds no control for the label that failed');
 });
