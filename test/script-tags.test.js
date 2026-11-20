@@ -41,4 +41,6 @@ test('a tag in any other form is named, not dropped', () => {
     assert.throws(() => scriptTags('<script src="first.js"></script>' + tag),
       (error) => NOT_PLAIN.test(error.message) && error.message.endsWith(': ' + opening), tag);
   }
+  assert.throws(() => scriptTags('<script src="a.js"></script><script src="b.js" '), NOT_PLAIN, 'a tag the page ends inside');
+  assert.throws(() => scriptTags('<script src="a.js"></script><script src="b.js" <!-- note></script>'), NOT_PLAIN, 'a tag an unclosed comment cuts');
 });

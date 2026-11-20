@@ -23,7 +23,7 @@ function withoutComments(html) {
  * @param {string} html
  */
 function scriptTags(html) {
-  return (withoutComments(html).match(/<script\b[^>]*>/gi) ?? []).map((tag) => {
+  return (withoutComments(html).match(/<script\b[^>]*(?:>|$)/gi) ?? []).map((tag) => {
     const plain = /^<script src="([^"]+)">$/.exec(tag);
     if (!plain) throw new Error('index.html has a script tag that is not a plain <script src="...">: ' + tag);
     return plain[1];
