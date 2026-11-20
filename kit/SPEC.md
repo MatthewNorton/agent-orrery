@@ -275,8 +275,9 @@ Event batch entries (from `AU.onEvents`):
    // project is the ID string; bucket = the edit's top-level folder as the edit wrote it, or
    // '(root)'; isNew => planet formation. Under a Windows path main keeps one bucket for a
    // folder's casings, so the planet is found by `key` (the Planet's and PlanetData's), not by
-   // the bucket's spelling. An edit whose path holds a NUL, CR or LF, or is over 4096
-   // characters, is no build, live and in history alike (`safePath`): its tool still shows.
+   // the bucket's spelling. An edit's path is checked once, trimmed, where its transcript is read
+   // (`safePath`): one that holds a NUL, CR or LF, or is over 4096 characters, names no file, and a
+   // relative one is in no project. Either is no build, live and in history alike; its tool still shows.
 { type: 'activity', project, shipId, tool, status, detail, ts }
 { type: 'feed', entry: FeedEntry }
 ```

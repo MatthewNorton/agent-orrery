@@ -11,8 +11,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { canonicalProjectPath } = require('../src/main/provider-adapters');
 const {
-  SEC, T0, SLUG, CLAUDE_SESSION, TASK_ID, SHIP_ID, CODEX_SHIP_ID, hex8, appendJsonl, createWorld, ofType, countTypes,
-  pick, claude,
+  SEC, T0, SLUG, CLAUDE_SESSION, CODEX_SESSION, TASK_ID, SHIP_ID, CODEX_SHIP_ID, hex8, appendJsonl, createWorld, ofType, countTypes,
+  pick, claude, codex,
 } = require('./support/transcripts');
 const { runBoth } = require('./support/both-models');
 
@@ -138,6 +138,35 @@ test('agree: codex project id, ship identity, classified activity and builds', a
   const build = pick(['project', 'bucket', 'isNew', 'shipId', 'ts']);
   assert.deepEqual(ofType(replay.events, 'build').map(build), ofType(live.events, 'build').map(build));
   assert.equal(ofType(live.events, 'build').length, 1);
+});
+
+test('agree: a relative edit path builds nothing in either model, Claude or Codex, wherever the app runs', async (t) => {
+  // A relative path would resolve against the app's working folder, which here is the project.
+  const cwd = process.cwd();
+  const inProject = (lines) => (dir) => { process.chdir(dir); return lines(dir); };
+  const sides = {
+    claude: inProject((dir) => [
+      claude.prompt(dir, T0),
+      claude.tool(dir, T0 + 1 * SEC, 'toolu_rel', 'Edit', { file_path: path.join('src', 'a.js') }),
+      claude.tool(dir, T0 + 2 * SEC, 'toolu_abs', 'Edit', { file_path: path.join(dir, 'src', 'b.js') }),
+    ]),
+    codex: inProject((dir) => [
+      codex.meta(T0, CODEX_SESSION, dir), codex.event(T0 + 1 * SEC, 'task_started'), codex.patchCall(T0 + 2 * SEC, 'call-patch'),
+      codex.patched(T0 + 3 * SEC, 'call-patch', [path.join('src', 'a.js'), path.join(dir, 'src', 'b.js')]),
+    ]),
+  };
+  for (const [provider, records] of Object.entries(sides)) {
+    await t.test(provider, async (st) => {
+      try {
+        const { live, replay } = await runBoth(st, { provider, records });
+        for (const side of [live, replay]) {
+          assert.deepEqual(ofType(side.events, 'build').map((event) => event.file.replaceAll('\\', '/')), ['src/b.js']);
+        }
+      } finally {
+        process.chdir(cwd);
+      }
+    });
+  }
 });
 
 test('differs: event volume — replay adds project-updated per record and ship-updated per turn/tool boundary', async (t) => {

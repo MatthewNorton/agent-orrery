@@ -1,7 +1,7 @@
 // @ts-check
 'use strict';
 
-const { plainObject } = require('./fields');
+const { plainObject, safePath } = require('./fields');
 const { claudeModel } = require('./model');
 
 const TOOL_STATUS = Object.freeze({
@@ -51,9 +51,9 @@ const BOOKKEEPING_KINDS = new Set([
  * @property {'tool-start'} type
  * @property {any} callId The tool_use id as written.
  * @property {any} tool The tool name as written.
- * @property {string | null} filePath input.file_path when it is a string.
- * @property {string | null} detail Without a file path: the pattern or description, cut to 60
- *   characters. Only the live view shows it.
+ * @property {string | null} filePath input.file_path, trimmed, when safePath keeps it.
+ * @property {string | null} detail When the input names no file_path at all: the pattern or
+ *   description, cut to 60 characters. Only the live view shows it.
  *
  * @typedef {object} ClaudeToolEnd
  * @property {'tool-end'} type
@@ -123,10 +123,13 @@ function claudeRecordFacts(value) {
  */
 function toolStart(block) {
   const input = block.input || {};
-  const filePath = typeof input.file_path === 'string' ? input.file_path : null;
+  // Security: one check of the path for both models (fields.js). A path it refuses names no file,
+  // so no build and no ship detail is made of it.
+  const named = typeof input.file_path === 'string';
+  const filePath = named ? safePath(input.file_path) : null;
   let detail = null;
-  if (filePath === null && typeof input.pattern === 'string') detail = input.pattern.slice(0, 60);
-  else if (filePath === null && typeof input.description === 'string') detail = input.description.slice(0, 60);
+  if (!named && typeof input.pattern === 'string') detail = input.pattern.slice(0, 60);
+  else if (!named && typeof input.description === 'string') detail = input.description.slice(0, 60);
   return { type: 'tool-start', callId: block.id, tool: block.name, filePath, detail };
 }
 

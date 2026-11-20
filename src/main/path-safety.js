@@ -96,17 +96,18 @@ function ignoresCase(root) {
  * file relative to root, joined with `separator`, or null unless it lies strictly beneath
  * root. The flavor, and Windows case folding, come from root's syntax, so every host agrees.
  * Case folding only decides containment: the result keeps the file's own casing.
- * Without `requireAbsolute` a relative file resolves against the process cwd.
- * @param {string | null | undefined} root
- * @param {string | null | undefined} file
- * @param {{ separator?: string, requireAbsolute?: boolean }} [options]
+ * Both must be absolute paths: a relative one would resolve against the process cwd, which
+ * says nothing about where a transcript's file is.
+ * @param {unknown} root
+ * @param {unknown} file
+ * @param {{ separator?: string }} [options]
  * @returns {string | null}
  */
-function relativeInside(root, file, { separator = path.sep, requireAbsolute = false } = {}) {
-  if (!root || !file) return null;
+function relativeInside(root, file, { separator = path.sep } = {}) {
+  if (typeof root !== 'string' || typeof file !== 'string') return null;
   const windows = ignoresCase(root);
   const flavor = windows ? path.win32 : path.posix;
-  if (requireAbsolute && (!flavor.isAbsolute(root) || !flavor.isAbsolute(file))) return null;
+  if (!flavor.isAbsolute(root) || !flavor.isAbsolute(file)) return null;
   const normalizedRoot = flavor.normalize(root);
   const normalizedFile = flavor.normalize(file);
   const comparableRoot = windows ? normalizedRoot.toLowerCase() : normalizedRoot;

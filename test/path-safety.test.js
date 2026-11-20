@@ -194,6 +194,10 @@ test('relativeInside ignores case only under a Windows-style root and keeps the 
   assert.equal(relativeInside('C:\\Work\\Demo', 'c:\\work\\demo'), null);
   assert.equal(relativeInside('/Work/Demo', '/Work/Demo/Docs/Guide.md', { separator: '/' }), 'Docs/Guide.md');
   assert.equal(relativeInside('/Work/Demo', '/work/demo/Docs/Guide.md'), null);
+  // A relative path says nothing about where a file is: it would resolve against the app's own folder.
+  for (const [root, file] of [[process.cwd(), path.join('Docs', 'x.md')], ['Demo', 'Demo/Docs/x.md'], [process.cwd(), 7], [null, '/x']]) {
+    assert.equal(relativeInside(root, file), null, JSON.stringify([root, file]));
+  }
   assert.deepEqual(['C:\\Work', 'c:/work', 'relative\\dir', '/Work', null].map(ignoresCase),
     [true, true, true, false, false]);
 });

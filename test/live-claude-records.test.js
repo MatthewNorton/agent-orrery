@@ -242,7 +242,8 @@ test('claude: an edit whose path holds a NUL, CR or LF, or is too long, counts n
     ...unsafe.map((file_path, index) => claude.tool(dir, T0 + (1 + index) * SEC, `toolu_u${index}`, 'Edit', { file_path })),
     claude.tool(dir, T0 + 9 * SEC, 'toolu_ok', 'Write', { file_path: path.join(dir, 'src', 'a.js') }),
   ], T0 + 9 * SEC);
-  // As history reads the same lines: the tool still shows on its ship, and only the path that is one builds.
+  // The tool still shows on its ship, with no detail, and only the path that is one builds;
+  // history builds the same (transcripts-claude.test.js).
   assert.deepEqual(ofType(events, 'build').map(pick(['bucket', 'file'])), [{ bucket: 'src', file: path.join('src', 'a.js') }]);
   assert.deepEqual(ofType(events, 'activity').map(pick(['tool', 'status', 'detail'])),
     unsafe.map(() => ({ tool: 'Edit', status: 'Building', detail: null })));

@@ -11,7 +11,7 @@ const { fnv1a, hex8, mulberry32 } = require('../shared/hash');
 const { bareCopy, wholeCount } = require('../shared/values');
 const { relativeInside } = require('../path-safety');
 const { bucketOf, bucketFor, countBuild, planetKey } = require('../build-buckets');
-const { safeId, safePath } = require('../transcripts/fields');
+const { safeId } = require('../transcripts/fields');
 const { proceduralSystem, systemData } = require('../universe/planets');
 const { historyProject, historyShip } = require('../universe/public-shape');
 const { createShipRecord } = require('../universe/ships');
@@ -176,8 +176,7 @@ function createHistoryModel({ batchSize, onBatch, preferredProjectId }) {
     for (const value of files.slice(0, 256)) {
       const filePath = typeof value === 'string' ? value
         : value && typeof value === 'object' ? value.movePath || value.path : null;
-      const relative = safePath(project.path) && safePath(filePath)
-        ? relativeInside(project.path, filePath, { separator: '/', requireAbsolute: true }) : null;
+      const relative = relativeInside(project.path, filePath, { separator: '/' });
       if (!relative || seen.has(relative)) continue;
       seen.add(relative);
       const bucket = bucketOf(relative, '/');
