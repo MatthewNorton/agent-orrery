@@ -29,7 +29,7 @@ test('asar check: a temporary folder it cannot make fails every answer, and the 
 });
 
 // fs.promises whose rename and unlink fail for each file as `fails` says ({ call: [code, times] }), then
-// go through; `tried` lists the calls.
+// go through; each error names its try, and `tried` lists the calls.
 function holding(fails) {
   const tried = [], counts = new Map();
   const call = (name) => async (target, ...rest) => {
@@ -37,7 +37,7 @@ function holding(fails) {
     const [code, times] = fails[name] || [null, 0];
     const n = counts.get(name + target) ?? 0;
     counts.set(name + target, n + 1);
-    if (n < times) throw Object.assign(new Error(`${code}: ${name} '${path.basename(target)}'`), { code });
+    if (n < times) throw Object.assign(new Error(`${code}: ${name} '${path.basename(target)}', try ${n + 1}`), { code });
     return fs.promises[name](target, ...rest);
   };
   return { tried, files: { ...fs.promises, rename: call('rename'), unlink: call('unlink') } };
@@ -53,10 +53,10 @@ test('asar check: a rename or delete held for a moment is tried again, five trie
   const long = holding({ unlink: ['EACCES', 9] });
   const kept = await asarCheck(long.files, options);
   assert.deepEqual([kept.deleted, kept.errors, long.tried.filter((name) => name === 'unlink').length, waits],
-    [false, ["delete: EACCES: unlink 'malformed.asar'"], 5, 4], 'the last try\'s error');
+    [false, ["delete: EACCES: unlink 'malformed.asar', try 5"], 5, 4], 'the last try\'s error');
   waits = 0;
   const gone = holding({ unlink: ['ENOENT', 1] });
-  assert.deepEqual([(await asarCheck(gone.files, options)).errors, waits], [["delete: ENOENT: unlink 'malformed.asar'"], 0]);
+  assert.deepEqual([(await asarCheck(gone.files, options)).errors, waits], [["delete: ENOENT: unlink 'malformed.asar', try 1"], 0]);
 });
 
 test('asar check: an fs that opens archives fails every step it gets wrong, and cleans up all the same', async (t) => {
