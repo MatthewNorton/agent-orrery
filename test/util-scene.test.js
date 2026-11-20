@@ -116,3 +116,16 @@ test('memo builds an entry once and hands the same one back after', () => {
   assert.equal(AUR.memo(map, 'k', build), AUR.memo(map, 'k', build));
   assert.equal(builds, 1);
 });
+
+test('AUR.dressed returns a material once dressed, and disposes one that cannot be', () => {
+  const AUR = loadUtilLayer();
+  const made = () => ({ disposed: 0, dispose() { this.disposed += 1; } });
+  const whole = made();
+  assert.equal(AUR.dressed(whole, (material) => { material.worn = true; }), whole);
+  assert.deepEqual([whole.worn, whole.disposed], [true, 0]);
+
+  const half = made();
+  const fault = new Error('no trim');
+  assert.throws(() => AUR.dressed(half, () => { throw fault; }), (error) => error === fault);
+  assert.equal(half.disposed, 1);
+});

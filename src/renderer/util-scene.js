@@ -20,6 +20,18 @@
     if (material.transparencyMode === BABYLON.Material.MATERIAL_OPAQUE) material.transparencyMode = null;
   };
 
+  // A material just made, once `dress` has run on it; one that cannot be dressed is disposed, so
+  // a copy is never left in the scene half dressed.
+  AUR.dressed = function (material, dress) {
+    try {
+      dress(material);
+    } catch (error) {
+      material.dispose();
+      throw error;
+    }
+    return material;
+  };
+
   // A light that reaches only the meshes carrying a layer bit.
   AUR.layerLight = function (light, intensity, diffuse, layer) {
     light.intensity = intensity;

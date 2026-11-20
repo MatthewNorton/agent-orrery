@@ -277,3 +277,26 @@ test('an opaque material fades with its mesh once it gives its transparency mode
   cutOut.transparencyMode = null;
   assert.deepEqual([cutOut.needAlphaBlendingForMesh(mesh), cutOut.needAlphaTestingForMesh(mesh)], [true, false]);
 }));
+
+test('a trim copy that cannot be dressed is not left in the scene, and the next one is made whole', () => onNullScene(BABYLON, (scene) => {
+  const models = load().shipModels;
+  const lamp = new BABYLON.PBRMaterial('lamp', scene);
+  const hull = new BABYLON.MultiMaterial('hull', scene);
+  hull.subMaterials = [lamp];
+  const model = { id: 'probe', trim: { lamp: { lamps: '#ffb24a' } } };
+  const materials = new Map();
+  const made = () => [scene.materials.length, scene.multiMaterials.length];
+  const before = made();
+
+  const emissive = lamp.emissiveColor;
+  lamp.emissiveColor = null; // what a lamp's dressing reads
+  lamp.clone('a copy can still be made').dispose();
+  assert.throws(() => models.material(materials, model, 'claude', '#ff7a1a', hull), TypeError);
+  assert.deepEqual(made(), before, 'neither the lamp copy nor the hull material that was to hold it stays');
+  assert.equal(materials.size, 0, 'and nothing half dressed is kept for the next ship');
+
+  lamp.emissiveColor = emissive;
+  const worn = models.material(materials, model, 'claude', '#ff7a1a', hull);
+  assert.deepEqual(made(), [before[0] + 1, before[1] + 1]);
+  assert.notEqual(worn.subMaterials[0], lamp, 'the hull wears the lamp in the ship color');
+}));

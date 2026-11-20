@@ -159,15 +159,9 @@
     let material = state.materials.get(key);
     if (material) return material;
     const id = 'ship_fleet_' + file + '_' + palette + '_' + sourceName;
-    material = baseMaterial && typeof baseMaterial.clone === 'function'
-      ? baseMaterial.clone(id)
-      : new BABYLON.StandardMaterial(id, scene);
-    try {
-      dressFleetMaterial(scene, material, materialRole(sourceName), selfLight, ship);
-    } catch (error) {
-      material.dispose(); // a copy half dressed is never kept
-      throw error;
-    }
+    material = AUR.dressed(
+      baseMaterial && typeof baseMaterial.clone === 'function' ? baseMaterial.clone(id) : new BABYLON.StandardMaterial(id, scene),
+      (copy) => dressFleetMaterial(scene, copy, materialRole(sourceName), selfLight, ship));
     state.materials.set(key, material);
     return material;
   }
