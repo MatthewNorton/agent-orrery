@@ -8,6 +8,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { getSystem, getPlanet, isPlanetSegment, planetFolders, IGNORE_DIRS } = require('../src/main/live/system-view');
 const { linkTo, outsideFolder, projectOnDisk, refuseReads, spyReaddir } = require('./support/system-view');
+const { SEC, SLUG, T0, claude, ofType } = require('./support/transcripts');
+const { runBoth } = require('./support/both-models');
 
 test('live system view: planets are top-level folders ranked by files plus five per build', (t) => {
   const { model } = projectOnDisk(t, [
@@ -29,11 +31,41 @@ test('live system view: planets are top-level folders ranked by files plus five 
   assert.equal(getSystem(model, 'missing'), null);
 });
 
-test('live system view: the root planet\'s builds are read as any bucket\'s, a whole count', (t) => {
+test('live system view: the root planet\'s builds are the top-level files\' own bucket, a whole count', (t) => {
   // A count held past the rule (shared/values.js) is made whole on the way out, and one that is none starts no planet.
   const builds = (root) => getSystem(projectOnDisk(t, ['src/a.js', 'README.md'], { '(root)': root, src: 2 }).model, 'p').planets.map((planet) => [planet.name, planet.builds]);
   assert.deepEqual(builds(2.9), [['src', 2], ['(root)', 2]]);
   assert.deepEqual(builds('3'), [['src', 2]]);
+});
+
+test('live system view: a folder whose name a Windows path folds to (root) draws no root planet', (t) => {
+  const { root, model } = projectOnDisk(t, ['(Root)/a.js', 'src/b.js', 'README.md'], { '(Root)': 3 }, 'case\\root');
+  const planets = () => getSystem(model, 'p').planets.map((planet) => [planet.name, planet.builds]);
+  assert.deepEqual(planets(), [['(Root)', 3], ['src', 0]]);
+  // Nor once the folder is gone.
+  fs.rmSync(path.join(root, '(Root)'), { recursive: true });
+  model.systemCache.clear();
+  assert.deepEqual(planets(), [['src', 0]]);
+});
+
+test('both models answer a planet card with as many builds as were sent with its key, (root) beside a folder (Root) too', async (t) => {
+  // A Windows-style root on every host, where the folder (Root) and the top-level files' (root) share a key.
+  const { live, replay } = await runBoth(t, {
+    cwd: 'C:\\Orrery-Fixture-Missing\\Demo',
+    records: (dir) => [claude.prompt(dir, T0),
+      ...[1, 2].map((n) => claude.tool(dir, T0 + n * SEC, `toolu_${n}`, 'Write', { file_path: `${dir}\\(Root)\\${n}.md` }))],
+  });
+  const cards = [[live, (name) => live.tracker.getPlanet(SLUG, name)], [replay, async (name) => replay.source.getPlanet(SLUG, name)]];
+  for (const [side, card] of cards) {
+    const builds = ofType(side.events, 'build');
+    assert.equal(builds.length, 2);
+    for (const name of ['(root)', '(Root)']) {
+      const planet = await card(name);
+      assert.equal(planet.builds, builds.filter((event) => event.key === planet.key).length, name);
+    }
+  }
+  // The history system draws the folder alone too.
+  assert.deepEqual(replay.source.getSystem(SLUG).planets.map((planet) => planet.name), ['(Root)']);
 });
 
 test('live system view: the system view and the planet card count a planet\'s files alike, a link as the one file it is', async (t) => {

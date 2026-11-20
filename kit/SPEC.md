@@ -239,13 +239,13 @@ Planet     = { name, key, files, builds, procedural? }   // name '(root)' possib
 //   and is never followed (`isPlanetFile`): a planet's `files` and `beltDensity` in the system view
 //   and the planet card's `files` count alike. getSystem draws the planet folders that are not
 //   ignored (a name starting with `.`, or one of `IGNORE_DIRS` such as `node_modules`), and
-//   `(root)` when the top-level files have builds. getPlanet reads any planet folder. So a folder
-//   with builds that the system view does not draw (`.github`) stays in `Project.planets` (every
-//   bucket's key), which Go to lists, and opens as a planet that reads its folder. Every bucket
-//   opens: a bucket's name is one a planet can have (one plain path segment) with no control
-//   character (`isBucketName` in `src/main/build-buckets.js`), and a project keeps 10,000 at most.
-//   One rule for both models' counting and both files' reader, so a bucket reads back after a
-//   restart as it was.
+//   `(root)` from the top-level files' own bucket, by that exact key, when it has builds. getPlanet
+//   reads any planet folder. So a folder with builds that the system view does not draw
+//   (`.github`) stays in `Project.planets` (every bucket's key), which Go to lists, and opens as a
+//   planet that reads its folder. Every bucket opens: a bucket's name is one a planet can have
+//   (one plain path segment) with no control character (`isBucketName` in
+//   `src/main/build-buckets.js`), and a project keeps 10,000 at most. One rule for both models'
+//   counting and both files' reader, so a bucket reads back after a restart as it was.
 
 PlanetData = { name, key, project: Project, builds, files, sizeKb, subdirs,
                resources: string[], procedural?, folderRead? }   // resources = top file exts;

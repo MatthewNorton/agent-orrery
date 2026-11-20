@@ -6,6 +6,7 @@
 const fs = require('fs');
 const path = require('path');
 const { fnv1a, mulberry32 } = require('../shared/hash');
+const { wholeCount } = require('../shared/values');
 const { bucketBuilds, bucketFor, isPlanetSegment, matchingEntry, planetKey } = require('../build-buckets');
 const { isStandInName, proceduralSystem, systemData } = require('../universe/planets');
 const { liveProject } = require('../universe/public-shape');
@@ -97,7 +98,9 @@ function getSystem(model, projectId) {
         files: shallowCount(path.join(project.path, d.name)),
         builds: bucketBuilds(project, d.name),
       }));
-      const rootBuilds = bucketBuilds(project, '(root)');
+      // The top-level files' own bucket, by that exact key: a folder whose name a path folds to
+      // (root) is a planet folder of its own.
+      const rootBuilds = Object.hasOwn(project.buckets, '(root)') ? wholeCount(project.buckets['(root)']) : 0;
       if (rootBuilds) {
         planets.push({ name: '(root)', files: beltDensity, builds: rootBuilds });
       }
