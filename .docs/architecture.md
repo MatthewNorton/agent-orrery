@@ -83,10 +83,10 @@ or the record of how the app was built.
 
 | Folder | Files | Size | What it is | Part of the running app? |
 |---|---|---|---|---|
-| `src/main/` + `src/preload.js` | 93 | 14,022 lines JS (1,580 of it test harness) | Main process | **Yes** (harness runs only with test flags) |
-| `src/renderer/` | 98 | 12,612 lines JS + 3,200 HTML/CSS | Renderer (UI + 3D) | **Yes** |
+| `src/main/` + `src/preload.js` | 93 | 14,006 lines JS (1,574 of it test harness) | Main process | **Yes** (harness runs only with test flags) |
+| `src/renderer/` | 98 | 12,609 lines JS + 3,200 HTML/CSS | Renderer (UI + 3D) | **Yes** |
 | `assets/` | 347 | ~280 MB | Planet / skybox / asteroid textures, ship GLBs | Partly — see §8 |
-| `test/` | 126 | 18,247 lines | Unit tests (`npm test`, Node's runner, no Electron) | No |
+| `test/` | 126 | 18,254 lines | Unit tests (`npm test`, Node's runner, no Electron) | No |
 | `kit/` | 23 | — | Kit tooling, two stubs **and** 13 regression gate scripts | No (gates matter, see §9) |
 | `scripts/` | 11 | — | One-step setup (run by the root `Install Agent Orrery.cmd` / `.command`), ship generators, the fleet-v2 LOD build, launcher shortcuts, demo screenshots and their synthetic profile, a VCS UI lab | No |
 | `docs/` | 16 | — | Feature notes and plans; four of them are also gate fixtures | No |
@@ -204,7 +204,7 @@ in a closure, and anything shared is a field of `ctx`.
 | `live/projects.js` | 251 | functions | Project registry: path → id, display path, folder still exists; `takeProjectPath`, the one way a project takes a path; restores the projects a state file or a backup keeps | `provider-adapters`, `path-safety`, `build-buckets`, `shared/hash`, `universe/public-shape`, `live/events`, `live/forgotten`, `live/saved-project` |
 | `live/project-edits.js` | 127 | functions | What the owner does to one project by hand: `remapProjectPath` points a missing project at the folder it moved to, `forgetProject` forgets it; each is saved to the state file before it shows | `provider-adapters`, `universe/public-shape`, `live/events`, `live/state-file`, `live/ships`, `live/projects` |
 | `live/ships.js` | 180 | functions | Ships and drones: spawn, pending tool calls, departure | `provider-adapters`, `universe/ships`, `universe/public-shape`, `live/events` |
-| `live/builds.js` | 64 | functions | One verified edit → one build in its top-level folder; one that no bucket holds carries no planet key | `build-buckets`, `path-safety`, `shared/build-histogram`, `shared/values`, `live/events` |
+| `live/builds.js` | 60 | functions | One verified edit → one build in its top-level folder; one that no bucket holds carries no planet key | `build-buckets`, `path-safety`, `shared/build-histogram`, `shared/values`, `live/events` |
 | `live/claude-source.js` | 144 | functions | Finds Claude projects and which transcripts to tail | `provider-adapters`, `live/events`, `live/model`, `live/projects`, `live/ships`, `live/forgotten`, `history/jsonl` |
 | `live/claude-records.js` | 206 | functions | Reads new Claude text, applies each record; counts a startup tail's head for the canary on a poll | `transcripts/claude`, `provider-adapters`, `path-safety`, `universe/public-shape`, `live/events`, `live/model`, `live/projects`, `live/ships`, `live/builds`, `live/drift`, `history/jsonl` |
 | `live/codex-source.js` | 235 | functions | Finds Codex rollouts, one tail per session (also across `archived_sessions/`) | `provider-adapters`, `transcripts/codex`, `shared/hash`, `live/model`, `live/projects`, `live/ships`, `live/drift`, `history/jsonl` |
@@ -221,14 +221,14 @@ in a closure, and anything shared is a field of `ctx`.
 | `history/order.js` | 74 | functions | Deterministic record order: compare function and heap | — |
 | `history/merge.js` | 78 | functions | k-way merge of the cursors | `history/order`, `history/record-reader` |
 | `history/apply-record.js` | 156 | functions | Reduces one merged record into the historical model | `provider-adapters`, `transcripts/fields`, `shared/hash`, `universe/public-shape` |
-| `history/model.js` | 317 | factory | The historical universe, its event batches, `getSystem` / `getPlanet` | `history/apply-record`, `universe/*`, `transcripts/fields`, `provider-adapters`, `build-buckets`, `path-safety`, `shared/hash`, `shared/values` |
+| `history/model.js` | 313 | factory | The historical universe, its event batches, `getSystem` / `getPlanet` | `history/apply-record`, `universe/*`, `transcripts/fields`, `provider-adapters`, `build-buckets`, `path-safety`, `shared/hash`, `shared/values` |
 | `history/checkpoint-plan.js` | 79 | function | Up to 32 checkpoint times that split the indexed bytes evenly | — |
 | `history/checkpoints.js` | 278 | factory | In-memory seek checkpoints: capture, restore, a 64 MB budget, and a guard that redoes a seek cold when a checkpoint is stale | `history/checkpoint-plan`, `history/model`, `shared/values` |
 | `universe/galaxy.js` | 157 | functions | `deriveGalaxy` (live), `historyGalaxy` (history) | `provider-adapters`, `shared/hash` |
 | `universe/planets.js` | 49 | functions | `systemData`, a system's public shape in live and history alike: its eight biggest planets, each with its key (`planetKey`), and `planetTotal` when it has more; `proceduralSystem`, the stand-ins of a project with no folders, and `isStandInName` | `build-buckets`, `shared/hash` |
 | `universe/ships.js` | 33 | function | `createShipRecord` | — |
 | `universe/public-shape.js` | 83 | functions | `liveProject` / `liveShip`, `historyProject` / `historyShip`: the shapes the renderer receives | `universe/galaxy`, `provider-adapters`, `shared/hash` |
-| `build-buckets.js` | 306 | functions | Build counts per top-level folder; one bucket and one planet key (`planetKey`) per folder where the project's names ignore case (`namesIgnoreCase`, the one rule for it: a path in Windows syntax, as containment has it), found through an index of lower-cased keys kept on each buckets object (`setBucket` is the only write); a planet's name is one plain path segment (`isPlanetSegment`) and a bucket's one a build can start (`isBucketName`), 10,000 buckets at most; `countBuild` answers the planet key a build is counted under (none when no bucket holds it) and whether it is new; `setProjectPath` is the only write of a project's path and folds its buckets by it (`foldBuckets`: casings added up when they were counted under a path, `bucketsCounted`, never past the project's builds); `mergeBuckets` joins a backup's | `path-safety`, `shared/ids`, `shared/values` |
+| `build-buckets.js` | 314 | functions | Build counts per top-level folder; one bucket and one planet key (`planetKey`) per folder where the project's names ignore case (`namesIgnoreCase`, the one rule for it: a path in Windows syntax, as containment has it), found through an index of lower-cased keys kept on each buckets object (`setBucket` is the only write); a planet's name is one plain path segment (`isPlanetSegment`) and a bucket's one a build can start (`isBucketName`), 10,000 buckets at most; `countBuild` answers the planet key a build is counted under (none when no bucket holds it) and whether it is new; `setProjectPath` is the only write of a project's path and folds its buckets by it (`foldBuckets`: casings added up when they were counted under a path, `bucketsCounted`, never past the project's builds); `mergeBuckets` joins a backup's buckets into a project's | `path-safety`, `shared/ids`, `shared/values` |
 | `signal-sources.js` | 76 | functions | Which files a `providers.json` watch entry covers (listings and stats only) | `provider-adapters`, `shared/hash` |
 | `provider-adapters.js` | 368 | pure functions | Provider names, project path keys, the cross-provider tool vocabulary (`classifyTool`), Signal config, `adaptLine` | `transcripts/codex`, `transcripts/fields` |
 | `transcripts/codex.js` | 237 | pure functions | One Codex record → structural signals; rollout ownership; parent thread id | `transcripts/fields` |
@@ -247,7 +247,7 @@ in a closure, and anything shared is a field of `ctx`.
 | `terminal/target.js`, `focus.js` | <400 each | live target resolver; factory → `{focus}` | exact session → owning process → Windows console/tab/pane or macOS Terminal TTY; Linux unsupported | fixed native helpers; bounded `process.js` |
 | `project-paths.js` | 162 | functions | Bounded folder search for a moved project (depth 6, 12k dirs, 8 s) | — |
 | `vcs-status/controller.js` | 127 | factory | Tracker events → debounced (400 ms) per-project git refresh | — |
-| `path-safety.js` | 137 | functions | Shared "is this a canonical local path / inside that path" checks, `relativeInside` (a root and a file in one path syntax) | `provider-adapters` |
+| `path-safety.js` | 127 | functions | Shared "is this a canonical local path / inside that path" checks, `relativeInside` (a root and a file in one path syntax) | `provider-adapters` |
 | `window-security.js` | 55 | functions | Navigation / pop-up / permission lockdown, trusted-frame check | — |
 | `shared/bounded-process.js` | 96 | function | One child-process runner with a timeout and output cap (git and gh) | `shared/values` |
 | `shared/atomic-write.js` | 28 | function | Temp file + rename write (`GOALS.md`, IDEAS and run stores, `universe-state.json`) | — |
@@ -273,8 +273,8 @@ in a closure, and anything shared is a field of `ctx`.
 | `ipc/project-paths.js` | 281 | Moved-project scan / locate / apply, one-time tokens, folder dialog |
 | `preload.js` | 41 | `window.AU` bridge |
 
-**Test harness** — only runs with a test flag (1,580 lines): `harness/fixtures.js` (204),
-`harness/driver.js` (305), `harness/metrics.js` (195), `harness/asar-check.js` (102, what the main
+**Test harness** — only runs with a test flag (1,574 lines): `harness/fixtures.js` (204),
+`harness/driver.js` (305), `harness/metrics.js` (195), `harness/asar-check.js` (96, what the main
 process's fs makes of a file named `*.asar`, for gate M7), `harness/modes/{shots,control,history,provider,polish}.js`
 (159 / 157 / 207 / 106 / 145).
 
@@ -463,7 +463,7 @@ contract), `AUR`, `AUR_POLISH` and `AUR_GALAXY` (all `any` for now).
 
 | File | Lines | Job |
 |---|---|---|
-| `util.js` | 354 | Creates `AUR`; hashes, colours, provider metadata, motion tuning, asset paths, DOM helpers; bridge calls that fail soft (`AUR.settle`, `AUR.settleBusy` with a busy flag up meanwhile, `AUR.fetchSystem`) |
+| `util.js` | 352 | Creates `AUR`; hashes, colours, provider metadata, motion tuning, asset paths, DOM helpers; bridge calls that fail soft (`AUR.settle`, `AUR.settleBusy` with a busy flag up meanwhile, `AUR.fetchSystem`) |
 | `util-scene.js` | 340 | Babylon helpers on `AUR`: skybox (PhotoDome), starfield, orbit rings, ship and signal markers, GUI labels |
 | `procedural-worlds.js` | 329 | Planet and asteroid surfaces (authored textures + generated normal maps) |
 | `ship-assets.js` | 252 | Manifest, per-scene state, hull choice by rank (`builds` against the manifest ladder), container loading; procedural dart fallback |
@@ -488,7 +488,7 @@ contract), `AUR`, `AUR_POLISH` and `AUR_GALAXY` (all `any` for now).
 | `scene/system/worlds.js` | 100 | The planets' generated worlds, lit from the sun: maps placeholder, then system size, and the hovered planet's detail map fetched ahead for the planet view; the sun's photosphere and billboards |
 | `scene/planet/view.js` | 195 | Planet close-up |
 | `app/state.js` | 236 | Shared state and constants (including the chrome dirty bits, `AUR.app.const.CHROME`) |
-| `app/store.js` | 133 | `seedStore`, `applyEvent`, `maybeNotifyAttention`, `refreshShipHulls`, `workedShipIds` |
+| `app/store.js` | 132 | `seedStore`, `applyEvent`, `maybeNotifyAttention`, `refreshShipHulls`, `workedShipIds` |
 | `app/chrome-queue.js` | 75 | `chromeMaskFor`, `scheduleChrome`, `renderChrome`, `renderChromeNow`: one panel redraw per frame, or now |
 | `app/playback.js` | 232 | History bar |
 | `app/replay.js` | 172 | Stream epochs, playback state, `issueReplay` |
