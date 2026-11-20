@@ -10,7 +10,8 @@ const path = require('node:path');
 const { parseBackup } = require('../src/main/live/backup');
 const { savedProject, validKey } = require('../src/main/live/saved-project');
 const { CASED_COUNTS, own, KEPT_APART } = require('./support/bucket-cases');
-const { createWorld, writeState } = require('./support/transcripts');
+const { SEC, SLUG, T0, claude, createWorld, ofType, writeState } = require('./support/transcripts');
+const { appendAndPoll, startClaude } = require('./support/live-session');
 
 const MAX = Number.MAX_SAFE_INTEGER;
 const LONG = 'n'.repeat(5000);
@@ -38,12 +39,13 @@ test('a saved project: only a record is one, and each field is checked', () => {
     [[null, false], [null, false], [null, false], [null, false], ['relative/x', true], ['/work/demo', true]]);
 });
 
-test('a saved project\'s buckets: a plain-text folder name with a whole count above none', () => {
+test('a saved project\'s buckets: a folder name build-buckets.js counts, with a whole count above none', () => {
   // A string, a zero, a negative and a null count are no bucket; a fraction keeps its whole part; '__proto__' is a folder like any other.
   assert.deepEqual(own(savedProject({ buckets: JSON.parse(CASED_COUNTS) }).buckets), KEPT_APART);
   for (const odd of ['text', [3, 4], null, 7, undefined]) assert.deepEqual(savedProject({ buckets: odd }).buckets, {}, String(odd));
-  const names = savedProject({ buckets: { 'tab\tname': 4, 'c1\u0085': 4, [LONG]: 4, '': 4, kept: 4, 'with space': 1 } }).buckets;
-  assert.deepEqual(own(names), [['kept', 4], ['with space', 1]]);
+  const names = savedProject({ buckets: { 'tab\tname': 4, 'c1\u0085': 4, [LONG]: 4, '': 4, kept: 4, 'with space': 1, 'docs/api': 2, '..': 1,
+    'a\\b': 1, ['x'.repeat(256)]: 1, '(root)': 3 } }).buckets;
+  assert.deepEqual(own(names), [['kept', 4], ['with space', 1], ['(root)', 3]]);
   // At most 10,000 folders of one project are read.
   const many = Object.fromEntries(Array.from({ length: 10_050 }, (_, i) => ['f' + i, 1]));
   assert.deepEqual([Object.keys(savedProject({ buckets: many }).buckets).length, Object.hasOwn(savedProject({ buckets: many }).buckets, 'f9999')], [10_000, true]);
@@ -83,4 +85,28 @@ test('a state file and a backup holding the same odd entry give the same project
   // Docs and docs are one folder under a Windows path, two elsewhere; either way no count passes the largest kept.
   const docs = got.pathed.buckets.filter(([name]) => name.toLowerCase() === 'docs');
   assert.deepEqual([got.pathed.buckets.filter((bucket) => !docs.includes(bucket)), docs.every(([, builds]) => builds === MAX)], [[['two', 2]], true]);
+});
+
+test('a planet\'s builds are the same after a restart, also in a folder whose name can be no bucket', (t) => {
+  const session = startClaude(t);
+  const { dir, tracker, world } = session;
+  // Names a folder can have on some disk (DEL and C1 on NTFS, tab and ESC on POSIX) that a file
+  // keeps no bucket of: their builds count in the totals only, before the restart and after it.
+  const names = ['tab\tdir', 'esc\u001bdir', 'del\u007fdir', 'c1\u0085dir', 'src'];
+  const events = appendAndPoll(session, names.map((name, index) => claude.tool(dir, T0 + (1 + index) * SEC, `toolu_${index}`, 'Edit',
+    { file_path: path.join(dir, name, 'a.js') })), T0 + 9 * SEC);
+  assert.deepEqual(ofType(events, 'build').map((event) => event.isNew), [false, false, false, false, true]);
+  const counts = (live) => [live.model.projects.get(SLUG).totalBuilds, own(live.model.projects.get(SLUG).buckets), live.snapshot().projects[0].planets];
+  const before = counts(tracker);
+  assert.deepEqual(before, [5, [['src', 1]], ['src']]);
+  tracker.stop();
+  const again = world.live();
+  assert.deepEqual(counts(again.tracker), before);
+  // And a build there after the restart starts no planet either.
+  again.tracker.scan(true);
+  again.take();
+  const after = appendAndPoll({ ...session, ...again }, [claude.tool(dir, T0 + 20 * SEC, 'toolu_next', 'Edit',
+    { file_path: path.join(dir, 'del\u007fdir', 'b.js') })], T0 + 20 * SEC);
+  assert.deepEqual(ofType(after, 'build').map((event) => event.isNew), [false]);
+  assert.deepEqual(counts(again.tracker), [6, [['src', 1]], ['src']]);
 });

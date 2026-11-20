@@ -6,7 +6,7 @@
 const fs = require('fs');
 const path = require('path');
 const { fnv1a, mulberry32 } = require('../shared/hash');
-const { bucketBuilds, bucketFor, matchingEntry, planetKey } = require('../build-buckets');
+const { bucketBuilds, bucketFor, isPlanetSegment, matchingEntry, planetKey } = require('../build-buckets');
 const { isStandInName, proceduralSystem, systemData } = require('../universe/planets');
 const { liveProject } = require('../universe/public-shape');
 
@@ -241,11 +241,6 @@ async function readFolder(dir, root) {
   // than a floor of none. A floor is rounded down.
   const sizeKb = partial ? Math.floor(bytes / 1024) : Math.round(bytes / 1024);
   return { files, sizeKb, subdirs, resources, folderRead: failed ?? (partial ? 'partial' : 'full') };
-}
-
-function isPlanetSegment(value) {
-  return typeof value === 'string' && value.length > 0 && value.length <= 255 &&
-    value !== '.' && value !== '..' && !/[\\/\0]/.test(value);
 }
 
 function shallowCount(dir) {

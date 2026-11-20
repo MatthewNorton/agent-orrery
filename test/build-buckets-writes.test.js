@@ -106,9 +106,10 @@ function bucketWrites(source) {
 test('every write of a bucket in src/main goes through setBucket, and none is removed', () => {
   // setBucket keeps the index of a buckets object in step. A write past it would leave a key the
   // lookups under a root that ignores case never find, and a removal one they still answer with.
-  // build-buckets.js has two: the index it hangs on the object, and setBucket's own.
+  // build-buckets.js has three: the index and the count it hangs on the object, and setBucket's own.
   assert.deepEqual(mainLines(bucketWrites).map((line) => line.replace(/\{.*$/, '')), [
     'build-buckets.js: if (Object.isExtensible(buckets)) Object.defineProperty(buckets, FOLDED, ',
+    'build-buckets.js: if (Object.isExtensible(buckets)) Object.defineProperty(buckets, SIZE, ',
     'build-buckets.js: Object.defineProperty(buckets, key, ',
   ]);
   // And the scan does see a write: through the name, and through another name for the object.

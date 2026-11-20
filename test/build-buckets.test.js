@@ -3,9 +3,12 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
-  addBuckets, bucketOf, bucketKey, bucketFor, countBuild, bucketBuilds, foldBuckets, matchingEntry, planetKey, setBucket, setProjectPath,
+  MAX_BUCKETS, addBuckets, bucketOf, bucketKey, bucketFor, countBuild, bucketBuilds, foldBuckets, isBucketName, matchingEntry, planetKey,
+  setBucket, setProjectPath,
 } = require('../src/main/build-buckets');
 const { readCounts, own, KEPT_APART, KEPT_AS_ONE, KEPT_LARGER } = require('./support/bucket-cases');
+const { SEC, T0, ofType, claude } = require('./support/transcripts');
+const { runBoth } = require('./support/both-models');
 
 // The name matchingEntry finds among names, as it finds a folder among a listing's entries.
 const matchingName = (names, name, root) => matchingEntry(names.map((each) => ({ name: each })), name, root)?.name ?? null;
@@ -14,6 +17,47 @@ test('bucketOf names the top-level folder, or (root) for a file at the top level
   assert.equal(bucketOf('Docs/Guide.md', '/'), 'Docs');
   assert.equal(bucketOf('Src\\Deep\\A.js', '\\'), 'Src');
   assert.equal(bucketOf('README.md', '/'), '(root)');
+});
+
+test('a bucket is named as a planet is, with no control character: a build elsewhere starts none', () => {
+  const project = { path: '/work/demo', buckets: {} };
+  // Each of these is a folder some disk can hold, or what bucketOf makes of a path: its build counts in the totals only.
+  for (const name of ['', '.', '..', 'a/b', 'a\\b', 'nul\0', 'tab\tname', 'esc\u001bdir', 'del\u007fdir', 'c1\u0085dir', 'x'.repeat(256)]) {
+    assert.equal(countBuild(project, name), false, JSON.stringify(name));
+  }
+  assert.deepEqual(own(project.buckets), []);
+  for (const name of ['(root)', 'src', '.github', 'with space', '__proto__', 'x'.repeat(255)]) assert.equal(isBucketName(name), true, name);
+  // A merge starts no bucket that countBuild would not.
+  addBuckets(project, { 'a/b': 2, 'tab\tname': 4, src: 3 }, Math.max);
+  assert.deepEqual(own(project.buckets), [['src', 3]]);
+});
+
+test('a project keeps MAX_BUCKETS buckets at most: past them a new folder starts none, and one that has a bucket still counts', () => {
+  const project = { path: 'C:\\Work\\Demo', buckets: {} };
+  for (let index = 0; index < MAX_BUCKETS; index++) countBuild(project, `f${index}`);
+  assert.deepEqual([countBuild(project, 'one-more'), countBuild(project, 'F0')], [false, false]);
+  assert.deepEqual([Object.keys(project.buckets).length, project.buckets.f0, Object.hasOwn(project.buckets, 'one-more')], [MAX_BUCKETS, 2, false]);
+  // A merge stops there too, so the state file it is saved to reads back whole (live/saved-project.js).
+  const merged = { path: project.path, buckets: { ...project.buckets } };
+  addBuckets(merged, { another: 1, f1: 5 }, Math.max);
+  assert.deepEqual([Object.keys(merged.buckets).length, merged.buckets.f1, Object.hasOwn(merged.buckets, 'another')], [MAX_BUCKETS, 5, false]);
+});
+
+test('both models count a build whose folder can be no bucket in the totals only', async (t) => {
+  const { live, replay } = await runBoth(t, {
+    cwd: '/Orrery-Fixture-Missing/Demo',
+    records: (dir) => [
+      claude.prompt(dir, T0),
+      claude.tool(dir, T0 + 2 * SEC, 'toolu_del', 'Write', { file_path: `${dir}/del\u007fdir/a.js` }),
+      claude.tool(dir, T0 + 3 * SEC, 'toolu_src', 'Write', { file_path: `${dir}/src/a.js` }),
+    ],
+  });
+  for (const side of [live, replay]) {
+    assert.deepEqual(ofType(side.events, 'build').map((event) => [event.bucket, event.isNew]), [['del\u007fdir', false], ['src', true]]);
+    assert.deepEqual([side.snapshot.projects[0].totalBuilds, side.snapshot.projects[0].planets, side.snapshot.ships[0].builds], [2, ['src'], 2]);
+    assert.deepEqual(ofType(side.events, 'feed').map((event) => event.entry.text).filter((text) => text.startsWith('Planet formation')),
+      ['Planet formation started: src in Demo']);
+  }
 });
 
 test('under a Windows-style root a folder keeps one bucket across casings, under the first key', () => {
@@ -87,11 +131,13 @@ test('a miss under a case-sensitive root looks at no other bucket', () => {
   const keys = { asked: 0 };
   const watched = (buckets) => new Proxy(buckets, { ownKeys(target) { keys.asked++; return Reflect.ownKeys(target); } });
   const posix = { path: '/work/demo', buckets: watched({ Docs: 1, src: 2 }) };
-  assert.deepEqual([bucketKey(posix, 'docs'), bucketKey(posix, 'Docs'), bucketBuilds(posix, 'lib'), countBuild(posix, 'lib')], [null, 'Docs', 0, true]);
+  assert.deepEqual([bucketKey(posix, 'docs'), bucketKey(posix, 'Docs'), bucketBuilds(posix, 'lib')], [null, 'Docs', 0]);
   assert.equal(keys.asked, 0, 'no scan of the keys');
+  assert.deepEqual([countBuild(posix, 'lib'), countBuild(posix, 'bin'), countBuild(posix, 'lib')], [true, true, false]);
+  assert.equal(keys.asked, 1, 'a new folder counts the keys once (MAX_BUCKETS), and the count is kept');
   const windows = { path: 'C:\\Work\\Demo', buckets: watched({ Docs: 1 }) };
   assert.equal(bucketKey(windows, 'docs'), 'Docs');
-  assert.equal(keys.asked, 1, 'a root that ignores case looks through them');
+  assert.equal(keys.asked, 2, 'a root that ignores case looks through them');
 });
 
 test('only own keys name a bucket', () => {

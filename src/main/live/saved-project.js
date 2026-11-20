@@ -5,7 +5,7 @@
 // backup. Either file may hold anything, so each field is checked here, once, and the code past
 // this reader takes what it gives as it is.
 
-const { setBucket } = require('../build-buckets');
+const { MAX_BUCKETS, isBucketName, setBucket } = require('../build-buckets');
 const { hasControlChars } = require('../shared/ids');
 const { wholeCount } = require('../shared/values');
 const { plainObject } = require('../transcripts/fields');
@@ -13,7 +13,6 @@ const { plainObject } = require('../transcripts/fields');
 /** @import { SavedProject } from '../../types/live-model' */
 
 const MAX_TEXT_LENGTH = 4096;
-const MAX_BUCKETS = 10_000;
 // Security: keys that would reach an object's prototype. A bucket (setBucket) and a project id are not held to them.
 const RESERVED_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
@@ -36,7 +35,8 @@ function validKey(value) {
  * each file's own rule then says whether the app may use it; `counted` is whether the record had
  * one, so whether its builds were counted under a path (build-buckets.js). A name is plain text
  * of a length that fits the screen, or none. Every count and time is a whole count
- * (shared/values.js), and a bucket is a plain-text folder name with a count above none.
+ * (shared/values.js), and a bucket is a folder name build-buckets.js would count (isBucketName)
+ * with a count above none, MAX_BUCKETS of them at most.
  * @param {unknown} raw
  * @returns {SavedProject | null}
  */
@@ -61,7 +61,7 @@ function savedBuckets(value) {
   if (!plainObject(value)) return out;
   for (const [name, saved] of Object.entries(value).slice(0, MAX_BUCKETS)) {
     const builds = wholeCount(saved);
-    if (plainText(name) && builds > 0) setBucket(out, name, builds);
+    if (isBucketName(name) && builds > 0) setBucket(out, name, builds);
   }
   return out;
 }

@@ -147,9 +147,9 @@ AU.universeImport()                    -> Promise<{ok, canceled, added, merged, 
    // One JSON file: universe-state.json as the model stands plus the IDEAS queue's texts.
    // Import merges (larger build counts, earlier firstSeen, later lastActivity) and never
    // removes; new projects arrive as project-added events, imported ideas as new items.
-   // A bucket is a folder's name and is kept whatever it is (`__proto__`, `constructor`), and so
-   // is a project id. A folder keeps one bucket, by the rule of the path the project ends with
-   // (its own, else the one the file gives it): under a Windows path each side's counts for
+   // A bucket is kept under any name a build can start one under (`isBucketName`), `__proto__`
+   // and `constructor` too, and so is a project id. A folder keeps one bucket, by the rule of the
+   // path the project ends with (its own, else the one the file gives it): under a Windows path each side's counts for
    // `docs` and `Docs` are made one, and the larger of the two sides is kept. A side that had a
    // path (any path, also one this machine does not take) counted each build once, so its two
    // counts are added up. A side with no path counts no build (a build is bucketed relative to
@@ -162,9 +162,10 @@ AU.universeImport()                    -> Promise<{ok, canceled, added, merged, 
    // A saved project has one reader (`live/saved-project.js`) for both files, so the same entry
    // is the same project from either: an entry that is not a record is passed over; a name is
    // kept only as plain text (no control character, 4,096 characters at most) and otherwise the
-   // project goes by its folder or its id; a bucket is a plain-text folder name with a whole
-   // count above none, 10,000 of them at most. The path alone has a rule per file: the state
-   // file's is used when it is local, a backup's only when it is also absolute, and normalized.
+   // project goes by its folder or its id; a bucket is a name a build can start one under
+   // (`isBucketName`, below) with a whole count above none, 10,000 of them at most. The path
+   // alone has a rule per file: the state file's is used when it is local, a backup's only when
+   // it is also absolute, and normalized.
 ```
 
 ```js
@@ -232,7 +233,10 @@ Planet     = { name, key, files, builds, procedural? }   // name '(root)' possib
 //   `IGNORE_DIRS` such as `node_modules`), and `(root)` when it has builds. getPlanet reads any
 //   planet folder. So a folder with builds that the system view does not draw (`.github`) stays
 //   in `Project.planets` (every bucket's key), which Go to lists, and opens as a planet that
-//   reads its folder.
+//   reads its folder. Every bucket opens: a bucket's name is one a planet can have (one plain path
+//   segment) with no control character (`isBucketName` in `src/main/build-buckets.js`), and a
+//   project keeps 10,000 at most. One rule for both models' counting and both files' reader, so a
+//   bucket reads back after a restart as it was.
 
 PlanetData = { name, key, project: Project, builds, files, sizeKb, subdirs,
                resources: string[], procedural?, folderRead? }   // resources = top file exts;
@@ -273,8 +277,10 @@ Event batch entries (from `AU.onEvents`):
 { type: 'ship-departed',  shipId, ts }
 { type: 'build', project, bucket, key, file, shipId, isNew, ts }
    // project is the ID string; bucket = the edit's top-level folder as the edit wrote it, or
-   // '(root)'; isNew => planet formation. Under a Windows path main keeps one bucket for a
-   // folder's casings, so the planet is found by `key` (the Planet's and PlanetData's), not by
+   // '(root)'; isNew => planet formation. A folder whose name can be no bucket (`isBucketName`),
+   // or a new one in a project that has 10,000, starts none: the build counts in the project's
+   // and the ship's builds only, with isNew false. Under a Windows path main keeps one bucket for
+   // a folder's casings, so the planet is found by `key` (the Planet's and PlanetData's), not by
    // the bucket's spelling. An edit's path is checked once, trimmed, where its transcript is read
    // (`safePath`): one that holds a NUL, CR or LF, or is over 4096 characters, names no file, and a
    // relative one is in no project. Either is no build, live and in history alike; its tool still shows.
@@ -333,9 +339,9 @@ Design tokens (put in `:root`):
   and the list stays scrolled where it was. A row is its entry's key, and every entry has one of
   its own: a project `p:<id>`, an agent `a:<id>`, a folder `f:` + the JSON of
   `[<project id>, <folder>]`. The kinds differ in the first letter, and no two id and folder pairs
-  are written as the same JSON, whatever they hold (a folder name is shown as main sends it, and one from
-  a state file may hold a separator, a quote or a NUL). `A.renderListbox` logs, once for a key,
-  two entries that share one: a click on either row would open the first. A click opens the entry that was
+  are written as the same JSON, whatever they hold (a folder name, one main counts builds under,
+  may hold a quote; a project id from a state file may hold anything). `A.renderListbox` logs,
+  once for a key, two entries that share one: a click on either row would open the first. A click opens the entry that was
   pressed (`A.wireListbox`): when the rows moved under a pointer that stayed put, the release
   lands on another row and the pressed entry, found by its key, still opens while it is listed.
   PROJECTS shares all of it (its key is the project id). While an input method
