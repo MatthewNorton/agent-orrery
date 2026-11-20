@@ -60,7 +60,15 @@ test('a terminal kept in the background is reported as found, not missing', asyn
 
 // ---------- planet card ----------
 
-function planetSetup(planet, { project = {}, system = null } = {}) {
+const systemOf = (count) => ({
+  project: { id: 'p' }, beltDensity: 0,
+  planets: Array.from({ length: count }, (_, index) => ({ name: 'd' + index, key: 'd' + index, files: 1, builds: 0 })),
+});
+const settled = () => new Promise((done) => setImmediate(done));
+
+// The planet card of project p, open on `planet`. `files` are more app modules to load, and `more`
+// the state and app functions they need.
+function planetSetup(planet, { project = {}, system = null, files = [], more = {}, app = {} } = {}) {
   const document = fakeDocument();
   const window = { AUR_PANEL_LAYOUT: { panelsOn: () => [] }, AU: {} };
   const whole = { id: 'p', name: 'demo', path: '/work/demo', exists: true, totalBuilds: 0, ...project };
@@ -70,13 +78,15 @@ function planetSetup(planet, { project = {}, system = null } = {}) {
     activeView: { planetData: { project: whole, builds: 0, resources: [], ...planet } },
     planetSystem: { data: system, loading: false, stale: false, awaited: null, missed: false },
     commandRail: {},
-    projectControl: { projectId: null }, terminalRequestSerial: 0, playback: { mode: 'live' },
+    projectControl: { projectId: null }, terminalRequestSerial: 0, playback: { mode: 'live' }, routeRequestGeneration: 0,
+    ...more,
   };
   const scheduled = [];
-  const AUR = runApp(['app/chrome.js', 'app/project/control.js'], {
-    state, const: { CHROME: { PROJECT: 1, FOCUS: 2, PLANET: 4 } },
+  const AUR = runApp(['app/chrome.js', 'app/project/control.js', ...files], {
+    state, const: { CHROME: { PROJECT: 1, FOCUS: 2, PLANET: 4, HISTORY: 8, FEED: 16, SETTINGS: 32, IDEAS: 64 } },
     moduleHead: (card, title) => card.appendChild(window.AUR.el('h2', 'mod-title', title)),
     scheduleChrome: (mask) => scheduled.push(mask),
+    ...app,
   }, { document, window, aur: { worldProfile: () => ({ key: 'rocky' }) } });
   const card = () => {
     AUR.app.renderPlanetCard();
@@ -136,25 +146,21 @@ test('planet card: folder rows are dashes for a folder that is gone or unread; P
 });
 
 test('planet card: a project\'s system is fetched whole or not at all', async () => {
-  const { app, window } = planetSetup({ name: 'src' });
+  const { window } = planetSetup({ name: 'src' });
+  const { fetchSystem } = window.AUR;
   const system = { project: { id: 'p' }, planets: [], beltDensity: 0 };
   window.AU.getSystem = async (id) => {
     if (id === 'throws') throw new Error('main is away');
     return id === 'p' ? system : id === 'odd' ? { planets: 'not a list' } : null;
   };
-  assert.equal(await app.fetchSystem('p'), system);
-  for (const id of ['gone', 'throws', 'odd']) assert.equal(await app.fetchSystem(id), null, id);
+  assert.equal(await fetchSystem('p'), system);
+  for (const id of ['gone', 'throws', 'odd']) assert.equal(await fetchSystem(id), null, id);
 });
 
 test('planet card: a build that starts a planet fetches the system again, one request at a time', async () => {
-  const systemOf = (count) => ({
-    project: { id: 'p' }, beltDensity: 0,
-    planets: Array.from({ length: count }, (_, index) => ({ name: 'd' + index, key: 'd' + index, files: 1, builds: 0 })),
-  });
   const { app, state, window, card, scheduled } = planetSetup({ name: 'src', folderRead: 'full' }, { system: systemOf(1) });
   const asked = [];
   window.AU.getSystem = () => { asked.push(deferred()); return asked.at(-1).promise; };
-  const settled = () => new Promise((done) => setImmediate(done));
   assert.equal(card().rows.PLANETS, '1');
 
   // Three planets start in a row: the first asks, the others wait for its answer and share one more.
@@ -183,9 +189,7 @@ test('planet card: a build that starts a planet fetches the system again, one re
 });
 
 test('planet card: a planet that starts while a planet is opening reaches its card once it has opened', async () => {
-  const systemOf = (count) => ({ project: { id: 'p' }, beltDensity: 0, planets: Array.from({ length: count }, (_, index) => ({ name: 'd' + index })) });
   const { app, state, window, card } = planetSetup({ name: 'src', folderRead: 'full' });
-  const settled = () => new Promise((done) => setImmediate(done));
   let asked = 0;
   window.AU.getSystem = async () => systemOf(++asked + 1);
   // What boot.js openPlanet does around its own awaits: ask, wait for the planet, show it.
@@ -220,7 +224,6 @@ test('planet card: a planet that starts while a planet is opening reaches its ca
 });
 
 test('planet card: a refresh that throws is not left loading, and the next build fetches again', async () => {
-  const systemOf = (count) => ({ project: { id: 'p' }, beltDensity: 0, planets: Array.from({ length: count }, (_, index) => ({ name: 'd' + index })) });
   const { app, state, window, card, scheduled } = planetSetup({ name: 'src', folderRead: 'full' }, { system: systemOf(1) });
   let asked = 0;
   window.AU.getSystem = async () => systemOf(++asked + 1);
@@ -231,4 +234,104 @@ test('planet card: a refresh that throws is not left loading, and the next build
   app.scheduleChrome = scheduleChrome;
   await app.refreshPlanetSystem('p');
   assert.deepEqual([state.planetSystem.loading, asked, card().rows.PLANETS, scheduled.length], [false, 2, '3', 1]);
+});
+
+test('planet card: a request that fails is not made again, unless a planet started while it was out', async () => {
+  const { app, state, window, card } = planetSetup({ name: 'src', folderRead: 'full' }, { system: systemOf(1) });
+  const asked = [];
+  window.AU.getSystem = () => { asked.push(deferred()); return asked.at(-1).promise; };
+
+  const bare = app.refreshPlanetSystem('p');
+  asked[0].resolve(null); // main has no such system
+  await bare;
+  assert.deepEqual([asked.length, state.planetSystem.loading, card().rows.PLANETS], [1, false, '1'], 'no retry');
+
+  const again = app.refreshPlanetSystem('p');
+  app.refreshPlanetSystem('p'); // a second planet starts while the request is out
+  asked[1].reject(new Error('main is away'));
+  await settled();
+  assert.equal(asked.length, 3, 'asked once more, for the planet that started meanwhile');
+  asked[2].resolve(null);
+  await again;
+  assert.deepEqual([asked.length, state.planetSystem.loading], [3, false], 'never a retry of its own');
+
+  await Promise.all([app.refreshPlanetSystem('p'), asked[3].resolve(systemOf(3))]);
+  assert.deepEqual([asked.length, card().rows.PLANETS], [4, '3'], 'the next planet to start fetches again');
+});
+
+// The card over the real stream switch (app/replay.js): a seek adopts history's snapshot and
+// reopens the route, here through what boot.js openPlanet does around its awaits.
+function streamSetup(streamEpoch) {
+  const planetRead = [];
+  const setup = planetSetup({ name: 'src', folderRead: 'full' }, {
+    system: systemOf(1), files: ['app/replay.js'],
+    more: {
+      streamEpoch, booting: false, replayRequest: 0, replayTransitionPending: false, replayBusy: false, historyPreviewTs: null,
+      retiredEpochs: new Set(), deferredEpochBatches: [], transitionEventQueue: [], notificationByShip: new Map(),
+      lastNotificationAt: -Infinity, lastEventSequence: -Infinity,
+      playback: { mode: 'live', available: true, indexing: false, minTs: 1, maxTs: 9, cursorTs: 9, playing: false, speed: 1, truncated: false },
+    },
+    app: {
+      renderChromeNow() {}, renderChrome() {}, seedStore() {}, handleSequencedEvents() {},
+      showUniverse: () => assert.fail('the planet is reopened, not the universe'),
+      openSystem: () => assert.fail('the planet is reopened, not the system'),
+    },
+  });
+  const { app, state, window } = setup;
+  const asked = [];
+  window.AU.getSystem = () => { asked.push(deferred()); return asked.at(-1).promise; };
+  app.openPlanet = async (projectId, name) => {
+    const request = ++state.routeRequestGeneration;
+    const requestedEpoch = state.streamEpoch;
+    const systemRequest = app.requestPlanetSystem(projectId);
+    planetRead.push(deferred());
+    await planetRead.at(-1).promise; // AU.getPlanet
+    const held = await systemRequest;
+    if (request !== state.routeRequestGeneration || !app.sameEpoch(requestedEpoch, state.streamEpoch)) return;
+    state.planetSystem.data = held;
+    Object.assign(state.current, { view: 'planet', projectId, planetName: name });
+    app.planetSystemOpened(projectId);
+  };
+  // LIVE to REPLAY: history's stream is `epoch`.
+  const seek = (epoch) => {
+    window.AU.replay = async () => ({
+      streamEpoch: epoch, snapshot: { streamEpoch: epoch, eventSequence: 0 }, playback: { ...state.playback, mode: 'replay', cursorTs: 5 },
+    });
+    return app.issueReplay({ action: 'seek', ts: 5 });
+  };
+  return { ...setup, asked, planetRead, seek };
+}
+
+test('planet card: the live system asked for before a seek never lands on the card history reopens', async () => {
+  // The live answer comes back while the planet is being reopened, or after it has reopened.
+  for (const late of [false, true]) {
+    const { app, state, card, asked, planetRead, seek } = streamSetup(1);
+    const refresh = app.refreshPlanetSystem('p'); // a planet starts in LIVE: asked[0] is the live system
+    await seek(2);
+    assert.deepEqual([state.streamEpoch, state.playback.mode, asked.length, planetRead.length], [2, 'replay', 2, 1], 'the same project and planet are reopened');
+    assert.deepEqual([state.current.view, state.current.projectId, state.current.planetName], ['planet', 'p', 'src'], 'the route never changed');
+    const live = () => asked[0].resolve(systemOf(7));
+    if (!late) { live(); await refresh; }
+    assert.equal(card().rows.PLANETS, '1', 'not drawn while history is reopening the planet');
+    planetRead[0].resolve();
+    asked[1].resolve(systemOf(3)); // the system as history has it
+    await settled();
+    assert.equal(card().rows.PLANETS, '3');
+    if (late) { live(); await refresh; }
+    assert.deepEqual([card().rows.PLANETS, asked.length, state.planetSystem.loading], ['3', 2, false], `late ${late}: the replay card shows the replay system`);
+
+    // In the stream the card is in, an answer is drawn as before.
+    const replayed = app.refreshPlanetSystem('p');
+    asked[2].resolve(systemOf(4));
+    await replayed;
+    assert.equal(card().rows.PLANETS, '4');
+  }
+});
+
+test('planet card: a stream with no epoch still updates', async () => {
+  const { app, card, asked } = streamSetup(null);
+  const refresh = app.refreshPlanetSystem('p');
+  asked[0].resolve(systemOf(2));
+  await refresh;
+  assert.equal(card().rows.PLANETS, '2');
 });

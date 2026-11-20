@@ -573,8 +573,9 @@ Data: `AU.getSystem(projectId)`.
   one request at a time and once more for a planet that started while one was out, grow the new
   planet in from zero, feed shows planet formation. An answer is drawn only while the app still
   shows the view in the stream it was asked in (`ctx.shown`). A fetch that fails is not tried
-  again: the view stays behind (its system is not handed to a planet, which fetches its own)
-  until the next planet starts or the view is built again. A planet that cannot be built, when
+  again, unless a planet started while it was out, which is a new reason to ask once more. Until
+  an answer is drawn or the view is built again the view stays behind: its system is not handed
+  to a planet, which fetches its own. A planet that cannot be built, when
   the view opens or later, leaves no ring, globe, shell, material or label behind and gives its
   maps back to the map service (a world's own `dispose()`, `worlds/material.js`, which never
   disposes the blank texture its scene shares); it is logged once and does not stop the others,
@@ -628,7 +629,11 @@ behind a planet that has just started. The app holds it in `S.planetSystem`; whe
 none, those rows show `—`; a `build` with `isNew: true` in the open planet's project fetches it
 again, one request at a time (`A.refreshPlanetSystem`), and one that arrives while the planet
 is still opening does so as soon as it has opened (`A.requestPlanetSystem`,
-`A.planetSystemOpened`). The view and the route take the planet's name from the answer
+`A.planetSystemOpened`). An answer is drawn only if no route was asked for and no stream adopted
+since it was asked for (`S.routeRequestGeneration` counts both, so a seek into history never
+shows the live system on the planet it reopens) and the card still shows that project. A fetch
+that fails follows the system view's rule: not tried again, unless a planet started while it was
+out. The view and the route take the planet's name from the answer
 (`PlanetData.name`), not from the name asked for.
 
 - Large generated world (same class rule) filling ~60% of view height, slow

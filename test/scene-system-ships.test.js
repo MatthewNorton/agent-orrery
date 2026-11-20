@@ -147,14 +147,30 @@ test('system ships: a failed fetch leaves the view behind until the next planet 
   await settled();
   assert.deepEqual([asked.length, view.sysBehind, built], [2, false, ['docs', 'lib']]);
 
-  // A planet that started while the failed fetch was out waits for the next one too.
+  // A planet that started while the failed fetch was out is a new reason to ask: once more, and
+  // that request failing too ends the loop.
   build('web', 'web', { isNew: true });
   build('api', 'api', { isNew: true });
   asked[2].resolve(null); // main has no such system
   await settled();
-  assert.deepEqual([asked.length, view.sysBehind, built.length], [3, true, 2]);
-  build('cli', 'cli', { isNew: true });
-  asked[3].resolve(systemOf('src', 'docs', 'lib', 'web', 'api', 'cli'));
+  assert.deepEqual([asked.length, view.sysBehind, built.length], [4, true, 2], 'asked again for the planet that started meanwhile');
+  asked[3].resolve(null);
   await settled();
-  assert.deepEqual([asked.length, view.sysBehind, built], [4, false, ['docs', 'lib', 'web', 'api', 'cli']]);
+  assert.deepEqual([asked.length, view.sysBehind, built.length], [4, true, 2], 'never a retry of its own');
+  build('cli', 'cli', { isNew: true });
+  asked[4].resolve(systemOf('src', 'docs', 'lib', 'web', 'api', 'cli'));
+  await settled();
+  assert.deepEqual([asked.length, view.sysBehind, built], [5, false, ['docs', 'lib', 'web', 'api', 'cli']]);
+});
+
+test('system ships: a view the app cannot place is not left fetching', async () => {
+  const { view, asked, logged, build } = loadPart([{ name: 'src', key: 'src' }]);
+  const shown = view.shown;
+  view.shown = () => { throw new Error('no app'); };
+  build('docs', 'docs', { isNew: true });
+  await settled();
+  assert.deepEqual([asked.length, logged], [0, ['planets not fetched again no app']]);
+  view.shown = shown;
+  build('lib', 'lib', { isNew: true });
+  assert.equal(asked.length, 1, 'the next planet fetches');
 });

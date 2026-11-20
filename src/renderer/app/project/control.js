@@ -206,9 +206,6 @@
     return pd.folderRead ? line : line + ' · history keeps no file counts';
   }
 
-  /** @type {(projectId: string) => Promise<SystemData | null>} */
-  A.fetchSystem = AUR.fetchSystem;
-
   /**
    * The system a planet opens its card with: the system view's own (`handed`) or a fetch. Either
    * can predate a planet that forms in the project while the planet is read, so from here until
@@ -217,7 +214,7 @@
    */
   A.requestPlanetSystem = function requestPlanetSystem(projectId, handed) {
     Object.assign(S.planetSystem, { awaited: projectId, missed: false });
-    return handed ? Promise.resolve(handed) : A.fetchSystem(projectId);
+    return handed ? Promise.resolve(handed) : AUR.fetchSystem(projectId);
   };
 
   /**
@@ -233,7 +230,11 @@
   /**
    * A build that starts a planet in `projectId` changes a planet card's PLANETS row. For the open
    * planet, its system (S.planetSystem) is fetched again, one request at a time, and once more for
-   * a build that came while one was out; for a planet still opening, when it has opened.
+   * a build that came while one was out; for a planet still opening, when it has opened. An answer
+   * is the card's only if no route was asked for and no stream adopted since the request (each
+   * counts in S.routeRequestGeneration, so history never gets the live system) and the card still
+   * shows that project. A request that fails is not made again, unless a planet started while it
+   * was out, which is a new reason to ask: the rule of the system view's loop (scene/system/ships.js).
    * @param {string} projectId
    */
   A.refreshPlanetSystem = async function refreshPlanetSystem(projectId) {
@@ -247,9 +248,10 @@
     try {
       while (held.stale && S.current.view === 'planet') {
         held.stale = false;
-        const open = S.current.projectId;
-        const system = await A.fetchSystem(open);
-        if (!system || S.current.view !== 'planet' || S.current.projectId !== open) continue;
+        const open = S.current.projectId, route = S.routeRequestGeneration;
+        const system = await AUR.fetchSystem(open);
+        const stillThisCard = route === S.routeRequestGeneration && S.current.view === 'planet' && S.current.projectId === open;
+        if (!system || !stillThisCard) continue;
         held.data = system;
         A.scheduleChrome(C.CHROME.PLANET);
       }

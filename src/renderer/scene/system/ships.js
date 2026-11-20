@@ -150,7 +150,7 @@
         } else if (ev.type === 'build' && ev.project === projectId) {
           const pr = AUR.planetOfBuild(planets.values(), ev);
           const sh = ships.get(ev.shipId);
-          if (ev.isNew && !pr) { refetchPlanets(); }
+          if (ev.isNew && !pr) refetchPlanets().catch((e) => AUR.log('planets not fetched again', e && e.message));
           if (pr) {
             pr.pulseUntil = performance.now() + 600;
             if (sh && sh.mode === 'patrol') {
@@ -169,20 +169,22 @@
     }
 
     // A build started a planet this view does not draw: the system is fetched again, one request at
-    // a time, and once more for a planet that started meanwhile. A fetch that fails ends the loop and
-    // leaves the view behind (view.sysBehind) until the next planet starts or the view is rebuilt.
+    // a time, and once more for a planet that started meanwhile. A fetch that fails is not tried
+    // again: the loop ends there, unless a planet started while it was out, which is a new reason to
+    // ask. Either way the view stays behind (view.sysBehind) until an answer is drawn or it is rebuilt.
     async function refetchPlanets() {
       view.sysBehind = refetchAgain = true;
       if (refetching) return;
       refetching = true;
-      // An answer is drawn only while the app still shows this view, in the stream it was asked in.
-      const stream = view.shown();
-      const shown = () => stream !== null && view.shown() === stream;
       try {
+        // An answer is drawn only while the app still shows this view, in the stream it was asked in.
+        const stream = view.shown();
+        const shown = () => stream !== null && view.shown() === stream;
         while (refetchAgain && shown()) {
           refetchAgain = false;
           const ns = await AUR.fetchSystem(projectId);
-          if (!ns || !shown()) break;
+          if (!shown()) break;
+          if (!ns) continue;
           view.sys = ns;
           view.sysBehind = refetchAgain;
           drawNewPlanets(ns.planets);
