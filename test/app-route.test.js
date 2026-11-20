@@ -8,7 +8,8 @@ const assert = require('node:assert/strict');
 const { runApp } = require('./support/renderer-source');
 
 // The routes in stream 1 over a stand-in for boot.js's A.setView, which records the view it is
-// asked for and the system or planet it is given; `logged` holds what AUR.log was given.
+// asked for and the system or planet it is given, and takes its route as setView does once a view
+// is built; `logged` holds what AUR.log was given.
 function setup(projects = []) {
   const shown = [], logged = [];
   let ready = 0;
@@ -22,7 +23,7 @@ function setup(projects = []) {
     state, const: { CHROME: {} },
     setView(name, data) {
       shown.push([name, data.system || data.planet || null]);
-      state.current.view = name;
+      Object.assign(state.current, this.viewRoute(name, data));
     },
   }, { window, aur: { log: (...args) => logged.push(args.join(' ')) } });
   return { app: AUR.app, state, window, shown, logged, ready: () => ready };

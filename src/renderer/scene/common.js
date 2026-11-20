@@ -111,14 +111,18 @@
     }
   };
 
-  // The teardown every view ends with, after its own.
+  // The teardown every view ends with, after its own. The scene goes even when a step before it
+  // throws, and with it what the view tied to its dispose (its timers, its elements on the page).
   AUR.disposeView = function (scene, gui) {
-    scene.onBeforeRenderObservable.clear();
-    scene.onPointerObservable.clear();
-    scene.getEngine().getRenderingCanvas().style.cursor = 'default';
-    gui.dispose();
-    AUR.ships.dispose(scene);
-    scene.dispose();
+    try {
+      scene.onBeforeRenderObservable.clear();
+      scene.onPointerObservable.clear();
+      scene.getEngine().getRenderingCanvas().style.cursor = 'default';
+      gui.dispose();
+      AUR.ships.dispose(scene);
+    } finally {
+      scene.dispose();
+    }
   };
 
   // Hull materials are shared per scene and released by AUR.ships.dispose. Any other material is

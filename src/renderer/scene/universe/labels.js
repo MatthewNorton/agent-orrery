@@ -81,7 +81,11 @@
     const dialogs = [...document.querySelectorAll('dialog')];
     const dialogToggled = () => { chromeUnder = NO_CHROME; markLabelLayoutDirty(); };
     for (const dialog of dialogs) dialog.addEventListener('toggle', dialogToggled);
-    scene.onDisposeObservable.add(() => { for (const dialog of dialogs) dialog.removeEventListener('toggle', dialogToggled); });
+    // Both go with the scene, also when the view's build fails (AUR.buildView).
+    scene.onDisposeObservable.add(() => {
+      cancelLabelLayout();
+      for (const dialog of dialogs) dialog.removeEventListener('toggle', dialogToggled);
+    });
 
     // An overlay marked data-see-through (the Go to palette's light backdrop) hides none of the map;
     // the chrome behind it still does.
@@ -258,7 +262,7 @@
 
     return {
       markLabelLayoutDirty, cameraLayoutChanged, labelPointIsClear, ensureLabelLayout,
-      cancelLabelLayout, lastLabelMetrics: () => lastLabelMetrics,
+      lastLabelMetrics: () => lastLabelMetrics,
     };
   };
 })();

@@ -198,7 +198,7 @@ function routeSetup({ system = null, streamEpoch = 1, more = {}, app = {} } = {}
     app: {
       setView(name, data) {
         if (name === 'planet' && setup.unbuildable) return setup.app.showUniverse();
-        setup.state.current.view = name;
+        Object.assign(setup.state.current, setup.app.viewRoute(name, data));
         if (name === 'planet') setup.state.activeView = { planetData: data.planet };
       },
       ...app,

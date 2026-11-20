@@ -217,7 +217,11 @@
     };
   }
 
-  /** The view `name` built from `data` takes the place of the one shown (kit/SPEC.md view contract). */
+  /**
+   * The view `name` built from `data` takes the place of the one shown (kit/SPEC.md view contract),
+   * and the route is then its own: the view, and the project and planet its data names. A view that
+   * cannot be built leaves the one shown, and its route, as they were.
+   */
   A.setView = function setView(name, data) {
     const factory = AUR.views[name];
     if (typeof factory !== 'function') {
@@ -241,7 +245,7 @@
     if (S.agentFocus.shipId) A.exitAgentFocus(false);
     S.activeView = next;
     S.activeScene = next.scene;
-    S.current.view = name;
+    Object.assign(S.current, A.viewRoute(name, data));
     document.body.dataset.view = name;
     A.stopTasksView();
     if (old) disposeSettled(old);

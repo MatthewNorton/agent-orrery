@@ -13,11 +13,18 @@
   const S = A.state;
 
   // ---------- routes ----------
+  /**
+   * The route view `name` built from `data` is at: the view, and the project and planet its data
+   * names. A.setView makes it S.current once the view is built, and not before, so a view that
+   * cannot be built leaves the route of the one shown.
+   * @param {string} name @param {{ projectId?: string, name?: string }} data
+   */
+  A.viewRoute = function viewRoute(name, data) {
+    return { view: name, projectId: data.projectId ?? null, planetName: name === 'planet' ? data.name : null };
+  };
+
   A.showUniverse = function showUniverse() {
     S.routeRequestGeneration++;
-    S.current.view = 'universe';
-    S.current.projectId = null;
-    S.current.planetName = null;
     A.setView('universe', { store: S.store });
   };
 
@@ -26,8 +33,6 @@
     const requestedEpoch = S.streamEpoch;
     const data = await AUR.fetchSystem(projectId);
     if (request !== S.routeRequestGeneration || !A.sameEpoch(requestedEpoch, S.streamEpoch)) return;
-    S.current.projectId = projectId;
-    S.current.planetName = null;
     // None: main has no such system, its answer lists no planets, or the call failed (logged there).
     if (!data) { AUR.log('no system data for', projectId); return A.showUniverse(); }
     A.setView('system', { system: data, projectId, store: S.store });
@@ -44,11 +49,9 @@
     try { data = await AU.getPlanet(projectId, name); } catch (e) { AUR.log('getPlanet err', e && e.message); }
     const held = await systemRequest;
     if (request !== S.routeRequestGeneration || !A.sameEpoch(requestedEpoch, S.streamEpoch)) return;
-    S.current.projectId = projectId;
-    // Main answers with the name the system view draws the planet under; its casing can differ.
-    S.current.planetName = data ? data.name : name;
     if (!data) { AUR.log('no planet data for', projectId, name); return A.openSystem(projectId); }
     S.planetSystem.data = held;
+    // Main answers with the name the system view draws the planet under; its casing can differ.
     A.setView('planet', { planet: data, projectId, name: data.name, store: S.store });
     A.planetSystemOpened(projectId);
   };

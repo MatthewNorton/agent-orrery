@@ -7,16 +7,7 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 const { runRenderer } = require('./support/renderer-source');
-
-// Callable, constructible, and every property is another one: it stands in for Babylon and for
-// whatever a drawing helper returns.
-function anything() {
-  return new Proxy(function () {}, {
-    get: (target, key) => (key in target ? target[key] : (target[key] = anything())),
-    apply: () => anything(),
-    construct: () => anything(),
-  });
-}
+const { anything } = require('./support/scene-fakes');
 
 // Opens the system view on `planets`; a planet named in `failing` has no world.
 function openSystem(planets, failing = []) {
