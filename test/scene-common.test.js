@@ -160,6 +160,18 @@ test('a built planet view releases the scene it holds unready when it is dispose
   assert.deepEqual([engine.scenes, timers.delays(), made[0].pendingData.size], [[], [], 0]);
 });
 
+test('the stand-in scene disposes as Babylon 9.36 does: once, and past an observer that throws', () => {
+  const engine = { scenes: [] };
+  const [first, other] = [fakeScene(engine), fakeScene(engine)];
+  const ran = [];
+  first.onDisposeObservable.add(() => { ran.push('throws'); throw new Error('observer failed'); });
+  first.onDisposeObservable.add(() => ran.push('after'));
+  first.dispose();
+  first.dispose();
+  // The error is kept, not thrown, and the observers after it are skipped; the scene leaves the list once.
+  assert.deepEqual([ran, first.disposeError && first.disposeError.message, first.isDisposed, engine.scenes], [['throws'], 'observer failed', true, [other]]);
+});
+
 test('disposeView: the scene goes, and what was tied to it, also when a step before it throws', () => {
   const { AUR } = loadCommon();
   const engine = { scenes: [], getRenderingCanvas: () => ({ style: {} }) };

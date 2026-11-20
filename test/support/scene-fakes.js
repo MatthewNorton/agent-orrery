@@ -14,20 +14,28 @@ function anything() {
 }
 
 // A scene as `new BABYLON.Scene(engine)` makes one: listed by `engine` until disposed, holding the
-// pending data it is given. Disposing it runs its onDisposeObservable first, as Babylon does. What
-// else a view asks of it (its other observables, its metadata) accepts anything.
+// pending data it is given. It disposes as Babylon 9.36 does: once; its onDisposeObservable first,
+// where an observer that throws skips the ones after it and its error is kept (`disposeError`, which
+// Babylon logs) rather than thrown; then it leaves the engine's list and is disposed. What else a
+// view asks of it (its other observables, its metadata) accepts anything.
 function fakeScene(engine) {
   const observers = [];
   const scene = new Proxy({
-    isDisposed: false, pendingData: new Set(),
+    isDisposed: false, disposeError: null, pendingData: new Set(),
     getEngine: () => engine,
     onDisposeObservable: { add: (fn) => observers.push(fn), addOnce: (fn) => observers.push(fn) },
     addPendingData: (data) => scene.pendingData.add(data),
     removePendingData: (data) => scene.pendingData.delete(data),
     dispose() {
-      for (const fn of observers.splice(0)) fn(scene);
+      if (scene.isDisposed) return;
+      try {
+        for (const fn of observers.splice(0)) fn(scene);
+      } catch (error) {
+        scene.disposeError = error;
+      }
+      const index = engine.scenes.indexOf(scene);
+      if (index > -1) engine.scenes.splice(index, 1);
       scene.isDisposed = true;
-      engine.scenes.splice(engine.scenes.indexOf(scene), 1);
     },
   }, { get: (target, key) => (key in target ? target[key] : (target[key] = anything())) });
   engine.scenes.push(scene);
