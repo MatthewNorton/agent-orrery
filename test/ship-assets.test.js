@@ -1,8 +1,8 @@
 'use strict';
 
 // The ship-assets core and hulls (src/renderer/ship-assets.js, ship-assets-hulls.js): the rank
-// ladder, LODs, a template per provider and the livery. AUR.ships' refresh and triangle budget are
-// test/ship-assets-api.test.js, its fade test/ship-assets-api-fade.test.js.
+// ladder, LODs, a template per provider, the livery, and what a failure logs. AUR.ships' refresh
+// and triangle budget are test/ship-assets-api.test.js, its fade test/ship-assets-api-fade.test.js.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -217,6 +217,99 @@ test('a fleet hull keeps its baked tones and glass, and its trim lights and nozz
   assert.ok(partMaterial(claude, 'window_light').emissiveColor.r < 0.3, 'a lit pane, not a white block');
   assert.equal(partMaterial(claude, 'engine_glow').metadata.role, 'glow', 'every fleet material carries its role');
   assert.equal(claude.material.emissiveColor.toHexString(), '#d97757', 'the root emits the exact hex as evidence');
+});
+
+// ---------- what a failure logs: its cause, once per failure and cause, and what the ship keeps ----------
+
+const logsOf = (assets) => {
+  const logs = [];
+  assets.AUR.log = (message) => logs.push(message);
+  return logs;
+};
+
+test('a hull that cannot be built logs its cause once per hull and cause, for a new ship or a fade', async () => {
+  const assets = loadShipAssets(LADDER_MANIFEST, {});
+  const logs = logsOf(assets);
+  const scene = assets.scene('system');
+  const a = await assets.ships.upgrade(scene, ship('a', 0), assets.fallback('a'));
+  const { containers, templates } = assets.AUR.shipAssets.sceneStates.get(scene);
+  let cause = 'no instances';
+  const throwing = () => { throw new Error(cause); };
+  for (const template of templates.values()) for (const root of template.roots) root.instantiateHierarchy = throwing;
+  const { container } = containers.get('small-near.glb');
+  const make = container.instantiateModelsToScene; // and every template made from now on
+  container.instantiateModelsToScene = (...args) => {
+    const made = make(...args);
+    for (const root of made.rootNodes) root.instantiateHierarchy = throwing;
+    return made;
+  };
+  for (const id of ['b', 'c']) assert.equal(await assets.ships.upgrade(scene, ship(id, 0), assets.fallback(id)), null, id + ' keeps its dart');
+  assets.ships.fade(scene, 0.16, { shipId: 'a', visibility: 1 });
+  assert.equal(a.children.length, 1, 'the followed ship keeps its hull');
+  cause = 'out of memory';
+  assert.equal(await assets.ships.upgrade(scene, ship('d', 0), assets.fallback('d')), null);
+  assert.deepEqual(logs, [
+    'Hull small could not be built (no instances); the ship keeps the hull or dart it has.',
+    'Hull small could not be built (out of memory); the ship keeps the hull or dart it has.',
+  ]);
+});
+
+test('a hull whose provider evidence cannot be made is not built, and leaves no instance behind', async () => {
+  const assets = loadShipAssets(LADDER_MANIFEST, {});
+  const logs = logsOf(assets);
+  const { unlitMaterial } = assets.AUR;
+  assets.AUR.unlitMaterial = () => { throw new Error('no unlit material'); };
+  assert.equal(await assets.ships.upgrade(assets.scene('system'), ship('a', 0), assets.fallback('a')), null);
+  assert.ok(assets.templates().length > 0 && assets.templates().every((part) => part.instances.length === 0), 'its instances went with it');
+  assert.deepEqual(logs, ['Hull small could not be built (no unlit material); the ship keeps the hull or dart it has.']);
+  assets.AUR.unlitMaterial = unlitMaterial;
+  assert.ok(await assets.ships.upgrade(assets.scene('system'), ship('a', 0), assets.fallback('a')), 'and the next build works');
+});
+
+test('a hull file that cannot be loaded logs its cause once per file and cause, and a full budget says what ships keep', async () => {
+  const assets = loadShipAssets(LADDER_MANIFEST, { 'mid-near.glb': 950000, 'mid-far.glb': 950000 }); // over a 900k budget
+  const logs = logsOf(assets);
+  const load = assets.BABYLON.SceneLoader.LoadAssetContainerAsync;
+  for (const cause of ['file missing', 'file missing', 'not a glTF']) {
+    assets.BABYLON.SceneLoader.LoadAssetContainerAsync = async () => { throw new Error(cause); };
+    assert.equal(await assets.ships.upgrade(assets.scene('system'), ship('a', 0), assets.fallback('a')), null);
+  }
+  assets.BABYLON.SceneLoader.LoadAssetContainerAsync = load;
+  const scene = assets.scene('system');
+  await assets.ships.upgrade(scene, ship('b', 0), assets.fallback('b'));
+  assert.equal(await assets.ships.refresh(scene, ship('b', 3)), null, 'a promotion that does not fit');
+  assert.deepEqual(logs, [
+    'Hull small-near.glb unavailable (file missing); ships keep the hull or dart they have.',
+    'Hull small-near.glb unavailable (not a glTF); ships keep the hull or dart they have.',
+    'Ship hull triangle budget reached; ships that do not fit keep the hull or dart they have.',
+  ]);
+});
+
+test('a manifest that cannot be used logs why', async () => {
+  const assets = loadShipAssets({ ...LADDER_MANIFEST, schemaVersion: 2 }, {});
+  const logs = logsOf(assets);
+  assert.equal(await assets.AUR.shipAssets.manifestPromise, null);
+  assert.deepEqual(logs, ['Ship assets unavailable (manifest schema unsupported); using procedural hulls.']);
+});
+
+test('ship reflections that cannot be prefiltered log the cause once per cause, in whichever scene', async () => {
+  const assets = loadShipAssets(LADDER_MANIFEST, {});
+  const logs = logsOf(assets);
+  let cause = 'no float render targets';
+  Object.assign(assets.BABYLON, {
+    Constants: {}, RawCubeTexture: class {}, HDRFiltering: class { prefilter() { return Promise.reject(new Error(cause)); } },
+  });
+  assets.BABYLON.Material.prototype.environmentIntensity = 1; // a PBR finish, which takes the studio reflections
+  for (const next of ['no float render targets', 'no float render targets', 'context lost']) {
+    cause = next;
+    const scene = Object.assign(assets.scene('system'), { getEngine: () => ({}) }); // each prefilters its own copy
+    assert.ok(await assets.ships.upgrade(scene, ship('a', 0), assets.fallback('a')));
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+  assert.deepEqual(logs, [
+    'Ship environment could not be prefiltered (no float render targets); it is used unfiltered.',
+    'Ship environment could not be prefiltered (context lost); it is used unfiltered.',
+  ]);
 });
 
 test('a template whose parts cannot all be dressed leaves no node or half-dressed livery behind, and later builds work', async () => {

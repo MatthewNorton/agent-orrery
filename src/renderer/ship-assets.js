@@ -32,8 +32,7 @@
  *   disposed: boolean }} SceneState `visibility` is the fleet's, which every template shows, and
  *   `apart` the one ship focus mode shows at a visibility of its own (AUR.ships.fade)
  * @typedef {object} ShipAssetsCore shared by the ship-assets*.js files as AUR.shipAssets
- * @property {(key: string, message: string) => void} logOnce
- * @property {(failure: string, error: any, outcome: string) => void} logFailure
+ * @property {(failure: string, error: any, outcome: string) => void} logFailure logged once per failure and cause
  * @property {Promise<ShipManifest | null>} manifestPromise
  * @property {() => ShipManifest | null} settledManifest null until the manifest has loaded
  * @property {WeakMap<object, SceneState>} sceneStates
@@ -118,8 +117,8 @@
   const manifestPromise = loadWithFetch()
     .catch(() => loadWithXhr())
     .then(validateManifest)
-    .catch(() => {
-      logOnce('manifest', 'Ship assets unavailable; using procedural hulls.');
+    .catch((error) => {
+      logFailure('Ship assets unavailable', error, 'using procedural hulls.');
       return null;
     })
     .then((manifest) => {
@@ -256,7 +255,7 @@
         return loading;
       })
       .catch((error) => {
-        logOnce('hull:' + file, 'Hull ' + file + ' unavailable (' + (error && error.message || error) + '); using procedural hulls.');
+        logFailure('Hull ' + file + ' unavailable', error, 'ships keep the hull or dart they have.');
         return null;
       });
     return record.promise;
@@ -267,7 +266,7 @@
   }
 
   function logBudget(scene) {
-    logOnce('budget:' + scene.uid, 'Ship hull triangle budget reached; using procedural hulls.');
+    logOnce('budget:' + scene.uid, 'Ship hull triangle budget reached; ships that do not fit keep the hull or dart they have.');
   }
 
   /**
@@ -302,8 +301,8 @@
 
   /** @type {ShipAssetsCore} */
   const core = {
-    logOnce, logFailure, manifestPromise, sceneStates, stateFor, isSceneDisposed, apartVisibility,
-    ownVisibility, settledManifest: () => (manifestSettled ? manifestValue : null),
+    logFailure, manifestPromise, sceneStates, stateFor, isSceneDisposed, apartVisibility, ownVisibility,
+    settledManifest: () => (manifestSettled ? manifestValue : null),
     viewLod, selectHull, hullFiles, ensureContainer, fitsBudget, resolveAsset,
   };
   AUR.shipAssets = core;

@@ -16,7 +16,7 @@
   const AUR = window.AUR;
   /** @type {ShipAssetsCore} */
   const core = AUR.shipAssets;
-  const { logOnce, logFailure, viewLod, apartVisibility, ownVisibility } = core;
+  const { logFailure, viewLod, apartVisibility, ownVisibility } = core;
   // The universe map has no lights, so far hulls carry a faint tint of their
   // own; without it they read as black cut-outs behind their accent lights.
   const FAR_SELF_LIGHT = 0.1;
@@ -65,13 +65,13 @@
     texture.name = 'ship-studio-env';
     texture.gammaSpace = false;
     environments.set(scene, texture);
-    const unfiltered = () => logOnce('env:prefilter', 'Ship environment left unfiltered.');
+    const unfiltered = (error) => logFailure('Ship environment could not be prefiltered', error, 'it is used unfiltered.');
     try {
       const filtering = new BABYLON.HDRFiltering(scene.getEngine(), { quality: BABYLON.Constants.TEXTURE_FILTERING_QUALITY_LOW });
       const done = filtering.prefilter(texture);
       if (done && typeof done.catch === 'function') done.catch(unfiltered);
     } catch (error) {
-      unfiltered();
+      unfiltered(error);
     }
     return texture;
   }
@@ -264,7 +264,8 @@
   /**
    * Builds the correction node (rotation, class display size, offset) holding the hull's meshes,
    * on the template and in the state focus mode's fade gives the ship: disabled when it is hidden.
-   * Returns null when the model cannot be instantiated.
+   * Returns null, leaving nothing of it behind, when the hull cannot be built: for a new ship, a
+   * promotion or a fade alike, the ship keeps the hull or dart it has.
    * @param {HullEntry} hull @param {HullAsset} asset
    */
   function buildHull(scene, state, hull, asset, ship) {
@@ -291,13 +292,13 @@
           copy.metadata = { ...(copy.metadata || {}), ...tags };
         });
       }
+      return { correction, own: own === null ? null : template, evidence: evidenceMaterial(scene, state, ship) };
     } catch (error) {
       correction.dispose();
       if (template && own !== null) disposeTemplate(template);
-      logOnce('instance:' + hull.id, 'Hull ' + hull.id + ' could not be instantiated; using procedural hulls.');
+      logFailure('Hull ' + hull.id + ' could not be built', error, 'the ship keeps the hull or dart it has.');
       return null;
     }
-    return { correction, own: own === null ? null : template, evidence: evidenceMaterial(scene, state, ship) };
   }
 
   function hullMetadata(hull, asset, ship) {

@@ -197,6 +197,7 @@ function loadShipAssets(manifest, trianglesByFile, materials = ['hull_primary', 
   let sceneCount = 0;
   return {
     AUR,
+    BABYLON, // what the ship-assets files see as Babylon, read when they call it
     ships: AUR.ships,
     models: AUR.shipModels,
     triangles: (scene) => AUR.shipAssets.sceneStates.get(scene).triangles,
