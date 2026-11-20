@@ -80,12 +80,18 @@
 
     const requestId = ++S.terminalRequestSerial;
     const targetId = shipId || projectId;
-    S.projectControl = { projectId, targetId, requestId, phase: 'pending', code: null };
-    A.renderChromeNow(C.CHROME.PROJECT | C.CHROME.FOCUS);
-
+    // Another project's card, or a newer request, holds the control once this one is not current.
+    const isCurrent = () => S.projectControl.projectId === projectId && S.projectControl.requestId === requestId;
     /** @type {OpenTerminalResult} */
-    const result = await AUR.settle(() => AU.openTerminal(targetId));
-    if (S.projectControl.projectId !== projectId || S.projectControl.requestId !== requestId) return;
+    const result = await AUR.settleBusy({
+      raise() {
+        S.projectControl = { projectId, targetId, requestId, phase: 'pending', code: null };
+        A.renderChromeNow(C.CHROME.PROJECT | C.CHROME.FOCUS);
+      },
+      lower() { if (S.projectControl.phase === 'pending') S.projectControl.phase = 'idle'; },
+      isCurrent,
+    }, () => AU.openTerminal(targetId));
+    if (!isCurrent()) return;
 
     const ok = result.ok === true;
     const code = !ok && typeof result.code === 'string' ? result.code : 'FAILED';

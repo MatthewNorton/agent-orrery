@@ -2,8 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const vm = require('node:vm');
-const { readRenderer, runApp } = require('./support/renderer-source');
+const { runApp } = require('./support/renderer-source');
 const { fakeDocument, textOf, withClass } = require('./support/fake-dom');
 const { deferred } = require('./support/main-wiring');
 
@@ -13,9 +12,7 @@ function setup() {
   const state = { projectControl: { projectId: null }, terminalRequestSerial: 0,
     playback: { mode: 'live' }, replayTransitionPending: false, replayBusy: false };
   const app = { state, const: { CHROME: { PROJECT: 1, FOCUS: 2 } }, renderChromeNow() {} };
-  const window = { AUR: { app, settle: (call) => call() },
-    AU: { openTerminal(id) { calls.push(id); return pending.promise; } } };
-  vm.runInNewContext(readRenderer('app/project/control.js'), { window });
+  runApp(['app/project/control.js'], app, { window: { AU: { openTerminal(id) { calls.push(id); return pending.promise; } } } });
   return { app, state, calls, pending };
 }
 
@@ -46,6 +43,15 @@ test('project actions retain their project ID and replay blocks both target type
   pending.resolve({ ok: false, code: 'AMBIGUOUS' });
   await request;
   assert.match(app.projectControlPresentation('project').note, /Select an agent/);
+});
+
+test('a render that throws as a terminal is asked for leaves the button free, not disabled on Opening…', async () => {
+  const { app, calls } = setup();
+  let renders = 0;
+  app.renderChromeNow = () => { if (renders++ === 0) throw new Error('render failed'); };
+  await assert.rejects(app.requestProjectTerminal('project'), /render failed/);
+  const { phase, disabled, buttonText } = app.projectControlPresentation('project');
+  assert.deepEqual([phase, disabled, buttonText, calls], ['idle', false, 'Open Terminal', []], 'and main was not asked');
 });
 
 test('a terminal kept in the background is reported as found, not missing', async () => {
