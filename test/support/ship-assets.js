@@ -49,7 +49,8 @@ function loadShipAssets(manifest, trianglesByFile, materials = ['hull_primary', 
   const loads = [];
   const built = []; // the ship id of every hull built, in order
   const parts = []; // every template part made from a hull file
-  let clones = 0;
+  const roots = []; // and every template root
+  const clones = []; // every material copied
   let held = null; // while a test holds the loads (hold()), each waits on this
   class Vector {
     constructor() { this.x = 0; this.y = 0; this.z = 0; }
@@ -63,13 +64,13 @@ function loadShipAssets(manifest, trianglesByFile, materials = ['hull_primary', 
       this.emissiveColor = new Color(0, 0, 0);
     }
     clone(name) {
-      clones++;
       const copy = new Material(name);
       copy.albedoTexture = this.albedoTexture;
       copy.albedoColor = this.albedoColor.clone();
+      clones.push(copy);
       return copy;
     }
-    dispose() {}
+    dispose() { this.disposed = true; }
   }
   Material.MATERIAL_OPAQUE = 0;
   class Node {
@@ -164,6 +165,7 @@ function loadShipAssets(manifest, trianglesByFile, materials = ['hull_primary', 
     meshes: [{ getTotalIndices: () => (trianglesByFile[file] || 1000) * 3 }],
     instantiateModelsToScene(nameFor) {
       const root = new Mesh(nameFor('__root__'));
+      roots.push(root);
       for (const spec of materials) {
         const { name, textured, albedo } = typeof spec === 'string' ? { name: spec } : spec;
         const part = new Mesh(nameFor(name));
@@ -203,7 +205,10 @@ function loadShipAssets(manifest, trianglesByFile, materials = ['hull_primary', 
     built: () => built.splice(0),
     // The parts of every template made from a hull file and not disposed.
     templates: () => parts.filter((part) => !part.disposed),
-    materialClones: () => clones,
+    // Every node of those templates not disposed, their roots too.
+    templateNodes: () => [...roots, ...parts].filter((node) => !node.disposed),
+    materialClones: () => clones.length,
+    liveClones: () => clones.filter((material) => !material.disposed),
     InstancedMesh,
     containerFor,
     scene: (view) => ({ uid: 'scene-' + (++sceneCount), metadata: view ? { view } : null, isDisposed: () => false }),

@@ -151,8 +151,7 @@
     return hull.id + '|' + paletteKey(ship);
   }
 
-  // Livery: an authored hull map keeps its own colors; the glass keeps its authored smoke; every
-  // other material wears its role's look in the ship color, the livery roles as its trim lights.
+  // A hull file's material in a palette's livery, copied once per scene and kept once dressed.
   function fleetMaterial(scene, state, file, selfLight, ship, baseMaterial) {
     const palette = paletteKey(ship);
     const sourceName = String(baseMaterial && baseMaterial.name || 'material');
@@ -163,7 +162,19 @@
     material = baseMaterial && typeof baseMaterial.clone === 'function'
       ? baseMaterial.clone(id)
       : new BABYLON.StandardMaterial(id, scene);
-    const role = materialRole(sourceName);
+    try {
+      dressFleetMaterial(scene, material, materialRole(sourceName), selfLight, ship);
+    } catch (error) {
+      material.dispose(); // a copy half dressed is never kept
+      throw error;
+    }
+    state.materials.set(key, material);
+    return material;
+  }
+
+  // Livery: an authored hull map keeps its own colors; the glass keeps its authored smoke; every
+  // other material wears its role's look in the ship color, the livery roles as its trim lights.
+  function dressFleetMaterial(scene, material, role, selfLight, ship) {
     const authored = material.albedoTexture || material.diffuseTexture;
     if (role === 'glass') {
       material.emissiveColor = new BABYLON.Color3(0, 0, 0);
@@ -184,8 +195,6 @@
       finishFleetMaterial(scene, material, selfLight ? 0.5 : 1.0);
     }
     material.metadata = { ...(material.metadata || {}), role }; // what the exhaust part asks
-    state.materials.set(key, material);
-    return material;
   }
 
   // What one mesh of a hull wears: a model keeps its own finishes and takes the ship color on its
@@ -206,7 +215,7 @@
 
   // ---------- building a hull ----------
 
-  /** @param {HullTemplate} template */
+  /** @param {Pick<HullTemplate, 'roots'>} template */
   function disposeTemplate(template) {
     for (const root of template.roots) root.dispose(false, false); // its materials are the scene's
   }
@@ -220,29 +229,34 @@
    * @returns {HullTemplate}
    */
   function makeTemplate(scene, state, asset, ship, name, visibility) {
-    const entries = asset.record.container.instantiateModelsToScene(
+    const roots = asset.record.container.instantiateModelsToScene(
       (sourceName) => name + '_' + sourceName,
       false,
       { doNotInstantiate: true }
-    );
-    // The lightless map's hulls light themselves, and so does a far file stepped down to up close.
-    const selfLight = viewLod(scene) === 'far' || asset.lod === 'far';
-    const layer = asset.model ? AUR.shipModels.LAYER : AUR.SHIP_LAYER;
-    const meshes = childMeshes(entries.rootNodes);
-    for (const mesh of meshes) {
-      mesh.material = hullMaterial(scene, state, asset, selfLight, ship, mesh.material);
-      mesh.isPickable = false;
-      mesh.isVisible = false;
-      mesh.visibility = visibility;
-      mesh.layerMask |= layer;
-      // Babylon sorts a template's ships as one, at the template's place: the scene origin, where
-      // the sun's glow is too. Past the default (Number.MAX_VALUE), which every other mesh keeps,
-      // a faded fleet draws after every other blended mesh, wherever its ships are, and never
-      // with the glow or a planet's shell between its parts. Only a faded hull blends: no flown
-      // hull has a blended material in full.
-      mesh.alphaIndex = Number.POSITIVE_INFINITY;
+    ).rootNodes;
+    try {
+      // The lightless map's hulls light themselves, as does a far file stepped down to up close.
+      const selfLight = viewLod(scene) === 'far' || asset.lod === 'far';
+      const layer = asset.model ? AUR.shipModels.LAYER : AUR.SHIP_LAYER;
+      const meshes = childMeshes(roots);
+      for (const mesh of meshes) {
+        mesh.material = hullMaterial(scene, state, asset, selfLight, ship, mesh.material);
+        mesh.isPickable = false;
+        mesh.isVisible = false;
+        mesh.visibility = visibility;
+        mesh.layerMask |= layer;
+        // Babylon sorts a template's ships as one, at the template's place: the scene origin,
+        // where the sun's glow is too. Past the default (Number.MAX_VALUE), which every other mesh
+        // keeps, a faded fleet draws after every other blended mesh, wherever its ships are, and
+        // never with the glow or a planet's shell between its parts. Only a faded hull blends: no
+        // flown hull has a blended material in full.
+        mesh.alphaIndex = Number.POSITIVE_INFINITY;
+      }
+      return { roots, meshes };
+    } catch (error) {
+      disposeTemplate({ roots }); // the parts not reached yet would draw, in the file's materials
+      throw error;
     }
-    return { roots: entries.rootNodes, meshes };
   }
 
   // The template a ship's hull is built on: its look's, one per hull file and palette at the

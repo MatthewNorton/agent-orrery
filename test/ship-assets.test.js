@@ -186,3 +186,21 @@ test('a fleet hull keeps its baked tones and glass, and its trim lights and nozz
   assert.equal(partMaterial(claude, 'engine_glow').metadata.role, 'glow', 'every fleet material carries its role');
   assert.equal(claude.material.emissiveColor.toHexString(), '#d97757', 'the root emits the exact hex as evidence');
 });
+
+test('a template whose parts cannot all be dressed leaves no node or half-dressed livery behind, and later builds work', async () => {
+  const assets = loadShipAssets(LADDER_MANIFEST, {}); // parts: hull_primary, then accent_energy
+  const scene = assets.scene('system');
+  const { trimLight } = assets.models;
+  assets.models.trimLight = () => { throw new Error('no trim light'); }; // the second part, once its livery is copied
+  assert.equal(await assets.ships.upgrade(scene, ship('a', 0), assets.fallback('a')), null, 'the fleet template');
+  assets.ships.fade(scene, 0.16, { shipId: 'b', visibility: 1 });
+  assert.equal(await assets.ships.upgrade(scene, ship('b', 0), assets.fallback('b')), null, 'a template of its own');
+  const { templates, materials } = assets.AUR.shipAssets.sceneStates.get(scene);
+  assert.deepEqual([assets.templateNodes().length, templates.size], [0, 0], 'no node of either is left, drawn or kept');
+  assert.ok(assets.liveClones().every((material) => [...materials.values()].includes(material)), 'every livery copy left is kept, dressed');
+
+  assets.models.trimLight = trimLight;
+  const [c, b] = [await assets.ships.upgrade(scene, ship('c', 0), assets.fallback('c')), await assets.ships.upgrade(scene, ship('b', 0), assets.fallback('b'))];
+  assert.ok([c, b].every((root) => root && instancesOf(root).length === 2), 'both build');
+  assert.ok(templatesOf(c).every((mesh) => mesh.visibility === 0.16) && templatesOf(b).every((mesh) => mesh.visibility === 1));
+});
