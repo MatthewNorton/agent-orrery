@@ -127,7 +127,7 @@ async function getPlanet(model, projectId, planetName) {
   // Security: planetName arrives over IPC. Only a single plain directory segment
   // is a planet; anything with separators or dot-segments could walk outside the project.
   // Checked before any read, whatever folder the project has now or gets during one.
-  if (!root && !isPlanetSegment(planetName)) return null;
+  if (!isPlanetSegment(planetName)) return null;
   const folderOf = () => (project.path && project.exists ? project.path : null);
   // A project without a folder has stand-in planets only.
   const readNow = async () => {
@@ -270,4 +270,4 @@ function shallowCount(dir) {
   return count;
 }
 
-module.exports = { IGNORE_DIRS, getSystem, getPlanet, isPlanetSegment, planetFolders };
+module.exports = { IGNORE_DIRS, getSystem, getPlanet, planetFolders };

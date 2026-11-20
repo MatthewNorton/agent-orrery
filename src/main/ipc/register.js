@@ -3,7 +3,7 @@
 
 const { isLocalProjectPath } = require('../provider-adapters');
 const { githubIdentity } = require('../vcs-status/collector');
-const { isPlanetSegment } = require('../live/system-view');
+const { isPlanetSegment } = require('../build-buckets');
 const guards = require('./guards');
 
 /** @import { OpenExternalResult } from '../../types/contract' */

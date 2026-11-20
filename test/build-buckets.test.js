@@ -3,8 +3,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
-  MAX_BUCKETS, addBuckets, bucketOf, bucketKey, bucketFor, countBuild, bucketBuilds, foldBuckets, isBucketName, matchingEntry, mergeBuckets, planetKey,
-  setBucket, setProjectPath,
+  MAX_BUCKETS, addBuckets, bucketOf, bucketKey, bucketFor, countBuild, bucketBuilds, foldBuckets, isBucketName, isPlanetSegment, matchingEntry, mergeBuckets,
+  planetKey, setBucket, setProjectPath,
 } = require('../src/main/build-buckets');
 const { readCounts, own, KEPT_APART, KEPT_AS_ONE, KEPT_LARGER } = require('./support/bucket-cases');
 const { SEC, T0, ofType, claude } = require('./support/transcripts');
@@ -17,6 +17,13 @@ test('bucketOf names the top-level folder, or (root) for a file at the top level
   assert.equal(bucketOf('Docs/Guide.md', '/'), 'Docs');
   assert.equal(bucketOf('Src\\Deep\\A.js', '\\'), 'Src');
   assert.equal(bucketOf('README.md', '/'), '(root)');
+});
+
+test('a planet name is one plain path segment, (root) too', () => {
+  for (const ok of ['src', 'Docs', '(root)', '.config', 'a'.repeat(255)]) assert.equal(isPlanetSegment(ok), true, ok);
+  for (const bad of ['', '.', '..', 'a/b', 'a\\b', 'a\0b', 'a'.repeat(256), null, 7]) {
+    assert.equal(isPlanetSegment(bad), false, String(bad));
+  }
 });
 
 test('a bucket is named as a planet is, with no control character: a build elsewhere starts none', () => {

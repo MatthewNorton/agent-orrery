@@ -6,7 +6,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { getSystem, getPlanet, isPlanetSegment, planetFolders, IGNORE_DIRS } = require('../src/main/live/system-view');
+const { getSystem, getPlanet, planetFolders, IGNORE_DIRS } = require('../src/main/live/system-view');
 const { linkTo, outsideFolder, projectOnDisk, refuseReads, spyReaddir } = require('./support/system-view');
 const { SEC, SLUG, T0, claude, ofType } = require('./support/transcripts');
 const { runBoth } = require('./support/both-models');
@@ -194,18 +194,10 @@ test('live system view: one definition of a planet folder; the system draws thos
 
   // The system draws the planet folders that are not ignored; each of them is one a planet reads.
   const drawn = getSystem(model, 'p').planets.map((planet) => planet.name);
-  assert.deepEqual(drawn, ['src']);
+  assert.deepEqual([drawn, IGNORE_DIRS.has('node_modules')], [['src'], true]);
   // A planet reads any planet folder: one with builds that is not drawn opens and is counted (Go to lists it).
   const read = async (name) => { const planet = await getPlanet(model, 'p', name); return [planet.name, planet.files, planet.builds, planet.folderRead, 'procedural' in planet]; };
   assert.deepEqual([await read('src'), await read('.github'), await read('node_modules')],
     [['src', 1, 0, 'full', false], ['.github', 2, 2, 'full', false], ['node_modules', 1, 1, 'full', false]]);
   assert.deepEqual([await read('linked'), await read('notes')], [['linked', 0, 1, 'none', false], ['notes', 0, 1, 'gone', false]]);
-});
-
-test('live system view: a planet name is one plain path segment', () => {
-  for (const ok of ['src', 'Docs', '(root)', '.config', 'a'.repeat(255)]) assert.equal(isPlanetSegment(ok), true, ok);
-  for (const bad of ['', '.', '..', 'a/b', 'a\\b', 'a\0b', 'a'.repeat(256), null, 7]) {
-    assert.equal(isPlanetSegment(bad), false, String(bad));
-  }
-  assert.equal(IGNORE_DIRS.has('node_modules'), true);
 });
