@@ -65,7 +65,10 @@ loaders), then:
 
 View contract: each `scene/<view>/view.js` registers
 `AUR.views.<name> = (engine, data, ctx) => ({ scene, update(eventBatch), dispose() })`
-where `ctx` provides `openSystem(projectId)`, `openPlanet(projectId, name, system?)`, the
+where `ctx` provides `openSystem(projectId)`, `openPlanet(projectId, name, system?)`,
+`shown(scene)` (the stream the app shows that scene in, `null` once another view has its place:
+a view compares it around a call of its own that it awaits, and drops an answer that comes after
+a change), the
 shared `store`, the graphics `quality` tier, the `galaxyFields` cache and `worldMaps`, the generated
 planet maps (`worlds/textures.js`: a view opens an epoch on its scene and requests maps in it; disposing the scene closes the epoch),
 and the Settings `skyLook` and `orbitRings` (§4).
@@ -143,8 +146,11 @@ AU.universeImport()                    -> Promise<{ok, canceled, added, merged, 
    // Import merges (larger build counts, earlier firstSeen, later lastActivity) and never
    // removes; new projects arrive as project-added events, imported ideas as new items.
    // A bucket is a folder's name and is kept whatever it is (`__proto__`, `constructor`), and so
-   // is a project id. A folder keeps one bucket: under a Windows path a count for `docs` merges
-   // into the project's `Docs`.
+   // is a project id. A folder keeps one bucket, by the rule of the path the project ends with
+   // (its own, else the one the file gives it): under a Windows path each side's counts for
+   // `docs` and `Docs` are added up, and the larger of the two sums is kept.
+   // Every count, here and in the state file, is a whole number up to Number.MAX_SAFE_INTEGER;
+   // anything else counts as none.
 ```
 
 ```js
@@ -217,13 +223,16 @@ PlanetData = { name, key, project: Project, builds, files, sizeKb, subdirs,
 //   folder that cannot be listed (when getSystem draws stand-ins). History: no builds at the cursor.
 // folderRead: live only. 'full'; 'partial' (the read stopped short, so files and size are
 //   floors); 'gone' (the folder is not there); 'none' (it is there and could not be read: locked,
-//   a passing error, or a link). A planet read reads nothing that resolves outside the project:
-//   a linked folder is not opened, a link inside one counts as a file of the link's own size, and
-//   each folder is resolved just before it is read, so one that turns out to be elsewhere (a
-//   junction lstat calls a folder, a folder swapped for a link) counts as one that cannot be read.
+//   a passing error, a link, or a project folder that cannot be listed). A planet read never
+//   descends into a link: the planet's folder is typed by the project folder's listing and every
+//   folder below by its parent's, and a listing types every link and junction as a link, never as
+//   a folder. A link inside a planet counts as a file of the link's own size. A folder swapped
+//   for a link between its parent's listing and its own read can still be followed (that needs a
+//   process already writing inside the project). getSystem types folders the same way.
 //   Absent when there was no folder to read (procedural, or history).
 // builds, project: as they stand when the answer is made, after the folder was read. A project
-//   forgotten meanwhile answers null.
+//   forgotten meanwhile answers null. A project whose folder changed during the read is read once
+//   more; if it changed again the answer is null, so counts and project are never of two folders.
 ```
 
 Event batch entries (from `AU.onEvents`):
@@ -290,13 +299,13 @@ Design tokens (put in `:root`):
   folder of a project at a drive or filesystem root reads `D:\src`, with one separator).
   Arrows, Enter and click pick a result through the existing guarded routes. The arrows move the
   selection on the rows as they stand, and a refresh from the store keeps the elements of every
-  row whose entry is still listed, also when a row comes in or goes above it (`A.renderListbox`;
-  entries that share a key each keep a row of their own),
-  and the list stays scrolled where it was. A click opens the entry that was pressed
-  (`A.wireListbox`): when the rows moved under a pointer that stayed put, the release lands on
-  another row and the pressed entry still opens. Entries that share a key are never told apart
-  by where they stand: the pressed one opens only while it is still listed, or is the one entry
-  with its key. PROJECTS shares all of it. While an input method
+  row whose entry is still listed, also when a row comes in or goes above it (`A.renderListbox`),
+  and the list stays scrolled where it was. A row is its entry's key, and every entry has one of
+  its own: a project `p:<id>`, an agent `a:<id>`, a folder `f:<project id>` + NUL + `<folder>`
+  (no folder name holds a NUL, so no two folders share a key). A click opens the entry that was
+  pressed (`A.wireListbox`): when the rows moved under a pointer that stayed put, the release
+  lands on another row and the pressed entry, found by its key, still opens while it is listed.
+  PROJECTS shares all of it (its key is the project id). While an input method
   composes text (`AUR.composing`), Enter, Escape and the arrows are its own. Escape, a click
   outside (pressed and released outside the dialog's own box with the main button, so a drag out
   of the field selecting text keeps it; Settings follows the same rule, `AUR.closeOnBackdrop`), a
@@ -559,9 +568,12 @@ Data: `AU.getSystem(projectId)`.
   ring (`AUR.MOTION.returnSeconds`). The `bucket` planet is the one whose `key` the build
   carries (`AUR.planetOfBuild`; the view keeps its planets by name). On `build` with
   `isNew: true` and no such planet: re-fetch `AU.getSystem` (the view's `systemData` follows),
-  one request at a time and once more for a planet that started while one was out (also behind
-  a fetch that failed; three failures in a row rest until the next such build), grow the new
-  planet in from zero, feed shows planet formation. A folder is one planet whatever its casing:
+  one request at a time and once more for a planet that started while one was out, grow the new
+  planet in from zero, feed shows planet formation. An answer is drawn only while the app still
+  shows the view in the stream it was asked in (`ctx.shown`). A fetch that fails is not tried
+  again: the view stays behind (its system is not handed to a planet, which fetches its own)
+  until the next planet starts or the view is built again. A planet that cannot be built leaves
+  no ring, globe or label behind, and does not stop the others. A folder is one planet whatever its casing:
   one renamed in case only keeps the globe it has, under the name it was drawn with, until the
   view is built again; a key gets a second globe only when the answer lists it twice.
   On `activity`: brief thruster flash.
@@ -606,7 +618,7 @@ Data: `AU.getSystem(projectId)`.
 Data: `AU.getPlanet(projectId, name)`, and the project's system alongside it for the planet
 card's solar-system totals: the system view hands over its own when the planet is clicked there
 (`ctx.openPlanet(projectId, name, system)`), and any other way in fetches it
-(`A.fetchSystem`: `AU.getSystem`, or `null`). The system view hands over none while its own is
+(`AUR.fetchSystem`, which the system view's refetch uses too: `AU.getSystem`, or `null`). The system view hands over none while its own is
 behind a planet that has just started. The app holds it in `S.planetSystem`; when there is
 none, those rows show `—`; a `build` with `isNew: true` in the open planet's project fetches it
 again, one request at a time (`A.refreshPlanetSystem`), and one that arrives while the planet
