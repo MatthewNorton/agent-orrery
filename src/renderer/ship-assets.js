@@ -229,13 +229,15 @@
     if (record.container) return Promise.resolve(record);
     if (record.promise) return record.promise;
     const loading = record;
-    // A model's container is built in code, a manifest hull's is loaded from its file.
+    // A model's container is built in code, a manifest hull's is loaded from its file. A build
+    // queued for a scene that is gone by the time it runs builds nothing.
     record.promise = (model
-      ? Promise.resolve().then(() => AUR.shipModels.container(scene, model))
+      ? Promise.resolve().then(() => (isSceneDisposed(scene, state) ? null : AUR.shipModels.container(scene, model)))
       : BABYLON.SceneLoader.LoadAssetContainerAsync(HULL_ROOT, file, scene))
       .then((container) => {
+        if (!container) return null;
         if (isSceneDisposed(scene, state)) {
-          container.dispose();
+          container.dispose(); // with its materials and textures, a model's as a file's
           return null;
         }
         loading.container = container;

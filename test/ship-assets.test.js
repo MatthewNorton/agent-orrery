@@ -111,6 +111,23 @@ test('a rank a ship model has taken flies the model, built in code, until the sh
   assert.ok(sameItems(templatesOf(far[0]), templatesOf(far[1])), 'on the map the ships of a palette are instances of one template');
 });
 
+test('a model container queued for a scene that is gone before the build runs is never built', async () => {
+  const assets = loadShipAssets(LADDER_MANIFEST, {});
+  const built = [];
+  assets.models.container = (_scene, model) => { built.push(model.id); return assets.containerFor('model:' + model.id); };
+  assets.models.register({ id: 'coded', replaces: 'small', correction: { scale: 0.1, offset: [0, 0, 0] }, trim: {} });
+  await assets.AUR.shipAssets.manifestPromise;
+  const ends = { 'its hull state disposed': (scene) => assets.ships.dispose(scene), 'Babylon disposed': (scene) => { scene.isDisposed = () => true; } };
+  for (const [how, end] of Object.entries(ends)) {
+    const scene = assets.scene('system');
+    assert.equal(assets.ships.instantiate(scene, ship('a', 0)), null, 'the first sight of a container queues its build');
+    const { promise } = assets.AUR.shipAssets.sceneStates.get(scene).containers.get('model:coded');
+    end(scene);
+    assert.equal(await promise, null, how);
+    assert.deepEqual(built, [], how);
+  }
+});
+
 test('every view instances its hulls from one template per provider: far hulls on the map, near ones in a system', async () => {
   const assets = loadShipAssets(LADDER_MANIFEST, {});
   const universe = assets.scene('universe');

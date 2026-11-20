@@ -167,12 +167,25 @@ test('the model sits in the fleet frame its correction claims: one unit long, ce
   });
 });
 
-test('a build that fails part-way leaves nothing in the scene', () => {
+// A scene's first PBR material makes the BRDF lookup texture that every later one uses: the scene's.
+const leavesOnlyTheScenes = (scene) => {
+  assert.deepEqual(['meshes', 'transformNodes', 'materials', 'multiMaterials'].map((list) => scene[list].length), [0, 0, 0, 0]);
+  assert.ok(sameItems(scene.textures, [scene.environmentBRDFTexture]), 'no texture but the scene\'s BRDF lookup, kept');
+};
+
+test('a build that fails part-way leaves nothing of its own in the scene', () => {
   onScene((scene, models, petrel) => {
     const failing = { ...petrel, probe() { throw new Error('no probe'); } };
     assert.throws(() => models.container(scene, failing), /no probe/);
-    assert.deepEqual(['meshes', 'transformNodes', 'materials', 'multiMaterials', 'textures'].map((list) => scene[list].length), [0, 0, 0, 0, 0]);
+    leavesOnlyTheScenes(scene);
     assert.equal(models.container(scene, petrel).meshes.length, 1, 'and the scene can still build the model');
+  });
+});
+
+test('a model container owns the materials and textures it was built with: disposing it releases them', () => {
+  onScene((scene, models, petrel) => {
+    models.container(scene, petrel).dispose();
+    leavesOnlyTheScenes(scene);
   });
 });
 

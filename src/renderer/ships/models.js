@@ -66,16 +66,28 @@
     }));
   }
 
-  /** One built ship, dressed, held out of the scene as one mesh with a sub-mesh per finish. */
+  /**
+   * One built ship, dressed, held out of the scene as one mesh with a sub-mesh per finish. It owns
+   * the materials and textures it was built with, so disposing it releases them as a file's
+   * container does; they stay in the scene, which marks its materials dirty when it changes.
+   */
   function container(scene, model) {
-    const before = BUILT.map((list) => scene[list].length);
+    const counts = Object.fromEntries(BUILT.map((list) => [list, scene[list].length]));
+    // What the build added to a scene list, less the BRDF lookup texture a scene's first PBR
+    // material makes: that is the scene's, and every later PBR material uses it.
+    const made = (list) => scene[list].slice(counts[list]).filter((item) => item !== scene.environmentBRDFTexture);
+    let held;
     try {
-      return dressed(scene, model);
+      held = dressed(scene, model);
     } catch (error) {
       // A build that fails part-way leaves nothing of itself in the scene.
-      BUILT.forEach((list, i) => { for (const made of scene[list].slice(before[i])) made.dispose(); });
+      for (const list of BUILT) for (const item of made(list)) item.dispose();
       throw error;
     }
+    held.materials.push(...made('materials'));
+    held.multiMaterials.push(...made('multiMaterials'));
+    held.textures.push(...made('textures'));
+    return held;
   }
 
   function dressed(scene, model) {
