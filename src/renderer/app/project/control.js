@@ -206,14 +206,8 @@
     return pd.folderRead ? line : line + ' · history keeps no file counts';
   }
 
-  /**
-   * A project's system as main has it now; null when it has none or the call fails.
-   * @param {string} projectId @returns {Promise<SystemData | null>}
-   */
-  A.fetchSystem = async function fetchSystem(projectId) {
-    const system = await AUR.settle(() => AU.getSystem(projectId));
-    return Array.isArray(system.planets) ? system : null;
-  };
+  /** @type {(projectId: string) => Promise<SystemData | null>} */
+  A.fetchSystem = AUR.fetchSystem;
 
   /**
    * The system a planet opens its card with: the system view's own (`handed`) or a fetch. Either
@@ -226,37 +220,42 @@
     return handed ? Promise.resolve(handed) : A.fetchSystem(projectId);
   };
 
-  /** The planet view is open with the system it asked for: one a planet has formed since is fetched again. */
-  A.planetSystemOpened = function planetSystemOpened() {
+  /**
+   * The planet view of `projectId` is open with the system it asked for: one a planet has formed since is fetched again.
+   * @param {string} projectId
+   */
+  A.planetSystemOpened = function planetSystemOpened(projectId) {
     const { missed } = S.planetSystem;
     Object.assign(S.planetSystem, { awaited: null, missed: false });
-    if (missed) A.refreshPlanetSystem(S.current.projectId);
+    if (missed) A.refreshPlanetSystem(projectId);
   };
 
   /**
    * A build that starts a planet in `projectId` changes a planet card's PLANETS row. For the open
    * planet, its system (S.planetSystem) is fetched again, one request at a time, and once more for
-   * a build that came while one was out; for a planet still opening, when it has opened. No project
-   * (the planet could not be shown, and the app is back at the universe) is no planet's system.
-   * @param {string | null} projectId
+   * a build that came while one was out; for a planet still opening, when it has opened.
+   * @param {string} projectId
    */
   A.refreshPlanetSystem = async function refreshPlanetSystem(projectId) {
     const held = S.planetSystem;
-    if (!projectId) return;
     if (projectId === held.awaited) held.missed = true;
     if (S.current.view !== 'planet' || S.current.projectId !== projectId) return;
     held.stale = true;
     if (held.loading) return;
     held.loading = true;
-    while (held.stale && S.current.view === 'planet') {
-      held.stale = false;
-      const open = S.current.projectId;
-      const system = await A.fetchSystem(open);
-      if (!system || S.current.view !== 'planet' || S.current.projectId !== open) continue;
-      held.data = system;
-      A.scheduleChrome(C.CHROME.PLANET);
+    // Whatever goes wrong, it ends not loading: the next build fetches again.
+    try {
+      while (held.stale && S.current.view === 'planet') {
+        held.stale = false;
+        const open = S.current.projectId;
+        const system = await A.fetchSystem(open);
+        if (!system || S.current.view !== 'planet' || S.current.projectId !== open) continue;
+        held.data = system;
+        A.scheduleChrome(C.CHROME.PLANET);
+      }
+    } finally {
+      held.loading = false;
     }
-    held.loading = false;
   };
 
   A.renderPlanetCard = function renderPlanetCard() {

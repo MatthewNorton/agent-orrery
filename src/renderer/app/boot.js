@@ -311,7 +311,7 @@
     if (!data) { AUR.log('no planet data for', projectId, name); return A.openSystem(projectId); }
     S.planetSystem.data = held;
     setView('planet', { planet: data, projectId, name: data.name, store: S.store });
-    A.planetSystemOpened();
+    A.planetSystemOpened(projectId);
   };
 
   function back() {

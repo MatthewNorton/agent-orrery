@@ -195,7 +195,7 @@ test('planet card: a planet that starts while a planet is opening reaches its ca
     meanwhile();
     state.planetSystem.data = await request;
     Object.assign(state.current, { view: 'planet', projectId });
-    app.planetSystemOpened();
+    app.planetSystemOpened(projectId);
     await settled();
     return card().rows.PLANETS;
   };
@@ -214,9 +214,21 @@ test('planet card: a planet that starts while a planet is opening reaches its ca
   await app.requestPlanetSystem('p', systemOf(1));
   app.refreshPlanetSystem('p');
   Object.assign(state.current, { view: 'universe', projectId: null });
-  app.planetSystemOpened();
+  app.planetSystemOpened('p');
   await settled();
   assert.deepEqual([state.planetSystem.awaited, state.planetSystem.missed, asked], [null, false, 3]);
-  await app.refreshPlanetSystem(null);
-  assert.deepEqual([state.planetSystem.awaited, state.planetSystem.missed, asked], [null, false, 3]);
+});
+
+test('planet card: a refresh that throws is not left loading, and the next build fetches again', async () => {
+  const systemOf = (count) => ({ project: { id: 'p' }, beltDensity: 0, planets: Array.from({ length: count }, (_, index) => ({ name: 'd' + index })) });
+  const { app, state, window, card, scheduled } = planetSetup({ name: 'src', folderRead: 'full' }, { system: systemOf(1) });
+  let asked = 0;
+  window.AU.getSystem = async () => systemOf(++asked + 1);
+  const scheduleChrome = app.scheduleChrome;
+  app.scheduleChrome = () => { throw new Error('no chrome'); };
+  await assert.rejects(app.refreshPlanetSystem('p'), /no chrome/);
+  assert.deepEqual([state.planetSystem.loading, asked], [false, 1]);
+  app.scheduleChrome = scheduleChrome;
+  await app.refreshPlanetSystem('p');
+  assert.deepEqual([state.planetSystem.loading, asked, card().rows.PLANETS, scheduled.length], [false, 2, '3', 1]);
 });

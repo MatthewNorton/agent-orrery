@@ -59,8 +59,8 @@
       case 'build': {
         const p = S.store.projects.get(ev.project);
         if (p) p.totalBuilds = (p.totalBuilds || 0) + 1;
-        // The open planet's own count keeps pace, so its card compares like with like; a build
-        // that starts a planet changes how many its system has.
+        // The open planet's count keeps pace with main's, which is one count per key: two folders that
+        // share a key share it, whichever of them the build flies to (AUR.planetOfBuild).
         const pd = A.activePlanetData();
         if (pd && ev.project === S.current.projectId && ev.key === pd.key) pd.builds = (pd.builds || 0) + 1;
         if (ev.isNew) A.refreshPlanetSystem(ev.project);

@@ -4,7 +4,6 @@
 
 (function () {
   const AUR = window.AUR;
-  const AU = window.AU;
   const { disposeMeshAndMaterial } = AUR;
 
   AUR.sceneParts.system.ships = function (view) {
@@ -169,24 +168,21 @@
       }
     }
 
-    // A build started a planet this view does not draw: the system is fetched again, one request
-    // at a time, and once more for a planet that started while one was out. Until an answer from
-    // after the build is in, view.sys is behind it (view.sysBehind) and is not handed to a planet.
-    // A fetch that fails ends the loop and leaves the view behind, until the next planet starts or
-    // the view is built again. Whatever goes wrong, it ends not fetching.
+    // A build started a planet this view does not draw: the system is fetched again, one request at
+    // a time, and once more for a planet that started meanwhile. A fetch that fails ends the loop and
+    // leaves the view behind (view.sysBehind) until the next planet starts or the view is rebuilt.
     async function refetchPlanets() {
       view.sysBehind = refetchAgain = true;
       if (refetching) return;
       refetching = true;
-      // An answer is drawn only while the app still shows this view, in the stream it was asked in:
-      // the view of another project, or of history, may have taken its place while the fetch was out.
+      // An answer is drawn only while the app still shows this view, in the stream it was asked in.
       const stream = view.shown();
       const shown = () => stream !== null && view.shown() === stream;
       try {
         while (refetchAgain && shown()) {
           refetchAgain = false;
-          const ns = await AUR.settle(() => AU.getSystem(projectId));
-          if (!shown() || !Array.isArray(ns.planets)) break;
+          const ns = await AUR.fetchSystem(projectId);
+          if (!ns || !shown()) break;
           view.sys = ns;
           view.sysBehind = refetchAgain;
           drawNewPlanets(ns.planets);
@@ -196,11 +192,8 @@
       }
     }
 
-    // Draws the planets of `listed` the view lacks. A folder is one planet whatever its casing
-    // (its key): one renamed in case only is the globe already drawn, which keeps the name, look
-    // and orbit it was built with until the view is built again, as a folder renamed any other way
-    // or removed does. Only a key the answer lists more often than the view draws it gets a globe:
-    // two folders of a case-sensitive directory that differ in case alone.
+    // Draws the planets of `listed` the view lacks. A folder renamed in case only is the globe already
+    // drawn (one key); a key listed more often than it is drawn (case-twin folders) gets another globe.
     function drawNewPlanets(listed) {
       const count = (counts, key) => counts.set(key, (counts.get(key) || 0) + 1);
       const drawn = new Map(), wanted = new Map();

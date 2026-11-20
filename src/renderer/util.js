@@ -244,6 +244,11 @@
   AUR.settle = async function settle(call) {
     try { return (await call()) || FAILED; } catch (error) { return FAILED; }
   };
+  // A project's system as main has it now; null when it has none or the call fails.
+  AUR.fetchSystem = async function fetchSystem(projectId) {
+    const system = await AUR.settle(() => window.AU.getSystem(projectId));
+    return Array.isArray(system.planets) ? system : null;
+  };
 
   // ---- tiny DOM helpers ----
   AUR.el = function el(tag, cls, text) {
