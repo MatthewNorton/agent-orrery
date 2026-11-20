@@ -60,8 +60,8 @@ loaders), then:
 | Shared libraries | `util.js` (creates `window.AUR`; `fnv1a`/`mulberry32` copied from `src/main/shared/hash.js` so seeds agree), `util-scene.js` (Babylon helpers), `procedural-worlds.js` (world profiles: class, palette, hue, seed; asteroids), `worlds/` (kit 15: the pure map generator `noise.js` + `classes.js` + `maps.js`, run by `worker.js`, a worker file and not a page script; `textures.js`, the map service on `AUR.app.state.worldMaps`; `shaders.js`; `material.js`, a world's globe and shells; `sun.js`, the system sun's photosphere plugin and billboards), `ship-assets.js` + `ship-assets-hulls.js` + `ship-assets-api.js` (`AUR.ships`), `polish-math.js`, `galaxy-layout.js` and `galaxy-field.js` (pure UMD; the field is a galaxy's emission/dust atlas and the stars drawn from it), `search-core.js`, `components/project-vcs-status.js` |
 | Views | `scene/common.js` (`AUR.sceneParts`), `scene/sky.js` (`AUR.addSky`, the system and planet views' baked sky), then for each view in `scene/<view>/` (universe, system, planet) its parts before its `view.js` |
 | App state | `app/state.js` — the only file that assigns `AUR.app` (`state`, `const`) |
-| App modules | every other file in `app/`, `app/project/` and `app/panels/`, in `index.html` order |
-| Boot | `app/boot.js` — boot, event routing, view switching, debug hooks |
+| App modules | every other file in `app/`, `app/project/` and `app/panels/`, in `index.html` order; the last of them is `app/route.js`, the routes (universe, system, planet, the back button, the debug views of §8) |
+| Boot | `app/boot.js` — boot, event routing, view switching (`A.setView`) |
 
 View contract: each `scene/<view>/view.js` registers
 `AUR.views.<name> = (engine, data, ctx) => ({ scene, update(eventBatch), dispose() })`
