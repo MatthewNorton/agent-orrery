@@ -10,13 +10,6 @@ const path = require('node:path');
 const test = require('node:test');
 const { asarCheck, validArchive } = require('../src/main/harness/asar-check');
 
-// `files` with its rm noting the folder it is asked to remove, which it then removes.
-const notingRemoved = (files) => {
-  const noted = { dir: null };
-  return { noted, files: { ...files, rm: (dir, options) => { noted.dir = dir; return fs.promises.rm(dir, options); } } };
-};
-const NO_WAIT = { wait: async () => {} };
-
 test('asar check: plain files, read and deleted, and the temporary folder goes, by an rm that tries again while it is held', async (t) => {
   const rm = t.mock.method(fs.promises, 'rm');
   assert.deepEqual(await asarCheck(), { lstatFile: true, direntFile: true, deleted: true, errors: [] });
@@ -64,10 +57,10 @@ test('asar check: a rename or delete held for a moment is tried again, five trie
   assert.deepEqual([(await asarCheck(gone.files, options)).errors, waits], [["delete: ENOENT: unlink 'malformed.asar'"], 0]);
 });
 
-test('asar check: an fs that opens archives fails every step it gets wrong, and still cleans up', async () => {
+test('asar check: an fs that opens archives fails every step it gets wrong, and cleans up all the same', async (t) => {
   // As Electron 45's fs with asar handling on (measured): it cannot write a file named *.asar,
-  // lstat throws for a malformed archive and calls a valid one a folder, readdir's types still say
-  // file, and an opened archive stays open.
+  // lstat throws for a malformed archive and calls a valid one a folder, readdir's types say file
+  // regardless, and an opened archive stays open.
   const opened = new Set();
   const electron = {
     ...fs.promises,
@@ -86,11 +79,12 @@ test('asar check: an fs that opens archives fails every step it gets wrong, and 
       return fs.promises.unlink(file);
     },
   };
-  const { noted, files } = notingRemoved(electron);
-  const result = await asarCheck(files, NO_WAIT);
+  const rm = t.mock.method(electron, 'rm');
+  const result = await asarCheck(electron, { wait: async () => {} });
   assert.deepEqual([result.lstatFile, result.direntFile, result.deleted], [false, true, false]);
   assert.deepEqual(result.errors.map((error) => error.split(':')[0]), ['lstat', 'delete'], 'the archives were written, then read');
-  assert.deepEqual([fs.existsSync(noted.dir), [...opened].some((file) => fs.existsSync(file))], [false, false], 'the valid archive went with the folder');
+  const [dir] = rm.mock.calls[0].arguments;
+  assert.deepEqual([fs.existsSync(dir), [...opened].some((file) => fs.existsSync(file))], [false, false], 'the valid archive went with the folder');
 });
 
 test('asar check: a temporary folder it cannot remove is named in its errors', async () => {
