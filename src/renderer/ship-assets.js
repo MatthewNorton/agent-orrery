@@ -1,7 +1,7 @@
 // @ts-check
 // Manifest-backed original hull loading with procedural fallback: the manifest,
-// per-scene state, hull choice and container loading. ship-assets-hulls.js builds hulls from these
-// and ship-assets-api.js publishes AUR.ships.
+// per-scene state, hull choice and container loading. ships/livery.js dresses hulls,
+// ship-assets-hulls.js builds them from these and ship-assets-api.js publishes AUR.ships.
 'use strict';
 
 /**
@@ -32,7 +32,7 @@
  *   visibility: number, apart: { shipId: string, visibility: number } | null,
  *   disposed: boolean }} SceneState `visibility` is the fleet's, which every template shows, and
  *   `apart` the one ship focus mode shows at a visibility of its own (AUR.ships.fade)
- * @typedef {object} ShipAssetsCore shared by the ship-assets*.js files as AUR.shipAssets
+ * @typedef {object} ShipAssetsCore shared by the ship-assets*.js files and ships/livery.js as AUR.shipAssets
  * @property {(failure: string, error: any, outcome?: string) => void} logFailure logged once per message
  * @property {(name: string, steps: [string, () => void][]) => void} guarded
  * @property {Promise<ShipManifest | null>} manifestPromise

@@ -44,6 +44,6 @@ Format per entry:
   edges and pod collars (a few centimetres wide, proud of the surface as the
   chevrons are) so `join_by_material` folds them into the `Livery` object.
   Needs a rebuild of the four fleet-v3 hulls (frozen assets).
-- Plugs in at: `src/renderer/ship-assets-hulls.js` (`roleLook`, the
+- Plugs in at: `src/renderer/ships/livery.js` (`roleLook`, the
   `accent` role); until supplied, the stripes, chevrons, tip accents and
   collars Blender already authored are the trim lights.

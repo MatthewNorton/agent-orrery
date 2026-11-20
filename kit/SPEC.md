@@ -57,7 +57,7 @@ loaders), then:
 
 | Layer | Files |
 |---|---|
-| Shared libraries | `util.js` (creates `window.AUR`; `fnv1a`/`mulberry32` copied from `src/main/shared/hash.js` so seeds agree), `util-scene.js` (Babylon helpers), `procedural-worlds.js` (world profiles: class, palette, hue, seed; asteroids), `worlds/` (kit 15: the pure map generator `noise.js` + `classes.js` + `maps.js`, run by `worker.js`, a worker file and not a page script; `textures.js`, the map service on `AUR.app.state.worldMaps`; `shaders.js`; `material.js`, a world's globe and shells; `sun.js`, the system sun's photosphere plugin and billboards), `ship-assets.js` + `ship-assets-hulls.js` + `ship-assets-api.js` (`AUR.ships`), `ships/` (ship models built in code: `modules.js`, the registry the converted modules load into; `models.js`, `AUR.shipModels`; one folder per model, `ships/petrel/` with its generated `source/` and the hand-written `model.js`), `polish-math.js`, `galaxy-layout.js` and `galaxy-field.js` (pure UMD; the field is a galaxy's emission/dust atlas and the stars drawn from it), `search-core.js`, `components/project-vcs-status.js` |
+| Shared libraries | `util.js` (creates `window.AUR`; `fnv1a`/`mulberry32` copied from `src/main/shared/hash.js` so seeds agree), `util-scene.js` (Babylon helpers), `procedural-worlds.js` (world profiles: class, palette, hue, seed; asteroids), `worlds/` (kit 15: the pure map generator `noise.js` + `classes.js` + `maps.js`, run by `worker.js`, a worker file and not a page script; `textures.js`, the map service on `AUR.app.state.worldMaps`; `shaders.js`; `material.js`, a world's globe and shells; `sun.js`, the system sun's photosphere plugin and billboards), `ship-assets.js` + `ships/livery.js` (what a hull wears: its studio reflections and livery materials) + `ship-assets-hulls.js` + `ship-assets-api.js` (`AUR.ships`), `ships/` (ship models built in code: `modules.js`, the registry the converted modules load into; `models.js`, `AUR.shipModels`; one folder per model, `ships/petrel/` with its generated `source/` and the hand-written `model.js`), `polish-math.js`, `galaxy-layout.js` and `galaxy-field.js` (pure UMD; the field is a galaxy's emission/dust atlas and the stars drawn from it), `search-core.js`, `components/project-vcs-status.js` |
 | Views | `scene/common.js` (`AUR.sceneParts`), `scene/sky.js` (`AUR.addSky`, the system and planet views' baked sky), then for each view in `scene/<view>/` (universe, system, planet) its parts before its `view.js` |
 | App state | `app/state.js` — the only file that assigns `AUR.app` (`state`, `const`) |
 | App modules | every other file in `app/`, `app/project/` and `app/panels/`, in `index.html` order |
@@ -339,7 +339,7 @@ Design tokens (put in `:root`):
   lit hull) and the system view's glow pass blooms them. The root's unlit
   evidence material carries the exact hex. `window_light` is a cool lit pane
   and `canopy_glass` keeps its authored smoke with stronger reflections
-  (`materialRole` in `ship-assets-hulls.js`). Every fleet material gets a
+  (`materialRole` in `ships/livery.js`). Every fleet material gets a
   procedural studio environment for reflections; the system and planet views
   add a viewer-relative key and rim that only ship meshes see
   (`AUR.shipLights`).

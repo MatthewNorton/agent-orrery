@@ -1,7 +1,7 @@
 // @ts-check
 // Ship models built in code. A model flies the rank of one manifest hull: ship-assets.js asks here
 // for the hull to fly and for its container (the ship built once per scene, as one mesh that every
-// ship of the model instances), ship-assets-hulls.js for what a ship's hull wears, the
+// ship of the model instances), ships/livery.js for what a ship's hull wears, the
 // views for the lights and the nozzles. A model keeps the finishes it was authored with, so it
 // brings its own reflections, tone curve and lights, and no other light of the view reaches it.
 'use strict';

@@ -1,14 +1,19 @@
 'use strict';
 
-// The ship-assets files (src/renderer/ship-assets*.js) on the renderer's own util layer and enough
-// of Babylon to build, fade, swap and dispose hulls, for test/ship-assets.test.js and
-// test/ship-assets-api*.test.js; and the hull pickers those and test/ships-models.test.js share.
+// The ship-assets files (src/renderer/ship-assets*.js and ships/livery.js) on the renderer's own
+// util layer and enough of Babylon to build, fade, swap and dispose hulls, for
+// test/ship-assets.test.js and test/ship-assets-api*.test.js; and the hull pickers those and
+// test/ships-models.test.js share.
 
 const assert = require('node:assert/strict');
 const { loadUtilLayer, runRenderer, scriptTags } = require('./renderer-source');
 
-// The core loads first; the files after it extend AUR.shipAssets and publish AUR.ships.
-const SHIP_ASSET_FILES = scriptTags().filter((file) => /^ship-assets[a-z-]*\.js$/.test(file));
+// In page order, from the core to ship-assets-api.js: the files after the core extend
+// AUR.shipAssets and publish AUR.ships.
+const SHIP_ASSET_FILES = (() => {
+  const tags = scriptTags();
+  return tags.slice(tags.indexOf('ship-assets.js'), tags.indexOf('ship-assets-api.js') + 1);
+})();
 // AUR.SHIP_LAYER, the fleet lights' layer; every camera sees Babylon's default mask, which a
 // hull's template keeps when it adds the layer of its lights.
 const SHIP_LAYER = 0x10000000;

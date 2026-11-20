@@ -1,8 +1,9 @@
 'use strict';
 
-// The ship-assets core and hulls (src/renderer/ship-assets.js, ship-assets-hulls.js): the rank
-// ladder, LODs, a template per provider, the livery, and what a failure logs. AUR.ships' refresh
-// and triangle budget are test/ship-assets-api.test.js, its fade test/ship-assets-api-fade.test.js.
+// The ship-assets core, livery and hulls (src/renderer/ship-assets.js, ships/livery.js,
+// ship-assets-hulls.js): the rank ladder, LODs, a template per provider, the livery, and what a
+// failure logs. AUR.ships' refresh and triangle budget are test/ship-assets-api.test.js, its fade
+// test/ship-assets-api-fade.test.js.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -12,10 +13,10 @@ const {
   instancesOf, templatesOf, sameItems,
 } = require('./support/ship-assets');
 
-test('index.html loads every ship-assets file, the core first', () => {
-  const onDisk = fs.readdirSync(path.join(__dirname, '..', 'src', 'renderer')).filter((file) => /^ship-assets.*\.js$/.test(file)).sort();
-  assert.equal(SHIP_ASSET_FILES[0], 'ship-assets.js');
-  assert.deepEqual([...SHIP_ASSET_FILES].sort(), onDisk);
+test('index.html loads every ship-assets file, the core first, and the livery before the hulls', () => {
+  const onDisk = fs.readdirSync(path.join(__dirname, '..', 'src', 'renderer')).filter((file) => /^ship-assets.*\.js$/.test(file));
+  assert.deepEqual(SHIP_ASSET_FILES, ['ship-assets.js', 'ships/livery.js', 'ship-assets-hulls.js', 'ship-assets-api.js']);
+  assert.deepEqual([...onDisk, 'ships/livery.js'].sort(), [...SHIP_ASSET_FILES].sort());
 });
 
 test('shared hulls receive fixed provider palettes; a signal loads no model and a drone flies its family hull', async () => {
