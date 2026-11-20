@@ -2,6 +2,7 @@
 'use strict';
 
 const { createHistogram } = require('../shared/build-histogram');
+const { bareCopy } = require('../shared/values');
 
 // The live model: every map and counter the live modules share, with its time windows and read
 // limits. The Tracker creates one and passes it to each live function.
@@ -64,7 +65,7 @@ function createLiveModel(statePath, options, publish) {
     files: new Map(),
     claudeTails: new Map(),
     persisted,
-    pathIds: Object.assign(Object.create(null), persisted.pathIds || {}),
+    pathIds: bareCopy(persisted.pathIds || {}),
     pathOverrides,
     forgotten: loadForgotten(persisted),
     forgottenSlugs: new Map(),

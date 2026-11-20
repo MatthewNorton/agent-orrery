@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { boundedInteger, ownString, bufferValue, wholeCount } = require('../src/main/shared/values');
+const { bareCopy, boundedInteger, ownString, bufferValue, wholeCount } = require('../src/main/shared/values');
 
 test('wholeCount is a whole number from 0 to the largest safe one, and 0 for anything that is no count', () => {
   const MAX = Number.MAX_SAFE_INTEGER;
@@ -37,6 +37,16 @@ test('ownString trims own string data properties and ignores everything else', (
   const getter = Object.defineProperty({}, 'id', { enumerable: true, get() { reads++; return 'x'; } });
   assert.equal(ownString(getter, 'id'), '');
   assert.equal(reads, 0);
+});
+
+test('bareCopy is a copy with no prototype, where any name is an own key', () => {
+  const from = JSON.parse('{ "__proto__": "a", "constructor": "b", "id": "c" }');
+  const copy = bareCopy(from);
+  assert.deepEqual([Object.getPrototypeOf(copy), Object.keys(copy), copy.__proto__, copy.constructor], [null, ['__proto__', 'constructor', 'id'], 'a', 'b']);
+  copy.__proto__ = 'd';
+  delete copy.constructor;
+  assert.deepEqual([Object.keys(copy), copy.__proto__, from.constructor], [['__proto__', 'id'], 'd', 'b'], 'a write is an own key; the original is untouched');
+  assert.deepEqual([Object.keys(bareCopy()), Object.getPrototypeOf(bareCopy())], [[], null]);
 });
 
 test('bufferValue turns chunks into buffers without copying existing ones', () => {

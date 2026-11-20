@@ -7,6 +7,7 @@
 // A record that is not (one parked behind a later-stamped line that a seek to C stops at)
 // marks the checkpoint stale for that target, and the seek runs cold instead.
 
+const { bareCopy } = require('../shared/values');
 const { MAX_CHECKPOINTS } = require('./checkpoint-plan');
 const { safeExists } = require('./model');
 
@@ -35,7 +36,7 @@ const CHECKPOINT_BUDGET_BYTES = 64 * 1024 * 1024;
 function cloneModelState(state) {
   const projects = new Map();
   for (const [id, project] of state.projects) {
-    projects.set(id, { ...project, buckets: Object.assign(Object.create(null), project.buckets) });
+    projects.set(id, { ...project, buckets: bareCopy(project.buckets) });
   }
   const ships = new Map();
   for (const [id, ship] of state.ships) ships.set(id, { ...ship, pending: new Map(ship.pending) });

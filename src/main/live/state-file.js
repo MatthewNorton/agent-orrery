@@ -11,6 +11,7 @@ const fs = require('fs');
 const path = require('path');
 const { writeFileAtomic } = require('../shared/atomic-write');
 const { pathFromKey } = require('../provider-adapters');
+const { bareCopy } = require('../shared/values');
 
 /** @import { LiveModel, PersistedState } from '../../types/live-model' */
 
@@ -69,17 +70,14 @@ function loadState(statePath) {
  * @returns {PersistedState}
  */
 function serializeState(model) {
-  // Security: these are keyed by project ids and path keys, which come from folder names on disk.
-  // An object with no prototype takes any of them as an own key ('__proto__' too), here and where
-  // a caller writes to the result or deletes from it.
-  const bare = (/** @type {object} */ from = {}) => Object.assign(Object.create(null), from);
+  // Security: keyed by project ids and path keys, which come from folder names on disk (bareCopy).
   /** @type {PersistedState} */
   const out = {
     version: STATE_VERSION,
-    projects: bare(),
-    pathIds: bare(model.pathIds),
-    pathOverrides: bare(model.pathOverrides),
-    forgotten: bare(model.forgotten),
+    projects: bareCopy(),
+    pathIds: bareCopy(model.pathIds),
+    pathOverrides: bareCopy(model.pathOverrides),
+    forgotten: bareCopy(model.forgotten),
   };
   for (const [id, p] of model.projects) {
     out.projects[id] = {
