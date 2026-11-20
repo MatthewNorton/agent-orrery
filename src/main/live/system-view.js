@@ -117,12 +117,12 @@ function getSystem(model, projectId) {
 async function getPlanet(model, projectId, planetName) {
   const project = model.projects.get(projectId);
   if (!project) return null;
-  const root = planetName === '(root)';
   // Security: planetName arrives over IPC. Only a single plain directory segment
   // is a planet; anything with separators or dot-segments could walk outside the project.
   // Checked before any read, whatever folder the project has now or gets during one.
   if (!isPlanetSegment(planetName)) return null;
   const folderOf = () => (project.path && project.exists ? project.path : null);
+  const root = planetName === '(root)';
   // A project without a folder has stand-in planets only.
   const readNow = async () => {
     const projectPath = folderOf();
