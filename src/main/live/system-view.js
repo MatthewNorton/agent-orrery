@@ -33,6 +33,15 @@ const isGone = (/** @type {any} */ error) => Boolean(error) && (error.code === '
 const unread = (folderRead) => ({ files: 0, sizeKb: 0, subdirs: 0, resources: [], folderRead });
 
 /**
+ * The one definition of a planet's file, over a folder's listing: an entry the listing types as
+ * anything but a folder (a file, a link, a junction). A link counts as the one file it is and is
+ * never followed. The system view (getSystem, shallowCount) and the planet card (readFolder)
+ * count by it, so the two agree.
+ * @param {fs.Dirent} entry
+ */
+const isPlanetFile = (entry) => !entry.isDirectory();
+
+/**
  * The one definition of a planet folder, over a project folder's listing (`entries`; null when the
  * folder could not be listed): an entry the listing types as a folder. Security: a listing types
  * every link and junction as a link (lstat calls some junctions folders), so none is a planet
@@ -81,7 +90,7 @@ function getSystem(model, projectId) {
   if (project.path && project.exists) {
     try {
       const entries = fs.readdirSync(project.path, { withFileTypes: true });
-      beltDensity = entries.filter((e) => e.isFile()).length;
+      beltDensity = entries.filter(isPlanetFile).length;
       const dirs = planetFolders(entries, project.path).all.filter((e) => !ignored(e.name));
       planets = dirs.map((d) => ({
         name: d.name,
@@ -188,7 +197,7 @@ async function readFolder(dir, root) {
     peeks++;
     let entries;
     try { entries = await fs.promises.readdir(d, { withFileTypes: true }); } catch { return true; }
-    if (entries.some((e) => !e.isDirectory())) return true;
+    if (entries.some(isPlanetFile)) return true;
     for (const e of entries) {
       if (!ignored(e.name) && await holdsFiles(path.join(d, e.name))) return true;
     }
@@ -210,22 +219,20 @@ async function readFolder(dir, root) {
       return;
     }
     for (const e of entries) {
-      if (e.isDirectory()) {
-        if (ignored(e.name)) continue;
-        if (depth === 0) subdirs++;
-        if (root) continue;
-        const sub = path.join(d, e.name);
-        if (depth + 1 < READ_LEVELS && files < READ_FILES) await walk(sub, depth + 1);
-        else await leave(sub);
-      } else if (files >= READ_FILES) {
-        partial = true;
-      } else {
+      if (isPlanetFile(e)) {
+        if (files >= READ_FILES) { partial = true; continue; }
         files++;
         const ext = path.extname(e.name).slice(1).toUpperCase() || 'MISC';
         exts.set(ext, (exts.get(ext) || 0) + 1);
         // Security: lstat, which follows no link: a link in the folder counts as the file it is,
         // and its target (another folder, a network share) is not opened.
         sizes.push(fs.promises.lstat(path.join(d, e.name)).then((stat) => stat.size, () => null));
+      } else if (!ignored(e.name)) {
+        if (depth === 0) subdirs++;
+        if (root) continue;
+        const sub = path.join(d, e.name);
+        if (depth + 1 < READ_LEVELS && files < READ_FILES) await walk(sub, depth + 1);
+        else await leave(sub);
       }
     }
   };
@@ -249,8 +256,8 @@ function shallowCount(dir) {
     const entries = fs.readdirSync(dir, { withFileTypes: true });
     for (const e of entries) {
       if (count > 400) break;
-      if (e.isFile()) count++;
-      else if (e.isDirectory() && !ignored(e.name)) {
+      if (isPlanetFile(e)) count++;
+      else if (!ignored(e.name)) {
         try {
           count += fs.readdirSync(path.join(dir, e.name)).length;
         } catch { /* ignore */ }

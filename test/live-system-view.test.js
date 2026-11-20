@@ -7,7 +7,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { getSystem, getPlanet, isPlanetSegment, planetFolders, IGNORE_DIRS } = require('../src/main/live/system-view');
-const { projectOnDisk, refuseReads, spyReaddir } = require('./support/system-view');
+const { linkTo, outsideFolder, projectOnDisk, refuseReads, spyReaddir } = require('./support/system-view');
+
 test('live system view: planets are top-level folders ranked by files plus five per build', (t) => {
   const { model } = projectOnDisk(t, [
     'big/1.js', 'big/2.js', 'big/3.js', 'big/4.js', 'big/5.js',
@@ -33,6 +34,18 @@ test('live system view: the root planet\'s builds are read as any bucket\'s, a w
   const builds = (root) => getSystem(projectOnDisk(t, ['src/a.js', 'README.md'], { '(root)': root, src: 2 }).model, 'p').planets.map((planet) => [planet.name, planet.builds]);
   assert.deepEqual(builds(2.9), [['src', 2], ['(root)', 2]]);
   assert.deepEqual(builds('3'), [['src', 2]]);
+});
+
+test('live system view: the system view and the planet card count a planet\'s files alike, a link as the one file it is', async (t) => {
+  const { root, model } = projectOnDisk(t, ['src/a.js', 'README.md'], { src: 1, '(root)': 1 });
+  const outside = outsideFolder(t, ['one.txt']);
+  linkTo(outside, path.join(root, 'linked'));
+  linkTo(outside, path.join(root, 'src', 'out'));
+  const system = getSystem(model, 'p');
+  const drawn = Object.fromEntries(system.planets.map((planet) => [planet.name, planet.files]));
+  const cards = { src: (await getPlanet(model, 'p', 'src')).files, '(root)': (await getPlanet(model, 'p', '(root)')).files };
+  assert.deepEqual([drawn, system.beltDensity], [cards, cards['(root)']]);
+  assert.deepEqual(cards, { src: 2, '(root)': 2 });
 });
 
 test('live system view: the biggest eight planets, and of how many; a system is cached for 30 s', (t) => {
