@@ -32,7 +32,37 @@ const isGone = (/** @type {any} */ error) => Boolean(error) && (error.code === '
  */
 const unread = (folderRead) => ({ files: 0, sizeKb: 0, subdirs: 0, resources: [], folderRead });
 
-// Planets = top-level directories of the real project on disk, sized by a
+/**
+ * The one definition of a planet folder, over a project folder's listing (`entries`; null when the
+ * folder could not be listed): an entry the listing types as a folder. Security: a listing types
+ * every link and junction as a link (lstat calls some junctions folders), so none is a planet
+ * folder and none is ever gone into. getSystem draws the planet folders that are not ignored;
+ * getPlanet reads any of them, also one that is not drawn (`.github`).
+ * @param {fs.Dirent[] | null} entries
+ * @param {string} projectPath
+ */
+function planetFolders(entries, projectPath) {
+  return {
+    all: entries ? entries.filter((entry) => entry.isDirectory()) : [],
+    /**
+     * Planet `name` in the listing: the name it is listed by (by the path's rule for casing; null
+     * when it is not), its planet folder, what a read says where it has none ('none' for a link,
+     * which is there and not read; 'gone' for a file or nothing), and the stand-in rule: a planet
+     * by a stand-in's name is one, while it has no builds, where no listing or nothing in it says
+     * otherwise.
+     * @param {string} name
+     */
+    named(name) {
+      const entry = entries ? matchingEntry(entries, name, projectPath) : null;
+      const folder = entry && entry.isDirectory() ? entry : null;
+      /** @type {'gone' | 'none' | null} */
+      const missing = folder ? null : entry && entry.isSymbolicLink() ? 'none' : 'gone';
+      return { name: entry ? entry.name : null, folder, missing, standIn: isStandInName(name) && (!entries || missing === 'gone') };
+    },
+  };
+}
+
+// Planets = the planet folders of the real project on disk that are not ignored, sized by a
 // shallow file count, enriched by accumulated build counts. Missing paths
 // (deleted/temp projects) get deterministic procedural planets instead.
 /**
@@ -52,7 +82,7 @@ function getSystem(model, projectId) {
     try {
       const entries = fs.readdirSync(project.path, { withFileTypes: true });
       beltDensity = entries.filter((e) => e.isFile()).length;
-      const dirs = entries.filter((e) => e.isDirectory() && !ignored(e.name));
+      const dirs = planetFolders(entries, project.path).all.filter((e) => !ignored(e.name));
       planets = dirs.map((d) => ({
         name: d.name,
         files: shallowCount(path.join(project.path, d.name)),
@@ -125,17 +155,12 @@ async function readPlanet(projectPath, planetName, root) {
   /** @type {'gone' | 'none'} */
   let failure = 'none';
   try { entries = await fs.promises.readdir(projectPath, { withFileTypes: true }); } catch (error) { failure = isGone(error) ? 'gone' : 'none'; }
-  const entry = entries && matchingEntry(entries, planetName, projectPath);
-  // Security: only what the project folder's listing calls a folder is read. A listing types every
-  // link and junction as a link (lstat calls some junctions folders), so none is ever gone into.
+  // Security: only a planet folder is read (planetFolders), so no link is ever gone into.
+  const { name, folder, missing, standIn } = planetFolders(entries, projectPath).named(planetName);
   let read;
   if (!entries) read = unread(failure);
-  else if (!entry) read = unread('gone');
-  else if (entry.isDirectory()) read = await readFolder(path.join(projectPath, entry.name), false);
-  else read = unread(entry.isSymbolicLink() ? 'none' : 'gone');
-  // As getSystem draws stand-ins: in a project folder that cannot be listed, or for a folder that is gone.
-  const standIn = isStandInName(planetName) && (!entries || read.folderRead === 'gone');
-  return { name: entry ? entry.name : null, read, standIn };
+  else read = folder ? await readFolder(path.join(projectPath, folder.name), false) : unread(missing);
+  return { name, read, standIn };
 }
 
 /**
@@ -240,4 +265,4 @@ function shallowCount(dir) {
   return count;
 }
 
-module.exports = { IGNORE_DIRS, getSystem, getPlanet, isPlanetSegment };
+module.exports = { IGNORE_DIRS, getSystem, getPlanet, isPlanetSegment, planetFolders };

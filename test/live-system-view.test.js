@@ -6,7 +6,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { getSystem, getPlanet, isPlanetSegment, IGNORE_DIRS } = require('../src/main/live/system-view');
+const { getSystem, getPlanet, isPlanetSegment, planetFolders, IGNORE_DIRS } = require('../src/main/live/system-view');
 const { countBuild } = require('../src/main/build-buckets');
 const { liveProject, tempDir } = require('./support/main-wiring');
 
@@ -230,6 +230,11 @@ test('live system view: a stand-in planet is one without a folder or builds, wha
   const built = await getPlanet(model, 'p', 'Sector-7');
   assert.deepEqual([built.builds, built.folderRead, 'procedural' in built], [2, 'gone', false], 'builds make it a folder that is gone');
   assert.equal(await getPlanet(model, 'p', 'Sector-1/..'), null);
+  // The listing decides: a folder it had that is gone by the time it is read is a folder that is gone, not a stand-in.
+  refuseReads(t, (dir) => dir.endsWith('Sector-9'), 'ENOENT');
+  const vanished = await getPlanet(model, 'p', 'Sector-9');
+  assert.deepEqual([vanished.files, vanished.folderRead, 'procedural' in vanished], [0, 'gone', false]);
+  t.mock.restoreAll();
 
   project.exists = false;
   assert.equal((await getPlanet(model, 'p', 'Sector-9')).procedural, true);
@@ -371,6 +376,38 @@ test('live system view: a planet is what the project folder\'s listing calls a f
   // A file of the planet's name is no folder; a name the listing lacks is one that is gone.
   assert.deepEqual([(await getPlanet(model, 'p', 'notes')).folderRead, (await getPlanet(model, 'p', 'lib')).folderRead], ['gone', 'gone']);
   assert.deepEqual(dirs, [root, root], 'neither is opened');
+});
+
+test('live system view: one definition of a planet folder; the system draws those not ignored, a planet reads any', async (t) => {
+  const { root, model } = projectOnDisk(t, ['.github/workflows/ci.yml', '.github/a.md', 'node_modules/pkg/index.js', 'src/a.js', 'notes', 'README.md'],
+    { '.github': 2, node_modules: 1, linked: 1, notes: 1 });
+  // One listing: a dot folder, an ignored folder, a folder that is drawn, a file, and a link (an entry typed as one; none is made on disk).
+  const link = { name: 'linked', isDirectory: () => false, isSymbolicLink: () => true, isFile: () => false };
+  const listed = (list) => [.../** @type {any[]} */ (list), link];
+  const entries = listed(fs.readdirSync(root, { withFileTypes: true }));
+  const readdirSync = fs.readdirSync;
+  t.mock.method(fs, 'readdirSync', (dir, options) => (dir === root ? listed(readdirSync(dir, options)) : readdirSync(dir, options)));
+  spyReaddir(t, { entries: (list, options) => (options && list.some((entry) => entry.name === 'README.md') ? listed(list) : list) });
+
+  const folders = planetFolders(entries, root);
+  assert.deepEqual(folders.all.map((entry) => entry.name).sort(), ['.github', 'node_modules', 'src']);
+  const named = (name, from = folders) => { const { folder, ...rest } = from.named(name); return { ...rest, folder: folder && folder.name }; };
+  assert.deepEqual(['.github', 'linked', 'notes', 'absent'].map((name) => named(name)), [
+    { name: '.github', folder: '.github', missing: null, standIn: false }, { name: 'linked', folder: null, missing: 'none', standIn: false },
+    { name: 'notes', folder: null, missing: 'gone', standIn: false }, { name: null, folder: null, missing: 'gone', standIn: false },
+  ]);
+  // The stand-in rule: a stand-in's name with no listing to look in, or with nothing there to say otherwise.
+  assert.deepEqual([named('Sector-1').standIn, named('Sector-1', planetFolders(null, root)).standIn, named('src', planetFolders(null, root)).standIn, planetFolders(null, root).all],
+    [true, true, false, []]);
+
+  // The system draws the planet folders that are not ignored; each of them is one a planet reads.
+  const drawn = getSystem(model, 'p').planets.map((planet) => planet.name);
+  assert.deepEqual(drawn, ['src']);
+  // A planet reads any planet folder: one with builds that is not drawn opens and is counted (Go to lists it).
+  const read = async (name) => { const planet = await getPlanet(model, 'p', name); return [planet.name, planet.files, planet.builds, planet.folderRead, 'procedural' in planet]; };
+  assert.deepEqual([await read('src'), await read('.github'), await read('node_modules')],
+    [['src', 1, 0, 'full', false], ['.github', 2, 2, 'full', false], ['node_modules', 1, 1, 'full', false]]);
+  assert.deepEqual([await read('linked'), await read('notes')], [['linked', 0, 1, 'none', false], ['notes', 0, 1, 'gone', false]]);
 });
 
 test('live system view: a planet name is one plain path segment', () => {

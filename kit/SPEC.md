@@ -226,6 +226,13 @@ Planet     = { name, key, files, builds, procedural? }   // name '(root)' possib
 //   Names are unique in a system and keys almost always are: a case-sensitive folder under a
 //   Windows path (WSL) can hold `Docs` and `docs`, two planets with one key and one build count.
 //   A build then goes to the one it spelled (`bucket`), else the first (`AUR.planetOfBuild`).
+// A planet folder, live: an entry the project folder's listing types as a folder (`planetFolders`
+//   in `src/main/live/system-view.js`); a link or junction is typed a link, so it is never one.
+//   getSystem draws the planet folders that are not ignored (a name starting with `.`, or one of
+//   `IGNORE_DIRS` such as `node_modules`), and `(root)` when it has builds. getPlanet reads any
+//   planet folder. So a folder with builds that the system view does not draw (`.github`) stays
+//   in `Project.planets` (every bucket's key), which Go to lists, and opens as a planet that
+//   reads its folder.
 
 PlanetData = { name, key, project: Project, builds, files, sizeKb, subdirs,
                resources: string[], procedural?, folderRead? }   // resources = top file exts;
@@ -233,18 +240,20 @@ PlanetData = { name, key, project: Project, builds, files, sizeKb, subdirs,
 //   disk spells it; in history, its bucket's key. Under a Windows path it can differ in case from
 //   the name asked for, and the renderer takes it as the planet's name.
 // procedural: a stand-in with invented folder numbers. Live: the project has no folder on disk,
-//   or the planet is a `Sector-N` stand-in with no builds and either no folder or a project
-//   folder that cannot be listed (when getSystem draws stand-ins). History: no builds at the cursor.
+//   or the planet has a stand-in's name (`Sector-N`), no builds, and by the project folder's
+//   listing nothing or a file at that name, or the listing could not be had (the rule is
+//   `planetFolders`'; getSystem draws stand-ins when it has no planet to draw). A folder the
+//   listing had that is gone by its read is 'gone', not a stand-in. History: no builds at the cursor.
 // folderRead: live only. 'full'; 'partial' (the read stopped short, so files and size are
 //   floors); 'gone' (the folder is not there); 'none' (it is there and could not be read: locked,
 //   a passing error, a link, or a project folder that cannot be listed). A planet read never
-//   descends into a link: the planet's folder is typed by the project folder's listing and every
-//   folder below by its parent's, and a listing types every link and junction as a link, never as
-//   a folder. A link inside a planet counts as a file of the link's own size, and a file named
+//   descends into a link: the planet's folder is a planet folder (above) and every folder below is
+//   typed by its parent's listing, which types every link and junction as a link, never as a
+//   folder. A link inside a planet counts as a file of the link's own size, and a file named
 //   `*.asar` as the plain file it is: main turns Electron's asar handling off before anything
 //   else loads (`process.noAsar` in `main.js`), which would otherwise open and parse it. A folder swapped
 //   for a link between its parent's listing and its own read can still be followed (that needs a
-//   process already writing inside the project). getSystem types folders the same way.
+//   process already writing inside the project).
 //   Absent when there was no folder to read (procedural, or history).
 // builds, project: as they stand when the answer is made, after the folder was read. A project
 //   forgotten meanwhile answers null. A project whose folder changed during the read is read once
