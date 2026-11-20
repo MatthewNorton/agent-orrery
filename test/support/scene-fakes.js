@@ -15,13 +15,13 @@ function anything() {
 
 // A scene as `new BABYLON.Scene(engine)` makes one: listed by `engine` until disposed, holding the
 // pending data it is given. It disposes as Babylon 9.36 does: once; its onDisposeObservable first,
-// where an observer that throws skips the ones after it and its error is kept (`disposeError`, which
-// Babylon logs) rather than thrown; then it leaves the engine's list and is disposed. What else a
-// view asks of it (its other observables, its metadata) accepts anything.
+// where an observer that throws skips the ones after it and its error is not thrown; then it leaves
+// the engine's list and is disposed. What else a view asks of it (its other observables, its
+// metadata) accepts anything.
 function fakeScene(engine) {
   const observers = [];
   const scene = new Proxy({
-    isDisposed: false, disposeError: null, pendingData: new Set(),
+    isDisposed: false, pendingData: new Set(),
     getEngine: () => engine,
     onDisposeObservable: { add: (fn) => observers.push(fn), addOnce: (fn) => observers.push(fn) },
     addPendingData: (data) => scene.pendingData.add(data),
@@ -30,9 +30,7 @@ function fakeScene(engine) {
       if (scene.isDisposed) return;
       try {
         for (const fn of observers.splice(0)) fn(scene);
-      } catch (error) {
-        scene.disposeError = error;
-      }
+      } catch { /* Babylon logs an observer's error and goes on disposing */ }
       const index = engine.scenes.indexOf(scene);
       if (index > -1) engine.scenes.splice(index, 1);
       scene.isDisposed = true;

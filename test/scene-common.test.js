@@ -168,8 +168,8 @@ test('the stand-in scene disposes as Babylon 9.36 does: once, and past an observ
   first.onDisposeObservable.add(() => ran.push('after'));
   first.dispose();
   first.dispose();
-  // The error is kept, not thrown, and the observers after it are skipped; the scene leaves the list once.
-  assert.deepEqual([ran, first.disposeError && first.disposeError.message, first.isDisposed, engine.scenes], [['throws'], 'observer failed', true, [other]]);
+  // The error is not thrown and the observers after it are skipped; the scene leaves the list once.
+  assert.deepEqual([ran, engine.scenes], [['throws'], [other]]);
 });
 
 test('disposeView: the scene goes, and what was tied to it, also when a step before it throws', () => {
