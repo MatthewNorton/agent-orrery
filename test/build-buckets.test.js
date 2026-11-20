@@ -30,7 +30,7 @@ test('a bucket is named as a planet is, with no control character: a build elsew
   const project = { path: '/work/demo', buckets: {} };
   // Each of these is a folder some disk can hold, or what bucketOf makes of a path: its build counts in the totals only.
   for (const name of ['', '.', '..', 'a/b', 'a\\b', 'nul\0', 'tab\tname', 'esc\u001bdir', 'del\u007fdir', 'c1\u0085dir', 'x'.repeat(256)]) {
-    assert.deepEqual(countBuild(project, name), { counted: false, isNew: false }, JSON.stringify(name));
+    assert.deepEqual(countBuild(project, name), { key: null, isNew: false }, JSON.stringify(name));
   }
   assert.deepEqual(own(project.buckets), []);
   for (const name of ['(root)', 'src', '.github', 'with space', '__proto__', 'x'.repeat(255)]) assert.equal(isBucketName(name), true, name);
@@ -39,10 +39,10 @@ test('a bucket is named as a planet is, with no control character: a build elsew
   assert.deepEqual(own(project.buckets), [['src', 3]]);
 });
 
-test('a project keeps MAX_BUCKETS buckets at most: past them a new folder starts none, and one that has a bucket still counts', () => {
+test('a project keeps MAX_BUCKETS buckets at most: past them a new folder starts none, and one that has a bucket goes on counting', () => {
   const project = { path: 'C:\\Work\\Demo', buckets: {} };
   for (let index = 0; index < MAX_BUCKETS; index++) countBuild(project, `f${index}`);
-  assert.deepEqual([countBuild(project, 'one-more'), countBuild(project, 'F0')], [{ counted: false, isNew: false }, { counted: true, isNew: false }]);
+  assert.deepEqual([countBuild(project, 'one-more'), countBuild(project, 'F0')], [{ key: null, isNew: false }, { key: 'f0', isNew: false }]);
   assert.deepEqual([Object.keys(project.buckets).length, project.buckets.f0, Object.hasOwn(project.buckets, 'one-more')], [MAX_BUCKETS, 2, false]);
   // A merge stops there too, so the state file it is saved to reads back whole (live/saved-project.js).
   const merged = { path: project.path, buckets: { ...project.buckets } };

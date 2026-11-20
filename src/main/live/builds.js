@@ -5,7 +5,7 @@
 
 const path = require('path');
 const { relativeInside } = require('../path-safety');
-const { bucketOf, countBuild, planetKey } = require('../build-buckets');
+const { bucketOf, countBuild } = require('../build-buckets');
 const { queue, pushFeed } = require('./events');
 const { countBuild: countHistogramBuild } = require('../shared/build-histogram');
 const { wholeCount } = require('../shared/values');
@@ -25,17 +25,13 @@ const BUILD_FILES_LIMIT = 64;
  */
 function addBuild(model, project, ship, rel, ts, catchup) {
   const bucket = bucketOf(rel, path.sep);
-  const { counted, isNew } = countBuild(project, bucket);
+  const { key, isNew } = countBuild(project, bucket);
   project.totalBuilds = wholeCount(project.totalBuilds + 1);
   ship.builds = wholeCount(ship.builds + 1);
   model.systemCache.delete(project.id);
   countHistogramBuild(model.buildHistogram, ts);
   if (catchup) return;
-  queue(model, {
-    // A build that no bucket holds is on no planet.
-    type: 'build', project: project.id, bucket, key: counted ? planetKey(project, bucket) : null, file: rel,
-    shipId: ship.id, isNew, ts,
-  });
+  queue(model, { type: 'build', project: project.id, bucket, key, file: rel, shipId: ship.id, isNew, ts });
   if (isNew) pushFeed(model, 'form', `Planet formation started: ${bucket} in ${project.name}`, project.id);
   pushFeed(model, 'build', `${ship.name} building ${rel} in ${project.name}`, project.id);
 }

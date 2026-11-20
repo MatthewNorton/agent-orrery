@@ -192,17 +192,18 @@ function setBucket(buckets, key, count) {
 }
 
 /**
- * Counts one build of `bucket`: `counted` when a bucket holds it, `isNew` when that bucket starts
- * with it. A folder that has no bucket and may not start one (canStart) holds none.
+ * Counts one build of `bucket`: `key` is the planet key it was counted under (planetKey), null when
+ * no bucket holds it, so it is on no planet; `isNew` when that bucket starts with it. A folder that
+ * has no bucket and may not start one (canStart) holds none.
  * @param {BucketedProject} project
  * @param {string} bucket
- * @returns {{ counted: boolean, isNew: boolean }}
+ * @returns {{ key: string | null, isNew: boolean }}
  */
 function countBuild(project, bucket) {
-  const { key, name, builds } = bucketFor(project, bucket);
-  if (key === null && !canStart(project.buckets, name)) return { counted: false, isNew: false };
-  setBucket(project.buckets, name, wholeCount(builds + 1));
-  return { counted: true, isNew: key === null };
+  const held = bucketFor(project, bucket);
+  if (held.key === null && !canStart(project.buckets, held.name)) return { key: null, isNew: false };
+  setBucket(project.buckets, held.name, wholeCount(held.builds + 1));
+  return { key: planetKey(project, held.name), isNew: held.key === null };
 }
 
 /**
