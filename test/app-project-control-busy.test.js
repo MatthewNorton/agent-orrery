@@ -5,7 +5,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { runApp } = require('./support/renderer-source');
+const { runApp, settled } = require('./support/renderer-source');
 const { fakeDocument, withClass } = require('./support/fake-dom');
 const { deferred } = require('./support/main-wiring');
 
@@ -55,4 +55,48 @@ test('a forget whose card render throws as it goes up leaves the card\'s Forget 
   assert.deepEqual(shown('pc-forget'), ['Forget…', true], 'drawn as the forget went up');
   runFrames();
   assert.deepEqual([shown('pc-forget'), asked], [['Forget…', false], []], 'and main was not asked');
+});
+
+// A card button's click whose render throws as its action goes up (`raise`) or once main answers.
+const THROWN_CLICKS = [
+  { button: 'project-terminal', render: 'renderAgentFocus', at: 'raise' },
+  { button: 'project-terminal', render: 'renderAgentFocus', at: 'answer' },
+  { button: 'pc-forget', render: 'renderProjectCard', at: 'raise' },
+  { button: 'pc-forget', render: 'renderProjectCard', at: 'answer' },
+];
+
+for (const { button: cls, render, at } of THROWN_CLICKS) {
+  test(`a click on the card's ${cls} whose render throws at its ${at} is logged, not left unhandled`, async () => {
+    const { app, asked, logged, button } = page();
+    const draw = app[render], throwAt = at === 'raise' ? 0 : 1;
+    let renders = 0;
+    app[render] = () => { draw(); if (renders++ === throwAt) throw new Error('render failed'); };
+    const unhandled = await settled(() => {
+      button(cls).fire('click');
+      if (at === 'answer') asked[0].held.resolve({ ok: true, canceled: true });
+    });
+    assert.deepEqual([unhandled, logged], [[], ['click handler failed: Error: render failed']]);
+  });
+}
+
+test('a click on the cockpit\'s Open Terminal whose render throws as it goes up is logged, not left unhandled', async () => {
+  const logged = [];
+  const document = fakeDocument(['agent-focus', 'agent-focus-frame', 'agent-focus-exit', 'agent-focus-folder', 'agent-focus-terminal']);
+  const C = {
+    CHROME: { PROJECT: 1, FOCUS: 2, AGENTS: 4 }, AGENT_FOCUS_VANTAGES: { forward: {} },
+    AGENT_FOCUS_ENVIRONMENTS: { exterior: { camera: 'exterior', label: 'Exterior', asset: null } },
+  };
+  const state = {
+    current: { view: 'system', projectId: 'p' }, store: { ships: new Map([['s', { id: 's', project: 'p' }]]) },
+    projectControl: { projectId: null }, terminalRequestSerial: 0, playback: { mode: 'live' }, replayTransitionPending: false,
+    agentFocus: { shipId: 's' },
+  };
+  const app = { state, const: C, renderChromeNow() { throw new Error('render failed'); }, scheduleChrome() {} };
+  runApp(['app/project/control.js', 'app/agent-focus.js'], app, {
+    document, window: { AU: { openTerminal: () => new Promise(() => {}) }, matchMedia: () => ({ matches: false }) },
+    aur: { log: (...args) => logged.push(args.join(' ')) },
+  });
+  app.wireAgentFocus();
+  const unhandled = await settled(() => document.getElementById('agent-focus-terminal').fire('click'));
+  assert.deepEqual([unhandled, logged], [[], ['click handler failed: Error: render failed']]);
 });

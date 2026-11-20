@@ -25,8 +25,8 @@
     els.importButton = document.getElementById('settings-import');
     els.backupStatus = document.getElementById('settings-backup-status');
     if (!els.exportButton || !els.importButton || !els.backupStatus) return;
-    els.exportButton.addEventListener('click', () => runBackup(els.exportButton, EXPORT));
-    els.importButton.addEventListener('click', () => runBackup(els.importButton, IMPORT));
+    AUR.listen(els.exportButton, 'click', () => runBackup(els.exportButton, EXPORT));
+    AUR.listen(els.importButton, 'click', () => runBackup(els.importButton, IMPORT));
   };
 
   A.setBackupStatus = function setBackupStatus(message, error = false) {

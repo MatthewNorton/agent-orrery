@@ -32,7 +32,7 @@
 
     els.button.addEventListener('click', A.openProjectSettings);
     els.close.addEventListener('click', closeProjectSettings);
-    els.scan.addEventListener('click', scanForProjectPaths);
+    AUR.listen(els.scan, 'click', scanForProjectPaths);
     els.dialog.addEventListener('close', finishProjectSettingsClose);
     AUR.closeOnBackdrop(els.dialog, closeProjectSettings);
     A.wireUniverseBackup();

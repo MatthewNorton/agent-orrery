@@ -277,10 +277,34 @@
   };
   // On screen: there, without the .hidden class a view sets, and not display: none.
   AUR.isShown = (n) => Boolean(n) && !n.classList.contains('hidden') && getComputedStyle(n).display !== 'none';
+  // An error as its name and message; any other thrown value as String() gives it, or a fixed
+  // text when even that throws (an object with no prototype, a getter that throws).
+  const errorText = (error) => {
+    try {
+      return error instanceof Error ? error.name + ': ' + error.message : String(error);
+    } catch (_) {
+      return 'an error with no readable text';
+    }
+  };
+  // Listens for `type` on `node`. What the listener throws, or the promise it returns rejects with,
+  // is logged: nothing awaits a listener, so it would go uncaught. The line says "handler failed",
+  // which a test run's renderer error check (src/main/window.js) fails on. A listener that starts
+  // a busy action (AUR.settleBusy) returns its promise.
+  AUR.listen = function listen(node, type, listener) {
+    const failed = (error) => AUR.log(type + ' handler failed:', errorText(error));
+    node.addEventListener(type, function (event) {
+      try {
+        const result = listener.call(this, event);
+        if (result && typeof result.then === 'function') result.then(undefined, failed);
+      } catch (error) {
+        failed(error);
+      }
+    });
+  };
   AUR.button = function button(cls, text, onClick) {
     const n = AUR.el('button', cls, text);
     n.type = 'button';
-    if (onClick) n.addEventListener('click', onClick);
+    if (onClick) AUR.listen(n, 'click', onClick);
     return n;
   };
   AUR.clear = (node) => { while (node.firstChild) node.removeChild(node.firstChild); };

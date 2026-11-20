@@ -36,12 +36,11 @@
     const els = S.taskPanel.els;
     if (!els.panel || !els.count || !els.list || !els.form || !els.input || !els.add ||
         !els.status) return;
-    els.form.addEventListener('submit', (event) => {
+    AUR.listen(els.form, 'submit', (event) => {
       event.preventDefault();
-      if (!S.taskPanel.trusted || S.taskPanel.saving) return;
+      if (!S.taskPanel.trusted || S.taskPanel.saving) return null;
       const text = els.input.value.trim();
-      if (!text) return;
-      addTask(text);
+      return text ? addTask(text) : null;
     });
   };
 
@@ -217,9 +216,7 @@
       S.taskPanel.items.forEach((item, index) => {
         const row = AUR.el('div', 'task-row' + (item.done ? ' done' : ''));
         row.dataset.taskIndex = String(index);
-        const toggle = AUR.button('task-toggle', null, () => {
-          setTaskDone(item, !item.done);
-        });
+        const toggle = AUR.button('task-toggle', null, () => setTaskDone(item, !item.done));
         toggle.disabled = S.taskPanel.saving;
         toggle.setAttribute('role', 'checkbox');
         toggle.setAttribute('aria-checked', String(item.done));

@@ -150,7 +150,7 @@
 
       const presentation = A.projectControlPresentation(p.id);
       const terminal = AUR.button(
-        'pc-btn project-terminal', presentation.buttonText, () => { A.requestProjectTerminal(p.id); }
+        'pc-btn project-terminal', presentation.buttonText, () => A.requestProjectTerminal(p.id)
       );
       terminal.id = 'project-terminal';
       terminal.disabled = presentation.disabled;
@@ -178,7 +178,7 @@
 
   function forgetButton(p, ships, presentation) {
     const working = ships.length > 0;
-    const button = AUR.button('pc-forget', 'Forget…', () => { A.forgetFromCard(p.id); });
+    const button = AUR.button('pc-forget', 'Forget…', () => A.forgetFromCard(p.id));
     button.id = 'project-forget';
     button.disabled = working || S.projectForget.pending ||
       presentation.phase === 'replay' || presentation.phase === 'transition';

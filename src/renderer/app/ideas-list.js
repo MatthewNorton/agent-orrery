@@ -150,8 +150,8 @@
         : 'Remove this unassigned idea?';
       // removeIdea refuses on its own; this check only spares the confirm dialog.
       const remove = ideaButton('idea-remove', '×', 'remove', () => {
-        if (A.ideaMutationsDisabled() || !A.confirmRemoval(prompt, item.text)) return;
-        A.removeIdea(item);
+        if (A.ideaMutationsDisabled() || !A.confirmRemoval(prompt, item.text)) return null;
+        return A.removeIdea(item);
       }, taskText.id);
       remove.setAttribute('aria-label', 'Remove idea');
       remove.title = 'Remove idea';

@@ -1,7 +1,7 @@
 'use strict';
 
 // Renderer source for the source-text tests, listed by folder under src/renderer, and
-// runRenderer() for the tests that run a renderer script.
+// runRenderer() for the tests that run a renderer script; settled() for what its events start.
 
 const fs = require('node:fs');
 const path = require('node:path');
@@ -40,4 +40,18 @@ function rendererFiles(dir, keep = (file) => file.endsWith('.js')) {
 
 const rendererSource = (dir, keep) => rendererFiles(dir, keep).map(readRenderer).join('\n');
 
-module.exports = { readRenderer, rendererFiles, rendererSource, runApp, runRenderer };
+/** Runs `act` (a click, say), lets what it started settle, and returns what rejected unhandled. */
+async function settled(act) {
+  const unhandled = [];
+  const record = (reason) => unhandled.push(reason && reason.message);
+  process.on('unhandledRejection', record);
+  try {
+    act();
+    for (let turn = 0; turn < 3; turn++) await new Promise((resolve) => setImmediate(resolve));
+  } finally {
+    process.off('unhandledRejection', record);
+  }
+  return unhandled;
+}
+
+module.exports = { readRenderer, rendererFiles, rendererSource, runApp, runRenderer, settled };

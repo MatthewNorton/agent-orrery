@@ -28,15 +28,15 @@
     if (!S.historyEls.bar || !S.historyEls.play || !S.historyEls.speed ||
         !S.historyEls.scrubber || !S.historyEls.time || !S.historyEls.live) return;
 
-    S.historyEls.play.addEventListener('click', () => {
-      if (S.playback.mode !== 'replay' || !S.playback.available) return;
-      A.issueReplay({ action: S.playback.playing ? 'pause' : 'play' });
+    AUR.listen(S.historyEls.play, 'click', () => {
+      if (S.playback.mode !== 'replay' || !S.playback.available) return null;
+      return A.issueReplay({ action: S.playback.playing ? 'pause' : 'play' });
     });
-    S.historyEls.speed.addEventListener('click', () => {
-      if (S.playback.mode !== 'replay' || !S.playback.available) return;
+    AUR.listen(S.historyEls.speed, 'click', () => {
+      if (S.playback.mode !== 'replay' || !S.playback.available) return null;
       const index = Math.max(0, C.REPLAY_SPEEDS.indexOf(S.playback.speed));
       const speed = C.REPLAY_SPEEDS[(index + 1) % C.REPLAY_SPEEDS.length];
-      A.issueReplay({ action: 'speed', speed });
+      return A.issueReplay({ action: 'speed', speed });
     });
     S.historyEls.scrubber.addEventListener('input', () => {
       const started = performance.now();
@@ -49,16 +49,15 @@
         S.historyPerf.maxInputHandlerMs, performance.now() - started
       );
     });
-    S.historyEls.scrubber.addEventListener('change', () => {
+    AUR.listen(S.historyEls.scrubber, 'change', () => {
       S.historyPendingPreviewTs = historyTimestampFromPosition(S.historyEls.scrubber.value);
       flushHistoryPreview();
-      if (Number.isFinite(S.historyPreviewTs) && !S.replayBusy) {
-        S.historyPerf.seekRequests++;
-        A.issueReplay({ action: 'seek', ts: S.historyPreviewTs });
-      }
+      if (!Number.isFinite(S.historyPreviewTs) || S.replayBusy) return null;
+      S.historyPerf.seekRequests++;
+      return A.issueReplay({ action: 'seek', ts: S.historyPreviewTs });
     });
-    S.historyEls.live.addEventListener('click', () => {
-      if (S.playback.mode !== 'live') A.issueReplay({ action: 'live' });
+    AUR.listen(S.historyEls.live, 'click', () => {
+      return S.playback.mode !== 'live' ? A.issueReplay({ action: 'live' }) : null;
     });
     A.renderHistory();
   };

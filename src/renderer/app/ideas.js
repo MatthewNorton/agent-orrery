@@ -25,11 +25,10 @@
     const els = S.ideaPanel.els;
     if (!els.panel || !els.count || !els.list || !els.form || !els.input ||
         !els.create || !els.status) return;
-    els.form.addEventListener('submit', (event) => {
+    AUR.listen(els.form, 'submit', (event) => {
       event.preventDefault();
       const text = els.input.value.trim();
-      if (!text) return;
-      mutateIdea(() => AU.rootTaskCreate(text), 'Idea created', true);
+      return text ? mutateIdea(() => AU.rootTaskCreate(text), 'Idea created', true) : null;
     });
   };
 
