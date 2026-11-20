@@ -1,6 +1,7 @@
 'use strict';
 
-// src/main/live/system-view.js: the planets a system lists from its project folder, and the names a planet answers to.
+// src/main/live/system-view.js: the planets a system lists from its project folder, and the names a planet answers to;
+// with src/main/history/model.js, the builds a planet card answers with in both models.
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
