@@ -214,7 +214,7 @@ test('claude: under a Windows-style root, builds merge into the lower-cased buck
   const planets = await Promise.all(['Docs', 'docs', 'DOCS'].map((name) => tracker.getPlanet(WINDOWS_SLUG, name)));
   assert.deepEqual(planets.map((planet) => planet.builds), [3, 3, 3]);
   tracker.saveState();
-  const saved = JSON.parse(fs.readFileSync(world.statePath, 'utf8')).projects[WINDOWS_SLUG];
+  const saved = readState(world.statePath).projects[WINDOWS_SLUG];
   assert.deepEqual(pick(['buckets', 'totalBuilds'])(saved), { buckets: { docs: 3, Src: 1 }, totalBuilds: 4 },
     'one bucket per folder: the saved key is kept, not split');
 });

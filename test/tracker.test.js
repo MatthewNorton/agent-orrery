@@ -12,7 +12,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { canonicalProjectPath } = require('../src/main/provider-adapters');
 const {
-  SEC, MIN, T0, SLUG, CODEX_SESSION, appendJsonl, createWorld, ofType, pick, claude, codex,
+  SEC, MIN, T0, SLUG, CODEX_SESSION, appendJsonl, createWorld, ofType, pick, claude, codex, readState,
 } = require('./support/transcripts');
 const { PROJECT_KEYS, SHIP_KEYS, startClaude, appendAndPoll } = require('./support/live-session');
 
@@ -110,7 +110,7 @@ test('saveState()/loadState() round-trip buckets, totals, firstSeen and path ids
   ], T0 + 2 * SEC);
   assert.equal(session.tracker.saveState(), true);
 
-  assert.deepEqual(JSON.parse(fs.readFileSync(world.statePath, 'utf8')), {
+  assert.deepEqual(readState(world.statePath), {
     version: 2,
     projects: {
       [SLUG]: {
@@ -149,7 +149,7 @@ test('a folder named __proto__ starts one planet, and its builds survive the sta
   assert.deepEqual(session.tracker.snapshot().projects[0].planets, ['__proto__']);
 
   assert.equal(session.tracker.saveState(), true);
-  const saved = JSON.parse(fs.readFileSync(world.statePath, 'utf8')).projects[SLUG];
+  const saved = readState(world.statePath).projects[SLUG];
   assert.deepEqual([Object.keys(saved.buckets), saved.buckets.__proto__, saved.totalBuilds], [['__proto__'], 3, 3]);
   const restored = world.live({ claudeProjectsDir: path.join(world.root, 'no-claude') }).tracker;
   restored.scan(true);
