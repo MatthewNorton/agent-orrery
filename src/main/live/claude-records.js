@@ -8,6 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const { canonicalProjectPath } = require('../provider-adapters');
 const { claudeRecordToSignals, claudeRecordFacts, claudeTool } = require('../transcripts/claude');
+const { safePath } = require('../transcripts/fields');
 const { relativeInside } = require('../path-safety');
 const { liveShip } = require('../universe/public-shape');
 const { queue, pushFeed } = require('./events');
@@ -164,8 +165,11 @@ function onToolUse(model, project, ship, signal, ts, catchup) {
   const tool = signal.tool || '?';
   const { status, build, spawn } = claudeTool(tool);
   ship.status = status;
-  const rel = signal.filePath === null ? null : relativeInside(project.path, signal.filePath);
-  ship.detail = signal.filePath === null ? signal.detail : rel || path.basename(signal.filePath);
+  // Security: the check history makes of a transcript's path (transcripts/fields.js): one with a
+  // NUL, CR or LF, or too long, names no file, so no bucket and no ship detail is made of it.
+  const filePath = safePath(signal.filePath);
+  const rel = relativeInside(project.path, filePath);
+  ship.detail = signal.filePath === null ? signal.detail : rel || (filePath && path.basename(filePath));
   queue(model, { type: 'ship-updated', ship: liveShip(ship) });
 
   if (build && rel) {

@@ -232,3 +232,20 @@ test('claude: a transcript already idle over 15 min at startup resumes from its 
   assert.deepEqual(ofType(events, 'build').map(pick(['file', 'isNew'])), [{ file: path.join('src', 'b.js'), isNew: true }]);
   assert.equal(tracker.snapshot().projects[0].totalBuilds, 1);
 });
+
+test('claude: an edit whose path holds a NUL, CR or LF, or is too long, counts no build and names no folder', (t) => {
+  const session = startClaude(t);
+  const { dir, tracker } = session;
+  const unsafe = ['bad\0dir', 'bad\rdir', 'bad\ndir'].map((folder) => path.join(dir, folder, 'a.js'));
+  unsafe.push(path.join(dir, 'long', 'a'.repeat(5000)), path.join(dir, 'a\0b.js'));
+  const events = appendAndPoll(session, [
+    ...unsafe.map((file_path, index) => claude.tool(dir, T0 + (1 + index) * SEC, `toolu_u${index}`, 'Edit', { file_path })),
+    claude.tool(dir, T0 + 9 * SEC, 'toolu_ok', 'Write', { file_path: path.join(dir, 'src', 'a.js') }),
+  ], T0 + 9 * SEC);
+  // As history reads the same lines: the tool still shows on its ship, and only the path that is one builds.
+  assert.deepEqual(ofType(events, 'build').map(pick(['bucket', 'file'])), [{ bucket: 'src', file: path.join('src', 'a.js') }]);
+  assert.deepEqual(ofType(events, 'activity').map(pick(['tool', 'status', 'detail'])),
+    unsafe.map(() => ({ tool: 'Edit', status: 'Building', detail: null })));
+  const project = tracker.model.projects.get(SLUG);
+  assert.deepEqual([Object.keys(project.buckets), project.totalBuilds, tracker.snapshot().projects[0].planets], [['src'], 1, ['src']]);
+});
