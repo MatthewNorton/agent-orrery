@@ -76,10 +76,8 @@
           // dart is put back as it was and the hull is let go, each step guarded.
           failed(hull, error);
           guarded('Uninstalled hull ' + hull.id, [
-            [' could not restore its dart', () => {
-              Object.assign(fallback, { isPickable, isVisible });
-              if (fallback.metadata !== metadata) fallback.metadata = metadata;
-            }],
+            [' could not restore its dart', () => Object.assign(fallback, { isPickable, isVisible })],
+            [" could not restore its dart's metadata", () => { if (fallback.metadata !== metadata) fallback.metadata = metadata; }],
             [' could not be hidden', () => assetRoot.setEnabled(false)],
             [' could not be disposed', () => assetRoot.dispose()],
           ]);
@@ -140,7 +138,8 @@
    * for the look already loading takes over from the one before, and the hull
    * is built once; a call for the look the ship has builds nothing. Resolves to
    * the root once the new hull is in place, else null (no model, the same look,
-   * ended, or a throw, which is logged). The new hull's provider evidence or a
+   * ended, no file of the hull within the triangle budget, or a throw; the last
+   * two are logged). The new hull's provider evidence or a
    * label that cannot be written on the root or the dart is logged, and the
    * root still resolves.
    * @param {Ship} ship

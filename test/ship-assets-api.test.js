@@ -189,10 +189,33 @@ test('a dart that cannot be read builds no hull, and one that cannot be shown ag
   Object.defineProperty(unshown, 'metadata', { get: () => held, set() { throw new Error('no metadata'); } });
   assert.equal(await assets.ships.upgrade(scene, ship('b', 0), unshown), null);
   assert.deepEqual([unshown.children.length, ...books()], [0, 0, 0], 'its hull is let go and off the books');
+  // A hull that cannot be marked, under a dart that cannot be shown again and on a root that
+  // cannot be disposed: the dart's metadata is still put back, before the hull is let go.
+  const { AUR, BABYLON: { Mesh } } = assets;
+  const { markShipMesh } = AUR;
+  const { dispose } = Mesh.prototype;
+  AUR.markShipMesh = () => { throw new Error('no mark'); };
+  Mesh.prototype.dispose = function () {
+    if (this.name === 'ship_asset_c') throw new Error('no dispose');
+    dispose.call(this);
+  };
+  let shown = true;
+  const dim = Object.defineProperty(assets.fallback('c'), 'isVisible', {
+    get: () => shown,
+    set(value) { if (value) throw new Error('no show on c'); shown = value; },
+  });
+  const { metadata } = dim;
+  assert.equal(await assets.ships.upgrade(scene, ship('c', 0), dim), null);
+  assert.deepEqual([dim.metadata, ...books()], [metadata, 0, 0]);
+  Object.assign(AUR, { markShipMesh });
+  Mesh.prototype.dispose = dispose;
   assert.deepEqual(logs, [
     'Hull small request failed (no isVisible).',
     'Hull small request failed (no metadata).',
     'Uninstalled hull small could not restore its dart (no show).',
+    'Hull small request failed (no mark).',
+    'Uninstalled hull small could not restore its dart (no show on c).',
+    'Uninstalled hull small could not be disposed (no dispose).',
   ]);
 });
 

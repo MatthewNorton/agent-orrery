@@ -467,7 +467,7 @@ contract), `AUR`, `AUR_POLISH` and `AUR_GALAXY` (all `any` for now).
 | `ship-assets.js` | 320 | Manifest, per-scene state, hull choice by rank (`builds` against the manifest ladder; a rank a ship model has taken flies the model), container loading, and the triangle budget a view's hulls stay under: 900k in a system or planet view, 1.24M on the universe map (in a near view a hull with levels of detail steps down to its far file first; a ship that does not fit keeps its dart or current hull) |
 | `ships/livery.js` | 195 | What a hull wears, on `AUR.shipAssets`: the procedural studio sky its reflections show, a hull file's materials in the livery of a palette (a ship model keeps its own finishes and wears the ship color on its trim), and the root's provider evidence; loads between `ship-assets.js` and `ship-assets-hulls.js` |
 | `ship-assets-hulls.js` | 243 | Builds a hull from a loaded container, in its livery: instances of a hidden template per hull file and palette in every view, a template of its own for the ship focus mode shows apart, and in-place swaps on promotion or a fade |
-| `ship-assets-api.js` | 178 | `AUR.ships`: `instantiate`, `upgrade` a fallback dart, `refresh` in place on promotion or new colors, `fade` the fleet on its templates while focus mode follows a ship, `dispose` a scene's hull state |
+| `ship-assets-api.js` | 177 | `AUR.ships`: `instantiate`, `upgrade` a fallback dart, `refresh` in place on promotion or new colors, `fade` the fleet on its templates while focus mode follows a ship, `dispose` a scene's hull state |
 | `galaxy-layout.js` | 284 | Pure: galaxy grouping, spiral placement, Graveyard |
 | `polish-math.js` | 67 | Pure: label overlap, sun pulse |
 | `search-core.js` | 87 | Pure: project ranking |
@@ -502,7 +502,7 @@ contract), `AUR`, `AUR_POLISH` and `AUR_GALAXY` (all `any` for now).
 | `app/project/tasks.js` | 267 | TASKS panel |
 | `app/project/control.js` | 210 | Project card, Open Terminal button, planet card |
 | `index.html` | 580 | All panels exist in the HTML up front; modules show / hide them |
-| `styles/*.css` | 1,865 | All styles, in 12 files; `focus.css` and `focus-rooms.css` (474) are the cockpit |
+| `styles/*.css` | 2,046 | All styles, in 12 files; `focus.css` and `focus-rooms.css` (445) are the cockpit |
 
 ### 6.3 Shared state and routing
 
@@ -634,7 +634,7 @@ not reproduced.
    `history/`; the public shapes, galaxies, planets and ship records are shared in `universe/`.
 2. *(resolved)* `scene/universe/view.js` is split into five parts (§6.2). `updateLabelLayout`
    (`scene/universe/labels.js`) is still one 158-line function.
-3. *(resolved)* The styles are split into 12 files under `styles/` (1,865 lines).
+3. *(resolved)* The styles are split into 12 files under `styles/` (2,046 lines).
 4. `ctx` is a service locator: `app-context.js` `start()` calls into `ctx.ipc.*` and
    `ctx.replay.*`, which `main.js` must attach first, and test-fixture branches are mixed into
    service construction.

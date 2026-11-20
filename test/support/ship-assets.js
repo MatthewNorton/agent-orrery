@@ -2,11 +2,11 @@
 
 // The ship-assets files (src/renderer/ship-assets*.js and ships/livery.js) on the renderer's own
 // util layer and enough of Babylon to build, fade, swap and dispose hulls, for
-// test/ship-assets.test.js and test/ship-assets-api*.test.js; and the hull pickers those and
-// test/ships-models.test.js share.
+// test/ship-assets.test.js, test/ship-assets-api*.test.js and test/ships-livery.test.js; and the
+// hull pickers those and test/ships-models.test.js share.
 
 const assert = require('node:assert/strict');
-const { loadUtilLayer, runRenderer, scriptTags } = require('./renderer-source');
+const { loadUtilLayer, logsOf, runRenderer, scriptTags } = require('./renderer-source');
 
 // In page order, from the core to ship-assets-api.js: the files after the core extend
 // AUR.shipAssets and publish AUR.ships.
@@ -256,12 +256,6 @@ const shows = (root, visibility) => instancesOf(root).every((mesh) => mesh.visib
 const hidden = (root) => instancesOf(root).every((mesh) => !mesh.isEnabled());
 // Babylon objects compare by identity: a deepEqual that fails tries to print them whole.
 const sameItems = (a, b) => a.length === b.length && a.every((item, i) => item === b[i]);
-// Everything AUR.log is given from here on, in order.
-const logsOf = (assets) => {
-  const logs = [];
-  assets.AUR.log = (message) => logs.push(message);
-  return logs;
-};
 // A ship model is one merged mesh (ships/models.js), so its hull is one instance.
 function hullOf(root) {
   const instances = instancesOf(root);

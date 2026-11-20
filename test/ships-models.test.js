@@ -7,7 +7,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const BABYLON = require('babylonjs');
 const { withCanvas, onNullScene, loadShipModules } = require('../scripts/lib/ship-fingerprint.js');
-const { loadUtilLayer, readRenderer, runRenderer } = require('./support/renderer-source');
+const { loadUtilLayer, logsOf, readRenderer, runRenderer } = require('./support/renderer-source');
 const { SHIP_ASSET_FILES, ship, hullOf, sameItems } = require('./support/ship-assets');
 
 const ROOT = path.join(__dirname, '..');
@@ -184,8 +184,7 @@ test('a build that fails part-way leaves nothing of its own in the scene', () =>
 
 test('a build that fails part-way and cannot dispose one of its materials throws its own cause, and disposes the rest', () => {
   onScene((scene, models, petrel, AUR) => {
-    const logs = [];
-    AUR.log = (message) => logs.push(message);
+    const logs = logsOf({ AUR });
     const count = scene.materials.length;
     let stuck = null;
     const failing = {

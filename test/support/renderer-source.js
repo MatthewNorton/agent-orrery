@@ -43,4 +43,11 @@ function rendererFiles(dir, keep = (file) => file.endsWith('.js')) {
 
 const rendererSource = (dir, keep) => rendererFiles(dir, keep).map(readRenderer).join('\n');
 
-module.exports = { loadUtilLayer, readRenderer, rendererFiles, rendererSource, runRenderer, scriptTags };
+/** Everything `AUR.log` is given from here on, in order. */
+function logsOf({ AUR }) {
+  const logs = [];
+  AUR.log = (message) => logs.push(message);
+  return logs;
+}
+
+module.exports = { loadUtilLayer, logsOf, readRenderer, rendererFiles, rendererSource, runRenderer, scriptTags };

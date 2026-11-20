@@ -4,7 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { loadUtilLayer, scriptTags } = require('./support/renderer-source');
+const { loadUtilLayer, logsOf, scriptTags } = require('./support/renderer-source');
 
 const RENDERER = path.join(__dirname, '..', 'src', 'renderer');
 
@@ -129,17 +129,17 @@ test('AUR.dressed returns a material once dressed, and disposes one that cannot 
   assert.throws(() => AUR.dressed(half, () => { throw fault; }), (error) => error === fault);
   assert.equal(half.disposed, 1);
 
-  const logs = [];
-  AUR.log = (message) => logs.push(message);
+  const logs = logsOf({ AUR });
   const stuck = { name: 'lamp claude', dispose() { throw new Error('no dispose'); } };
   assert.throws(() => AUR.dressed(stuck, () => { throw fault; }), (error) => error === fault, 'the cause stays the dressing\'s');
-  assert.deepEqual(logs, ['Undressed material lamp claude could not be disposed (no dispose).']);
+  assert.throws(() => AUR.dressed(null, () => { throw fault; }), (error) => error === fault, 'and for a material never made');
+  assert.equal(logs[0], 'Undressed material lamp claude could not be disposed (no dispose).');
+  assert.equal(logs.length, 2);
 });
 
 test('AUR.disposeLogged logs a dispose that throws once per message', () => {
   const AUR = loadUtilLayer();
-  const logs = [];
-  AUR.log = (message) => logs.push(message);
+  const logs = logsOf({ AUR });
   let cause = 'no dispose';
   const stuck = { dispose() { throw new Error(cause); } };
   AUR.disposeLogged(stuck, 'A copy');
