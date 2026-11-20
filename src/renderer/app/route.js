@@ -24,12 +24,11 @@
   A.openSystem = async function openSystem(projectId) {
     const request = ++S.routeRequestGeneration;
     const requestedEpoch = S.streamEpoch;
-    /** @type {SystemData} */
-    let data = null;
-    try { data = await AU.getSystem(projectId); } catch (e) { AUR.log('getSystem err', e && e.message); }
+    const data = await AUR.fetchSystem(projectId);
     if (request !== S.routeRequestGeneration || !A.sameEpoch(requestedEpoch, S.streamEpoch)) return;
     S.current.projectId = projectId;
     S.current.planetName = null;
+    // None: main has no such system, its answer lists no planets, or the call failed (logged there).
     if (!data) { AUR.log('no system data for', projectId); return A.showUniverse(); }
     A.setView('system', { system: data, projectId, store: S.store });
   };
@@ -105,9 +104,7 @@
       } else if (view === 'planet') {
         const p = pickDemoProject();
         if (p) {
-          /** @type {SystemData} */
-          let sys = null;
-          try { sys = await AU.getSystem(p.id); } catch (e) { /* fall through */ }
+          const sys = await AUR.fetchSystem(p.id);
           const planet = sys ? largestPlanet(sys.planets) : null;
           if (planet) await A.openPlanet(p.id, planet.name);
         }

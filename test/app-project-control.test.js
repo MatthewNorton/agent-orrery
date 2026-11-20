@@ -67,7 +67,7 @@ const systemOf = (count) => ({
 const settled = () => new Promise((done) => setImmediate(done));
 
 // The planet card of project p, open on `planet`. `files` are more app modules to load, and `more`
-// the state and app functions they need.
+// the state and app functions they need; `logged` holds what AUR.log was given.
 function planetSetup(planet, { project = {}, system = null, files = [], more = {}, app = {} } = {}) {
   const document = fakeDocument();
   const window = { AUR_PANEL_LAYOUT: { panelsOn: () => [] }, AU: {} };
@@ -81,13 +81,13 @@ function planetSetup(planet, { project = {}, system = null, files = [], more = {
     projectControl: { projectId: null }, terminalRequestSerial: 0, playback: { mode: 'live' }, routeRequestGeneration: 0,
     ...more,
   };
-  const scheduled = [];
+  const scheduled = [], logged = [];
   const AUR = runApp(['app/chrome.js', 'app/project/control.js', ...files], {
     state, const: { CHROME: { PROJECT: 1, FOCUS: 2, PLANET: 4, HISTORY: 8, FEED: 16, SETTINGS: 32, IDEAS: 64 } },
     moduleHead: (card, title) => card.appendChild(window.AUR.el('h2', 'mod-title', title)),
     scheduleChrome: (mask) => scheduled.push(mask),
     ...app,
-  }, { document, window, aur: { worldProfile: () => ({ key: 'rocky' }) } });
+  }, { document, window, aur: { worldProfile: () => ({ key: 'rocky' }), log: (...args) => logged.push(args.join(' ')) } });
   const card = () => {
     AUR.app.renderPlanetCard();
     const node = document.getElementById('planet-card');
@@ -95,7 +95,7 @@ function planetSetup(planet, { project = {}, system = null, files = [], more = {
     return { rows, line: textOf(withClass(node, 'plc-sub')[0]), share: textOf(withClass(node, 'plc-share-note')[0]),
       bar: withClass(node, 'bar-fill')[0].style.width };
   };
-  return { app: AUR.app, state, window, card, scheduled };
+  return { app: AUR.app, state, window, card, scheduled, logged };
 }
 
 test('planet card: the share of builds is never 0% of a planet with builds, nor 100% of one without them all', () => {
@@ -145,8 +145,8 @@ test('planet card: folder rows are dashes for a folder that is gone or unread; P
   assert.equal(rows({ folderRead: 'partial', sizeKb: 1590 }, null).SIZE, '1.5 MB+', 'a floor rounds down');
 });
 
-test('planet card: a project\'s system is fetched whole or not at all', async () => {
-  const { window } = planetSetup({ name: 'src' });
+test('planet card: a project\'s system is fetched whole or not at all, and a call that throws is logged', async () => {
+  const { window, logged } = planetSetup({ name: 'src' });
   const { fetchSystem } = window.AUR;
   const system = { project: { id: 'p' }, planets: [], beltDensity: 0 };
   window.AU.getSystem = async (id) => {
@@ -155,6 +155,7 @@ test('planet card: a project\'s system is fetched whole or not at all', async ()
   };
   assert.equal(await fetchSystem('p'), system);
   for (const id of ['gone', 'throws', 'odd']) assert.equal(await fetchSystem(id), null, id);
+  assert.deepEqual(logged, ['getSystem err main is away'], 'what the call threw; an empty or odd answer is no error');
 });
 
 test('planet card: a build that starts a planet fetches the system again, one request at a time', async () => {

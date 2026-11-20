@@ -553,7 +553,9 @@ Design tokens (put in `:root`):
 
 ## 6. Solar system view (`2.solar-system-view.png`)
 
-Data: `AU.getSystem(projectId)`.
+Data: `AU.getSystem(projectId)`, through `AUR.fetchSystem` (`util.js`): `null` when main has no
+such system, its answer has no `planets` list, or the call throws, which it logs. For `null` the
+route logs that and shows the universe instead (`app/route.js`).
 
 - Backdrop: `AUR.addSky` (`scene/sky.js`), a cube baked offline by `scripts/bake-sky.js` from the
   author's Sidereal Deep Field shader (region The Veil): nebula gas, dust and stars in one

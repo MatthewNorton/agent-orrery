@@ -239,14 +239,17 @@
   };
 
   // ---- main-process calls ----
-  // A call's result, or a shared FAILED one when the call throws or resolves empty.
+  // A call's result, or a shared FAILED one when the call throws or resolves empty. `onError`, when
+  // given, hears what the call threw.
   const FAILED = Object.freeze({ ok: false, code: 'FAILED' });
-  AUR.settle = async function settle(call) {
-    try { return (await call()) || FAILED; } catch (error) { return FAILED; }
+  AUR.settle = async function settle(call, onError) {
+    try { return (await call()) || FAILED; } catch (error) { if (onError) onError(error); return FAILED; }
   };
-  // A project's system as main has it now; null when it has none or the call fails.
+  // A project's system as main has it now; null when it has none, its answer lists no planets, or
+  // the call fails, which is logged.
   AUR.fetchSystem = async function fetchSystem(projectId) {
-    const system = await AUR.settle(() => window.AU.getSystem(projectId));
+    const system = await AUR.settle(() => window.AU.getSystem(projectId),
+      (error) => AUR.log('getSystem err', error && error.message));
     return Array.isArray(system.planets) ? system : null;
   };
 

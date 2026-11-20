@@ -134,12 +134,13 @@ test('system ships: a folder renamed in case only stays its one globe; two folde
 });
 
 test('system ships: a failed fetch leaves the view behind until the next planet starts', async () => {
-  const { view, asked, built, build } = loadPart([{ name: 'src', key: 'src' }]);
+  const { view, asked, built, build, logged } = loadPart([{ name: 'src', key: 'src' }]);
   // One build, one fetch that fails: the loop stops there.
   build('docs', 'docs', { isNew: true });
   asked[0].reject(new Error('main is away'));
   await settled();
   assert.deepEqual([asked.length, view.sysBehind, view.sys, built], [1, true, null, []], 'no retry, and the system is not handed to a planet');
+  assert.deepEqual(logged, ['getSystem err main is away'], 'what the fetch threw is logged');
   // The next planet to start fetches again, and the answer has both.
   build('lib', 'lib', { isNew: true });
   assert.equal(asked.length, 2, 'the refetch is not left fetching');
