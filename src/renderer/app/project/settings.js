@@ -150,13 +150,17 @@
     const owner = S.projectSettings.owner;
     const request = ++S.projectSettings.request;
     S.projectSettings.busy = true;
-    setStatus(statusText);
-    A.renderProjectSettings();
-    S.projectSettings.els.close.focus();
-    const result = await AUR.settle(call);
-    if (!settingsRequestIsCurrent(owner, request)) return null;
-    S.projectSettings.busy = false;
-    return result;
+    try {
+      setStatus(statusText);
+      A.renderProjectSettings();
+      S.projectSettings.els.close.focus();
+      const result = await AUR.settle(call);
+      return settingsRequestIsCurrent(owner, request) ? result : null;
+    } finally {
+      // Whatever goes wrong, it ends not busy. Its own flag only: once superseded, the flag is the
+      // session's that followed (resetSettingsSession cleared it, and a request there may hold it).
+      if (settingsRequestIsCurrent(owner, request)) S.projectSettings.busy = false;
+    }
   }
   A.runSettingsRequest = runSettingsRequest;
 

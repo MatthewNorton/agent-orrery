@@ -74,16 +74,16 @@
     if (!projectId) return;
     const project = S.store.projects.get(projectId);
     const label = project ? project.name : 'project';
-    mutateIdea(() => AU.rootTaskAssign(id, projectId), `Assigned to ${label}; agent start requested`);
+    return mutateIdea(() => AU.rootTaskAssign(id, projectId), `Assigned to ${label}; agent start requested`);
   };
 
   A.retryIdea = function retryIdea(id) {
-    mutateIdea(() => AU.rootTaskRetry(id), 'Agent start requested again');
+    return mutateIdea(() => AU.rootTaskRetry(id), 'Agent start requested again');
   };
 
   A.removeIdea = function removeIdea(item) {
     const index = S.ideaPanel.items.findIndex((entry) => entry.id === item.id);
-    mutateIdea(() => AU.rootTaskRemove(item.id), 'Idea removed', false, () => {
+    return mutateIdea(() => AU.rootTaskRemove(item.id), 'Idea removed', false, () => {
       S.ideaPanel.selections.delete(item.id);
       S.ideaPanel.items = S.ideaPanel.items.filter((entry) => entry.id !== item.id);
       const next = S.ideaPanel.items[Math.min(index, S.ideaPanel.items.length - 1)] || null;
@@ -103,13 +103,18 @@
   async function mutateIdea(operation, successText, clearInput = false, onSuccess = null) {
     if (A.ideaMutationsDisabled()) return;
     S.ideaPanel.busy = true;
-    S.ideaPanel.refreshAfterBusy = false;
-    S.ideaPanel.status = '';
-    S.ideaPanel.error = false;
-    A.renderIdeas();
     /** @type {RootTaskResult} */
-    const result = await AUR.settle(operation);
-    S.ideaPanel.busy = false;
+    let result;
+    // Whatever goes wrong, it ends not busy: a render that throws must not refuse every edit from then on.
+    try {
+      S.ideaPanel.refreshAfterBusy = false;
+      S.ideaPanel.status = '';
+      S.ideaPanel.error = false;
+      A.renderIdeas();
+      result = await AUR.settle(operation);
+    } finally {
+      S.ideaPanel.busy = false;
+    }
     if (result.ok === true) {
       S.ideaPanel.status = successText;
       S.ideaPanel.error = false;
