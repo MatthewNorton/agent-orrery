@@ -168,16 +168,18 @@
       out.addInPlace(focusOffset);
     }
 
-    // The hull's diagonal this frame: measured per unit of the ship's scaling once per hull, then
-    // scaled by the size the pixel floor gives the ship right now. A hull swapped in under a dart
-    // is noted on the dart (ship-assets-api.js) and sits under it; a hull built in place, or the
-    // bare dart, is the mesh itself.
+    // The hull's diagonal this frame: measured per unit of the ship's scaling once per hull (the
+    // ship's mesh and its hull id, which a promotion changes in place), then scaled by the size the
+    // pixel floor gives the ship right now. A hull swapped in under a dart is noted on the dart
+    // (ship-assets-api.js) and sits under it beside the plume anchors; a hull built in place, or
+    // the bare dart, is the mesh itself.
     function hullSpan(rec) {
       const { shipFocus } = view;
-      const swapped = rec.mesh.metadata && rec.mesh.metadata.upgradedHullId;
-      const key = swapped || rec.mesh;
+      const key = rec.mesh.uniqueId + ':' + AUR.shipHullId(rec.mesh);
       if (shipFocus.measured !== key) {
-        const node = swapped ? rec.mesh.getChildren()[0] : rec.mesh;
+        const swapped = rec.mesh.metadata && rec.mesh.metadata.upgradedHullId;
+        const hull = swapped && rec.mesh.getChildren((child) => Boolean(child.metadata && child.metadata.assetHullId), true)[0];
+        const node = hull || rec.mesh;
         const bounds = node.getHierarchyBoundingVectors();
         const diagonal = bounds.max.subtract(bounds.min).length() / (rec.mesh.scaling.x || 1);
         shipFocus.measured = key;
