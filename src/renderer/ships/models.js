@@ -122,15 +122,16 @@
   // and a copy that cannot take them is not left in the scene.
   /** @param {BABYLON.PBRMaterial} material @param {string} name */
   function copyMaterial(material, name) {
-    const textures = TEXTURE_SLOTS.map((slot) => material[slot]);
-    for (const slot of TEXTURE_SLOTS) material[slot] = null;
     const scene = material.getScene();
     const count = scene.materials.length;
+    const textures = TEXTURE_SLOTS.map((slot) => material[slot]);
     let copy;
     try {
+      for (const slot of TEXTURE_SLOTS) material[slot] = null;
       copy = material.clone(name);
     } catch (error) {
-      for (const partial of scene.materials.slice(count)) partial.dispose(); // a clone that failed once made
+      // A clone that failed once made: its copy is not left in the scene.
+      for (const partial of scene.materials.slice(count)) AUR.disposeLogged(partial, 'A failed copy of ' + material.name);
       throw error;
     } finally {
       TEXTURE_SLOTS.forEach((slot, i) => { material[slot] = textures[i]; });

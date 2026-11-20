@@ -128,4 +128,10 @@ test('AUR.dressed returns a material once dressed, and disposes one that cannot 
   const fault = new Error('no trim');
   assert.throws(() => AUR.dressed(half, () => { throw fault; }), (error) => error === fault);
   assert.equal(half.disposed, 1);
+
+  const logs = [];
+  AUR.log = (message) => logs.push(message);
+  const stuck = { dispose() { throw new Error('no dispose'); } };
+  assert.throws(() => AUR.dressed(stuck, () => { throw fault; }), (error) => error === fault, 'the cause stays the dressing\'s');
+  assert.deepEqual(logs, ['A material that could not be dressed could not be disposed (no dispose).']);
 });

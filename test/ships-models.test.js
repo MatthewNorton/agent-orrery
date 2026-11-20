@@ -335,6 +335,19 @@ test('a trim copy that cannot be made leaves the model finish every map it had, 
     assert.throws(wear, /no plugins/);
     assert.equal(scene.materials.length, count, 'a copy the clone made before it failed is not left in the scene');
     assert.ok(sameItems(mapsOf(finish), maps), 'and the finish keeps its maps');
+    finish.clone = function (name) { // and one whose copy cannot be disposed either: the cause is still the clone's
+      clone.call(this, name).dispose = () => { throw new Error('no dispose'); };
+      throw new Error('no plugins');
+    };
+    assert.throws(wear, /no plugins/);
+    assert.ok(sameItems(mapsOf(finish), maps));
+    const kept = scene.materials[scene.materials.length - 1]; // the copy that could not be disposed
+    delete kept.dispose;
+    kept.dispose();
+    finish.getScene = () => { throw new Error('no scene'); }; // a failure before the copy is begun
+    assert.throws(wear, /no scene/);
+    assert.ok(sameItems(mapsOf(finish), maps), 'the finish keeps its maps whatever fails');
+    delete finish.getScene;
     finish.clone = function (name) { // a copy made that cannot take the model's tone curve
       return Object.defineProperty(clone.call(this, name), 'imageProcessingConfiguration', { set() { throw new Error('no tone curve'); } });
     };

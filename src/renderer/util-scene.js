@@ -20,13 +20,23 @@
     if (material.transparencyMode === BABYLON.Material.MATERIAL_OPAQUE) material.transparencyMode = null;
   };
 
+  // Disposes what a failure left behind without losing that failure: a dispose that throws is
+  // logged, and the caller goes on to report its own cause.
+  AUR.disposeLogged = function (item, name) {
+    try {
+      item.dispose();
+    } catch (error) {
+      AUR.log(name + ' could not be disposed (' + ((error && error.message) || error) + ').');
+    }
+  };
+
   // A material just made, once `dress` has run on it; one that cannot be dressed is disposed, so
   // a copy is never left in the scene half dressed.
   AUR.dressed = function (material, dress) {
     try {
       dress(material);
     } catch (error) {
-      material.dispose();
+      AUR.disposeLogged(material, 'A material that could not be dressed');
       throw error;
     }
     return material;

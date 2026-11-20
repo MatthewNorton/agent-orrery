@@ -21,18 +21,20 @@
  * @typedef {{ roots: BABYLON.TransformNode[], meshes: BABYLON.AbstractMesh[] }} HullTemplate a hidden
  *   copy of a hull that ships draw as instances of, and its meshes
  * @typedef {{ root: BABYLON.Mesh, correction: BABYLON.TransformNode, own: HullTemplate | null,
- *   hull: HullEntry, asset: HullAsset, ship: any, request: number,
+ *   hull: HullEntry, asset: HullAsset, ship: any, request: number, counted: boolean,
  *   fallback: BABYLON.AbstractMesh | null }} ShipEntry `hull`, `asset` and `ship` are what its hull
  *   was last built from, so a fade can rebuild that hull exactly (its triangles are its asset's,
  *   its look lookOf(hull, ship)); `request` counts its refresh calls, so a waiting one can tell a
- *   later one came; `own` is the template of its own it is built on while focus mode shows it apart
+ *   later one came; `own` is the template of its own it is built on while focus mode shows it
+ *   apart; `counted` while its triangles are in the scene's count
  * @typedef {{ containers: Map<string, HullRecord>, materials: Map<string, any>,
  *   templates: Map<string, HullTemplate>, ships: Map<string, ShipEntry>, triangles: number,
  *   visibility: number, apart: { shipId: string, visibility: number } | null,
  *   disposed: boolean }} SceneState `visibility` is the fleet's, which every template shows, and
  *   `apart` the one ship focus mode shows at a visibility of its own (AUR.ships.fade)
  * @typedef {object} ShipAssetsCore shared by the ship-assets*.js files as AUR.shipAssets
- * @property {(failure: string, error: any, outcome?: string) => void} logFailure logged once per failure and cause
+ * @property {(failure: string, error: any, outcome?: string) => void} logFailure logged once per message
+ * @property {(name: string, steps: [string, () => void][]) => void} guarded
  * @property {Promise<ShipManifest | null>} manifestPromise
  * @property {() => ShipManifest | null} settledManifest null until the manifest has loaded
  * @property {WeakMap<object, SceneState>} sceneStates
@@ -70,11 +72,24 @@
     AUR.log(message);
   }
 
-  // A failure and its cause, logged once per failure and cause: one that every ship meets is
-  // logged once, and a different cause is logged too.
+  // A failure, its cause and what it leaves, logged once per message: one that every ship meets
+  // is logged once, and a different cause or outcome is logged too.
   function logFailure(failure, error, outcome) {
-    const what = failure + ' (' + String((error && error.message) || error) + ')';
-    logOnce(what, what + (outcome ? '; ' + outcome : '.'));
+    const message = failure + ' (' + String((error && error.message) || error) + ')' + (outcome ? '; ' + outcome : '.');
+    logOnce(message, message);
+  }
+
+  // Runs each step of a clean-up, each named by what it could not do (' could not be disposed').
+  // One that throws is logged, not thrown, so the rest still run and what the caller reports stands.
+  /** @param {string} name @param {[string, () => void][]} steps */
+  function guarded(name, steps) {
+    for (const [what, step] of steps) {
+      try {
+        step();
+      } catch (error) {
+        logFailure(name + what, error);
+      }
+    }
   }
 
   function loadWithFetch() {
@@ -302,7 +317,7 @@
 
   /** @type {ShipAssetsCore} */
   const core = {
-    logFailure, manifestPromise, sceneStates, stateFor, isSceneDisposed, apartVisibility, ownVisibility,
+    logFailure, guarded, manifestPromise, sceneStates, stateFor, isSceneDisposed, apartVisibility, ownVisibility,
     settledManifest: () => (manifestSettled ? manifestValue : null),
     viewLod, selectHull, hullFiles, ensureContainer, fitsBudget, resolveAsset,
   };

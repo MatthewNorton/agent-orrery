@@ -273,8 +273,33 @@ test('a hull that can be neither built nor disposed still ends its build: both c
   assert.equal(assets.templateNodes().length, fleet, 'the template made for it goes though the hull before it could not');
   assert.deepEqual(logs, [
     'Hull small could not be built (no instances); the ship keeps the hull or dart it has.',
-    'Unbuilt hull small could not be disposed (no dispose); it is hidden.',
+    'Unbuilt hull small could not be disposed (no dispose).',
   ]);
+});
+
+test('a built hull its ship cannot take is let go: no instance of it stays, and the ship keeps its dart', async () => {
+  const assets = loadShipAssets(LADDER_MANIFEST, {});
+  const logs = logsOf(assets);
+  const scene = assets.scene('system');
+  await assets.ships.upgrade(scene, ship('a', 0), assets.fallback('a'));
+  const { Mesh } = assets.BABYLON;
+  assets.BABYLON.Mesh = function () { throw new Error('no mesh'); }; // the root a new ship's hull hangs from
+  assert.equal(await assets.ships.upgrade(scene, ship('b', 0), assets.fallback('b')), null);
+  assets.BABYLON.Mesh = Mesh;
+  assert.ok(assets.templates().every((part) => part.instances.length === 1), 'only the first ship draws');
+  assert.equal(assets.triangles(scene), 1000);
+  assert.deepEqual(logs, ['Hull small could not be built (no mesh); the ship keeps the hull or dart it has.']);
+});
+
+test('a failure is logged once per message: the same failure and cause again under another outcome is logged too', () => {
+  const assets = loadShipAssets(LADDER_MANIFEST, {});
+  const logs = logsOf(assets);
+  const { logFailure } = assets.AUR.shipAssets;
+  for (let i = 0; i < 2; i += 1) {
+    logFailure('Hull small request failed', new Error('no metadata'), 'the ship keeps its dart.');
+    logFailure('Hull small request failed', new Error('no metadata'));
+  }
+  assert.deepEqual(logs, ['Hull small request failed (no metadata); the ship keeps its dart.', 'Hull small request failed (no metadata).']);
 });
 
 test('a hull whose provider evidence cannot be made is not built, and leaves no instance behind', async () => {

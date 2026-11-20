@@ -10,13 +10,14 @@
  * @property {(hull: HullEntry, ship: any) => string} lookOf
  * @property {(scene: any, state: SceneState, hull: HullEntry, asset: HullAsset, ship: any) => ShipEntry | null} createShipEntry
  * @property {(scene: any, state: SceneState, entry: ShipEntry, hull: HullEntry, asset: HullAsset, ship: any) => boolean} swapHull
+ * @property {(state: SceneState, entry: ShipEntry) => void} forget
  */
 
 (function () {
   const AUR = window.AUR;
   /** @type {ShipAssetsCore} */
   const core = AUR.shipAssets;
-  const { logFailure, viewLod, apartVisibility, ownVisibility } = core;
+  const { logFailure, guarded, viewLod, apartVisibility, ownVisibility } = core;
   // The universe map has no lights, so far hulls carry a faint tint of their
   // own; without it they read as black cut-outs behind their accent lights.
   const FAR_SELF_LIGHT = 0.1;
@@ -294,84 +295,104 @@
       }
       return { correction, own: own === null ? null : template, evidence: evidenceMaterial(scene, state, ship) };
     } catch (error) {
-      logFailure('Hull ' + hull.id + ' could not be built', error, 'the ship keeps the hull or dart it has.');
-      const made = template && own !== null ? template : null; // the fleet's template stays
-      discard('Unbuilt hull ' + hull.id, correction, made);
+      unbuilt(hull, error, { correction, own: template && own !== null ? template : null }, null); // the fleet's template stays
       return null;
     }
   }
 
-  // Lets go of a hull no ship holds: drawn by nothing before it is disposed, and what cannot be
-  // disposed is logged, not thrown, so the rest still goes and the caller's outcome stands.
+  // Lets go of a hull no ship is to hold: hidden first, then off what holds it, then disposed, a
+  // template of its own with it. Each step is guarded, so the hull is let go as far as it can be.
   /** @param {string} name @param {BABYLON.TransformNode} correction @param {HullTemplate | null} own */
   function discard(name, correction, own) {
-    const steps = [() => correction.setEnabled(false), () => correction.dispose(false, false), () => own && disposeTemplate(own)];
-    for (const step of steps) {
-      try {
-        step();
-      } catch (error) {
-        logFailure(name + ' could not be disposed', error, 'it is hidden.');
-      }
-    }
+    guarded(name, [
+      [' could not be hidden', () => correction.setEnabled(false)],
+      [' could not be taken off its ship', () => { correction.parent = null; }],
+      [' could not be disposed', () => correction.dispose(false, false)],
+    ]);
+    if (own) discardTemplate(name, own);
+  }
+
+  function discardTemplate(name, own) {
+    guarded(name, [["'s own template could not be disposed", () => disposeTemplate(own)]]);
   }
 
   function hullMetadata(hull, asset, ship) {
-    return {
-      assetHullId: hull.id,
-      assetFamily: hull.family,
-      assetRole: hull.role,
-      assetLod: asset.lod,
-      providerTint: AUR.shipColor(ship),
-    };
+    const { id, family, role } = hull;
+    return { assetHullId: id, assetFamily: family, assetRole: role, assetLod: asset.lod, providerTint: AUR.shipColor(ship) };
   }
 
   /** @param {HullEntry} hull @param {HullAsset} asset @returns {ShipEntry | null} */
   function createShipEntry(scene, state, hull, asset, ship) {
     const built = buildHull(scene, state, hull, asset, ship);
     if (!built) return null;
-    const root = new BABYLON.Mesh('ship_asset_' + ship.id, scene);
-    built.correction.parent = root;
-    root.material = built.evidence;
-    root.metadata = hullMetadata(hull, asset, ship);
-    root.isPickable = false;
-    /** @type {ShipEntry} */
-    const entry = { root, correction: built.correction, own: built.own, hull, asset, ship, request: 0, fallback: null };
-    const shipId = String(ship.id);
-    state.triangles += asset.record.triangles;
-    state.ships.set(shipId, entry);
-    root.onDisposeObservable.addOnce(() => {
-      state.triangles = Math.max(0, state.triangles - entry.asset.record.triangles);
-      if (entry.own) disposeTemplate(entry.own); // a template of its own leaves with its ship
-      if (state.ships.get(shipId) === entry) state.ships.delete(shipId);
-    });
-    return entry;
+    let root = null;
+    try {
+      root = new BABYLON.Mesh('ship_asset_' + ship.id, scene);
+      built.correction.parent = root;
+      root.material = built.evidence;
+      root.metadata = hullMetadata(hull, asset, ship);
+      root.isPickable = false;
+      /** @type {ShipEntry} */
+      const entry = { root, correction: built.correction, own: built.own, hull, asset, ship, request: 0, fallback: null, counted: true };
+      root.onDisposeObservable.addOnce(() => forget(state, entry));
+      state.triangles += asset.record.triangles;
+      state.ships.set(String(ship.id), entry);
+      return entry;
+    } catch (error) {
+      unbuilt(hull, error, built, root);
+      return null;
+    }
+  }
+
+  // Takes a ship's hull off the scene's books, once: when its root goes, or for a root that could
+  // not. The books first; a template of its own that cannot go with its ship is logged.
+  /** @param {SceneState} state @param {ShipEntry} entry */
+  function forget(state, entry) {
+    if (!entry.counted) return;
+    entry.counted = false;
+    state.triangles = Math.max(0, state.triangles - entry.asset.record.triangles);
+    if (state.ships.get(String(entry.ship.id)) === entry) state.ships.delete(String(entry.ship.id));
+    if (entry.own) discardTemplate('Hull ' + entry.hull.id, entry.own);
+  }
+
+  // A hull built that its ship could not take: logged as one that could not be built, and let go.
+  function unbuilt(hull, error, built, root) {
+    logFailure('Hull ' + hull.id + ' could not be built', error, 'the ship keeps the hull or dart it has.');
+    discard('Unbuilt hull ' + hull.id, built.correction, built.own);
+    if (root) guarded('Unbuilt hull ' + hull.id, [["'s root could not be disposed", () => root.dispose()]]);
   }
 
   /**
    * Builds a hull in place of the entry's own, under the same root, on the template and in the
    * state focus mode's fade gives the ship, so a promotion lands as the hull it replaces showed.
-   * The new hull takes the root and the triangle count before the old one is let go, off its
-   * ship, so a dispose that throws leaves the ship the one hull that replaced it.
+   * The new hull takes the root and the triangle count before the old one is let go, and nothing
+   * after that is thrown: the ship has either the hull it had (false) or the new one (true).
    * @param {ShipEntry} entry @param {HullEntry} hull @param {HullAsset} asset
    */
   function swapHull(scene, state, entry, hull, asset, ship) {
     const built = buildHull(scene, state, hull, asset, ship);
     if (!built) return false;
+    try {
+      built.correction.parent = entry.root;
+    } catch (error) {
+      unbuilt(hull, error, built, null);
+      return false;
+    }
     const old = { hull: entry.hull, correction: entry.correction, own: entry.own };
-    built.correction.parent = entry.root;
     state.triangles += asset.record.triangles - entry.asset.record.triangles;
     Object.assign(entry, { correction: built.correction, own: built.own, hull, asset, ship });
-    old.correction.parent = null;
     discard('Replaced hull ' + old.hull.id, old.correction, old.own);
-    entry.root.material = built.evidence;
-    entry.root.metadata = { ...(entry.root.metadata || {}), ...hullMetadata(hull, asset, ship) };
-    if (entry.fallback && entry.fallback.metadata) {
-      entry.fallback.metadata = { ...entry.fallback.metadata, upgradedHullId: hull.id };
-    }
+    // The ship flies the new hull by now: what cannot be written of it is logged, not thrown.
+    const { root, fallback } = entry;
+    guarded('Hull ' + hull.id, [
+      [' could not show its provider evidence', () => { root.material = built.evidence; }],
+      [' could not be named on its root', () => { root.metadata = { ...(root.metadata || {}), ...hullMetadata(hull, asset, ship) }; }],
+      [' could not be named on its dart', () => { if (fallback && fallback.metadata) fallback.metadata = { ...fallback.metadata, upgradedHullId: hull.id }; }],
+    ]);
     return true;
   }
 
   /** @type {ShipAssetsHulls} */
-  const hulls = { lookOf, createShipEntry, swapHull };
+  const hulls = { lookOf, createShipEntry, swapHull, forget };
   Object.assign(core, hulls);
 })();

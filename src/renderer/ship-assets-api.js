@@ -14,9 +14,9 @@
   /** @type {ShipAssetsCore & ShipAssetsHulls} */
   const assets = AUR.shipAssets;
   const {
-    logFailure, manifestPromise, settledManifest, sceneStates, stateFor, isSceneDisposed, apartVisibility,
+    logFailure, guarded, manifestPromise, settledManifest, sceneStates, stateFor, isSceneDisposed, apartVisibility,
     ownVisibility, viewLod, selectHull, hullFiles, ensureContainer, fitsBudget, resolveAsset, lookOf,
-    createShipEntry, swapHull,
+    createShipEntry, swapHull, forget,
   } = assets;
 
   // A hull request that throws past buildHull's own catch is logged and resolves null. `outcome`
@@ -73,9 +73,14 @@
             upgradedHullId: hull.id,
           };
         } catch (error) {
-          // A hull that cannot be installed under its dart goes, and the dart flies as it did.
-          assetRoot.dispose();
+          // A hull that cannot be installed under its dart: the dart flies as it did, then the
+          // hull is let go, and the cause reported is the install's.
           Object.assign(fallback, { isPickable, isVisible });
+          guarded('Uninstalled hull ' + hull.id, [
+            [' could not be hidden', () => assetRoot.setEnabled(false)],
+            [' could not be disposed', () => assetRoot.dispose()],
+          ]);
+          forget(state, entry); // off the books, though its root could not go
           throw error;
         }
         return assetRoot;

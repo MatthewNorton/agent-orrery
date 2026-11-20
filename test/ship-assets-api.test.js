@@ -97,28 +97,68 @@ test('a refresh that a later one ends while its file loads stays ended, and the 
   assert.deepEqual(await requests([3, 3, 3]), once, 'asked again for the look already loading');
 });
 
-test('a hull request that throws past the hull build resolves null and logs its cause once, for a new hull and a swap', async () => {
+test('a hull that cannot be installed leaves its dart as it was, a swap that cannot be labelled is still a swap, and a request that throws logs its cause', async () => {
   const assets = loadShipAssets(LADDER_MANIFEST, {});
   const logs = [];
   assets.AUR.log = (message) => logs.push(message);
   const scene = assets.scene('system');
+  const books = () => { const { ships, triangles } = assets.AUR.shipAssets.sceneStates.get(scene); return [ships.size, triangles]; };
   // A dart whose metadata cannot be written: upgrade writes it once the hull is built, a swap last.
-  const unwritable = (dart) => Object.defineProperty(dart, 'metadata', { get: () => ({ isShip: true }), set() { throw new Error('no metadata'); } });
+  const unwritable = (dart, cause = 'no metadata') => Object.defineProperty(dart, 'metadata', { get: () => ({ isShip: true }), set() { throw new Error(cause); } });
   for (const id of ['a', 'b']) {
-    const dart = unwritable(assets.fallback(id));
-    const flown = [dart.isVisible, dart.isPickable];
+    const dart = Object.assign(unwritable(assets.fallback(id)), { isVisible: true, isPickable: false });
     assert.equal(await assets.ships.upgrade(scene, ship(id, 0), dart), null, 'upgrade ' + id);
-    const { ships, triangles } = assets.AUR.shipAssets.sceneStates.get(scene);
-    assert.deepEqual([dart.children.length, dart.isVisible, dart.isPickable, ships.size, triangles], [0, ...flown, 0, 0],
+    assert.deepEqual([dart.children.length, dart.isVisible, dart.isPickable, ...books()], [0, true, false, 0, 0],
       'a hull that cannot be installed is gone, uncounted, and its dart flies as it did');
   }
+  // The ship focus mode follows, whose own template cannot be disposed either: the dart still
+  // flies, the books hold only the ship already on them, and the cause reported is the install's.
+  await assets.ships.upgrade(scene, ship('g', 0), assets.fallback('g'));
+  assets.ships.fade(scene, 0.16, { shipId: 'e', visibility: 1 });
+  const { Mesh } = assets.BABYLON;
+  const { dispose } = Mesh.prototype;
+  Mesh.prototype.dispose = function () {
+    if (/^ship_template_.*\|e_/.test(this.name)) throw new Error('no template dispose');
+    dispose.call(this);
+  };
+  const followed = Object.assign(unwritable(assets.fallback('e'), 'no metadata on e'), { isVisible: true, isPickable: true });
+  assert.equal(await assets.ships.upgrade(scene, ship('e', 0), followed), null);
+  assert.deepEqual([followed.children.length, followed.isVisible, followed.isPickable, ...books()], [0, true, true, 1, 1000]);
+  // And one whose root cannot be disposed: hidden under a dart that flies, and off the books.
+  Mesh.prototype.dispose = function () {
+    if (this.name === 'ship_asset_f') throw new Error('no dispose');
+    dispose.call(this);
+  };
+  const stuck = Object.assign(unwritable(assets.fallback('f'), 'no metadata on f'), { isVisible: true, isPickable: true });
+  assert.equal(await assets.ships.upgrade(scene, ship('f', 0), stuck), null);
+  assert.deepEqual([stuck.isVisible, stuck.isPickable, stuck.children[0].isEnabled(), ...books()], [true, true, false, 1, 1000]);
+  Mesh.prototype.dispose = dispose;
+  assets.ships.fade(scene, 1);
+
   const darts = [assets.fallback('c'), assets.fallback('d')];
   const roots = [await assets.ships.upgrade(scene, ship('c', 0), darts[0]), await assets.ships.upgrade(scene, ship('d', 0), darts[1])];
-  darts.forEach(unwritable);
-  for (const id of ['c', 'd']) assert.equal(await assets.ships.refresh(scene, ship(id, 3)), null, 'refresh ' + id);
-  // A throw after the swap leaves the new hull whole, so the log claims nothing of what the ship keeps.
-  assert.deepEqual(logs, ['Hull small request failed (no metadata); the ship keeps its dart.', 'Hull mid request failed (no metadata).']);
-  assert.ok(roots.every((root) => root.children.length === 1 && hullId(root) === 'mid'), 'a throw after the swap leaves it whole');
+  darts.forEach((dart) => unwritable(dart));
+  for (const [i, id] of ['c', 'd'].entries()) assert.equal(await assets.ships.refresh(scene, ship(id, 3)), roots[i], 'refresh ' + id);
+  assert.ok(roots.every((root) => root.children.length === 1 && hullId(root) === 'mid'), 'the ship flies the new hull, whole');
+  // A throw from the request itself, once it has started: asked a second time whether it is live.
+  const { isNodeDisposed } = assets.AUR;
+  let asked = 0;
+  assets.AUR.isNodeDisposed = (node) => {
+    if (node === roots[0] && ++asked > 1) throw new Error('no node');
+    return isNodeDisposed(node);
+  };
+  assert.equal(await assets.ships.refresh(scene, ship('c', 10)), null);
+  assets.AUR.isNodeDisposed = isNodeDisposed;
+  assert.equal(hullId(roots[0]), 'mid', 'and the ship keeps the hull it had');
+  assert.deepEqual(logs, [
+    'Hull small request failed (no metadata); the ship keeps its dart.',
+    "Hull small's own template could not be disposed (no template dispose).",
+    'Hull small request failed (no metadata on e); the ship keeps its dart.',
+    'Uninstalled hull small could not be disposed (no dispose).',
+    'Hull small request failed (no metadata on f); the ship keeps its dart.',
+    'Hull mid could not be named on its dart (no metadata).',
+    'Hull big request failed (no node).',
+  ]);
 });
 
 test('a replaced hull that cannot be disposed leaves its ship one hull, counted, whether a promotion or focus mode replaces it', async () => {
@@ -139,9 +179,23 @@ test('a replaced hull that cannot be disposed leaves its ship one hull, counted,
   assets.ships.fade(scene, 1); // back onto the fleet template
   assert.deepEqual([root.children.length, assets.triangles(scene)], [1, 2000]);
   assert.ok(shows(root, 1) && !templatesOf(root).some((mesh) => own.includes(mesh)), 'on the fleet template, in full');
+
+  // A new hull the root cannot take is let go, and the ship keeps the one it has.
+  root.children.push = () => { throw new Error('no room'); };
+  assert.equal(await assets.ships.refresh(scene, ship('a', 10)), null, 'not promoted');
+  assert.deepEqual([root.children.length, hullId(root), assets.triangles(scene)], [1, 'mid', 2000]);
+  assert.ok(assets.templates().filter((part) => part.name.includes('big')).every((part) => part.instances.length === 0), 'no instance of it stays');
+  // An old hull that cannot be taken off its ship is hidden first, so the ship draws one hull.
+  const stuck = root.children[0];
+  Object.defineProperty(stuck, 'parent', { get() { return this.parentNode; }, set() { throw new Error('no detach'); } });
+  assert.equal(await assets.ships.refresh(scene, ship('a', 10)), root, 'promoted');
+  assert.ok(hullId(root) === 'big' && !stuck.isEnabled(), 'the new hull in place, the old one drawn by nothing');
   assert.deepEqual(logs, [
-    'Replaced hull small could not be disposed (no dispose); it is hidden.',
-    'Replaced hull mid could not be disposed (no template dispose); it is hidden.',
+    'Replaced hull small could not be disposed (no dispose).',
+    "Replaced hull mid's own template could not be disposed (no template dispose).",
+    'Hull big could not be built (no room); the ship keeps the hull or dart it has.',
+    'Replaced hull mid could not be taken off its ship (no detach).',
+    'Replaced hull mid could not be disposed (no detach).',
   ]);
 });
 
