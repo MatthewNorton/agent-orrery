@@ -6,8 +6,9 @@
 
 const fs = require('fs');
 const path = require('path');
-const { foldBuckets } = require('../build-buckets');
+const { setProjectPath } = require('../build-buckets');
 const { canonicalProjectPath, isLocalProjectPath } = require('../provider-adapters');
+const { plainObject } = require('../transcripts/fields');
 const { localAbsolutePath } = require('../path-safety');
 const { hex8 } = require('../shared/hash');
 const { wholeCount } = require('../shared/values');
@@ -49,20 +50,22 @@ function isProjectDirectory(projectPath) {
  * @returns {LiveProject}
  */
 function createProject(model, id, projPath, fields) {
+  /** @type {LiveProject} */
   const project = {
     id,
-    path: projPath,
+    path: null,
     name: fields.name || (projPath && path.basename(projPath)) || id,
     exists: isProjectDirectory(projPath),
     lastActivity: fields.lastActivity || 0,
     totalBytes: fields.totalBytes || 0,
     claudeBytes: fields.claudeBytes || 0,
     codexBytes: fields.codexBytes || 0,
-    // One bucket per folder by the rule of the path, every count a whole one (build-buckets.js).
-    buckets: foldBuckets(projPath, fields.buckets && typeof fields.buckets === 'object' ? fields.buckets : {}),
+    buckets: plainObject(fields.buckets) ? fields.buckets : {},
     totalBuilds: fields.totalBuilds || 0,
     firstSeen: fields.firstSeen || Date.now(),
   };
+  // One bucket per folder by the rule of the path, every count a whole one (build-buckets.js).
+  setProjectPath(project, projPath);
   model.projects.set(id, project);
   indexProjectPath(model, project);
   queue(model, { type: 'project-added', project: liveProject(project) });
@@ -70,18 +73,27 @@ function createProject(model, id, projPath, fields) {
 }
 
 /**
- * A project that had no folder learns one.
+ * A project that had no folder learns one, and the change is announced.
  * @param {LiveModel} model
  * @param {LiveProject} project
  * @param {string} projPath
  */
 function adoptProjectPath(model, project, projPath) {
-  project.path = projPath;
-  project.buckets = foldBuckets(projPath, project.buckets);
+  takeProjectPath(model, project, projPath);
+  announceProjectUpdated(model, project);
+}
+
+/**
+ * Gives a project that had no folder one, with what follows from it; the caller announces it.
+ * @param {LiveModel} model
+ * @param {LiveProject} project
+ * @param {string} projPath
+ */
+function takeProjectPath(model, project, projPath) {
+  setProjectPath(project, projPath);
   project.name = path.basename(projPath) || project.name;
   project.exists = isProjectDirectory(projPath);
   indexProjectPath(model, project);
-  announceProjectUpdated(model, project);
 }
 
 /**
@@ -229,8 +241,7 @@ function remapProjectPath(model, projectId, nextPath) {
     hadPathId: Object.prototype.hasOwnProperty.call(model.pathIds, key),
     pathIdOwner: model.pathIds[key],
   };
-  project.path = real;
-  project.buckets = foldBuckets(real, project.buckets);
+  setProjectPath(project, real);
   project.name = path.basename(real) || project.name;
   project.exists = true;
   model.pathOverrides[projectId] = real;
@@ -240,7 +251,8 @@ function remapProjectPath(model, projectId, nextPath) {
   try {
     saveState(model, true);
   } catch {
-    project.path = previous.path;
+    setProjectPath(project, previous.path);
+    // The buckets as they were: once joined by the new path's rule, they cannot be told apart again.
     project.buckets = previous.buckets;
     project.name = previous.name;
     project.exists = previous.exists;
@@ -339,6 +351,7 @@ module.exports = {
   isProjectDirectory,
   createProject,
   adoptProjectPath,
+  takeProjectPath,
   announceProjectUpdated,
   restoreRememberedProjects,
   restoreProject,

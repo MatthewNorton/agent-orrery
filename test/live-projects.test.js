@@ -14,7 +14,8 @@ const {
 } = require('../src/main/live/projects');
 const { ignoresCase } = require('../src/main/path-safety');
 const { canonicalProjectPath } = require('../src/main/provider-adapters');
-const { hex8 } = require('./support/transcripts');
+const { casedCounts, KEPT_APART, KEPT_AS_ONE } = require('./support/bucket-cases');
+const { hex8, readState } = require('./support/transcripts');
 
 function newModel(t, { statePath, persisted } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'au-live-projects-'));
@@ -122,7 +123,7 @@ test('live projects: remapProjectPath refuses with a code, then recovers and sav
   const visible = remapProjectPath(model, 'missing', moved);
   assert.deepEqual([visible.path, visible.name, visible.exists], [real, 'moved', true]);
   assert.deepEqual(take(), [['project-updated', 'missing'], ['feed', 'Project path recovered: moved']]);
-  assert.equal(JSON.parse(fs.readFileSync(file, 'utf8')).pathOverrides.missing, real);
+  assert.equal(readState(file).pathOverrides.missing, real);
   assert.equal(code('missing', moved), 'NOT_MISSING');
 });
 
@@ -146,44 +147,38 @@ test('live projects: remapProjectPath rolls everything back when the state file 
 });
 
 test('live projects: a folder keeps one bucket by the rule of the path its project has', (t) => {
-  const { model, dir } = newModel(t);
-  const counts = () => JSON.parse('{ "Docs": 5, "docs": 7, "src": 1, "__proto__": 2 }');
+  const { model, file, dir } = newModel(t);
   // A temp folder is a Windows path on Windows only: there Docs and docs are one folder.
-  const kept = (project) => [Object.entries(project.buckets),
-    ignoresCase(project.path) ? [['Docs', 12], ['src', 1], ['__proto__', 2]] : Object.entries(counts())];
-  // From a state file or a backup.
-  const here = restoreProject(model, 'here', { path: dir('here'), buckets: counts(), totalBuilds: 15 });
+  const kept = (project) => [Object.entries(project.buckets), ignoresCase(project.path) ? KEPT_AS_ONE : KEPT_APART];
+  // From a state file or a backup: every count a whole one, and the casings a path joins added up.
+  const here = restoreProject(model, 'here', { path: dir('here'), buckets: casedCounts(), totalBuilds: 15 });
   assert.deepEqual(...kept(here));
   assert.equal(here.totalBuilds, 15);
   // No path tells no two names apart or together; the folder the project then gets decides.
-  const pathless = restoreProject(model, 'pathless', { name: 'pathless', buckets: counts() });
-  assert.deepEqual(Object.entries(pathless.buckets), Object.entries(counts()));
+  const pathless = restoreProject(model, 'pathless', { name: 'pathless', buckets: casedCounts() });
+  assert.deepEqual(Object.entries(pathless.buckets), KEPT_APART);
   adoptProjectPath(model, pathless, dir('adopted'));
   assert.deepEqual(...kept(pathless));
   // Counted under a POSIX path, on another machine, and recovered to a folder here.
-  const moved = restoreProject(model, 'moved', { path: '/work/elsewhere', buckets: counts() });
-  assert.deepEqual([moved.path, Object.entries(moved.buckets)], ['/work/elsewhere', Object.entries(counts())]);
+  const moved = restoreProject(model, 'moved', { path: '/work/elsewhere', buckets: casedCounts() });
+  assert.deepEqual([moved.path, Object.entries(moved.buckets)], ['/work/elsewhere', KEPT_APART]);
   remapProjectPath(model, 'moved', dir('moved'));
   assert.deepEqual(...kept(moved));
   // Buckets that are no object count nothing.
-  assert.deepEqual(restoreProject(model, 'odd', { path: dir('odd'), buckets: /** @type {any} */ ('text') }).buckets, {});
+  ['text', [3, 4], null, 7].forEach((odd, i) => {
+    assert.deepEqual(restoreProject(model, 'odd' + i, { path: dir('odd' + i), buckets: /** @type {any} */ (odd) }).buckets, {}, String(odd));
+  });
+  // The state file the recovery wrote holds whole counts only: no "46", and no null for an Infinity.
+  const written = Object.values(readState(file).projects).flatMap((project) => Object.values(project.buckets));
+  assert.deepEqual([written.length > 0, written.filter((count) => !Number.isSafeInteger(count))], [true, []]);
 });
 
-test('live projects: a count a state file holds is made a whole count, and casings of 1e308 add up to the largest kept', (t) => {
-  const { model, file, dir } = newModel(t);
-  const MAX = Number.MAX_SAFE_INTEGER;
-  // 1e400 reads as Infinity. Joined as they stood, "5" and 7 made the string "57", and the two 1e308 Infinity, which saves as null.
-  const saved = () => JSON.parse('{ "buckets": { "Docs": "5", "docs": 7, "src": 2.9, "big": 1e308, "BIG": 1e308, "none": null, "neg": -3 },'
-    + ' "totalBuilds": "9", "firstSeen": "soon", "lastActivity": 1e400 }');
-  const exact = restoreProject(model, 'exact', { path: '/work/elsewhere', ...saved() });
-  assert.deepEqual(Object.entries(exact.buckets), [['docs', 7], ['src', 2], ['big', MAX], ['BIG', MAX]]);
-  assert.deepEqual([exact.totalBuilds, exact.lastActivity, typeof exact.firstSeen, exact.firstSeen > 0], [0, 0, 'number', true]);
+test('live projects: a total or a time a state file holds is made a whole count', (t) => {
+  const { model, dir } = newModel(t);
+  // 1e400 reads as Infinity.
+  const saved = () => JSON.parse('{ "totalBuilds": "9", "firstSeen": "soon", "lastActivity": 1e400 }');
+  const odd = restoreProject(model, 'odd', { path: dir('odd'), ...saved() });
+  assert.deepEqual([odd.totalBuilds, odd.lastActivity, typeof odd.firstSeen, odd.firstSeen > 0], [0, 0, 'number', true]);
   const here = restoreProject(model, 'here', { path: dir('here'), ...saved(), totalBuilds: 9.5, firstSeen: 1700000000000.4 });
-  assert.deepEqual(Object.entries(here.buckets), ignoresCase(here.path) ? [['docs', 7], ['src', 2], ['big', MAX]] : Object.entries(exact.buckets));
   assert.deepEqual([here.totalBuilds, here.firstSeen, here.lastActivity], [9, 1700000000000, 1700000000000]);
-  // A path that joins the casings adds them up, and stops at the largest count kept.
-  remapProjectPath(model, 'exact', dir('moved'));
-  if (ignoresCase(exact.path)) assert.deepEqual(Object.entries(exact.buckets), [['docs', 7], ['src', 2], ['big', MAX]]);
-  const written = fs.readFileSync(file, 'utf8');
-  assert.equal(/null|Infinity|"57"/.test(JSON.stringify(Object.values(JSON.parse(written).projects).map((project) => project.buckets))), false, written);
 });

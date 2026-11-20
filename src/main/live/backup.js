@@ -13,7 +13,7 @@ const { ownString, wholeCount } = require('../shared/values');
 const { plainObject } = require('../transcripts/fields');
 const { liftForgotten } = require('./forgotten');
 const {
-  adoptProjectPath, announceProjectUpdated, preferredProjectPath, projectIdAtPath, restoreProject,
+  announceProjectUpdated, preferredProjectPath, projectIdAtPath, restoreProject, takeProjectPath,
 } = require('./projects');
 const { serializeState } = require('./state-file');
 
@@ -29,9 +29,7 @@ const BACKUP_VERSION = 1;
 const MAX_BACKUP_BYTES = 8 * 1024 * 1024;
 const MAX_ENTRIES = 10_000;
 const MAX_KEY_LENGTH = 4096;
-// Security: keys that would reach an object's prototype instead of an own property. A bucket is
-// not held to them: it is a folder's name, any of these can be one, and it is written as an own
-// count (setBucket). Nor is a project id (parseBackup).
+// Security: keys that would reach an object's prototype. A bucket (setBucket) and a project id are not held to them.
 const RESERVED_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
 /**
@@ -63,8 +61,7 @@ function parseBackup(text) {
   /** @type {[string, ImportedProject][]} */
   const projects = [];
   for (const [id, saved] of Object.entries(raw.universe.projects).slice(0, MAX_ENTRIES)) {
-    // Security: an id is not held to RESERVED_KEYS. A folder of transcripts can be named
-    // '__proto__', and every map an id keys is a Map or an object with no prototype.
+    // Security: an id may be '__proto__' (a folder of transcripts); every map it keys has no prototype.
     if (!validProjectId(id) || !plainObject(saved)) continue;
     // Security: a backup's path is later stat'd and opened; only a local absolute one may be.
     projects.push([id, {
@@ -110,18 +107,15 @@ function importProjects(model, backup) {
       added++;
       continue;
     }
+    // The project takes its folder first: both sides are then counted by that folder's rule (each
+    // side's casings of a folder added up), and the larger count of each folder is kept.
     const adopted = existing.path ? null : preferredProjectPath(model, target, saved.path);
-    // A folder has one bucket in whatever casing it was written, by the rule of the folder the
-    // project has or is about to take. The backup's counts are folded by that rule first, as
-    // they are for a project that is new here (createProject), and each then goes to the key
-    // that holds it here: what a backup brings does not depend on what was here before it.
-    const under = existing.path || adopted;
-    addBuckets({ path: under, buckets: existing.buckets }, foldBuckets(under, saved.buckets), Math.max);
+    if (adopted) takeProjectPath(model, existing, adopted);
+    addBuckets(existing, foldBuckets(existing.path, saved.buckets), Math.max);
     existing.totalBuilds = Math.max(existing.totalBuilds, saved.totalBuilds);
     if (saved.firstSeen && saved.firstSeen < existing.firstSeen) existing.firstSeen = saved.firstSeen;
     existing.lastActivity = Math.max(existing.lastActivity, saved.lastActivity);
-    if (adopted) adoptProjectPath(model, existing, adopted);
-    else announceProjectUpdated(model, existing);
+    announceProjectUpdated(model, existing);
   }
   for (const [key, id] of backup.pathIds) {
     // A key that leads to a forgotten project is free to take.

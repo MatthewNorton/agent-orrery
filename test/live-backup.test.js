@@ -7,13 +7,12 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { setProjectPath } = require('../src/main/build-buckets');
 const { parseBackup } = require('../src/main/live/backup');
 const { ignoresCase } = require('../src/main/path-safety');
-const { MIN, T0, appendJsonl, claude, createWorld, writeState } = require('./support/transcripts');
-
-function byId(tracker) {
-  return new Map(tracker.snapshot().projects.map((project) => [project.id, project]));
-}
+const { CASED_COUNTS, KEPT_APART, KEPT_AS_ONE } = require('./support/bucket-cases');
+const { projectsById } = require('./support/live-session');
+const { MIN, T0, appendJsonl, claude, createWorld, readState, writeState } = require('./support/transcripts');
 
 test('an export imported into an empty universe brings back every project, path and build count', (t) => {
   const w = createWorld(t);
@@ -36,7 +35,7 @@ test('an export imported into an empty universe brings back every project, path 
   assert.deepEqual(backup.ideas, ['ship the backup']);
   assert.deepEqual(target.importBackup(backup), { added: 2, merged: 0 });
 
-  const projects = byId(target);
+  const projects = projectsById(target);
   assert.equal(projects.get('demo').path, w.projectDir);
   assert.equal(projects.get('demo').exists, true);
   assert.equal(projects.get('demo').totalBuilds, 4);
@@ -71,7 +70,7 @@ test('an import merges: larger counts win, nothing is removed, a forgotten proje
   }));
 
   assert.deepEqual(tracker.importBackup(backup), { added: 1, merged: 1 });
-  const projects = byId(tracker);
+  const projects = projectsById(tracker);
   assert.deepEqual([...projects.keys()].sort(), ['gone', 'kept', 'local']);
   assert.deepEqual({ ...tracker.model.projects.get('kept').buckets }, { src: 3, docs: 4 });
   assert.equal(projects.get('kept').totalBuilds, 5);
@@ -100,7 +99,7 @@ test('a folder named __proto__, constructor or prototype keeps its builds throug
   };
   assert.deepEqual(own('kept'), [['__proto__', 4], ['constructor', 2], ['prototype', 1], ['src', 3]]);
   assert.deepEqual(own('fresh'), [['__proto__', 5]]);
-  assert.deepEqual(byId(tracker).get('fresh').planets, ['__proto__']);
+  assert.deepEqual(projectsById(tracker).get('fresh').planets, ['__proto__']);
 
   // And out again: the export of that universe, imported into an empty one.
   const exported = JSON.stringify(tracker.createBackup([]));
@@ -135,37 +134,70 @@ test('a backup\'s count for a folder goes to the bucket the folder has here, in 
   assert.deepEqual(buckets('kept'), oneFolder ? [['Docs', 7], ['src', 3], ['lib', 2]]
     : [['Docs', 5], ['src', 3], ['docs', 7], ['SRC', 1], ['lib', 2]]);
   assert.deepEqual(buckets('fresh'), oneFolder ? [['Docs', 12]] : [['Docs', 5], ['docs', 7]]);
-  assert.equal(byId(tracker).get('kept').planets.length, oneFolder ? 3 : 5);
+  assert.equal(projectsById(tracker).get('kept').planets.length, oneFolder ? 3 : 5);
 });
 
 test('a backup\'s casings of one folder are added up before they meet what is here, whatever is here', (t) => {
   const w = createWorld(t);
-  const MAX = Number.MAX_SAFE_INTEGER;
   writeState(w.statePath, { version: 2, projects: {
-    held: { name: 'held', buckets: { Docs: 1, lib: 20 }, totalBuilds: 21, firstSeen: T0 },
+    held: { name: 'held', buckets: { Docs: 1, SRC: 20 }, totalBuilds: 21, firstSeen: T0 },
     bare: { name: 'bare', buckets: {}, totalBuilds: 0, firstSeen: T0 },
   } });
   const { tracker } = w.live();
   // A folder of a Windows path on every host: the two projects are known by one each.
-  for (const id of ['held', 'bare']) tracker.model.projects.get(id).path = `C:\\Work\\${id}`;
-  const counts = '{ "Docs": 5, "docs": 7, "LIB": 3, "big": 1e308, "BIG": 1e308, "odd": "4" }';
+  for (const id of ['held', 'bare']) setProjectPath(tracker.model.projects.get(id), `C:\\Work\\${id}`);
   const backup = parseBackup(`{ "format": "agent-orrery-backup", "version": 1, "universe": { "projects": {
-    "held": { "buckets": ${counts} }, "bare": { "buckets": ${counts} } } } }`);
+    "held": { "buckets": ${CASED_COUNTS} }, "bare": { "buckets": ${CASED_COUNTS} } } } }`);
   assert.deepEqual(tracker.importBackup(backup), { added: 0, merged: 2 });
   const buckets = (id) => Object.entries(tracker.model.projects.get(id).buckets);
-  assert.deepEqual(buckets('bare'), [['Docs', 12], ['LIB', 3], ['big', MAX]]);
-  assert.deepEqual(buckets('held'), [['Docs', 12], ['lib', 20], ['big', MAX]], 'the same 12, not the larger casing alone; lib keeps the larger count');
-  // What the import saved holds numbers only.
-  const saved = JSON.parse(fs.readFileSync(w.statePath, 'utf8'));
-  assert.deepEqual(saved.projects.held.buckets, { Docs: 12, lib: 20, big: MAX });
+  assert.deepEqual(buckets('bare'), KEPT_AS_ONE);
+  assert.deepEqual(buckets('held'), [['Docs', 12], ['SRC', 20], ...KEPT_AS_ONE.filter(([name]) => name !== 'Docs' && name !== 'src')],
+    'the same 12, not the larger casing alone; src keeps its key here and the larger count');
+  // What the import saved holds the same, as numbers.
+  assert.deepEqual(Object.entries(readState(w.statePath).projects.held.buckets), buckets('held'));
 
   // A project that is new here goes through the same fold, by the rule of the folder it gets.
   const other = path.join(w.root, 'workspace', 'other');
   fs.mkdirSync(other);
   tracker.importBackup(parseBackup(`{ "format": "agent-orrery-backup", "version": 1, "universe": { "projects": {
-    "fresh": { "path": ${JSON.stringify(other)}, "buckets": ${counts} } } } }`));
-  assert.deepEqual(buckets('fresh'), ignoresCase(other) ? [['Docs', 12], ['LIB', 3], ['big', MAX]]
-    : [['Docs', 5], ['docs', 7], ['LIB', 3], ['big', MAX], ['BIG', MAX]]);
+    "fresh": { "path": ${JSON.stringify(other)}, "buckets": ${CASED_COUNTS} } } } }`));
+  assert.deepEqual(buckets('fresh'), ignoresCase(other) ? KEPT_AS_ONE : KEPT_APART);
+});
+
+test('an import counts both sides by the folder the project ends with, and then keeps the larger', (t) => {
+  const w = createWorld(t);
+  const dirs = Object.fromEntries(['had', 'took', 'split'].map((id) => [id, path.join(w.root, 'workspace', id)]));
+  for (const dir of Object.values(dirs)) fs.mkdirSync(dir);
+  writeState(w.statePath, { version: 2, projects: {
+    had: { path: dirs.had, buckets: { Docs: 4 }, totalBuilds: 4, firstSeen: T0 },
+    took: { name: 'took', buckets: { Docs: 4 }, totalBuilds: 4, firstSeen: T0 },
+    // Counted with no folder, where Docs and docs are two names.
+    split: { name: 'split', buckets: { Docs: 3, docs: 2 }, totalBuilds: 5, firstSeen: T0 },
+  } });
+  const { tracker } = w.live();
+  const project = (id) => tracker.model.projects.get(id);
+  assert.deepEqual([project('took').path, project('split').path, Object.entries(project('split').buckets)], [null, null, [['Docs', 3], ['docs', 2]]]);
+  const events = [];
+  tracker.on('events', (batch) => events.push(...batch));
+  assert.deepEqual(tracker.importBackup(parseBackup(JSON.stringify({ format: 'agent-orrery-backup', version: 1, universe: { projects: {
+    had: { path: dirs.had, buckets: { Docs: 5, docs: 7 }, totalBuilds: 12 },
+    took: { path: dirs.took, buckets: { Docs: 5, docs: 7 }, totalBuilds: 12 },
+    split: { path: dirs.split, buckets: { Docs: 5 }, totalBuilds: 5 },
+  } } }))), { added: 0, merged: 3 });
+  // The temp folder is a Windows path on Windows only: there Docs and docs are one folder.
+  const oneFolder = ignoresCase(dirs.had);
+  const buckets = (id) => Object.entries(project(id).buckets);
+  assert.deepEqual([project('took').path, project('split').path], [dirs.took, dirs.split]);
+  for (const id of ['had', 'took']) {
+    assert.deepEqual(buckets(id), oneFolder ? [['Docs', 12]] : [['Docs', 5], ['docs', 7]], `${id}: the same whether the folder was here or came with the backup`);
+  }
+  // The project's own two casings are one folder under the path it takes: 5 here, 5 in the file.
+  assert.deepEqual(buckets('split'), oneFolder ? [['Docs', 5]] : [['Docs', 5], ['docs', 2]]);
+  if (oneFolder) assert.equal(project('split').buckets.Docs <= project('split').totalBuilds, true, 'a planet has no more builds than its project');
+  // One announcement per project, made after the merge: it names the planets the project ends with.
+  const updates = events.filter((event) => event.type === 'project-updated');
+  assert.deepEqual(updates.map((event) => [event.project.id, event.project.planets]),
+    ['had', 'took', 'split'].map((id) => [id, Object.keys(project(id).buckets)]));
 });
 
 test('a project whose id is __proto__ or constructor goes out in an export and comes back from it', (t) => {
@@ -177,7 +209,7 @@ test('a project whose id is __proto__ or constructor goes out in an export and c
   }
   const { tracker } = w.live();
   tracker.scan(true);
-  assert.deepEqual([...byId(tracker).keys()].sort(), ['__proto__', 'constructor']);
+  assert.deepEqual([...projectsById(tracker).keys()].sort(), ['__proto__', 'constructor']);
 
   const exported = JSON.stringify(tracker.createBackup([]));
   const universe = JSON.parse(exported).universe;
@@ -187,7 +219,7 @@ test('a project whose id is __proto__ or constructor goes out in an export and c
   const emptyState = path.join(w.root, 'fresh', 'universe-state.json');
   const empty = w.live({ statePath: emptyState, claudeProjectsDir: path.join(w.root, 'none') }).tracker;
   assert.deepEqual(empty.importBackup(parseBackup(exported)), { added: 2, merged: 0 });
-  assert.deepEqual([...byId(empty)].map(([id, project]) => [id, project.path]).sort(),
+  assert.deepEqual([...projectsById(empty)].map(([id, project]) => [id, project.path]).sort(),
     [['__proto__', dirs.__proto__], ['constructor', dirs.constructor]]);
   // The import saved them, as own keys of the file.
   const saved = JSON.parse(fs.readFileSync(emptyState, 'utf8'));

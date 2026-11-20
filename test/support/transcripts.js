@@ -56,6 +56,11 @@ function writeState(file, state) {
   fs.writeFileSync(file, JSON.stringify(state));
 }
 
+// The universe-state.json (or its .bak) as it is on disk.
+function readState(file) {
+  return JSON.parse(fs.readFileSync(file, 'utf8'));
+}
+
 function createWorld(t, { now = T0 } = {}) {
   t.mock.timers.enable({ apis: ['Date'], now });
   // onToolUse samples 12% of non-build tool calls into the feed.
@@ -208,6 +213,7 @@ module.exports = {
   setMtime,
   appendJsonl,
   writeState,
+  readState,
   createWorld,
   ofType,
   countTypes,

@@ -46,9 +46,24 @@ function planetKey(project, name) {
  */
 function matchingName(names, name, root) {
   if (names.includes(name)) return name;
-  if (!ignoresCase(root)) return null;
-  const project = { path: root }, key = planetKey(project, name);
-  return names.find((entry) => planetKey(project, entry) === key) ?? null;
+  return ignoresCase(root) ? firstByFold(names).get(fold(name)) ?? null : null;
+}
+
+/**
+ * The first of `names` for each folded spelling: the one name a folder goes by where case is ignored.
+ * @param {string[]} names
+ * @returns {Map<string, string>}
+ */
+function firstByFold(names) {
+  const first = new Map();
+  for (const name of names) addFolded(first, name);
+  return first;
+}
+
+/** @param {Map<string, string>} first @param {string} name */
+function addFolded(first, name) {
+  const folded = fold(name);
+  if (!first.has(folded)) first.set(folded, name);
 }
 
 /**
@@ -82,15 +97,9 @@ function foldedKeys(buckets, again = false) {
   /** @type {Map<string, string> | undefined} */
   let index = /** @type {any} */ (buckets)[FOLDED];
   if (index && !again) return index;
-  index = new Map();
-  for (const key of Object.keys(buckets)) addFolded(index, key);
-  if (Object.isExtensible(buckets) || Object.hasOwn(buckets, FOLDED)) Object.defineProperty(buckets, FOLDED, { value: index, configurable: true });
+  index = firstByFold(Object.keys(buckets));
+  Object.defineProperty(buckets, FOLDED, { value: index, configurable: true });
   return index;
-}
-
-/** @param {Map<string, string>} index @param {string} key */
-function addFolded(index, key) {
-  if (!index.has(fold(key))) index.set(fold(key), key);
 }
 
 /**
@@ -101,7 +110,7 @@ function addFolded(index, key) {
  */
 function bucketFor(project, name) {
   const key = bucketKey(project, name);
-  return { key, name: key ?? name, builds: key === null ? 0 : project.buckets[key] || 0 };
+  return { key, name: key ?? name, builds: key === null ? 0 : wholeCount(project.buckets[key]) };
 }
 
 /**
@@ -125,8 +134,8 @@ function setBucket(buckets, key, count) {
  * @param {string} bucket
  */
 function countBuild(project, bucket) {
-  const key = bucketKey(project, bucket);
-  setBucket(project.buckets, key ?? bucket, wholeCount(wholeCount(key === null ? 0 : project.buckets[key]) + 1));
+  const { key, name, builds } = bucketFor(project, bucket);
+  setBucket(project.buckets, name, wholeCount(builds + 1));
   return key === null;
 }
 
@@ -143,16 +152,16 @@ function addBuckets(project, counts, both) {
   for (const [name, counted] of Object.entries(counts)) {
     const builds = wholeCount(counted);
     if (builds === 0) continue;
-    const key = bucketKey(project, name);
+    const held = bucketFor(project, name);
     // Security: an own count read and written, whatever the bucket is called.
-    setBucket(project.buckets, key ?? name, key === null ? builds : wholeCount(both(wholeCount(project.buckets[key]), builds)));
+    setBucket(project.buckets, held.name, held.key === null ? builds : wholeCount(both(held.builds, builds)));
   }
 }
 
 /**
  * `counts` as the buckets of a project at `root`: one bucket per folder by that root's rule, under
- * the first key that names it, with the counts of its casings added up. What a project's buckets
- * go through wherever they or its path come from outside: a state file, a backup, a new path.
+ * the first key that names it, with the counts of its casings added up. What counts from outside
+ * (a state file, a backup) go through before they are a project's.
  * @param {string | null} root
  * @param {Record<string, unknown>} counts
  * @returns {Record<string, number>}
@@ -164,6 +173,18 @@ function foldBuckets(root, counts) {
 }
 
 /**
+ * Gives a project its path: the one way a project's path is written. The path decides which names
+ * are one folder, so the buckets are folded by it in the same step, and are always as their
+ * project's path counts them.
+ * @param {BucketedProject} project
+ * @param {string | null} projectPath
+ */
+function setProjectPath(project, projectPath) {
+  project.path = projectPath;
+  project.buckets = foldBuckets(projectPath, project.buckets);
+}
+
+/**
  * The builds counted for folder `name`.
  * @param {BucketedProject} project
  * @param {string} name
@@ -172,4 +193,6 @@ function bucketBuilds(project, name) {
   return bucketFor(project, name).builds;
 }
 
-module.exports = { addBuckets, bucketOf, bucketKey, bucketFor, countBuild, bucketBuilds, foldBuckets, matchingName, planetKey, setBucket };
+module.exports = {
+  addBuckets, bucketOf, bucketKey, bucketFor, countBuild, bucketBuilds, foldBuckets, matchingName, planetKey, setBucket, setProjectPath,
+};

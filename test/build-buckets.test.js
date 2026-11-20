@@ -5,8 +5,9 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const {
-  addBuckets, bucketOf, bucketKey, bucketFor, countBuild, bucketBuilds, foldBuckets, matchingName, planetKey, setBucket,
+  addBuckets, bucketOf, bucketKey, bucketFor, countBuild, bucketBuilds, foldBuckets, matchingName, planetKey, setBucket, setProjectPath,
 } = require('../src/main/build-buckets');
+const { casedCounts, KEPT_APART, KEPT_AS_ONE } = require('./support/bucket-cases');
 
 const own = (buckets) => Object.keys(buckets).map((name) => [name, Object.getOwnPropertyDescriptor(buckets, name).value]);
 
@@ -178,24 +179,47 @@ test('addBuckets puts each count under the key its folder has, by the rule of th
 
 test('every bucket count is a whole count, and no sum passes the largest one kept', () => {
   const MAX = Number.MAX_SAFE_INTEGER;
-  // As a state file may hold them: a string, a fraction, a negative, null, zero, and two casings of 1e308.
-  const counts = () => JSON.parse('{ "Docs": "5", "docs": 7, "src": 2.9, "neg": -1, "none": null, "zero": 0, "big": 1e308, "BIG": 1e308, "__proto__": 3 }');
-  const windows = foldBuckets('C:\\Work\\Demo', counts());
-  assert.deepEqual(own(windows), [['docs', 7], ['src', 2], ['big', MAX], ['__proto__', 3]], 'the string is no count, so it is no bucket and is not joined to 7');
-  assert.deepEqual(own(foldBuckets('/work/demo', counts())), [['docs', 7], ['src', 2], ['big', MAX], ['BIG', MAX], ['__proto__', 3]]);
+  const windows = foldBuckets('C:\\Work\\Demo', casedCounts());
+  assert.deepEqual(own(windows), KEPT_AS_ONE, 'a string is no count, so it is no bucket and is not joined to the 6 of its other casing');
+  assert.deepEqual(own(foldBuckets('/work/demo', casedCounts())), KEPT_APART);
   assert.equal(JSON.stringify(windows).includes('null'), false, 'nothing saves as null');
-  assert.deepEqual(own(foldBuckets(null, { Docs: 5, docs: 7 })), [['Docs', 5], ['docs', 7]], 'no path joins no two names');
+  assert.deepEqual(own(foldBuckets(null, casedCounts())), KEPT_APART, 'no path joins no two names');
 
   const project = { path: 'C:\\Work\\Demo', buckets: windows };
   assert.deepEqual([countBuild(project, 'BIG'), countBuild(project, 'big'), project.buckets.big], [false, false, MAX], 'a full count stays full');
   addBuckets(project, { DOCS: MAX, Src: 1 }, (held, added) => held + added);
   addBuckets(project, { docs: 3, SRC: 9, lib: '4' }, Math.max);
-  assert.deepEqual(own(project.buckets), [['docs', MAX], ['src', 9], ['big', MAX], ['__proto__', 3]]);
+  assert.deepEqual(own(project.buckets), [['Docs', MAX], ['odd', 6], ['src', 9], ['big', MAX], ['__proto__', 3]]);
   // A count put there past the rule (an older state, read by other code) is made whole when it is next added to.
   const odd = { path: '/work/demo', buckets: {} };
   setBucket(odd.buckets, 'src', /** @type {any} */ ('5'));
   setBucket(odd.buckets, 'lib', NaN);
   assert.deepEqual([countBuild(odd, 'src'), countBuild(odd, 'lib'), own(odd.buckets)], [false, false, [['src', 1], ['lib', 1]]]);
+});
+
+test('setProjectPath writes the path and counts the buckets by it in one step', () => {
+  const project = { path: null, buckets: JSON.parse('{ "Docs": 3, "docs": 2, "src": "1", "__proto__": 4 }') };
+  setProjectPath(project, '/work/demo');
+  assert.deepEqual([project.path, own(project.buckets)], ['/work/demo', [['Docs', 3], ['docs', 2], ['__proto__', 4]]]);
+  setProjectPath(project, 'C:\\Work\\Demo');
+  assert.deepEqual([project.path, own(project.buckets)], ['C:\\Work\\Demo', [['Docs', 5], ['__proto__', 4]]]);
+  // The lookup of the new buckets goes by the new path at once: no index of the old ones is left.
+  assert.deepEqual([bucketKey(project, 'DOCS'), countBuild(project, 'docs'), project.buckets.Docs], ['Docs', false, 6]);
+  setProjectPath(project, null);
+  assert.deepEqual([project.path, own(project.buckets), bucketKey(project, 'docs')], [null, [['Docs', 6], ['__proto__', 4]], null]);
+});
+
+test('every write of a project\'s path in src/main goes through setProjectPath', () => {
+  const dir = path.join(__dirname, '..', 'src', 'main');
+  const files = fs.readdirSync(dir, { recursive: true }).map(String).filter((file) => file.endsWith('.js'));
+  const writes = [];
+  for (const file of files) {
+    const lines = fs.readFileSync(path.join(dir, file), 'utf8').split('\n');
+    lines.forEach((line) => {
+      if (/\b(project|existing|proj|p)\.path\s*=(?!=)/.test(line)) writes.push(`${file.replaceAll('\\', '/')}: ${line.trim()}`);
+    });
+  }
+  assert.deepEqual(writes, ['build-buckets.js: project.path = projectPath;']);
 });
 
 test('a key removed past setBucket is not answered from the index of the keys', () => {
@@ -260,7 +284,7 @@ test('every write of a bucket in src/main goes through setBucket', () => {
     .map(([, line]) => `${file.replace(/\\/g, '/')}: ${line.replace(/\{.*$/, '')}`));
   // build-buckets.js has two: the index it hangs on the object, and setBucket's own.
   assert.deepEqual(found, [
-    'build-buckets.js: if (Object.isExtensible(buckets) || Object.hasOwn(buckets, FOLDED)) Object.defineProperty(buckets, FOLDED, ',
+    'build-buckets.js: Object.defineProperty(buckets, FOLDED, ',
     'build-buckets.js: Object.defineProperty(buckets, key, ',
   ]);
   // And the scan does see a write: through the name, and through another name for the object.

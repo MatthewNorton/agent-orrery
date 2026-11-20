@@ -14,28 +14,27 @@ const SHIP_KEYS = [
   'provider', 'status', 'taskId', 'turnOutcome',
 ];
 
-// A Claude session whose first line was on disk at startup (so it is tailed
-// from EOF and its ship is docked), with startup events already drained.
-// `saved` is the projects map of a universe-state.json left by an earlier run.
-function startClaude(t, { mtime = T0, saved } = {}) {
+// A session whose first line was on disk at startup (so it is tailed from EOF and its ship is
+// docked), with startup events already drained. `file(world)` is its transcript and
+// `firstRecord(world, mtime)` that line; `saved` is the projects map of a universe-state.json
+// left by an earlier run.
+function start(t, file, firstRecord, { mtime = T0, saved } = {}) {
   const world = createWorld(t);
   if (saved) writeState(world.statePath, { projects: saved });
-  const file = world.claudeFile();
-  appendJsonl(file, [claude.prompt(world.projectDir, mtime)], mtime);
+  const transcript = file(world);
+  appendJsonl(transcript, [firstRecord(world, mtime)], mtime);
   const live = world.live();
   live.tracker.scan(true);
   const startup = live.take();
-  return { world, file, dir: world.projectDir, ...live, startup };
+  return { world, file: transcript, dir: world.projectDir, ...live, startup };
 }
 
-function startCodex(t) {
-  const world = createWorld(t);
-  const file = world.codexFile();
-  appendJsonl(file, [codex.meta(T0, CODEX_SESSION, world.projectDir)], T0);
-  const live = world.live();
-  live.tracker.scan(true);
-  const startup = live.take();
-  return { world, file, dir: world.projectDir, ...live, startup };
+const startClaude = (t, options) => start(t, (world) => world.claudeFile(), (world, mtime) => claude.prompt(world.projectDir, mtime), options);
+const startCodex = (t, options) => start(t, (world) => world.codexFile(), (world, mtime) => codex.meta(mtime, CODEX_SESSION, world.projectDir), options);
+
+/** The tracker's projects as a snapshot gives them, by id. */
+function projectsById(tracker) {
+  return new Map(tracker.snapshot().projects.map((project) => [project.id, project]));
 }
 
 // Moves the clock to `at`, appends records with that mtime, and polls once.
@@ -62,4 +61,4 @@ function shipOf(tracker, id) {
   return tracker.snapshot().ships.find((ship) => ship.id === id);
 }
 
-module.exports = { PROJECT_KEYS, SHIP_KEYS, startClaude, startCodex, appendAndPoll, pollAt, sweepAt, shipOf };
+module.exports = { PROJECT_KEYS, SHIP_KEYS, start, startClaude, startCodex, projectsById, appendAndPoll, pollAt, sweepAt, shipOf };
