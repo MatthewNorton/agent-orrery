@@ -6,14 +6,17 @@
 
 /**
  * @import { Ship } from '../types/contract'
+ * @import { ShipModel } from './ships/models.js'
  * @typedef {{ rotateY?: number, scale?: number, offset?: number[] }} HullCorrection
  * @typedef {{ id: string, file: string, lods?: { far?: string }, family: string, role: string,
- *   minBuilds?: number, correction?: HullCorrection }} HullEntry
+ *   minBuilds?: number, correction?: HullCorrection, model?: ShipModel }} HullEntry a hull of the
+ *   manifest, or the hull a ship model flies as (ships/models.js): `model` builds it and its
+ *   `file` names no file
  * @typedef {{ schemaVersion: number, providerFamilies: Record<string, string>,
  *   hulls: HullEntry[] }} ShipManifest
  * @typedef {{ container: BABYLON.AssetContainer | null, promise: Promise<HullRecord | null> | null,
  *   triangles: number }} HullRecord
- * @typedef {{ file: string, lod: 'far' | 'near' | null }} HullFile
+ * @typedef {{ file: string, lod: 'far' | 'near' | null, model?: ShipModel }} HullFile
  * @typedef {HullFile & { record: HullRecord }} HullAsset
  * @typedef {{ root: BABYLON.Mesh, correction: BABYLON.TransformNode, hull: HullEntry,
  *   triangles: number, look: string, wanted: string, fallback: BABYLON.AbstractMesh | null }} ShipEntry
@@ -30,8 +33,8 @@
  * @property {(scene: any) => 'far' | 'near' | null} viewLod
  * @property {(manifest: ShipManifest | null, ship: Ship) => HullEntry | null} selectHull
  * @property {(hull: HullEntry, lod: 'far' | 'near') => HullFile[]} hullFiles
- * @property {(scene: any, state: SceneState, file: string) => Promise<HullRecord | null>} ensureContainer
- * @property {(state: SceneState, record: HullRecord, released: number) => boolean} fitsBudget
+ * @property {(scene: any, state: SceneState, file: HullFile) => Promise<HullRecord | null>} ensureContainer
+ * @property {(scene: any, state: SceneState, record: HullRecord, released: number) => boolean} fitsBudget
  * @property {(scene: any, state: SceneState, hull: HullEntry, released: number) => Promise<HullAsset | null>} resolveAsset
  */
 
@@ -39,9 +42,12 @@
   const AUR = window.AUR;
   const MANIFEST_PATH = '../../assets/ships/manifest.json';
   const HULL_ROOT = '../../assets/ships/';
-  // Fleet v3 hulls carry their detail as geometry (6k to 58k triangles each); the budget holds a
-  // busy system of flagships before the step-down to darts starts.
-  const TRIANGLE_BUDGET = 400000;
+  // Hulls carry their detail as geometry (10k to 58k triangles each), and past its budget a view
+  // steps down to darts. A system or planet view holds fifty-one ships of the first rank (Petrel,
+  // 17,544): the most it drew inside a 60 fps frame on an integrated GPU (about 14 ms, nearly all
+  // of it on the CPU, which a hull loads by its draws, so triangles stand in for them). The
+  // universe map instances its hulls and holds seventy (about 4 ms).
+  const TRIANGLE_BUDGET = { near: 900000, far: 1240000 };
   /** @type {WeakMap<object, SceneState>} */
   const sceneStates = new WeakMap();
   const logged = new Set();
@@ -170,7 +176,8 @@
     const ladder = rankLadder(manifest, family);
     if (!ladder.length) return hashedHull(manifest, family, ship);
     // A drone (subagent) flies the family's first rank whatever its build count; the view shrinks it.
-    return ship && ship.kind === 'drone' ? ladder[0] : rankedHull(ladder, Number(ship && ship.builds) || 0);
+    const ranked = ship && ship.kind === 'drone' ? ladder[0] : rankedHull(ladder, Number(ship && ship.builds) || 0);
+    return AUR.shipModels.inPlaceOf(ranked); // a rank a model has taken over flies the model
   }
 
   /**
@@ -180,15 +187,16 @@
    */
   function hullFiles(hull, lod) {
     const far = hull.lods && hull.lods.far;
-    if (!far) return [{ file: hull.file, lod: null }];
+    if (!far) return [{ file: hull.file, lod: null, model: hull.model }];
     const farFile = { file: far, lod: /** @type {'far'} */ ('far') };
     return lod === 'near' ? [{ file: hull.file, lod: 'near' }, farFile] : [farFile];
   }
 
   // ---------- loading ----------
 
-  /** @returns {Promise<HullRecord | null>} */
-  function ensureContainer(scene, state, file) {
+  /** @param {HullFile} hullFile @returns {Promise<HullRecord | null>} */
+  function ensureContainer(scene, state, hullFile) {
+    const { file, model } = hullFile;
     let record = state.containers.get(file);
     if (!record) {
       record = { container: null, promise: null, triangles: 0 };
@@ -197,7 +205,10 @@
     if (record.container) return Promise.resolve(record);
     if (record.promise) return record.promise;
     const loading = record;
-    record.promise = BABYLON.SceneLoader.LoadAssetContainerAsync(HULL_ROOT, file, scene)
+    // A model's container is built in code, a manifest hull's is loaded from its file.
+    record.promise = (model
+      ? Promise.resolve().then(() => AUR.shipModels.container(scene, model))
+      : BABYLON.SceneLoader.LoadAssetContainerAsync(HULL_ROOT, file, scene))
       .then((container) => {
         if (isSceneDisposed(scene, state)) {
           container.dispose();
@@ -210,15 +221,15 @@
         }, 0);
         return loading;
       })
-      .catch(() => {
-        logOnce('hull:' + file, 'Hull ' + file + ' unavailable; using procedural hulls.');
+      .catch((error) => {
+        logOnce('hull:' + file, 'Hull ' + file + ' unavailable (' + (error && error.message || error) + '); using procedural hulls.');
         return null;
       });
     return record.promise;
   }
 
-  function fitsBudget(state, record, released) {
-    return state.triangles - released + record.triangles < TRIANGLE_BUDGET;
+  function fitsBudget(scene, state, record, released) {
+    return state.triangles - released + record.triangles < TRIANGLE_BUDGET[viewLod(scene) || 'far'];
   }
 
   function logBudget(scene) {
@@ -237,9 +248,9 @@
         logBudget(scene);
         return Promise.resolve(null);
       }
-      return ensureContainer(scene, state, files[index].file).then((record) => {
+      return ensureContainer(scene, state, files[index]).then((record) => {
         if (!record || isSceneDisposed(scene, state)) return null;
-        if (fitsBudget(state, record, released)) return { ...files[index], record };
+        if (fitsBudget(scene, state, record, released)) return { ...files[index], record };
         return tryFile(index + 1);
       });
     };

@@ -15,6 +15,7 @@ test('the system view trails a plume from each stern nozzle of a hull, read off 
   assert.match(exhaust, /AUR\.meshIslands\(positions, indices\)/, 'one plume per disc, not one per mesh');
   assert.match(exhaust, /AUR\.sternIslands\(islands, length, PLUME\.sternShare\)/, 'lit intakes forward of the stern get no plume');
   assert.match(exhaust, /AUR\.memo\(hulls, rec\.hull/, 'nozzles are found once per hull, not once per ship');
+  assert.match(exhaust, /const named = AUR\.shipModels\.nozzles\(rec\.hull\);\s+if \(named\) return named;/, 'a ship model names its own nozzles');
   assert.match(exhaust, /new BABYLON\.TrailMesh\([^)]*anchor/, 'the ribbon trails a nozzle anchor under the root, not the root');
   assert.match(exhaust, /plumeMaterial\(rec\.tint\)/, 'one material per tint, shared by every plume');
   assert.match(exhaust, /glow\.addExcludedMesh\(trail\)/, 'additive plumes skip the glow pass');

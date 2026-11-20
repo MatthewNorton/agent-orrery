@@ -7,9 +7,14 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
+const { scriptTags: tagsOf } = require('../../scripts/lib/script-tags.js');
+
 const RENDERER = path.join(__dirname, '..', '..', 'src', 'renderer');
 
 const readRenderer = (file) => fs.readFileSync(path.join(RENDERER, file), 'utf8');
+
+/** The `src` of every script tag in index.html, in load order. Throws on a tag that is not a plain one. */
+const scriptTags = () => tagsOf(readRenderer('index.html'));
 
 /**
  * Runs src/renderer/<file>, after `edit`, with each key of `globals` bound to its value. It runs
@@ -28,4 +33,4 @@ function rendererFiles(dir, keep = (file) => file.endsWith('.js')) {
 
 const rendererSource = (dir, keep) => rendererFiles(dir, keep).map(readRenderer).join('\n');
 
-module.exports = { readRenderer, rendererFiles, rendererSource, runRenderer };
+module.exports = { readRenderer, rendererFiles, rendererSource, runRenderer, scriptTags };

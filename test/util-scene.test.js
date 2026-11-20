@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const { scriptTags } = require('./support/renderer-source');
 
 const RENDERER = path.join(__dirname, '..', 'src', 'renderer');
 
@@ -18,8 +19,7 @@ function loadUtilLayer() {
 }
 
 test('index.html loads every util-*.js file directly after util.js', () => {
-  const html = fs.readFileSync(path.join(RENDERER, 'index.html'), 'utf8');
-  const tags = [...html.matchAll(/<script\s+src="([^"]+)"/g)].map((m) => m[1]);
+  const tags = scriptTags();
   const parts = fs.readdirSync(RENDERER).filter((f) => /^util-[a-z0-9-]+\.js$/.test(f)).sort();
   const at = tags.indexOf('util.js');
   assert.ok(at >= 0, 'util.js is loaded');
