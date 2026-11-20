@@ -140,19 +140,22 @@ test('agree: codex project id, ship identity, classified activity and builds', a
   assert.equal(ofType(live.events, 'build').length, 1);
 });
 
-test('agree: a relative edit path builds nothing in either model, Claude or Codex, wherever the app runs', async (t) => {
-  // A relative path would resolve against the app's working folder, which here is the project.
+test('agree: a relative or drive-less edit path builds nothing in either model, Claude or Codex, wherever the app runs', async (t) => {
+  // A relative path would resolve against the app's working folder, which here is the project, and a
+  // Windows path with no drive against that folder's drive.
   const cwd = process.cwd();
   const inProject = (lines) => (dir) => { process.chdir(dir); return lines(dir); };
+  const driveless = (dir) => path.win32.join(dir.replace(/^[A-Za-z]:/, ''), 'src', 'c.js');
   const sides = {
     claude: inProject((dir) => [
       claude.prompt(dir, T0),
       claude.tool(dir, T0 + 1 * SEC, 'toolu_rel', 'Edit', { file_path: path.join('src', 'a.js') }),
       claude.tool(dir, T0 + 2 * SEC, 'toolu_abs', 'Edit', { file_path: path.join(dir, 'src', 'b.js') }),
+      claude.tool(dir, T0 + 3 * SEC, 'toolu_nodrive', 'Edit', { file_path: driveless(dir) }),
     ]),
     codex: inProject((dir) => [
       codex.meta(T0, CODEX_SESSION, dir), codex.event(T0 + 1 * SEC, 'task_started'), codex.patchCall(T0 + 2 * SEC, 'call-patch'),
-      codex.patched(T0 + 3 * SEC, 'call-patch', [path.join('src', 'a.js'), path.join(dir, 'src', 'b.js')]),
+      codex.patched(T0 + 3 * SEC, 'call-patch', [path.join('src', 'a.js'), path.join(dir, 'src', 'b.js'), driveless(dir)]),
     ]),
   };
   for (const [provider, records] of Object.entries(sides)) {

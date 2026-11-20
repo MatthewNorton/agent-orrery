@@ -94,22 +94,24 @@ function ignoresCase(root) {
 
 /**
  * file relative to root, joined with `separator`, or null unless it lies strictly beneath
- * root. The flavor, and Windows case folding, come from root's syntax, so every host agrees.
- * Case folding only decides containment: the result keeps the file's own casing.
- * Both must be absolute paths: a relative one would resolve against the process cwd, which
- * says nothing about where a transcript's file is.
+ * root. Both must be absolute in one path syntax (pathFlavor). The syntax, and with it Windows
+ * case folding, comes from root's own text, so every host agrees. Case folding only decides
+ * containment: the result keeps the file's own casing.
  * @param {unknown} root
  * @param {unknown} file
  * @param {{ separator?: string }} [options]
  * @returns {string | null}
  */
 function relativeInside(root, file, { separator = path.sep } = {}) {
-  if (typeof root !== 'string' || typeof file !== 'string') return null;
-  const windows = ignoresCase(root);
-  const flavor = windows ? path.win32 : path.posix;
-  if (!flavor.isAbsolute(root) || !flavor.isAbsolute(file)) return null;
-  const normalizedRoot = flavor.normalize(root);
-  const normalizedFile = flavor.normalize(file);
+  // Security: a relative path, or a Windows path with no drive, would resolve against the process's
+  // working folder or its drive, which says nothing about where a transcript's file is.
+  const flavorName = pathFlavor(root);
+  if (!flavorName || pathFlavor(file) !== flavorName) return null;
+  const windows = flavorName === 'win32';
+  const flavor = path[flavorName];
+  // pathFlavor names the syntax of strings only.
+  const normalizedRoot = flavor.normalize(/** @type {string} */ (root));
+  const normalizedFile = flavor.normalize(/** @type {string} */ (file));
   const comparableRoot = windows ? normalizedRoot.toLowerCase() : normalizedRoot;
   const comparableFile = windows ? normalizedFile.toLowerCase() : normalizedFile;
   const rel = flavor.relative(comparableRoot, comparableFile);

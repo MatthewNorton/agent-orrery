@@ -195,9 +195,13 @@ test('relativeInside ignores case only under a Windows-style root and keeps the 
   assert.equal(relativeInside('/Work/Demo', '/Work/Demo/Docs/Guide.md', { separator: '/' }), 'Docs/Guide.md');
   assert.equal(relativeInside('/Work/Demo', '/work/demo/Docs/Guide.md'), null);
   // A relative path says nothing about where a file is: it would resolve against the app's own folder.
-  for (const [root, file] of [[process.cwd(), path.join('Docs', 'x.md')], ['Demo', 'Demo/Docs/x.md'], [process.cwd(), 7], [null, '/x']]) {
+  for (const [root, file] of [[process.cwd(), path.join('Docs', 'x.md')], ['Demo', 'Demo/Docs/x.md'], [process.cwd(), 7], [null, '/x'],
+    ['Demo', path.posix.resolve('Demo', 'Docs', 'x.md')], ['Demo\\x', path.win32.resolve('Demo\\x', 'Docs', 'x.md')]]) {
     assert.equal(relativeInside(root, file), null, JSON.stringify([root, file]));
   }
+  // Nor does a Windows path with no drive, which would resolve against the working folder's drive.
+  const drive = process.platform === 'win32' ? process.cwd().slice(0, 2) : 'C:';
+  for (const file of ['\\Demo\\src\\a.js', '/Demo/src/a.js']) assert.equal(relativeInside(`${drive}\\Demo`, file), null, file);
   assert.deepEqual(['C:\\Work', 'c:/work', 'relative\\dir', '/Work', null].map(ignoresCase),
     [true, true, true, false, false]);
 });
