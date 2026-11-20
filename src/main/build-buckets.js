@@ -274,7 +274,9 @@ function foldBuckets(root, counts, counted, total) {
 /**
  * Gives a project its path: the one way a project's path is written. The path decides which names
  * are one folder, so the buckets are folded by it in the same step (foldBuckets, as the project's
- * bucketsCounted and totalBuilds say), and are always as their project's path counts them.
+ * bucketsCounted and totalBuilds say), and are always as their project's path counts them. A path
+ * that joins a folder's casings (namesIgnoreCase) marks the buckets counted under a path from then
+ * on: after the fold each folder is one bucket, and each build after it is counted once, in it.
  * @param {BucketedProject} project
  * @param {string | null} projectPath
  */

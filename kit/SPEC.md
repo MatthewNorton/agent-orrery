@@ -159,8 +159,9 @@ AU.universeImport()                    -> Promise<{ok, canceled, added, merged, 
    // it): under a Windows path each side's counts for `docs` and `Docs` are made one, and the
    // larger of the two sides is kept. How one side's casings are made one follows whether its
    // builds were counted under a path, which a project keeps with its buckets (`bucketsCounted`,
-   // saved in the state file and the backup) for every later path; `foldBuckets` in
-   // `src/main/build-buckets.js` says how. A folder never has more builds than its project.
+   // saved in the state file and the backup) through any change of path; `setProjectPath` and
+   // `mergeBuckets` in `src/main/build-buckets.js` say how. A folder never has more builds than
+   // its project.
    // Every build count (a folder's, a project's total, a ship's), here, in the state file and
    // as builds add to it, is a whole number up to Number.MAX_SAFE_INTEGER: anything else in a
    // file counts as none, and a build adds nothing to a count that is already the largest.
