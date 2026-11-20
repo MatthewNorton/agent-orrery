@@ -6,7 +6,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { readRenderer } = require('./support/renderer-source');
 const {
-  loadShipAssets, LADDER_MANIFEST, ship, hullId, partMaterial, templatesOf, shows, hidden,
+  loadShipAssets, LADDER_MANIFEST, ship, hullId, partMaterial, templatesOf, shows, hidden, logsOf,
 } = require('./support/ship-assets');
 
 test('refresh swaps the hull inside the same root and keeps the fallback valid', async () => {
@@ -99,12 +99,12 @@ test('a refresh that a later one ends while its file loads stays ended, and the 
 
 test('a hull that cannot be installed leaves its dart as it was, a swap that cannot be labelled is still a swap, and a request that throws logs its cause', async () => {
   const assets = loadShipAssets(LADDER_MANIFEST, {});
-  const logs = [];
-  assets.AUR.log = (message) => logs.push(message);
+  const logs = logsOf(assets);
   const scene = assets.scene('system');
   const books = () => { const { ships, triangles } = assets.AUR.shipAssets.sceneStates.get(scene); return [ships.size, triangles]; };
   // A dart whose metadata cannot be written: upgrade writes it once the hull is built, a swap last.
-  const unwritable = (dart, cause = 'no metadata') => Object.defineProperty(dart, 'metadata', { get: () => ({ isShip: true }), set() { throw new Error(cause); } });
+  const held = { isShip: true };
+  const unwritable = (dart, cause = 'no metadata') => Object.defineProperty(dart, 'metadata', { get: () => held, set() { throw new Error(cause); } });
   for (const id of ['a', 'b']) {
     const dart = Object.assign(unwritable(assets.fallback(id)), { isVisible: true, isPickable: false });
     assert.equal(await assets.ships.upgrade(scene, ship(id, 0), dart), null, 'upgrade ' + id);
@@ -135,6 +135,14 @@ test('a hull that cannot be installed leaves its dart as it was, a swap that can
   assert.equal(stuck.children[0].metadata.isShip, undefined, 'a hull that is not installed is not marked a ship');
   Mesh.prototype.dispose = dispose;
   assets.ships.fade(scene, 1);
+  // A hull that cannot be marked, the install's last step: the dart's metadata is put back too.
+  const { markShipMesh } = assets.AUR;
+  assets.AUR.markShipMesh = () => { throw new Error('no mark'); };
+  const unmarked = assets.fallback('h');
+  const { metadata } = unmarked;
+  assert.equal(await assets.ships.upgrade(scene, ship('h', 0), unmarked), null);
+  assert.deepEqual([unmarked.metadata, unmarked.children.length, ...books()], [metadata, 0, 1, 1000]);
+  assets.AUR.markShipMesh = markShipMesh;
 
   const darts = [assets.fallback('c'), assets.fallback('d')];
   const roots = [await assets.ships.upgrade(scene, ship('c', 0), darts[0]), await assets.ships.upgrade(scene, ship('d', 0), darts[1])];
@@ -152,11 +160,12 @@ test('a hull that cannot be installed leaves its dart as it was, a swap that can
   assets.AUR.isNodeDisposed = isNodeDisposed;
   assert.equal(hullId(roots[0]), 'mid', 'and the ship keeps the hull it had');
   assert.deepEqual(logs, [
-    'Hull small request failed (no metadata); the ship keeps its dart.',
-    'Hull small request failed (no metadata on e); the ship keeps its dart.',
+    'Hull small request failed (no metadata).',
+    'Hull small request failed (no metadata on e).',
     "Hull small's own template could not be disposed (no template dispose).",
-    'Hull small request failed (no metadata on f); the ship keeps its dart.',
+    'Hull small request failed (no metadata on f).',
     'Uninstalled hull small could not be disposed (no dispose).',
+    'Hull small request failed (no mark).',
     'Hull mid could not be named on its dart (no metadata).',
     'Hull big request failed (no node).',
   ]);
@@ -164,8 +173,7 @@ test('a hull that cannot be installed leaves its dart as it was, a swap that can
 
 test('a dart that cannot be read builds no hull, and one that cannot be shown again still lets its hull go', async () => {
   const assets = loadShipAssets(LADDER_MANIFEST, {});
-  const logs = [];
-  assets.AUR.log = (message) => logs.push(message);
+  const logs = logsOf(assets);
   const scene = assets.scene('system');
   const books = () => { const { ships, triangles } = assets.AUR.shipAssets.sceneStates.get(scene); return [ships.size, triangles]; };
   const unread = Object.defineProperty(assets.fallback('a'), 'isVisible', { get() { throw new Error('no isVisible'); } });
@@ -177,20 +185,20 @@ test('a dart that cannot be read builds no hull, and one that cannot be shown ag
     get: () => visible,
     set(value) { if (value) throw new Error('no show'); visible = value; },
   });
-  Object.defineProperty(unshown, 'metadata', { get: () => ({ isShip: true }), set() { throw new Error('no metadata'); } });
+  const held = { isShip: true };
+  Object.defineProperty(unshown, 'metadata', { get: () => held, set() { throw new Error('no metadata'); } });
   assert.equal(await assets.ships.upgrade(scene, ship('b', 0), unshown), null);
   assert.deepEqual([unshown.children.length, ...books()], [0, 0, 0], 'its hull is let go and off the books');
   assert.deepEqual(logs, [
     'Hull small request failed (no isVisible).',
-    'Hull small request failed (no metadata); the ship keeps its dart.',
+    'Hull small request failed (no metadata).',
     'Uninstalled hull small could not restore its dart (no show).',
   ]);
 });
 
 test('a replaced hull that cannot be disposed leaves its ship one hull, counted, whether a promotion or focus mode replaces it', async () => {
   const assets = loadShipAssets(LADDER_MANIFEST, { 'small-near.glb': 1000, 'mid-near.glb': 2000 });
-  const logs = [];
-  assets.AUR.log = (message) => logs.push(message);
+  const logs = logsOf(assets);
   const scene = assets.scene('system');
   const root = await assets.ships.upgrade(scene, ship('a', 0), assets.fallback('a'));
   const old = root.children[0];

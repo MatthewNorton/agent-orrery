@@ -1,16 +1,16 @@
 'use strict';
 
-// The ship-assets core, livery and hulls (src/renderer/ship-assets.js, ships/livery.js,
-// ship-assets-hulls.js): the rank ladder, LODs, a template per provider, the livery, and what a
-// failure logs. AUR.ships' refresh and triangle budget are test/ship-assets-api.test.js, its fade
-// test/ship-assets-api-fade.test.js.
+// The ship-assets core and hulls (src/renderer/ship-assets.js, ship-assets-hulls.js): the rank
+// ladder, LODs, a template per provider, and what a failure logs. What a hull wears is
+// test/ships-livery.test.js, AUR.ships' refresh and triangle budget test/ship-assets-api.test.js,
+// its fade test/ship-assets-api-fade.test.js.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const {
-  SHIP_ASSET_FILES, SHIP_LAYER, instanceOnLayer, Color, loadShipAssets, LADDER_MANIFEST, ship, hullId, partMaterial,
-  instancesOf, templatesOf, sameItems,
+  SHIP_ASSET_FILES, SHIP_LAYER, instanceOnLayer, loadShipAssets, LADDER_MANIFEST, ship, hullId, partMaterial,
+  instancesOf, templatesOf, sameItems, logsOf,
 } = require('./support/ship-assets');
 
 test('index.html loads every ship-assets file, the core first, and the livery before the hulls', () => {
@@ -194,39 +194,7 @@ test('a scene that has not declared its view loads nothing until upgrade, which 
   assert.equal(ready.metadata.assetLod, 'near');
 });
 
-test('a fleet hull keeps its baked tones and glass, and its trim lights and nozzles emit the ship color', async () => {
-  const assets = loadShipAssets(LADDER_MANIFEST, {}, [
-    { name: 'hull_white', textured: true, albedo: '#f2f2f2' }, { name: 'hull_grey', textured: true, albedo: '#f2f2f2' },
-    { name: 'canopy_glass', albedo: '#06101c' }, 'accent_livery', 'engine_glow', 'window_light',
-  ]);
-  const scene = assets.scene('system');
-  const claude = await assets.ships.upgrade(scene, ship('a', 0), assets.fallback('a'));
-  const codex = await assets.ships.upgrade(scene, ship('b', 0, { provider: 'codex' }), assets.fallback('b'));
-
-  for (const tone of ['hull_white', 'hull_grey']) {
-    assert.equal(partMaterial(claude, tone).albedoColor.toHexString(), '#f2f2f2', tone + ' stays as baked');
-  }
-  assert.equal(partMaterial(claude, 'canopy_glass').albedoColor.toHexString(), '#06101c', 'the glass keeps its smoke');
-  assert.equal(partMaterial(claude, 'canopy_glass').emissiveColor.toHexString(), '#000000');
-  for (const light of ['accent_livery', 'engine_glow']) {
-    assert.deepEqual(partMaterial(claude, light).emissiveColor, new Color('#d97757').toLinearSpace(), light + ' emits terracotta, linear, so the frame shows the hex');
-    assert.deepEqual(partMaterial(codex, light).emissiveColor, new Color('#f2f0ea').toLinearSpace(), light + ' emits pearl on Codex');
-    assert.ok(partMaterial(claude, light).albedoColor.r < 0.1, light + ' is a dark surface under its light');
-    assert.ok(partMaterial(claude, light).emissiveIntensity > 1, light + ' outshines the lit hull');
-  }
-  assert.equal(partMaterial(claude, 'window_light').emissiveIntensity, undefined, 'only the trim runs hot');
-  assert.ok(partMaterial(claude, 'window_light').emissiveColor.r < 0.3, 'a lit pane, not a white block');
-  assert.equal(partMaterial(claude, 'engine_glow').metadata.role, 'glow', 'every fleet material carries its role');
-  assert.equal(claude.material.emissiveColor.toHexString(), '#d97757', 'the root emits the exact hex as evidence');
-});
-
 // ---------- what a failure logs: its cause, once per failure and cause, and what the ship keeps ----------
-
-const logsOf = (assets) => {
-  const logs = [];
-  assets.AUR.log = (message) => logs.push(message);
-  return logs;
-};
 
 test('a hull that cannot be built logs its cause once per hull and cause, for a new ship or a fade', async () => {
   const assets = loadShipAssets(LADDER_MANIFEST, {});
@@ -297,10 +265,10 @@ test('a failure is logged once per message: the same failure and cause again und
   const logs = logsOf(assets);
   const { logFailure } = assets.AUR.shipAssets;
   for (let i = 0; i < 2; i += 1) {
-    logFailure('Hull small request failed', new Error('no metadata'), 'the ship keeps its dart.');
-    logFailure('Hull small request failed', new Error('no metadata'));
+    logFailure('Hull small could not be built', new Error('no mesh'), 'the ship keeps the hull or dart it has.');
+    logFailure('Hull small could not be built', new Error('no mesh'));
   }
-  assert.deepEqual(logs, ['Hull small request failed (no metadata); the ship keeps its dart.', 'Hull small request failed (no metadata).']);
+  assert.deepEqual(logs, ['Hull small could not be built (no mesh); the ship keeps the hull or dart it has.', 'Hull small could not be built (no mesh).']);
 });
 
 test('a hull whose provider evidence cannot be made is not built, and leaves no instance behind', async () => {
@@ -339,26 +307,6 @@ test('a manifest that cannot be used logs why', async () => {
   const logs = logsOf(assets);
   assert.equal(await assets.AUR.shipAssets.manifestPromise, null);
   assert.deepEqual(logs, ['Ship assets unavailable (manifest schema unsupported); using procedural hulls.']);
-});
-
-test('ship reflections that cannot be prefiltered log the cause once per cause, in whichever scene', async () => {
-  const assets = loadShipAssets(LADDER_MANIFEST, {});
-  const logs = logsOf(assets);
-  let cause = 'no float render targets';
-  Object.assign(assets.BABYLON, {
-    Constants: {}, RawCubeTexture: class {}, HDRFiltering: class { prefilter() { return Promise.reject(new Error(cause)); } },
-  });
-  assets.BABYLON.Material.prototype.environmentIntensity = 1; // a PBR finish, which takes the studio reflections
-  for (const next of ['no float render targets', 'no float render targets', 'context lost']) {
-    cause = next;
-    const scene = Object.assign(assets.scene('system'), { getEngine: () => ({}) }); // each prefilters its own copy
-    assert.ok(await assets.ships.upgrade(scene, ship('a', 0), assets.fallback('a')));
-    await new Promise((resolve) => setImmediate(resolve));
-  }
-  assert.deepEqual(logs, [
-    'Ship environment could not be prefiltered (no float render targets); it is used unfiltered.',
-    'Ship environment could not be prefiltered (context lost); it is used unfiltered.',
-  ]);
 });
 
 test('a template whose parts cannot all be dressed leaves no node or half-dressed livery behind, and later builds work; a root that cannot be disposed is logged and the rest go', async () => {

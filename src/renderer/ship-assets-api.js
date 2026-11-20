@@ -19,11 +19,10 @@
     createShipEntry, swapHull, forget,
   } = assets;
 
-  // A hull request that throws past buildHull's own catch is logged and resolves null. `outcome`
-  // says what the ship is left with, where the request knows.
-  /** @param {HullEntry | null} hull null when the throw came before it was chosen @param {string} [outcome] */
-  function failed(hull, error, outcome) {
-    logFailure(hull ? 'Hull ' + hull.id + ' request failed' : 'A hull request failed', error, outcome);
+  // A hull request that throws past buildHull's own catch is logged and resolves null.
+  /** @param {HullEntry | null} hull null when the throw came before it was chosen */
+  function failed(hull, error) {
+    logFailure(hull ? 'Hull ' + hull.id + ' request failed' : 'A hull request failed', error);
     return null;
   }
 
@@ -56,7 +55,7 @@
       if (!hull) return null;
       chosen = hull;
       return resolveAsset(scene, state, hull, () => 0, () => !AUR.isNodeDisposed(fallback), (asset) => {
-        const { isPickable, isVisible } = fallback;
+        const { isPickable, isVisible, metadata } = fallback;
         const entry = createShipEntry(scene, state, hull, asset, ship);
         if (!entry) return null;
         const assetRoot = entry.root;
@@ -74,10 +73,13 @@
           AUR.markShipMesh(assetRoot, ship);
         } catch (error) {
           // A hull that cannot be installed under its dart: the install's cause is logged, then the
-          // dart flies as it did and the hull is let go, each step guarded.
-          failed(hull, error, 'the ship keeps its dart.');
+          // dart is put back as it was and the hull is let go, each step guarded.
+          failed(hull, error);
           guarded('Uninstalled hull ' + hull.id, [
-            [' could not restore its dart', () => Object.assign(fallback, { isPickable, isVisible })],
+            [' could not restore its dart', () => {
+              Object.assign(fallback, { isPickable, isVisible });
+              if (fallback.metadata !== metadata) fallback.metadata = metadata;
+            }],
             [' could not be hidden', () => assetRoot.setEnabled(false)],
             [' could not be disposed', () => assetRoot.dispose()],
           ]);
