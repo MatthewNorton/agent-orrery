@@ -361,7 +361,7 @@ test('ship reflections that cannot be prefiltered log the cause once per cause, 
   ]);
 });
 
-test('a template whose parts cannot all be dressed leaves no node or half-dressed livery behind, and later builds work', async () => {
+test('a template whose parts cannot all be dressed leaves no node or half-dressed livery behind, and later builds work; a root that cannot be disposed is logged and the rest go', async () => {
   const assets = loadShipAssets(LADDER_MANIFEST, {}); // parts: hull_primary, then accent_energy
   const scene = assets.scene('system');
   const { trimLight } = assets.models;
@@ -377,4 +377,23 @@ test('a template whose parts cannot all be dressed leaves no node or half-dresse
   const [c, b] = [await assets.ships.upgrade(scene, ship('c', 0), assets.fallback('c')), await assets.ships.upgrade(scene, ship('b', 0), assets.fallback('b'))];
   assert.ok([c, b].every((root) => root && instancesOf(root).length === 2), 'both build');
   assert.ok(templatesOf(c).every((mesh) => mesh.visibility === 0.16) && templatesOf(b).every((mesh) => mesh.visibility === 1));
+
+  // A template of two roots, the first of which cannot be disposed, for a palette not dressed yet.
+  const logs = logsOf(assets);
+  const { container } = assets.AUR.shipAssets.sceneStates.get(scene).containers.get('small-near.glb');
+  const make = container.instantiateModelsToScene;
+  const made = [];
+  container.instantiateModelsToScene = (...args) => {
+    const rootNodes = [...make(...args).rootNodes, ...make(...args).rootNodes];
+    made.push(...rootNodes.map((root) => [root, ...root.getChildMeshes(false)]));
+    rootNodes[0].dispose = () => { throw new Error('no dispose'); };
+    return { rootNodes };
+  };
+  assets.models.trimLight = () => { throw new Error('no trim light on codex'); };
+  assert.equal(await assets.ships.upgrade(scene, ship('e', 0, { provider: 'codex' }), assets.fallback('e')), null);
+  assert.deepEqual(made.map((nodes) => nodes.map((node) => node.disposed)), [[false, false, false], [true, true, true]]);
+  assert.deepEqual(logs, [
+    'Unmade template ship_template_small-near.glb|codex could not be disposed (no dispose).',
+    'Hull small could not be built (no trim light on codex); the ship keeps the hull or dart it has.',
+  ]);
 });

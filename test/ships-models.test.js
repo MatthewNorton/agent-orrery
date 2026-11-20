@@ -182,6 +182,29 @@ test('a build that fails part-way leaves nothing of its own in the scene', () =>
   });
 });
 
+test('a build that fails part-way and cannot dispose one of its materials throws its own cause, and disposes the rest', () => {
+  onScene((scene, models, petrel, AUR) => {
+    const logs = [];
+    AUR.log = (message) => logs.push(message);
+    const count = scene.materials.length;
+    let stuck = null;
+    const failing = {
+      ...petrel,
+      probe() {
+        stuck = Object.assign(scene.materials[count], { dispose() { throw new Error('no dispose'); } });
+        throw new Error('no probe');
+      },
+    };
+    assert.throws(() => models.container(scene, failing), /no probe/);
+    assert.ok(sameItems(scene.materials, [stuck]), 'only the material that could not be disposed stays');
+    assert.deepEqual(['meshes', 'transformNodes', 'multiMaterials'].map((list) => scene[list].length), [0, 0, 0]);
+    assert.ok(sameItems(scene.textures, [scene.environmentBRDFTexture]), 'and the scene\'s BRDF lookup');
+    assert.deepEqual(logs, [stuck.name + ' from a failed build of petrel could not be disposed (no dispose).']);
+    delete stuck.dispose;
+    stuck.dispose();
+  });
+});
+
 test('a model container owns the materials and textures it was built with: disposing it releases them', () => {
   onScene((scene, models, petrel) => {
     models.container(scene, petrel).dispose();

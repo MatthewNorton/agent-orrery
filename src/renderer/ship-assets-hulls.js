@@ -79,7 +79,8 @@
       }
       return { roots, meshes };
     } catch (error) {
-      disposeTemplate({ roots }); // the parts not reached yet would draw, in the file's materials
+      // The parts not reached yet would draw, in the file's materials.
+      for (const root of roots) AUR.disposeLogged(root, 'Unmade template ' + name);
       throw error;
     }
   }

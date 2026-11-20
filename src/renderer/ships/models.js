@@ -80,8 +80,10 @@
     try {
       held = dressed(scene, model);
     } catch (error) {
-      // A build that fails part-way leaves nothing of itself in the scene.
-      for (const list of BUILT) for (const item of made(list)) item.dispose();
+      // A build that fails part-way disposes what it made, and throws its own cause.
+      for (const list of BUILT) {
+        for (const item of made(list)) AUR.disposeLogged(item, item.name + ' from a failed build of ' + model.id);
+      }
       throw error;
     }
     held.materials.push(...made('materials'));
