@@ -105,6 +105,14 @@ test('focus mode fades the fleet on its templates and rebuilds only the followed
   assets.ships.fade(scene, 0.16, { shipId: 'a', visibility: 0 });
   assets.ships.fade(scene, 1);
   assert.ok(assets.built().length === 0 && shows(a, 1), 'focus from inside, and leaving it, rebuild nothing');
+
+  // A focus that begins inside builds no template of its own: the first time out builds it.
+  assets.ships.fade(scene, 0.16, { shipId: 'a', visibility: 0 });
+  assets.ships.fade(scene, 0.16, { shipId: 'a', visibility: 1 });
+  assert.deepEqual(assets.built(), ['a'], 'out for the first time');
+  assets.ships.fade(scene, 0.16, { shipId: 'a', visibility: 0 });
+  assets.ships.fade(scene, 0.16, { shipId: 'a', visibility: 1 });
+  assert.ok(assets.built().length === 0 && shows(a, 1), 'and in and out again rebuild nothing');
 });
 
 test('a hull built while focus mode fades the fleet is built faded, the followed ship apart, and a ship that leaves takes its template', async () => {

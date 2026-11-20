@@ -1,6 +1,7 @@
 // @ts-check
 // Builds a ship's hull from a loaded model: provider livery materials, instances of a template
-// per hull file and palette in every view, in-place swaps on promotion, and focus mode's fade.
+// per hull file and palette in every view, and in-place swaps on promotion, each built as focus
+// mode's fade shows the ship.
 'use strict';
 
 /**
@@ -274,8 +275,7 @@
     try {
       template = templateFor(scene, state, asset, ship, own);
       for (const node of template.roots) {
-        // An instance for each part (shown, unlike its template, and lit as it is), a copy for
-        // each node without geometry.
+        // An instance for each part, a copy for each node without geometry.
         node.instantiateHierarchy(pivot, undefined, (source, copy) => {
           copy.name = 'ship_' + String(ship.id) + '_' + source.name;
           if (!copy.material) return;

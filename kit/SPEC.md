@@ -347,69 +347,79 @@ Design tokens (put in `:root`):
   `assets/ships/manifest.json`: the hull is the highest rank whose `minBuilds`
   the ship's `builds` has reached (Scout 0, Workhorse 5, Capital 20, Flagship
   60); display length grows 1.9× over the ladder. A drone flies the first rank
-  at `AUR.DRONE_SCALE` of its size. Each hull is one file, and every view
-  draws its ships as instances of a hidden template per provider. A far file
-  lights itself faintly, on the lightless map and where a near view steps down
-  to it; the near views light their hulls, so the template carries the light
-  layer (an instance is lit as its source). An instance shows its template's material
-  and visibility, so focus mode fades the fleet on its templates
-  (`AUR.ships.fade(scene, visibility, apart)`: 0.16, then 1 to restore), and a
-  hull built later starts as the fade says. The ship it follows (`apart`) moves
-  to a template of its own in full from outside, and is disabled from inside:
-  entering or leaving focus rebuilds at most one hull, following another ship
-  at most two, and changing seats none; an opaque hull material gives its transparency mode up, because Babylon
-  ignores a mesh's visibility while its material is set opaque or cut-out;
-  no flown hull has a blended material in full, its glass included; a cut-out
-  keeps its mode and does not fade, and no hull has one. Babylon sorts a
-  template's ships as one, at the template's place (the scene origin, where
-  the sun's glow is too), so every template carries an `alphaIndex` of
-  `Infinity`, past the default (`Number.MAX_VALUE`) that every other mesh
-  keeps: a faded fleet draws after every other blended mesh, the sun's corona
-  and glow and the planets' shells, wherever its ships are. A view steps down to the dart past its hull triangle budget (checked again
-  in the step that builds a hull, so ships waiting on one container keep to
-  it; a request that ends while it waits, its dart gone or its swap
-  superseded, loads and builds nothing more): 900k in a
-  system or planet view, which holds fifty-one ships of the first rank, and
-  1.24M on the universe map, which holds seventy. Ship size is one policy (`AUR.SHIP_SIZE` per
-  view, `AUR.fitShip` with a pixel floor so a hull sized to its planets still
-  reads from the default orbit). `AUR.ships.refresh(scene, ship)` swaps the hull
-  inside the asset root the scene already holds; `app/boot.js` calls it after
-  `ship-updated` and `build` events, and the new hull lands as the fade shows
-  the ship.
+  at `AUR.DRONE_SCALE` of its size. Ship size is one policy (`AUR.SHIP_SIZE`
+  per view, `AUR.fitShip` with a pixel floor so a hull sized to its planets
+  still reads from the default orbit).
+  - **Instancing.** Each hull is one file. Every view draws its ships as
+    instances of a hidden template, one per hull file and palette (the
+    provider's, or local red), in one draw per part. An instance shows its
+    template's material, visibility and lights, so the template carries the
+    light layer. A far file lights itself faintly, on the lightless map and
+    where a near view steps down to it; the near views light their hulls.
+    Babylon sorts a template's ships as one, at the template's place (the
+    scene origin, where the sun's glow is too), so every template carries an
+    `alphaIndex` of `Infinity`, past the default (`Number.MAX_VALUE`) that
+    every other mesh keeps: a faded fleet draws after every other blended mesh
+    (the sun's corona and glow, the planets' shells), wherever its ships are.
+  - **Focus fade.** `AUR.ships.fade(scene, visibility, apart)` shows every
+    hull at `visibility`, written on the templates, and a hull built later
+    starts at it. The ship `apart` names (`{ shipId, visibility }`) shows its
+    own: above 0 on a template of its own, at 0 disabled where it is. Focus
+    mode fades the fleet to 0.16 and shows the followed ship at 1 from outside
+    and 0 from inside, then restores 1: entering or leaving focus rebuilds at
+    most one hull, following another ship at most two, and switching between
+    inside and outside none, except the first time out of a focus that began
+    inside (one). An opaque hull material gives its transparency
+    mode up, because Babylon ignores a mesh's visibility while its material is
+    set opaque or cut-out. No flown hull has a blended material in full, its
+    glass included; a cut-out would keep its mode and not fade, and no hull
+    has one.
+  - **Triangle budget.** Past its budget a view flies the dart, a near view
+    first trying the hull's far file: 900k in a system or planet view, which
+    holds fifty-one ships of the first rank, and 1.24M on the universe map,
+    which holds seventy. A hull is checked in the step that builds it, so ships
+    waiting on one container keep to the budget, and a request that ends while
+    it waits (its dart gone, its swap superseded) loads and builds nothing more.
+  - **Promotion.** `AUR.ships.refresh(scene, ship)` swaps the hull inside the
+    asset root the scene already holds; `app/boot.js` calls it after
+    `ship-updated` and `build` events, and the new hull lands as the fade shows
+    the ship.
 - A rank can be flown by a ship model built in code instead of a file
   (`AUR.shipModels`, `ships/models.js`). A model names the manifest hull it
   `replaces` and flies in that hull's rank (`selectHull` asks
   `AUR.shipModels.inPlaceOf`); the frozen manifest is unchanged. Petrel
   (`ships/petrel/model.js`) flies the Scout rank, so it is also every drone.
-  Its container is the ship built once per scene and merged into one mesh
-  with a sub-mesh per finish, because every mesh of a hull is placed and
-  culled once per ship; from there it goes the way of a hull file's
-  container (the hull entry `inPlaceOf` returns carries the `model`, which is
-  what tells the two apart): every view instances a per-provider template, so
-  all the Petrels of a provider draw in one draw per finish. A
-  model keeps the finishes it was authored with: its
-  materials reflect its own probe and use their own tone curve (ACES), and in
-  the views that light their ships three fixed lights are all that reaches a
-  model hull (`AUR.shipModels.LAYER`: the model lights include only that
-  layer and every other light of the view excludes it, since a material draws
-  four lights at most; the fleet's key and rim stay on `AUR.SHIP_LAYER`).
-  The ship color is still trim lighting, never hull paint: the model lists its
-  trim by material name, and each is copied once per palette as a light in the
-  ship color (a number: `TRIM_LIGHT` for a lamp, lower for a wide surface that
-  should glow as a lit panel) or, for `{ lamps: <the color its emissive map
-  is painted in> }`, keeps its surface and has that map show the ship color. `AUR.shipModels.trimLight` is that light, and
-  the fleet's livery stripes and nozzles are made by it too.
+  - **Container.** The ship is built once per scene and merged into one mesh
+    with a sub-mesh per finish, because every mesh of a hull is placed and
+    culled once per ship. From there it goes the way of a hull file's
+    container (the hull entry `inPlaceOf` returns carries the `model`, which
+    tells the two apart), so all the Petrels of a palette draw in one draw per
+    finish.
+  - **Finishes and light.** A model keeps the finishes it was authored with:
+    its materials reflect its own probe and use their own tone curve (ACES).
+    In the views that light their ships, three fixed lights are all that
+    reaches a model hull (`AUR.shipModels.LAYER`: the model lights include only
+    that layer and every other light of the view excludes it, since a material
+    draws four lights at most; the fleet's key and rim stay on
+    `AUR.SHIP_LAYER`).
+  - **Ship color.** It is still trim lighting, never hull paint: the model
+    lists its trim by material name, and each is copied once per palette as a
+    light in the ship color (a number: `TRIM_LIGHT` for a lamp, lower for a
+    wide surface that should glow as a lit panel) or, for `{ lamps: <the color
+    its emissive map is painted in> }`, keeps its surface and has that map show
+    the ship color. `AUR.shipModels.trimLight` is that light, and the fleet's
+    livery stripes and nozzles are made by it too.
 - A model's `source/` folder is generated: `node scripts/import-ship.mjs <ship>
   <source folder>` converts the ship's ES modules to page scripts that register
   with `AUR.shipModule` (one file per module, run on first use, so page load
   builds nothing), and writes `source.json`: the source commit, each module's
   hash, exports and the hash of the file generated from it, and a fingerprint
   of the built ship's geometry, which the script first proves equal to what
-  the original modules build. Never edit
-  those files: change the ship at its source and run the script again
-  (`--check` reports whether they are current); it prints the script tags
-  `index.html` needs. `test/ships-source.test.js` holds the committed files
-  to those hashes, rebuilds the ship from them and compares the fingerprint.
+  the original modules build. Never edit those files: change the ship at its
+  source and run the script again (`--check` reports whether they are
+  current); it prints the script tags `index.html` needs.
+  `test/ships-source.test.js` holds the committed files to those hashes,
+  rebuilds the ship from them and compares the fingerprint.
 
 ## 5. Universe view (`3.universe-map-view.png`)
 

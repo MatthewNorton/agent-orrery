@@ -42,9 +42,8 @@
     }
 
     // What focus mode shows of a ship: the focused one in full from outside, hidden from inside
-    // (the viewer sits in it), every other ship faded. A hull is instances, which show their
-    // template's visibility, so AUR.ships fades the hulls (setShipFocus); the dart, a signal's
-    // glyph and the plumes are meshes of their own, faded here.
+    // (the viewer sits in it), every other ship faded. AUR.ships fades the hulls (setShipFocus);
+    // the dart, a signal's glyph and the plumes are meshes of their own, faded here.
     function applyShipFocusVisual(rec) {
       const { shipFocus } = view;
       if (!shipFocus) return;

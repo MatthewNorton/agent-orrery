@@ -68,9 +68,10 @@
    * hides it): focus mode in the system view fades the ships it does not follow and shows the one
    * it follows in full, or hides it from inside, then restores them all at 1. It holds for hulls
    * built later too (a ship that arrives, a promotion). The fleet fades on its templates, so only
-   * a ship moving apart or back is rebuilt, onto or off a template of its own; a hidden one is
-   * disabled on the template it has, so the viewer looks out from inside it and back without a
-   * rebuild. A dart or a signal has meshes of its own, which focus mode fades itself.
+   * a ship moving apart or back is rebuilt, onto or off a template of its own. A hidden one is
+   * disabled on the template it has, which rebuilds nothing; shown again, it is rebuilt only if it
+   * has no template of its own yet (focus began inside it). A dart or a signal has meshes of its
+   * own, which focus mode fades itself.
    * @param {number} visibility
    * @param {{ shipId: string, visibility: number }} [apart]
    */
