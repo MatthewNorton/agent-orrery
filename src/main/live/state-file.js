@@ -84,7 +84,7 @@ function serializeState(model) {
   for (const [id, p] of model.projects) {
     out.projects[id] = {
       path: p.path, name: p.name, lastActivity: p.lastActivity,
-      buckets: p.buckets, totalBuilds: p.totalBuilds, firstSeen: p.firstSeen,
+      buckets: p.buckets, bucketsCounted: p.bucketsCounted, totalBuilds: p.totalBuilds, firstSeen: p.firstSeen,
     };
   }
   return out;

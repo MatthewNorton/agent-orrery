@@ -59,7 +59,7 @@ test('in the live model one function sets a project\'s path: takeProjectPath', (
   // It sets the name, the folder check and the path index with the path; a call past it leaves one of them behind.
   const calls = (source) => matched(codeLines(source), [/\bsetProjectPath\s*\(/]);
   assert.deepEqual(mainLines(calls).filter((line) => line.startsWith('live/')), [
-    'live/projects.js: setProjectPath(project, projPath, counted);',
+    'live/projects.js: setProjectPath(project, projPath);',
     'live/projects.js: setProjectPath(project, was.path);', // giving the path back
   ]);
   const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'main', 'live', 'projects.js'), 'utf8');

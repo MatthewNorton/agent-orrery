@@ -32,25 +32,29 @@ function validKey(value) {
 
 /**
  * A saved project, read: null for an entry that is not a record. Only a string is a path, and
- * each file's own rule then says whether the app may use it; `counted` is whether the record had
- * one, so whether its builds were counted under a path (build-buckets.js). A name is plain text
- * of a length that fits the screen, or none. Every count and time is a whole count
- * (shared/values.js), and a bucket is a folder name build-buckets.js would count (isBucketName)
- * with a count above none, MAX_BUCKETS of them at most.
+ * each file's own rule then says whether the app may use it. A name is plain text of a length that
+ * fits the screen, or none. Every count and time is a whole count (shared/values.js), and a bucket
+ * is a folder name build-buckets.js would count (isBucketName) with a count above none,
+ * MAX_BUCKETS of them at most. No folder has more builds than its project, so the total is at
+ * least the largest bucket. `bucketsCounted` (build-buckets.js foldBuckets) is the file's, or for
+ * a file written before it, whether the record had a path, whatever became of the path. A record
+ * with no buckets has no casings to join, and counts as counted.
  * @param {unknown} raw
  * @returns {SavedProject | null}
  */
 function savedProject(raw) {
   if (!plainObject(raw)) return null;
   const savedPath = typeof raw.path === 'string' && raw.path ? raw.path : null;
+  const buckets = savedBuckets(raw.buckets);
+  const counts = Object.values(buckets);
   return {
     path: savedPath,
-    counted: savedPath !== null,
+    bucketsCounted: counts.length === 0 || (typeof raw.bucketsCounted === 'boolean' ? raw.bucketsCounted : savedPath !== null),
     name: validKey(raw.name) ? raw.name : undefined,
     lastActivity: wholeCount(raw.lastActivity),
     firstSeen: wholeCount(raw.firstSeen),
-    totalBuilds: wholeCount(raw.totalBuilds),
-    buckets: savedBuckets(raw.buckets),
+    totalBuilds: counts.reduce((most, count) => Math.max(most, count), wholeCount(raw.totalBuilds)),
+    buckets,
   };
 }
 

@@ -18,7 +18,7 @@ const LONG = 'n'.repeat(5000);
 
 test('a saved project: only a record is one, and each field is checked', () => {
   for (const entry of [null, undefined, 5, 'demo', true, ['src']]) assert.equal(savedProject(entry), null, String(entry));
-  assert.deepEqual(savedProject({}), { path: null, counted: false, name: undefined, lastActivity: 0, firstSeen: 0, totalBuilds: 0, buckets: {} });
+  assert.deepEqual(savedProject({}), { path: null, bucketsCounted: true, name: undefined, lastActivity: 0, firstSeen: 0, totalBuilds: 0, buckets: {} });
 
   // A name is plain text that fits the screen: no control character (C0, DEL or C1), 4,096 characters at most.
   const nameOf = (name) => savedProject({ name }).name;
@@ -32,11 +32,20 @@ test('a saved project: only a record is one, and each field is checked', () => {
   const counts = savedProject(JSON.parse('{ "totalBuilds": "9", "firstSeen": 1700000000000.4, "lastActivity": 1e400 }'));
   assert.deepEqual([counts.totalBuilds, counts.firstSeen, counts.lastActivity], [0, 1700000000000, 0]);
   assert.deepEqual([9.9, -3, 1e308, NaN, null, '12', [4]].map((totalBuilds) => savedProject({ totalBuilds }).totalBuilds), [9, 0, MAX, 0, 0, 0, 0]);
+  // No folder has more builds than its project: the total is at least the largest bucket.
+  assert.deepEqual([{ totalBuilds: '7', buckets: { src: 7 } }, { totalBuilds: 3, buckets: { docs: 6, src: 2 } }, { totalBuilds: 9, buckets: { src: 2 } }]
+    .map((raw) => savedProject(raw).totalBuilds), [7, 6, 9]);
 
-  // Only a string is a path. Whether the app may use it is the rule of the file it came from; a
-  // record that had one counted its builds under a path, whatever became of the path.
-  assert.deepEqual([7, '', null, ['C:\\x'], 'relative/x', '/work/demo'].map((p) => { const { path: read, counted } = savedProject({ path: p }); return [read, counted]; }),
+  // Only a string is a path. Whether the app may use it is the rule of the file it came from.
+  // Whether the buckets were counted under a path is the file's (a boolean); a file from before
+  // that says it by whether the record had a path, whatever became of the path.
+  const read = (raw) => (({ path: p, bucketsCounted }) => [p, bucketsCounted])(savedProject({ buckets: { src: 1 }, ...raw }));
+  assert.deepEqual([7, '', null, ['C:\\x'], 'relative/x', '/work/demo'].map((p) => read({ path: p })),
     [[null, false], [null, false], [null, false], [null, false], ['relative/x', true], ['/work/demo', true]]);
+  assert.deepEqual([{ bucketsCounted: true }, { path: '/work/demo', bucketsCounted: false }, { bucketsCounted: 'yes' }, { path: '/work/demo', bucketsCounted: 0 }]
+    .map(read), [[null, true], ['/work/demo', false], [null, false], ['/work/demo', true]]);
+  // Buckets that are none have nothing to join: counted, whatever the record says.
+  assert.deepEqual([{}, { bucketsCounted: false }, { bucketsCounted: false, buckets: { 'a/b': 3 } }].map((raw) => savedProject(raw).bucketsCounted), [true, true, true]);
 });
 
 test('a saved project\'s buckets: a folder name build-buckets.js counts, with a whole count above none', () => {
@@ -79,7 +88,8 @@ test('a state file and a backup holding the same odd entry give the same project
   assert.deepEqual(Object.keys(got).sort(), ['control', 'long', 'named', 'pathed', 'unlisted']);
   // A name that is not plain text is not kept: the project goes by its id, or by its folder.
   assert.deepEqual([got.control.name, got.long.name, got.named.name, got.pathed.name], ['control', 'long', 'kept by name', 'pathed']);
-  assert.deepEqual([got.control.totalBuilds, got.control.buckets], [0, [['lib', 2]]]);
+  // The total read as none is raised to the largest bucket.
+  assert.deepEqual([got.control.totalBuilds, got.control.buckets], [2, [['lib', 2]]]);
   assert.deepEqual([got.long.totalBuilds, got.long.firstSeen, got.long.buckets], [2, 1700000000000, []]);
   assert.deepEqual([got.named.lastActivity, got.pathed.totalBuilds, got.pathed.lastActivity, got.unlisted.buckets], [MAX, MAX, 0, []]);
   // Docs and docs are one folder under a Windows path, two elsewhere; either way no count passes the largest kept.

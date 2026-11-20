@@ -11,7 +11,11 @@ const { ignoresCase } = require('./path-safety');
 const { hasControlChars } = require('./shared/ids');
 const { wholeCount } = require('./shared/values');
 
-/** @typedef {{ path: string | null, buckets: Record<string, number> }} BucketedProject */
+/**
+ * A project as the buckets see it. `bucketsCounted` and `totalBuilds` say how its folder's casings
+ * join when a path makes them one (foldBuckets).
+ * @typedef {{ path: string | null, buckets: Record<string, number>, bucketsCounted?: boolean, totalBuilds?: number }} BucketedProject
+ */
 
 // The most buckets a project keeps, and its files hold (live/saved-project.js). A transcript can
 // name a new folder per edit.
@@ -223,36 +227,73 @@ function addBuckets(project, counts, both) {
 }
 
 /**
+ * How two casings of one folder join into one count (foldBuckets): added up when they were counted
+ * under a path, but never past `total` nor below the larger of them; otherwise the larger.
+ * @param {boolean} counted
+ * @param {number | undefined} total
+ * @returns {(held: number, added: number) => number}
+ */
+function joinCasings(counted, total) {
+  const limit = typeof total === 'number' && total >= 0 ? total : Infinity;
+  return counted ? (held, added) => Math.max(held, added, Math.min(wholeCount(held + added), limit)) : Math.max;
+}
+
+/**
  * `counts` as the buckets of a project at `root`: one bucket per folder by that root's rule, under
- * the first key that names it. What a saved project's counts (a state file's, a backup's) go through
- * before they are a project's. Counts made under a path (`counted`) hold each build once, so the casings
- * of a folder are added up. A project with no path counts no build, since a build is bucketed
- * relative to the path: what it holds came from files, merged name by name, where two casings can
- * be two records of the same builds. Of those the larger is kept, so a folder never gets more
- * builds than its project has.
+ * the first key that names it. How a folder's casings join is decided here, and every other place
+ * that joins them cites this:
+ * - Counted under a path (`counted`: a project's bucketsCounted), each build was counted once, in
+ *   the casing its edit wrote, so the casings of a folder are added up.
+ * - Not counted under one, they came from files merged name by name with no path to bucket a build
+ *   by, where two casings can be two records of the same builds. The larger is kept.
+ * - Either way a folder never has more builds than its project: no sum passes `total` (the
+ *   project's totalBuilds), and none is lowered below the larger casing. That also bounds a
+ *   project whose buckets merged a counted side with one that was not, which one flag cannot
+ *   tell apart.
+ * A project the app makes counts under its own path. A saved project's flag is its file's, or for
+ * a file written before the flag, whether the record had a path (live/saved-project.js). Once a
+ * path that makes a folder's casings one has joined them, each folder has one bucket, so the
+ * flag is true from then on (setProjectPath, mergeBuckets).
  * @param {string | null} root
  * @param {Record<string, number>} counts
- * @param {boolean} [counted] whether the counts were made under a path
+ * @param {boolean} counted whether the counts were made under a path
+ * @param {number} [total] the project's builds, which no folder passes
  * @returns {Record<string, number>}
  */
-function foldBuckets(root, counts, counted = true) {
+function foldBuckets(root, counts, counted, total) {
   const project = { path: root, buckets: {} };
-  addBuckets(project, counts, counted ? (held, added) => held + added : Math.max);
+  addBuckets(project, counts, joinCasings(counted, total));
   return project.buckets;
 }
 
 /**
  * Gives a project its path: the one way a project's path is written. The path decides which names
- * are one folder, so the buckets are folded by it in the same step, and are always as their
- * project's path counts them. `counted` says whether they were counted under a path (foldBuckets);
- * left out, it is whether the project has a path now.
+ * are one folder, so the buckets are folded by it in the same step (foldBuckets, as the project's
+ * bucketsCounted and totalBuilds say), and are always as their project's path counts them.
  * @param {BucketedProject} project
  * @param {string | null} projectPath
- * @param {boolean} [counted]
  */
-function setProjectPath(project, projectPath, counted = project.path !== null) {
+function setProjectPath(project, projectPath) {
   project.path = projectPath;
-  project.buckets = foldBuckets(projectPath, project.buckets, counted);
+  project.buckets = foldBuckets(projectPath, project.buckets, project.bucketsCounted === true, project.totalBuilds);
+  if (ignoresCase(projectPath)) project.bucketsCounted = true;
+}
+
+/**
+ * Adds a saved project's counts to `project`'s, as an import does: the saved casings joined by the
+ * project's path as foldBuckets joins them (by the saved side's own flag and total), then the
+ * larger of each folder's two counts kept, since both sides can hold the same builds. The buckets
+ * are counted under a path after it if either side's were, or if the project's path has joined
+ * every folder's casings; a side with no buckets has no say.
+ * @param {BucketedProject} project
+ * @param {{ buckets: Record<string, number>, bucketsCounted: boolean, totalBuilds: number }} saved
+ */
+function mergeBuckets(project, saved) {
+  if (bucketCount(saved.buckets) > 0) {
+    project.bucketsCounted = ignoresCase(project.path) || saved.bucketsCounted
+      || (project.bucketsCounted === true && bucketCount(project.buckets) > 0);
+  }
+  addBuckets(project, foldBuckets(project.path, saved.buckets, saved.bucketsCounted, saved.totalBuilds), Math.max);
 }
 
 /**
@@ -266,5 +307,5 @@ function bucketBuilds(project, name) {
 
 module.exports = {
   MAX_BUCKETS, addBuckets, bucketOf, bucketKey, bucketFor, countBuild, bucketBuilds, foldBuckets, isBucketName, isPlanetSegment,
-  matchingEntry, planetKey, setBucket, setProjectPath,
+  matchingEntry, mergeBuckets, planetKey, setBucket, setProjectPath,
 };

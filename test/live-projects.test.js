@@ -111,7 +111,8 @@ test('live projects: a folder keeps one bucket by the rule of the path its proje
   // From a state file or a backup: every count a whole one, and the casings a path joins added up.
   const here = restoreProject(model, 'here', savedProject({ path: dir('here'), buckets: casedCounts(), totalBuilds: 15 }));
   assert.deepEqual(...kept(here));
-  assert.equal(here.totalBuilds, 15);
+  // Its total is at least its largest bucket (live/saved-project.js), here a full count.
+  assert.equal(here.totalBuilds, Number.MAX_SAFE_INTEGER);
   // No path tells no two names apart or together; the folder the project then gets decides. It
   // counted no build without a path, so two casings may be two records of the same builds: the
   // larger stays, by adoption and by recovery alike.

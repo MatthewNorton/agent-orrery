@@ -115,7 +115,7 @@ test('saveState()/loadState() round-trip buckets, totals, firstSeen and path ids
     projects: {
       [SLUG]: {
         path: dir, name: 'demo', lastActivity: T0 + 2 * SEC,
-        buckets: { src: 2 }, totalBuilds: 2, firstSeen: T0,
+        buckets: { src: 2 }, bucketsCounted: true, totalBuilds: 2, firstSeen: T0,
       },
     },
     pathIds: { [canonicalProjectPath(dir)]: SLUG },

@@ -30,16 +30,16 @@ function isProjectDirectory(projectPath) {
 
 /**
  * A new project record, announced. Build counts and first sight come from `fields` when an
- * earlier run saved them; `counted` is false when it saved those counts for a project with no
- * path. `fields.name` is its name only while it has no folder to be named for.
+ * earlier run saved them, and whether those were counted under a path (build-buckets.js
+ * foldBuckets); a project the app makes counts under its own. `fields.name` is its name only
+ * while it has no folder to be named for.
  * @param {LiveModel} model
  * @param {string} id
  * @param {string | null} projPath
  * @param {Partial<LiveProject>} fields
- * @param {boolean} [counted]
  * @returns {LiveProject}
  */
-function createProject(model, id, projPath, fields, counted = true) {
+function createProject(model, id, projPath, fields) {
   /** @type {LiveProject} */
   const project = {
     id,
@@ -51,10 +51,11 @@ function createProject(model, id, projPath, fields, counted = true) {
     claudeBytes: fields.claudeBytes || 0,
     codexBytes: fields.codexBytes || 0,
     buckets: fields.buckets || {},
+    bucketsCounted: fields.bucketsCounted ?? true,
     totalBuilds: fields.totalBuilds || 0,
     firstSeen: fields.firstSeen || Date.now(),
   };
-  takeProjectPath(model, project, projPath, counted);
+  takeProjectPath(model, project, projPath);
   model.projects.set(id, project);
   queue(model, { type: 'project-added', project: liveProject(project) });
   return project;
@@ -75,20 +76,19 @@ function adoptProjectPath(model, project, projPath) {
  * The one way a project takes a path (or none, at its creation), with what follows from it: one
  * bucket per folder by the rule of that path, every count a whole one (setProjectPath), the
  * folder's name, whether the folder is there, and the path index. The caller announces it.
- * `counted` is setProjectPath's: left out, the buckets of a project that had no path were not
- * counted under one, and of a folder's casings the larger stays.
  * @param {LiveModel} model
  * @param {LiveProject} project
  * @param {string | null} projPath
- * @param {boolean} [counted]
  * @returns {() => void} gives the path back: each of those as it was before
  */
-function takeProjectPath(model, project, projPath, counted) {
+function takeProjectPath(model, project, projPath) {
   const key = canonicalProjectPath(projPath);
-  const was = { path: project.path, buckets: project.buckets, name: project.name, exists: project.exists };
+  const was = {
+    path: project.path, buckets: project.buckets, bucketsCounted: project.bucketsCounted, name: project.name, exists: project.exists,
+  };
   const index = key && { had: model.projectPathIndex.has(key), id: model.projectPathIndex.get(key) };
   const pathId = key && { had: Object.hasOwn(model.pathIds, key), id: model.pathIds[key] };
-  setProjectPath(project, projPath, counted);
+  setProjectPath(project, projPath);
   project.name = (projPath && path.basename(projPath)) || project.name;
   project.exists = isProjectDirectory(projPath);
   indexProjectPath(model, project);
@@ -96,7 +96,7 @@ function takeProjectPath(model, project, projPath, counted) {
     setProjectPath(project, was.path);
     // The buckets as the very object they were: once joined by the new path's rule they cannot
     // be told apart again, and a fold of them would be a copy.
-    Object.assign(project, { buckets: was.buckets, name: was.name, exists: was.exists });
+    Object.assign(project, { buckets: was.buckets, bucketsCounted: was.bucketsCounted, name: was.name, exists: was.exists });
     if (!key) return;
     if (index.had) model.projectPathIndex.set(key, index.id);
     else model.projectPathIndex.delete(key);
@@ -139,8 +139,8 @@ function restoreRememberedProjects(model) {
 function restoreProject(model, id, saved) {
   return createProject(model, id, preferredProjectPath(model, id, saved.path), {
     name: saved.name, lastActivity: saved.lastActivity || saved.firstSeen,
-    buckets: saved.buckets, totalBuilds: saved.totalBuilds, firstSeen: saved.firstSeen,
-  }, saved.counted);
+    buckets: saved.buckets, bucketsCounted: saved.bucketsCounted, totalBuilds: saved.totalBuilds, firstSeen: saved.firstSeen,
+  });
 }
 
 /**

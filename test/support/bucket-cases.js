@@ -17,8 +17,8 @@ const casedCounts = () => JSON.parse(CASED_COUNTS);
 const readCounts = () => savedProject({ buckets: casedCounts() }).buckets;
 
 // What a project keeps of them where two casings are two folders, and where they are one: added
-// up when they were counted under a path, the larger alone when they came from a record with no
-// path, which counted nothing itself.
+// up when they were counted under a path, the larger alone when they were not (build-buckets.js
+// foldBuckets).
 const KEPT_APART = [['Docs', 5], ['docs', 7], ['odd', 6], ['src', 2], ['big', MAX], ['BIG', MAX], ['__proto__', 3]];
 const KEPT_AS_ONE = [['Docs', 12], ['odd', 6], ['src', 2], ['big', MAX], ['__proto__', 3]];
 const KEPT_LARGER = [['Docs', 7], ['odd', 6], ['src', 2], ['big', MAX], ['__proto__', 3]];

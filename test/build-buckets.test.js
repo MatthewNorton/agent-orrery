@@ -3,7 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
-  MAX_BUCKETS, addBuckets, bucketOf, bucketKey, bucketFor, countBuild, bucketBuilds, foldBuckets, isBucketName, matchingEntry, planetKey,
+  MAX_BUCKETS, addBuckets, bucketOf, bucketKey, bucketFor, countBuild, bucketBuilds, foldBuckets, isBucketName, matchingEntry, mergeBuckets, planetKey,
   setBucket, setProjectPath,
 } = require('../src/main/build-buckets');
 const { readCounts, own, KEPT_APART, KEPT_AS_ONE, KEPT_LARGER } = require('./support/bucket-cases');
@@ -228,11 +228,11 @@ test('addBuckets puts each count under the key its folder has, by the rule of th
 test('every bucket count stays a whole count, and no sum passes the largest one kept', () => {
   const MAX = Number.MAX_SAFE_INTEGER;
   // A saved project's counts come whole from its reader (test/live-saved-project.test.js); a fold keeps them so.
-  const windows = foldBuckets('C:\\Work\\Demo', readCounts());
+  const windows = foldBuckets('C:\\Work\\Demo', readCounts(), true);
   assert.deepEqual(own(windows), KEPT_AS_ONE, 'two full counts joined are one full count');
-  assert.deepEqual(own(foldBuckets('/work/demo', readCounts())), KEPT_APART);
+  assert.deepEqual(own(foldBuckets('/work/demo', readCounts(), true)), KEPT_APART);
   assert.equal(JSON.stringify(windows).includes('null'), false, 'nothing saves as null');
-  assert.deepEqual(own(foldBuckets(null, readCounts())), KEPT_APART, 'no path joins no two names');
+  assert.deepEqual(own(foldBuckets(null, readCounts(), true)), KEPT_APART, 'no path joins no two names');
 
   const project = { path: 'C:\\Work\\Demo', buckets: windows };
   assert.deepEqual([countBuild(project, 'BIG'), countBuild(project, 'big'), project.buckets.big], [false, false, MAX], 'a full count stays full');
@@ -247,7 +247,7 @@ test('every bucket count stays a whole count, and no sum passes the largest one 
 });
 
 test('setProjectPath writes the path and counts the buckets by it in one step', () => {
-  const project = { path: null, buckets: JSON.parse('{ "Docs": 3, "docs": 2, "__proto__": 4 }') };
+  const project = { path: null, buckets: JSON.parse('{ "Docs": 3, "docs": 2, "__proto__": 4 }'), bucketsCounted: true };
   setProjectPath(project, '/work/demo');
   assert.deepEqual([project.path, own(project.buckets)], ['/work/demo', [['Docs', 3], ['docs', 2], ['__proto__', 4]]]);
   setProjectPath(project, 'C:\\Work\\Demo');
@@ -258,21 +258,49 @@ test('setProjectPath writes the path and counts the buckets by it in one step', 
   assert.deepEqual([project.path, own(project.buckets), bucketKey(project, 'docs')], [null, [['Docs', 6], ['__proto__', 4]], null]);
 });
 
-test('casings counted under a path are added up; those of a project that had no path keep the larger', () => {
+test('casings counted under a path are added up, never past the project\'s builds; others keep the larger', () => {
   // Under a path each build is in one bucket, so two casings joined by a new path are all its builds.
-  const counted = { path: '/work/demo', buckets: { Docs: 3, docs: 3, src: 1 } };
+  const counted = { path: '/work/demo', buckets: { Docs: 3, docs: 3, src: 1 }, bucketsCounted: true, totalBuilds: 7 };
   setProjectPath(counted, 'C:\\Work\\Demo');
   assert.deepEqual(own(counted.buckets), [['Docs', 6], ['src', 1]]);
-  // With no path a project counts no build: its casings are records from files, maybe of the same builds.
-  const pathless = { path: null, buckets: { Docs: 3, docs: 3, src: 1 } };
+  // A sum stops at the project's builds, and is never less than the larger casing.
+  const over = { path: null, buckets: { Docs: 3, docs: 3 }, bucketsCounted: true, totalBuilds: 4 };
+  const short = { path: null, buckets: { docs: 2, Docs: 3 }, bucketsCounted: true, totalBuilds: 1 };
+  for (const project of [over, short]) setProjectPath(project, 'C:\\Work\\Demo');
+  assert.deepEqual([own(over.buckets), own(short.buckets)], [[['Docs', 4]], [['docs', 3]]]);
+  assert.deepEqual(own(foldBuckets('C:\\Work\\Demo', readCounts(), true, 10)), [['Docs', 10], ...KEPT_AS_ONE.slice(1)]);
+  // Not counted under a path, they are records from files, maybe of the same builds: the larger stays.
+  const pathless = { path: null, buckets: { Docs: 3, docs: 3, src: 1 }, bucketsCounted: false, totalBuilds: 7 };
+  setProjectPath(pathless, '/work/demo');
+  assert.deepEqual([own(pathless.buckets), pathless.bucketsCounted], [[['Docs', 3], ['docs', 3], ['src', 1]], false], 'a path that joins no casings');
   setProjectPath(pathless, 'C:\\Work\\Demo');
   assert.deepEqual(own(pathless.buckets), [['Docs', 3], ['src', 1]]);
-  // The caller says so where the project's own path does not: a saved record, a backup's entry.
+  // Joined there, each folder has one bucket, and the builds after are counted under a path.
+  assert.equal(pathless.bucketsCounted, true);
+  setProjectPath(pathless, '/work/demo');
+  countBuild(pathless, 'docs');
+  setProjectPath(pathless, 'C:\\Work\\Demo');
+  assert.deepEqual(own(pathless.buckets), [['Docs', 4], ['src', 1]]);
   assert.deepEqual(own(foldBuckets('C:\\Work\\Demo', readCounts(), false)), KEPT_LARGER);
   assert.deepEqual(own(foldBuckets(null, readCounts(), false)), KEPT_APART);
-  const restored = { path: null, buckets: { docs: 2, Docs: 5 } };
-  setProjectPath(restored, 'C:\\Work\\Demo', true);
-  assert.deepEqual(own(restored.buckets), [['docs', 7]]);
+});
+
+test('mergeBuckets joins the saved casings by the saved side\'s flag and total, and keeps the larger of each folder', () => {
+  const merged = (project, saved) => {
+    mergeBuckets(project, { bucketsCounted: false, totalBuilds: 3, ...saved });
+    return [own(project.buckets), project.bucketsCounted];
+  };
+  const uncounted = { buckets: { Docs: 3, docs: 3 } };
+  // The buckets are counted under a path after it if either side's were; a side with no buckets has no say.
+  assert.deepEqual(merged({ path: '/work/demo', buckets: { src: 1 }, bucketsCounted: true }, uncounted), [[['src', 1], ['Docs', 3], ['docs', 3]], true]);
+  assert.deepEqual(merged({ path: null, buckets: {}, bucketsCounted: true }, uncounted), [[['Docs', 3], ['docs', 3]], false]);
+  assert.deepEqual(merged({ path: null, buckets: { src: 1 }, bucketsCounted: false }, { buckets: {}, bucketsCounted: true }), [[['src', 1]], false]);
+  assert.deepEqual(merged({ path: null, buckets: { src: 1 }, bucketsCounted: false }, { buckets: { src: 2 }, bucketsCounted: true }), [[['src', 2]], true]);
+  // A path that makes casings one leaves each folder one bucket: counted from then on.
+  assert.deepEqual(merged({ path: 'C:\\Work\\Demo', buckets: {}, bucketsCounted: true }, uncounted), [[['Docs', 3]], true]);
+  // Counted casings are added up, but never past the saved side's total; then the larger of the two sides stays.
+  assert.deepEqual(merged({ path: 'C:\\Work\\Demo', buckets: { docs: 4 }, bucketsCounted: true }, { buckets: { Docs: 5, docs: 7 }, bucketsCounted: true, totalBuilds: 9 }),
+    [[['docs', 9]], true]);
 });
 
 test('a buckets object that takes no new property is looked up all the same', () => {

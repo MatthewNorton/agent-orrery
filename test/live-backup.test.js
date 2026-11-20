@@ -296,7 +296,8 @@ test('hostile ids, names, bucket counts and paths never reach the model', () => 
   assert.equal(projects.get('relative').path, null);
   assert.equal(projects.get('relative').name, undefined);
   assert.equal(projects.get('fine').path, local);
-  assert.equal(projects.get('fine').totalBuilds, 2);
+  // A total is at least the largest bucket: no folder has more builds than its project.
+  assert.equal(projects.get('fine').totalBuilds, 9);
   // A bucket is a folder's name, which may be one of those: an own count, and no prototype.
   const { buckets } = projects.get('fine');
   assert.deepEqual(own(buckets).sort(),

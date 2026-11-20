@@ -116,6 +116,7 @@ function createHistoryModel({ batchSize, onBatch, preferredProjectId }) {
         totalBytes: 0,
         totalBuilds: 0,
         buckets: bareCopy(),
+        bucketsCounted: true,
       };
       state.projects.set(id, project);
       state.projectIdByPath.set(key, id);

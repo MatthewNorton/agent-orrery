@@ -14,6 +14,8 @@ export interface LiveProject {
   codexBytes?: number;
   /** Build count per top-level folder; '(root)' counts files at the top level. */
   buckets: Record<string, number>;
+  /** Whether the buckets were counted under a path, so how a folder's casings join (build-buckets.js foldBuckets). */
+  bucketsCounted: boolean;
   totalBuilds: number;
   firstSeen: number;
 }
@@ -50,17 +52,17 @@ export interface PersistedProject {
   name?: string;
   lastActivity?: number;
   buckets?: Record<string, number>;
+  /** Missing from files written before it (live/saved-project.js). */
+  bucketsCounted?: boolean;
   totalBuilds?: number;
   firstSeen?: number;
 }
 
-/**
- * A saved project as the one reader gives it (live/saved-project.js), every field checked.
- * `counted` is whether the record had a path, so whether its builds were counted under one.
- */
+/** A saved project as the one reader gives it (live/saved-project.js), every field checked. */
 export interface SavedProject {
   path: string | null;
-  counted: boolean;
+  /** As LiveProject's. */
+  bucketsCounted: boolean;
   name: string | undefined;
   lastActivity: number;
   buckets: Record<string, number>;

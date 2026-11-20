@@ -7,7 +7,7 @@
 
 const { canonicalProjectPath } = require('../provider-adapters');
 const { localAbsolutePath } = require('../path-safety');
-const { addBuckets, foldBuckets } = require('../build-buckets');
+const { mergeBuckets } = require('../build-buckets');
 const { validProjectId } = require('../shared/ids');
 const { ownString } = require('../shared/values');
 const { plainObject } = require('../transcripts/fields');
@@ -103,13 +103,11 @@ function importProjects(model, backup) {
       added++;
       continue;
     }
-    // The project takes its folder first: both sides are then counted by that folder's rule, and
-    // the larger count of each folder is kept. A side that counted under a path has its casings of
-    // a folder added up, whether or not its path is one this machine takes; one that had no path
-    // counted nothing itself, and keeps the larger casing.
+    // The project takes its folder first: both sides are then counted by that folder's rule
+    // (mergeBuckets), and the larger count of each folder is kept.
     const adopted = existing.path ? null : preferredProjectPath(model, target, saved.path);
     if (adopted) takeProjectPath(model, existing, adopted);
-    addBuckets(existing, foldBuckets(existing.path, saved.buckets, saved.counted), Math.max);
+    mergeBuckets(existing, saved);
     existing.totalBuilds = Math.max(existing.totalBuilds, saved.totalBuilds);
     if (saved.firstSeen && saved.firstSeen < existing.firstSeen) existing.firstSeen = saved.firstSeen;
     existing.lastActivity = Math.max(existing.lastActivity, saved.lastActivity);

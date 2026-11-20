@@ -149,13 +149,12 @@ AU.universeImport()                    -> Promise<{ok, canceled, added, merged, 
    // removes; new projects arrive as project-added events, imported ideas as new items.
    // A bucket is kept under any name a build can start one under (`isBucketName`), `__proto__`
    // and `constructor` too, and so is a project id. A folder keeps one bucket, by the rule of the
-   // path the project ends with (its own, else the one the file gives it): under a Windows path each side's counts for
-   // `docs` and `Docs` are made one, and the larger of the two sides is kept. A side that had a
-   // path (any path, also one this machine does not take) counted each build once, so its two
-   // counts are added up. A side with no path counts no build (a build is bucketed relative to
-   // the path), so its two counts may be the same builds on record twice: the larger is kept,
-   // there and when the project later takes a path. A folder never has more builds than its
-   // project.
+   // path the project ends with (its own, else the one the file gives it): under a Windows path
+   // each side's counts for `docs` and `Docs` are made one, and the larger of the two sides is
+   // kept. How one side's casings are made one follows whether its builds were counted under a
+   // path, which a project keeps with its buckets (`bucketsCounted`, saved in the state file and
+   // the backup) for every later path; `foldBuckets` in `src/main/build-buckets.js` says how.
+   // A folder never has more builds than its project.
    // Every build count (a folder's, a project's total, a ship's), here, in the state file and
    // as builds add to it, is a whole number up to Number.MAX_SAFE_INTEGER: anything else in a
    // file counts as none, and a build adds nothing to a count that is already the largest.
@@ -163,9 +162,10 @@ AU.universeImport()                    -> Promise<{ok, canceled, added, merged, 
    // is the same project from either: an entry that is not a record is passed over; a name is
    // kept only as plain text (no control character, 4,096 characters at most) and otherwise the
    // project goes by its folder or its id; a bucket is a name a build can start one under
-   // (`isBucketName`, below) with a whole count above none, 10,000 of them at most. The path
-   // alone has a rule per file: the state file's is used when it is local, a backup's only when
-   // it is also absolute, and normalized.
+   // (`isBucketName`, below) with a whole count above none, 10,000 of them at most, and a
+   // project's total is at least its largest bucket. The path alone has a rule per file: the
+   // state file's is used when it is local, a backup's only when it is also absolute, and
+   // normalized.
 ```
 
 ```js
