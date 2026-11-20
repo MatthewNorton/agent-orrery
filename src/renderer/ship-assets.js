@@ -46,8 +46,8 @@
   const HULL_ROOT = '../../assets/ships/';
   // Hulls carry their detail as geometry (10k to 58k triangles each), and past its budget a view
   // steps down to darts. A system or planet view holds fifty-one ships of the first rank (Petrel,
-  // 17,544) and the universe map seventy; every view draws them as instances of a template per
-  // provider.
+  // 17,544) and the universe map seventy. The near budget was set when those views copied each
+  // hull, which costs more per ship than the instance every view now draws, so it still holds.
   const TRIANGLE_BUDGET = { near: 900000, far: 1240000 };
   /** @type {WeakMap<object, SceneState>} */
   const sceneStates = new WeakMap();

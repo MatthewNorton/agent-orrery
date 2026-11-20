@@ -348,9 +348,10 @@ Design tokens (put in `:root`):
   the ship's `builds` has reached (Scout 0, Workhorse 5, Capital 20, Flagship
   60); display length grows 1.9× over the ladder. A drone flies the first rank
   at `AUR.DRONE_SCALE` of its size. Each hull is one file, and every view
-  draws its ships as instances of a hidden template per provider (the map's
-  self-lit, the near views' lit, so the template carries the light layer: an
-  instance is lit as its source). An instance shows its template's material
+  draws its ships as instances of a hidden template per provider. A far file
+  lights itself faintly, on the lightless map and where a near view steps down
+  to it; the near views light their hulls, so the template carries the light
+  layer (an instance is lit as its source). An instance shows its template's material
   and visibility, so focus mode fades a ship by moving it to its provider's
   template at that visibility (`AUR.ships.fade(scene, shipId, visibility)`:
   0.16 for the others, 0 for the ship it is inside of, 1 to restore), which

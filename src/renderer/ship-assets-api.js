@@ -1,6 +1,6 @@
 // @ts-check
-// AUR.ships: instantiate a ship's hull, upgrade a fallback dart to one,
-// refresh it in place on promotion, and dispose a scene's hull state.
+// AUR.ships: instantiate a ship's hull, upgrade a fallback dart to one, refresh it in place on
+// promotion, fade it while focus mode follows another ship, and dispose a scene's hull state.
 'use strict';
 
 /**
