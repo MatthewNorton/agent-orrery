@@ -23,12 +23,11 @@ function withoutComments(html) {
  * @param {string} html
  */
 function scriptTags(html) {
-  const page = withoutComments(html);
-  const tags = [...page.matchAll(/<script src="([^"]+)">/g)].map((match) => match[1]);
-  if (tags.length !== (page.match(/<script\b/gi) ?? []).length) {
-    throw new Error('index.html has a script tag that is not a plain <script src="...">');
-  }
-  return tags;
+  return (withoutComments(html).match(/<script\b[^>]*>/gi) ?? []).map((tag) => {
+    const plain = /^<script src="([^"]+)">$/.exec(tag);
+    if (!plain) throw new Error('index.html has a script tag that is not a plain <script src="...">: ' + tag);
+    return plain[1];
+  });
 }
 
 module.exports = { scriptTags };

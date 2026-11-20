@@ -37,6 +37,8 @@ test('a tag in any other form is named, not dropped', () => {
     "<script src='a.js'></script>",
     '<SCRIPT defer src="a.js"></SCRIPT>',
   ]) {
-    assert.throws(() => scriptTags('<script src="first.js"></script>' + tag), NOT_PLAIN, tag);
+    const opening = tag.slice(0, tag.indexOf('>') + 1);
+    assert.throws(() => scriptTags('<script src="first.js"></script>' + tag),
+      (error) => NOT_PLAIN.test(error.message) && error.message.endsWith(': ' + opening), tag);
   }
 });
