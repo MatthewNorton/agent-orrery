@@ -236,8 +236,13 @@ Planet     = { name, key, files, builds, procedural? }   // name '(root)' possib
 // A planet folder, live: an entry the project folder's listing types as a folder (`planetFolders`
 //   in `src/main/live/system-view.js`); a link or junction is typed a link, so it is never one. A
 //   planet's file is every other entry, a link or junction too, and is never followed: one rule
-//   (`isPlanetFile`) says what a file is for a planet's `files` and `beltDensity` in the system
-//   view and for the planet card's `files`, so a link or junction is the one file it is in each.
+//   (`isPlanetFile`) says what a file is wherever an entry's type is read, so a link or junction
+//   is one file. The counts reach differently. In the system view a planet's `files` is a rough
+//   size (`shallowCount`): its folder's files, and every entry, of any type, in each of its
+//   folders that is not ignored, stopping past 400; `beltDensity` and `(root)`'s `files` are
+//   the project folder's own files. The planet card's `files` counts files down the folder's
+//   tree (`readFolder`: five levels, 600 files and 300 folders at most, ignored folders passed
+//   over), and for `(root)` the top-level files alone.
 //   getSystem draws the planet folders that are not ignored (a name starting with `.`, or one of
 //   `IGNORE_DIRS` such as `node_modules`), and `(root)` from the top-level files' own bucket, by
 //   that exact key, when it has builds. getPlanet reads any planet folder. So a folder with builds

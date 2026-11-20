@@ -33,7 +33,10 @@ const isGone = (/** @type {any} */ error) => Boolean(error) && (error.code === '
  */
 const unread = (folderRead) => ({ files: 0, sizeKb: 0, subdirs: 0, resources: [], folderRead });
 
-// A planet's file, one rule for the system view and the card: an entry not typed a folder, so a link or junction is one file.
+// A planet's file wherever an entry's type is read: an entry not typed a folder, so a link or
+// junction is one file. The system view's planet `files` is a rough size (shallowCount: the
+// folder's files, and every entry in its folders not ignored, stopping past 400); the card's counts
+// files down the folder's tree (readFolder).
 const isPlanetFile = (/** @type {fs.Dirent} */ entry) => !entry.isDirectory();
 
 /**
