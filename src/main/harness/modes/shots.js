@@ -145,6 +145,8 @@ async function runShotMode(ctx, driver) {
       directorySearch: directorySearchState,
       commandRail: compactRailState,
       leftRail: leftRailState,
+      // What main.js sets before anything loads, as it stands at the end of the run (grade.mjs M7).
+      mainProcess: { noAsar: process.noAsar === true },
     }, null, 2)
   );
   fs.writeFileSync(path.join(outDir, 'state.json'), JSON.stringify(ctx.tracker.snapshot(), null, 2));

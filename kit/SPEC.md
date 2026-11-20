@@ -233,7 +233,9 @@ PlanetData = { name, key, project: Project, builds, files, sizeKb, subdirs,
 //   a passing error, a link, or a project folder that cannot be listed). A planet read never
 //   descends into a link: the planet's folder is typed by the project folder's listing and every
 //   folder below by its parent's, and a listing types every link and junction as a link, never as
-//   a folder. A link inside a planet counts as a file of the link's own size. A folder swapped
+//   a folder. A link inside a planet counts as a file of the link's own size, and a file named
+//   `*.asar` as the plain file it is: main turns Electron's asar handling off before anything
+//   else loads (`process.noAsar` in `main.js`), which would otherwise open and parse it. A folder swapped
 //   for a link between its parent's listing and its own read can still be followed (that needs a
 //   process already writing inside the project). getSystem types folders the same way.
 //   Absent when there was no folder to read (procedural, or history).

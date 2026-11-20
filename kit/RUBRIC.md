@@ -14,6 +14,8 @@ hard-fail items.
 | M3 | `.shots/state.json` parses; `projects.length ≥ 1`; on the synthetic profile every project path is inside it and the app saved its state into it | tracker snapshot empty or unwritten, or the real profile was read |
 | M4 | Combined stdout/stderr has no `Uncaught`, `ReferenceError`, `TypeError`, `SyntaxError`, `is not defined`, `Failed to load resource` | any match (Electron GPU/`Autofill` noise is already filtered by the script) |
 | M5 (soft) | `state.json` ships length ≥ 1 | warn only — the synthetic profile always has live sessions, so a warning there means ship detection regressed; with `--real` it depends on a supported provider session being live |
+| M6 | `.shots/ux-state.json` parses; the left-rail modules folded and unfolded, and the panels button folded and opened both rails | any of the four did not happen, or the file is unreadable |
+| M7 | `ux-state.json` reports `mainProcess.noAsar: true` | the main process ran with Electron asar handling on (`process.noAsar`, set first thing in `src/main/main.js`; see `SECURITY.md`) |
 
 ## Visual — universe shot vs `3.universe-map-view.png`
 
