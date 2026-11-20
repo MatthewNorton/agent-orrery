@@ -377,6 +377,15 @@ test('a trim copy that cannot be made leaves the model finish every map it had, 
     assert.throws(wear, /no tone curve/);
     assert.ok(sameItems(mapsOf(finish), maps), 'and when the copy cannot take them');
     assert.deepEqual([scene.materials.length, materials.size], [count, 0], 'no copy is left in the scene or kept');
+    let metallic = finish.metallicTexture; // a map that cannot be taken off, after two that were
+    Object.defineProperty(finish, 'metallicTexture', {
+      configurable: true,
+      get: () => metallic,
+      set(value) { if (value === null) throw new Error('no strip'); metallic = value; },
+    });
+    assert.throws(wear, /no strip/);
+    assert.ok(sameItems(mapsOf(finish), maps), 'and when a map cannot be taken off');
+    delete finish.metallicTexture;
 
     delete finish.clone;
     assert.ok(maps.every(Boolean) && sameItems(mapsOf(wear()), maps), 'the next copy shares every map');
