@@ -283,8 +283,10 @@
   AUR.clear = (node) => { while (node.firstChild) node.removeChild(node.firstChild); };
   // The planet a build belongs to: the one with the build's key, which main gives a folder in any
   // casing. A case-sensitive folder under a Windows path (WSL) can hold two that differ only in
-  // case and so share a key: then the one the build spelled, else the first.
+  // case and so share a key: then the one the build spelled, else the first. A build with no key
+  // is in no bucket, so on no planet.
   AUR.planetOfBuild = (planets, ev) => {
+    if (typeof ev.key !== 'string') return null;
     let first = null;
     for (const planet of planets) {
       if (planet.key !== ev.key) continue;

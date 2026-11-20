@@ -181,11 +181,12 @@ function createHistoryModel({ batchSize, onBatch, preferredProjectId }) {
       if (!relative || seen.has(relative)) continue;
       seen.add(relative);
       const bucket = bucketOf(relative, '/');
-      const isNew = countBuild(project, bucket);
+      const { counted, isNew } = countBuild(project, bucket);
       project.totalBuilds = wholeCount(project.totalBuilds + 1);
       ship.builds = wholeCount(ship.builds + 1);
       queue({
-        type: 'build', project: project.id, bucket, key: planetKey(project, bucket), file: relative,
+        // A build that no bucket holds is on no planet.
+        type: 'build', project: project.id, bucket, key: counted ? planetKey(project, bucket) : null, file: relative,
         shipId: ship.id, isNew, ts,
       }, emit);
       if (isNew) pushFeed('form',

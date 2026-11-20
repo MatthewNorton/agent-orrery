@@ -54,6 +54,13 @@ test('system ships: a build goes to the planet with its key; of two that share o
   assert.deepEqual(pulsed(), []);
 });
 
+test('system ships: a build that no bucket holds goes to no planet, whatever key a planet has', () => {
+  const { asked, build, pulsed } = loadPart([{ name: 'odd', key: null }, { name: 'src', key: 'src' }]);
+  build('odd', null);
+  build('src', null);
+  assert.deepEqual([pulsed(), asked.length], [[], 0]);
+});
+
 test('system ships: a build that starts a planet fetches the system again, and it is behind until the answer', async () => {
   const { view, asked, built, build } = loadPart([{ name: 'src', key: 'src' }]);
   build('src', 'src', { isNew: true });

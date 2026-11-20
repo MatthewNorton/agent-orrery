@@ -23,7 +23,7 @@ test('a bucket is named as a planet is, with no control character: a build elsew
   const project = { path: '/work/demo', buckets: {} };
   // Each of these is a folder some disk can hold, or what bucketOf makes of a path: its build counts in the totals only.
   for (const name of ['', '.', '..', 'a/b', 'a\\b', 'nul\0', 'tab\tname', 'esc\u001bdir', 'del\u007fdir', 'c1\u0085dir', 'x'.repeat(256)]) {
-    assert.equal(countBuild(project, name), false, JSON.stringify(name));
+    assert.deepEqual(countBuild(project, name), { counted: false, isNew: false }, JSON.stringify(name));
   }
   assert.deepEqual(own(project.buckets), []);
   for (const name of ['(root)', 'src', '.github', 'with space', '__proto__', 'x'.repeat(255)]) assert.equal(isBucketName(name), true, name);
@@ -35,7 +35,7 @@ test('a bucket is named as a planet is, with no control character: a build elsew
 test('a project keeps MAX_BUCKETS buckets at most: past them a new folder starts none, and one that has a bucket still counts', () => {
   const project = { path: 'C:\\Work\\Demo', buckets: {} };
   for (let index = 0; index < MAX_BUCKETS; index++) countBuild(project, `f${index}`);
-  assert.deepEqual([countBuild(project, 'one-more'), countBuild(project, 'F0')], [false, false]);
+  assert.deepEqual([countBuild(project, 'one-more'), countBuild(project, 'F0')], [{ counted: false, isNew: false }, { counted: true, isNew: false }]);
   assert.deepEqual([Object.keys(project.buckets).length, project.buckets.f0, Object.hasOwn(project.buckets, 'one-more')], [MAX_BUCKETS, 2, false]);
   // A merge stops there too, so the state file it is saved to reads back whole (live/saved-project.js).
   const merged = { path: project.path, buckets: { ...project.buckets } };
@@ -53,7 +53,8 @@ test('both models count a build whose folder can be no bucket in the totals only
     ],
   });
   for (const side of [live, replay]) {
-    assert.deepEqual(ofType(side.events, 'build').map((event) => [event.bucket, event.isNew]), [['del\u007fdir', false], ['src', true]]);
+    // A build that no bucket holds is on no planet: it carries no key.
+    assert.deepEqual(ofType(side.events, 'build').map((event) => [event.bucket, event.isNew, event.key]), [['del\u007fdir', false, null], ['src', true, 'src']]);
     assert.deepEqual([side.snapshot.projects[0].totalBuilds, side.snapshot.projects[0].planets, side.snapshot.ships[0].builds], [2, ['src'], 2]);
     assert.deepEqual(ofType(side.events, 'feed').map((event) => event.entry.text).filter((text) => text.startsWith('Planet formation')),
       ['Planet formation started: src in Demo']);
@@ -62,7 +63,7 @@ test('both models count a build whose folder can be no bucket in the totals only
 
 test('under a Windows-style root a folder keeps one bucket across casings, under the first key', () => {
   const project = { path: 'C:\\Work\\Demo', buckets: { docs: 2 } };
-  assert.deepEqual(['Docs', 'DOCS', 'Src', 'src'].map((bucket) => countBuild(project, bucket)),
+  assert.deepEqual(['Docs', 'DOCS', 'Src', 'src'].map((bucket) => countBuild(project, bucket).isNew),
     [false, false, true, false]);
   assert.deepEqual(project.buckets, { docs: 4, Src: 2 });
   assert.deepEqual(['Docs', 'docs', 'SRC', 'lib'].map((name) => bucketKey(project, name)), ['docs', 'docs', 'Src', null]);
@@ -71,7 +72,7 @@ test('under a Windows-style root a folder keeps one bucket across casings, under
 
 test('under a POSIX root bucket names stay case-sensitive', () => {
   const project = { path: '/work/demo', buckets: { docs: 2 } };
-  assert.equal(countBuild(project, 'Docs'), true);
+  assert.equal(countBuild(project, 'Docs').isNew, true);
   assert.deepEqual(project.buckets, { docs: 2, Docs: 1 });
   assert.deepEqual(['docs', 'Docs', 'DOCS'].map((name) => bucketBuilds(project, name)), [2, 1, 0]);
 });
@@ -116,16 +117,16 @@ test('bucketFor answers a folder\'s key, builds and the name it goes by, in one 
 test('a folder named __proto__ is a bucket like any other, and stays one through the state file', () => {
   for (const root of ['/work/demo', 'C:\\Work\\Demo']) {
     const project = { path: root, buckets: {} };
-    assert.deepEqual([1, 2, 3].map(() => countBuild(project, '__proto__')), [true, false, false], root);
+    assert.deepEqual([1, 2, 3].map(() => countBuild(project, '__proto__').isNew), [true, false, false], root);
     assert.deepEqual([Object.hasOwn(project.buckets, '__proto__'), bucketBuilds(project, '__proto__'), Object.keys(project.buckets)],
       [true, 3, ['__proto__']]);
     assert.equal(Object.getPrototypeOf(project.buckets), Object.prototype, 'the object keeps its prototype');
     // The state file is JSON: the key and its count come back, and counting goes on from them.
     const loaded = { path: root, buckets: JSON.parse(JSON.stringify(project.buckets)) };
-    assert.deepEqual([countBuild(loaded, '__proto__'), bucketBuilds(loaded, '__proto__')], [false, 4]);
+    assert.deepEqual([countBuild(loaded, '__proto__').isNew, bucketBuilds(loaded, '__proto__')], [false, 4]);
   }
   const others = { path: '/work/demo', buckets: {} };
-  assert.deepEqual(['constructor', 'toString', 'constructor'].map((name) => countBuild(others, name)), [true, true, false]);
+  assert.deepEqual(['constructor', 'toString', 'constructor'].map((name) => countBuild(others, name).isNew), [true, true, false]);
   assert.deepEqual(others.buckets, { constructor: 2, toString: 1 });
 });
 
@@ -135,7 +136,7 @@ test('a miss under a case-sensitive root looks at no other bucket', () => {
   const posix = { path: '/work/demo', buckets: watched({ Docs: 1, src: 2 }) };
   assert.deepEqual([bucketKey(posix, 'docs'), bucketKey(posix, 'Docs'), bucketBuilds(posix, 'lib')], [null, 'Docs', 0]);
   assert.equal(keys.asked, 0, 'no scan of the keys');
-  assert.deepEqual([countBuild(posix, 'lib'), countBuild(posix, 'bin'), countBuild(posix, 'lib')], [true, true, false]);
+  assert.deepEqual([countBuild(posix, 'lib').isNew, countBuild(posix, 'bin').isNew, countBuild(posix, 'lib').isNew], [true, true, false]);
   assert.equal(keys.asked, 1, 'a new folder counts the keys once (MAX_BUCKETS), and the count is kept');
   const windows = { path: 'C:\\Work\\Demo', buckets: watched({ Docs: 1 }) };
   assert.equal(bucketKey(windows, 'docs'), 'Docs');
@@ -148,7 +149,7 @@ test('only own keys name a bucket', () => {
     assert.equal(bucketKey(project, name), null, name);
     assert.equal(bucketBuilds(project, name), 0, name);
   }
-  assert.equal(countBuild(project, 'constructor'), true);
+  assert.equal(countBuild(project, 'constructor').isNew, true);
   assert.deepEqual(project.buckets, { constructor: 1 });
 });
 
@@ -167,7 +168,7 @@ test('a lookup answers as a search through the keys would, whatever was counted 
       assert.equal(bucketKey(project, name), searched(project, name), `${root}: ${name} at step ${step}`);
       if (step % 3 === 0) {
         const before = searched(project, name);
-        assert.equal(countBuild(project, name), before === null, `${root}: counting ${name} at step ${step}`);
+        assert.equal(countBuild(project, name).isNew, before === null, `${root}: counting ${name} at step ${step}`);
         assert.equal(Object.hasOwn(project.buckets, before ?? name), true);
       }
     }
@@ -178,8 +179,8 @@ test('a lookup answers as a search through the keys would, whatever was counted 
 test('10,000 folders under a root that ignores case are counted and looked up without a search each', () => {
   const project = { path: 'C:\\Work\\Demo', buckets: {} };
   const started = performance.now();
-  for (let n = 0; n < 10_000; n++) assert.equal(countBuild(project, 'Folder-' + n), true);
-  for (let n = 0; n < 10_000; n++) assert.equal(countBuild(project, 'folder-' + n), false);
+  for (let n = 0; n < 10_000; n++) assert.equal(countBuild(project, 'Folder-' + n).isNew, true);
+  for (let n = 0; n < 10_000; n++) assert.equal(countBuild(project, 'folder-' + n).isNew, false);
   for (let n = 0; n < 10_000; n++) assert.equal(bucketFor(project, 'absent-' + n).key, null);
   const took = performance.now() - started;
   assert.equal(Object.keys(project.buckets).length, 10_000);
@@ -205,10 +206,10 @@ test('what a buckets object knows of its keys stays out of every copy of it', ()
     assert.deepEqual([Reflect.ownKeys(buckets), buckets.Docs], [['Docs'], 1], how);
     // A copy answers for its own keys, and its counts stay its own.
     const copy = { path: project.path, buckets };
-    assert.deepEqual([bucketKey(copy, 'DOCS'), countBuild(copy, 'Src'), bucketKey(copy, 'SRC')], ['Docs', true, 'Src'], how);
+    assert.deepEqual([bucketKey(copy, 'DOCS'), countBuild(copy, 'Src').isNew, bucketKey(copy, 'SRC')], ['Docs', true, 'Src'], how);
     assert.equal(bucketKey(project, 'src'), null, how);
   }
-  assert.deepEqual([countBuild(project, 'LIB'), bucketKey(project, 'lib'), bucketKey({ ...project, buckets: copies.spread }, 'lib')],
+  assert.deepEqual([countBuild(project, 'LIB').isNew, bucketKey(project, 'lib'), bucketKey({ ...project, buckets: copies.spread }, 'lib')],
     [true, 'LIB', null]);
 });
 
@@ -237,7 +238,7 @@ test('every bucket count stays a whole count, and no sum passes the largest one 
   assert.deepEqual(own(foldBuckets(null, readCounts(), true)), KEPT_APART, 'no path joins no two names');
 
   const project = { path: 'C:\\Work\\Demo', buckets: windows };
-  assert.deepEqual([countBuild(project, 'BIG'), countBuild(project, 'big'), project.buckets.big], [false, false, MAX], 'a full count stays full');
+  assert.deepEqual([countBuild(project, 'BIG').isNew, countBuild(project, 'big').isNew, project.buckets.big], [false, false, MAX], 'a full count stays full');
   addBuckets(project, { DOCS: MAX, Src: 1 }, (held, added) => held + added);
   addBuckets(project, { docs: 3, SRC: 9 }, Math.max);
   assert.deepEqual(own(project.buckets), [['Docs', MAX], ['odd', 6], ['src', 9], ['big', MAX], ['__proto__', 3]]);
@@ -245,7 +246,7 @@ test('every bucket count stays a whole count, and no sum passes the largest one 
   const odd = { path: '/work/demo', buckets: {} };
   setBucket(odd.buckets, 'src', /** @type {any} */ ('5'));
   setBucket(odd.buckets, 'lib', NaN);
-  assert.deepEqual([countBuild(odd, 'src'), countBuild(odd, 'lib'), own(odd.buckets)], [false, false, [['src', 1], ['lib', 1]]]);
+  assert.deepEqual([countBuild(odd, 'src').isNew, countBuild(odd, 'lib').isNew, own(odd.buckets)], [false, false, [['src', 1], ['lib', 1]]]);
 });
 
 test('setProjectPath writes the path and counts the buckets by it in one step', () => {
@@ -255,7 +256,7 @@ test('setProjectPath writes the path and counts the buckets by it in one step', 
   setProjectPath(project, 'C:\\Work\\Demo');
   assert.deepEqual([project.path, own(project.buckets)], ['C:\\Work\\Demo', [['Docs', 5], ['__proto__', 4]]]);
   // The lookup of the new buckets goes by the new path at once: no index of the old ones is left.
-  assert.deepEqual([bucketKey(project, 'DOCS'), countBuild(project, 'docs'), project.buckets.Docs], ['Docs', false, 6]);
+  assert.deepEqual([bucketKey(project, 'DOCS'), countBuild(project, 'docs').isNew, project.buckets.Docs], ['Docs', false, 6]);
   setProjectPath(project, null);
   assert.deepEqual([project.path, own(project.buckets), bucketKey(project, 'docs')], [null, [['Docs', 6], ['__proto__', 4]], null]);
 });

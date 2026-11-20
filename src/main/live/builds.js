@@ -25,14 +25,15 @@ const BUILD_FILES_LIMIT = 64;
  */
 function addBuild(model, project, ship, rel, ts, catchup) {
   const bucket = bucketOf(rel, path.sep);
-  const isNew = countBuild(project, bucket);
+  const { counted, isNew } = countBuild(project, bucket);
   project.totalBuilds = wholeCount(project.totalBuilds + 1);
   ship.builds = wholeCount(ship.builds + 1);
   model.systemCache.delete(project.id);
   countHistogramBuild(model.buildHistogram, ts);
   if (catchup) return;
   queue(model, {
-    type: 'build', project: project.id, bucket, key: planetKey(project, bucket), file: rel,
+    // A build that no bucket holds is on no planet.
+    type: 'build', project: project.id, bucket, key: counted ? planetKey(project, bucket) : null, file: rel,
     shipId: ship.id, isNew, ts,
   });
   if (isNew) pushFeed(model, 'form', `Planet formation started: ${bucket} in ${project.name}`, project.id);

@@ -220,8 +220,8 @@ export interface BuildEvent extends Sequenced {
    * path it can differ in case from its planet's name, so the planet is found by `key`.
    */
   bucket: string;
-  /** The key of the planet this build is in. */
-  key: PlanetKey;
+  /** The key of the planet this build is in; null when no bucket holds it (isBucketName, the cap). */
+  key: PlanetKey | null;
   file: string;
   shipId: string;
   /** True when this build forms a new planet. */

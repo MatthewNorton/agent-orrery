@@ -197,16 +197,17 @@ function setBucket(buckets, key, count) {
 }
 
 /**
- * Counts one build of `bucket`; true when it starts a new bucket. A folder that has no bucket and
- * may not start one (canStart) gets none, and its build counts in the totals its caller keeps.
+ * Counts one build of `bucket`: `counted` when a bucket holds it, `isNew` when that bucket starts
+ * with it. A folder that has no bucket and may not start one (canStart) holds none.
  * @param {BucketedProject} project
  * @param {string} bucket
+ * @returns {{ counted: boolean, isNew: boolean }}
  */
 function countBuild(project, bucket) {
   const { key, name, builds } = bucketFor(project, bucket);
-  if (key === null && !canStart(project.buckets, name)) return false;
+  if (key === null && !canStart(project.buckets, name)) return { counted: false, isNew: false };
   setBucket(project.buckets, name, wholeCount(builds + 1));
-  return key === null;
+  return { counted: true, isNew: key === null };
 }
 
 /**

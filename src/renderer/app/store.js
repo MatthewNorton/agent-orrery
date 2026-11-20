@@ -63,9 +63,10 @@
         const p = S.store.projects.get(ev.project);
         if (p) p.totalBuilds = oneMore(p.totalBuilds);
         // The open planet's count keeps pace with main's, which is one count per key: two folders that
-        // share a key share it, whichever of them the build flies to (AUR.planetOfBuild).
+        // share a key share it, whichever of them the build flies to (AUR.planetOfBuild). A build with
+        // no key is in no bucket, so no planet counts it.
         const pd = A.activePlanetData();
-        if (pd && ev.project === S.current.projectId && ev.key === pd.key) pd.builds = oneMore(pd.builds);
+        if (pd && ev.project === S.current.projectId && typeof ev.key === 'string' && ev.key === pd.key) pd.builds = oneMore(pd.builds);
         if (ev.isNew) A.refreshPlanetSystem(ev.project);
         // A ship-updated can precede the build it reports (and Codex patches
         // send none), so the stored count follows build events too.
