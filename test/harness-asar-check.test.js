@@ -49,6 +49,25 @@ test('asar check: an fs that opens archives fails every step it gets wrong, and 
   for (const file of opened) assert.equal(fs.existsSync(file), false, 'the valid archive went with the folder');
 });
 
+test('asar check: a temporary folder it cannot remove is named in its errors', async () => {
+  // As on Windows with asar handling on, where the archive the fs opened keeps the folder.
+  let kept = null;
+  const result = await asarCheck({
+    ...fs.promises,
+    async rm(dir) {
+      kept = dir;
+      throw Object.assign(new Error(`EBUSY: resource busy or locked, rmdir '${dir}'`), { code: 'EBUSY' });
+    },
+  });
+  try {
+    assert.ok(kept, 'the check removes its folder through the fs it checks');
+    assert.deepEqual([result.lstatFile, result.direntFile, result.deleted], [true, true, true]);
+    assert.deepEqual(result.errors, [`cleanup: ${kept} stays: EBUSY: resource busy or locked, rmdir '${kept}'`]);
+  } finally {
+    if (kept) fs.rmSync(kept, { recursive: true, force: true });
+  }
+});
+
 test('asar check: an archive that lstat or readdir calls a folder is no plain file', async () => {
   const folder = (entry) => ({ name: entry.name, isFile: () => false });
   const result = await asarCheck({

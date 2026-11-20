@@ -30,7 +30,8 @@ function validArchive() {
  * Writes both archives into a new temporary folder, reads them back and deletes them. Each is
  * written under another name and renamed, since with asar handling on the fs takes a new file's
  * *.asar name for an archive to open and cannot write it. Each answer is false when its step
- * threw; `errors` holds what each step threw. An archive held open keeps the folder from going.
+ * threw; `errors` holds what each step threw, and names the folder when it cannot be removed (an
+ * archive held open keeps it).
  * @param {typeof fs.promises} [files] the fs to check, Electron's own by default
  * @returns {Promise<{ lstatFile: boolean, direntFile: boolean, deleted: boolean, errors: string[] }>}
  */
@@ -45,6 +46,7 @@ async function asarCheck(files = fs.promises) {
   const run = async (name, step) => {
     try { return await step(); } catch (error) { errors.push(`${name}: ${error && error.message}`); return false; }
   };
+  let lstatFile = false, direntFile = false, deleted = false;
   try {
     await run('write', async () => {
       for (const name of names) {
@@ -53,22 +55,24 @@ async function asarCheck(files = fs.promises) {
       }
       return true;
     });
-    const lstatFile = await run('lstat', async () => {
+    lstatFile = await run('lstat', async () => {
       const stats = await Promise.all(names.map((name) => files.lstat(at(name))));
       return stats.every((stat) => stat.isFile());
     });
-    const direntFile = await run('readdir', async () => {
+    direntFile = await run('readdir', async () => {
       const entries = await files.readdir(dir, { withFileTypes: true });
       return names.every((name) => entries.some((entry) => entry.name === name && entry.isFile()));
     });
-    const deleted = await run('delete', async () => {
+    deleted = await run('delete', async () => {
       for (const name of names) await files.unlink(at(name));
       return (await files.readdir(dir)).length === 0;
     });
-    return { lstatFile, direntFile, deleted, errors };
   } finally {
-    await fs.promises.rm(dir, { recursive: true, force: true }).catch(() => {});
+    await files.rm(dir, { recursive: true, force: true }).catch((error) => {
+      errors.push(`cleanup: ${dir} stays: ${error && error.message}`);
+    });
   }
+  return { lstatFile, direntFile, deleted, errors };
 }
 
 module.exports = { asarCheck, validArchive };

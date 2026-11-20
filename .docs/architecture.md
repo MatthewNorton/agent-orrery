@@ -83,10 +83,10 @@ or the record of how the app was built.
 
 | Folder | Files | Size | What it is | Part of the running app? |
 |---|---|---|---|---|
-| `src/main/` + `src/preload.js` | 93 | 14,011 lines JS (1,552 of it test harness) | Main process | **Yes** (harness runs only with test flags) |
+| `src/main/` + `src/preload.js` | 93 | 14,015 lines JS (1,556 of it test harness) | Main process | **Yes** (harness runs only with test flags) |
 | `src/renderer/` | 98 | 12,605 lines JS + 3,200 HTML/CSS | Renderer (UI + 3D) | **Yes** |
 | `assets/` | 347 | ~280 MB | Planet / skybox / asteroid textures, ship GLBs | Partly — see §8 |
-| `test/` | 126 | 18,096 lines | Unit tests (`npm test`, Node's runner, no Electron) | No |
+| `test/` | 126 | 18,115 lines | Unit tests (`npm test`, Node's runner, no Electron) | No |
 | `kit/` | 23 | — | Kit tooling, two stubs **and** 13 regression gate scripts | No (gates matter, see §9) |
 | `scripts/` | 11 | — | One-step setup (run by the root `Install Agent Orrery.cmd` / `.command`), ship generators, the fleet-v2 LOD build, launcher shortcuts, demo screenshots and their synthetic profile, a VCS UI lab | No |
 | `docs/` | 16 | — | Feature notes and plans; four of them are also gate fixtures | No |
@@ -273,8 +273,8 @@ in a closure, and anything shared is a field of `ctx`.
 | `ipc/project-paths.js` | 281 | Moved-project scan / locate / apply, one-time tokens, folder dialog |
 | `preload.js` | 41 | `window.AU` bridge |
 
-**Test harness** — only runs with a test flag (1,552 lines): `harness/fixtures.js` (204),
-`harness/driver.js` (305), `harness/metrics.js` (195), `harness/asar-check.js` (74, what the main
+**Test harness** — only runs with a test flag (1,556 lines): `harness/fixtures.js` (204),
+`harness/driver.js` (305), `harness/metrics.js` (195), `harness/asar-check.js` (78, what the main
 process's fs makes of a file named `*.asar`, for gate M7), `harness/modes/{shots,control,history,provider,polish}.js`
 (159 / 157 / 207 / 106 / 145).
 
