@@ -89,19 +89,12 @@
     return fadeHull(scene, state, entry, visibility);
   }
 
-  // A promotion waits while focus mode fades the ship: it would change the hull the chase camera
-  // has measured. A hull that arrived under a faded dart since the last frame is faded with it.
-  // app/agent-focus.js refreshes every ship once focus ends.
-  function isFaded(entry) {
-    return entry.visibility < 1 || Boolean(entry.fallback && entry.fallback.visibility < 1);
-  }
-
   /**
    * Swaps a ship's hull in place when its rank or colors have changed (a ship
    * learns it runs a local model after it spawns). The asset root the scene
-   * holds (directly, or under its fallback dart) stays the same node. Resolves
-   * to the root once swapped, else null (no model yet, same look, superseded,
-   * or deferred while focus mode fades the ship).
+   * holds (directly, or under its fallback dart) stays the same node, and the
+   * new hull shows the visibility focus mode gave the old one. Resolves to the
+   * root once swapped, else null (no model yet, same look, or superseded).
    * @param {Ship} ship
    * @returns {Promise<BABYLON.Mesh | null>}
    */
@@ -115,8 +108,7 @@
     entry.wanted = look; // also cancels a pending swap when the rank falls back
     if (look === entry.look) return Promise.resolve(null);
     return whenFits(scene, state, hull, () => entry.triangles, (asset) => {
-      if (entry.wanted !== look || AUR.isNodeDisposed(entry.root) ||
-          isSceneDisposed(scene, state) || isFaded(entry)) return null;
+      if (entry.wanted !== look || AUR.isNodeDisposed(entry.root) || isSceneDisposed(scene, state)) return null;
       return swapHull(scene, state, entry, hull, asset, ship) ? entry.root : null;
     }).catch(() => null);
   }

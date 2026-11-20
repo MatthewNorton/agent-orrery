@@ -179,10 +179,7 @@
   A.exitAgentFocus = function exitAgentFocus(restoreFocus) {
     const id = S.agentFocus.shipId || S.agentFocus.pendingShipId;
     S.agentFocus.pendingShipId = null;
-    if (S.activeView && typeof S.activeView.clearShipFocus === 'function') {
-      S.activeView.clearShipFocus();
-      A.refreshShipHulls(); // promotions wait while focus mode fades the ships
-    }
+    if (S.activeView && typeof S.activeView.clearShipFocus === 'function') S.activeView.clearShipFocus();
     S.agentFocus.shipId = null;
     document.body.classList.remove('agent-focus-active');
     setAgentFocusInert(false);

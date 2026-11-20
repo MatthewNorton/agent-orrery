@@ -371,8 +371,8 @@ Design tokens (put in `:root`):
   view, `AUR.fitShip` with a pixel floor so a hull sized to its planets still
   reads from the default orbit). `AUR.ships.refresh(scene, ship)` swaps the hull
   inside the asset root the scene already holds; `app/boot.js` calls it after
-  `ship-updated` and `build` events, and it waits while focus mode has the ship
-  faded.
+  `ship-updated` and `build` events, and the new hull keeps the visibility
+  focus mode gave the old one.
 - A rank can be flown by a ship model built in code instead of a file
   (`AUR.shipModels`, `ships/models.js`). A model names the manifest hull it
   `replaces` and flies in that hull's rank (`selectHull` asks

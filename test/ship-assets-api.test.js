@@ -88,24 +88,20 @@ test('focus mode moves a ship to its provider\'s faded template and back, keepin
   assert.equal(assets.ships.fade(scene, 'a', 0.16), false, 'nor once it is gone');
 });
 
-test('refresh waits while focus mode fades the ship and only applies the latest request', async () => {
+test('refresh promotes a ship focus mode has faded and keeps it faded, and only applies the latest request', async () => {
   const assets = loadShipAssets(LADDER_MANIFEST, {});
   const scene = assets.scene('system');
-  const dart = assets.fallback('a');
-  const root = await assets.ships.upgrade(scene, ship('a', 0), dart);
-  // A hull that arrived under a faded dart is faded on the next frame: until then the dart says so.
-  dart.visibility = 0.16;
-  assert.equal(await assets.ships.refresh(scene, ship('a', 10)), null);
-  dart.visibility = 1;
+  const root = await assets.ships.upgrade(scene, ship('a', 0), assets.fallback('a'));
+  const on = (template) => templatesOf(root).every((mesh) => mesh.name.startsWith('ship_template_' + template + '_'));
   assets.ships.fade(scene, 'a', 0.16);
-  assert.equal(await assets.ships.refresh(scene, ship('a', 10)), null);
-  assert.equal(hullId(root), 'small');
-  assert.ok(templatesOf(root).every((mesh) => mesh.visibility === 0.16), 'still faded, on its old hull');
-  assets.ships.fade(scene, 'a', 1);
-  // Leaving focus refreshes every ship (app/agent-focus.js): the promotion lands then.
-  assert.equal(await assets.ships.refresh(scene, ship('a', 10)), root);
+  assert.equal(await assets.ships.refresh(scene, ship('a', 10)), root, 'promoted while faded');
   assert.equal(hullId(root), 'big');
-  assert.ok(templatesOf(root).every((mesh) => mesh.visibility === 1), 'on the full template of its new hull');
+  assert.ok(on('big-near.glb|claude|0.16'), 'on the faded template of its new hull');
+  assets.ships.fade(scene, 'a', 0);
+  assert.equal(await assets.ships.refresh(scene, ship('a', 10, { local: true })), root, 're-tinted while hidden from inside');
+  assert.ok(on('big-near.glb|local|0'), 'still hidden, in its new colors');
+  assets.ships.fade(scene, 'a', 1);
+  assert.ok(on('big-near.glb|local|1'), 'and back in full once focus ends');
   assert.equal(await assets.ships.refresh(scene, ship('a', 0)), root);
   const stale = assets.ships.refresh(scene, ship('a', 3));
   const latest = assets.ships.refresh(scene, ship('a', 10));
