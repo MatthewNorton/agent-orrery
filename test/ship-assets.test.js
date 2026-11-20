@@ -1,8 +1,8 @@
 'use strict';
 
 // The ship-assets core and hulls (src/renderer/ship-assets.js, ship-assets-hulls.js): the rank
-// ladder, LODs, a template per provider and the livery. AUR.ships' refresh, fade and triangle
-// budget are test/ship-assets-api.test.js.
+// ladder, LODs, a template per provider and the livery. AUR.ships' refresh and triangle budget are
+// test/ship-assets-api.test.js, its fade test/ship-assets-api-fade.test.js.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');

@@ -2,7 +2,7 @@
 
 // The ship-assets files (src/renderer/ship-assets*.js) on the renderer's own util layer and enough
 // of Babylon to build, fade, swap and dispose hulls, for test/ship-assets.test.js and
-// test/ship-assets-api.test.js; and the hull pickers those and test/ships-models.test.js share.
+// test/ship-assets-api*.test.js; and the hull pickers those and test/ships-models.test.js share.
 
 const assert = require('node:assert/strict');
 const { loadUtilLayer, runRenderer, scriptTags } = require('./renderer-source');
@@ -240,6 +240,9 @@ const partMaterial = (root, name) => root.getChildMeshes(false).find((mesh) => m
 // A ship's hull is instances of its template's meshes, under its asset root.
 const instancesOf = (root) => root.getChildMeshes(false).filter((mesh) => mesh.isAnInstance);
 const templatesOf = (root) => instancesOf(root).map((mesh) => mesh.sourceMesh);
+// The parts of a ship's hull all show `visibility` and are drawn (enabled), or are all hidden.
+const shows = (root, visibility) => instancesOf(root).every((mesh) => mesh.visibility === visibility && mesh.isEnabled());
+const hidden = (root) => instancesOf(root).every((mesh) => !mesh.isEnabled());
 // Babylon objects compare by identity: a deepEqual that fails tries to print them whole.
 const sameItems = (a, b) => a.length === b.length && a.every((item, i) => item === b[i]);
 // A ship model is one merged mesh (ships/models.js), so its hull is one instance.
@@ -251,5 +254,5 @@ function hullOf(root) {
 
 module.exports = {
   SHIP_ASSET_FILES, SHIP_LAYER, onLayer, instanceOnLayer, Color, loadShipAssets, LADDER_MANIFEST, ship, hullId, partMaterial,
-  instancesOf, templatesOf, sameItems, hullOf,
+  instancesOf, templatesOf, shows, hidden, sameItems, hullOf,
 };
