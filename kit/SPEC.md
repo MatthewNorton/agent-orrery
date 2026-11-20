@@ -295,8 +295,9 @@ Event batch entries (from `AU.onEvents`):
    // An edit's path is checked once, trimmed, where its transcript is read (`safePath`): one that
    // is blank, holds a NUL, CR or LF, or is over 4096 characters, names no file. Where builds are
    // counted (`relativeInside`), one that is relative, or not in its project path's syntax (a
-   // Windows path with no drive), is in no project. Either is no build, live and in history
-   // alike; its tool shows all the same.
+   // Windows path with no drive, a share), is in no project; under a POSIX path its leading
+   // slashes are one, as the system opens it (`//home/u/a` is `/home/u/a`). Either is no build,
+   // live and in history alike; its tool shows all the same.
 { type: 'activity', project, shipId, tool, status, detail, ts }
 { type: 'feed', entry: FeedEntry }
 ```

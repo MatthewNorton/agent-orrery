@@ -85,9 +85,9 @@ function isInsidePath(root, candidate) {
 
 /**
  * file relative to root, joined with `separator`, or null unless it lies strictly beneath
- * root. Both must be absolute in one path syntax (pathFlavor). The syntax, and with it Windows
- * case folding, comes from root's own text, so every host agrees. Case folding only decides
- * containment: the result keeps the file's own casing.
+ * root. Both must be absolute in one path syntax (pathFlavor), a POSIX file's leading slashes
+ * taken as one. The syntax, and with it Windows case folding, comes from root's own text, so
+ * every host agrees. Case folding only decides containment: the result keeps the file's own casing.
  * @param {unknown} root
  * @param {unknown} file
  * @param {{ separator?: string }} [options]
@@ -95,14 +95,17 @@ function isInsidePath(root, candidate) {
  */
 function relativeInside(root, file, { separator = path.sep } = {}) {
   if (typeof root !== 'string' || typeof file !== 'string') return null;
-  // Security: a relative path, or a Windows path with no drive, would resolve against the process's
-  // working folder or its drive, which says nothing about where a transcript's file is.
   const flavorName = pathFlavor(root);
-  if (!flavorName || pathFlavor(file) !== flavorName) return null;
+  if (!flavorName) return null;
   const windows = flavorName === 'win32';
   const flavor = path[flavorName];
   const normalizedRoot = flavor.normalize(root);
   const normalizedFile = flavor.normalize(file);
+  // Security: a relative path, or a Windows path with no drive, would resolve against the process's
+  // working folder or its drive, which says nothing about where a transcript's file is. A POSIX
+  // file is judged as the system opens it, its leading slashes one ('//home/u/a' is '/home/u/a');
+  // under a Windows root, '//host/share' names a share, in no project.
+  if (pathFlavor(windows ? file : normalizedFile) !== flavorName) return null;
   const comparableRoot = windows ? normalizedRoot.toLowerCase() : normalizedRoot;
   const comparableFile = windows ? normalizedFile.toLowerCase() : normalizedFile;
   const rel = flavor.relative(comparableRoot, comparableFile);

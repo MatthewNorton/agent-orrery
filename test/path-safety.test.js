@@ -204,6 +204,18 @@ test('relativeInside ignores case only under a Windows-style root and keeps the 
   for (const file of ['\\Demo\\src\\a.js', '/Demo/src/a.js']) assert.equal(relativeInside(`${drive}\\Demo`, file), null, file);
 });
 
+test('relativeInside takes a POSIX file\'s leading slashes as one, as the system opens it, and no share under any root', () => {
+  const { relativeInside } = pathSafety;
+  for (const file of ['//Work/Demo/src/a.js', '///Work/Demo/src/a.js']) {
+    assert.equal(relativeInside('/Work/Demo', file, { separator: '/' }), 'src/a.js', file);
+    assert.equal(relativeInside('C:\\Work\\Demo', file), null, `${file} under a Windows root`);
+  }
+  for (const file of ['\\\\server\\share\\Demo\\a.js', '//server/share/Demo/a.js']) {
+    assert.equal(relativeInside('C:\\server\\share\\Demo', file), null, file);
+  }
+  assert.equal(relativeInside('/server/share/Demo', '\\\\server\\share\\Demo\\a.js'), null);
+});
+
 test('pathFlavor names drive-rooted and POSIX paths and rejects UNC and //host/share', () => {
   const { pathFlavor } = pathSafety;
   assert.equal(pathFlavor('C:\\Work\\proj'), 'win32');
