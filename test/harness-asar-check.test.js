@@ -49,6 +49,16 @@ test('asar check: an fs that opens archives fails every step it gets wrong, and 
   for (const file of opened) assert.equal(fs.existsSync(file), false, 'the valid archive went with the folder');
 });
 
+test('asar check: an archive that lstat or readdir calls a folder is no plain file', async () => {
+  const folder = (entry) => ({ name: entry.name, isFile: () => false });
+  const result = await asarCheck({
+    ...fs.promises,
+    lstat: async () => ({ isFile: () => false }),
+    readdir: async (dir, options) => (options ? (await fs.promises.readdir(dir, options)).map(folder) : fs.promises.readdir(dir)),
+  });
+  assert.deepEqual(result, { lstatFile: false, direntFile: false, deleted: true, errors: [] });
+});
+
 test('asar check: the valid archive is one Electron could open: its header pickles name a.txt', () => {
   const bytes = validArchive();
   const headerSize = bytes.readUInt32LE(4);
