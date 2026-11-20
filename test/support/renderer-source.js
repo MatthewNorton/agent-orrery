@@ -11,8 +11,13 @@ const RENDERER = path.join(__dirname, '..', '..', 'src', 'renderer');
 
 const readRenderer = (file) => fs.readFileSync(path.join(RENDERER, file), 'utf8');
 
-/** The `src` of every script tag in index.html, in load order. A tag with any other attribute (defer, a type) is not listed. */
-const scriptTags = () => [...readRenderer('index.html').matchAll(/<script src="([^"]+)">/g)].map((match) => match[1]);
+/** The `src` of every script tag in index.html, in load order. Throws on a tag in any other form (defer, a type, inline). */
+function scriptTags() {
+  const html = readRenderer('index.html');
+  const tags = [...html.matchAll(/<script src="([^"]+)">/g)].map((match) => match[1]);
+  if (tags.length !== html.match(/<script\b/g).length) throw new Error('index.html has a script tag that is not a plain <script src="...">');
+  return tags;
+}
 
 /**
  * Runs src/renderer/<file>, after `edit`, with each key of `globals` bound to its value. It runs
