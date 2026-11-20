@@ -13,6 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { scriptTags } from '../../../scripts/lib/script-tags.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 // Works from kit/todo/ (pending) and kit/done/structural-cleanup/ (archived).
@@ -65,10 +66,10 @@ if (!reached('0')) skip('T2', '0');
 else {
   const before = failures;
   const html = read('src/renderer/index.html');
-  const tags = [...html.matchAll(/<script src="([^"]+)">/g)].map((m) => m[1]);
+  let tags = [];
+  try { tags = scriptTags(html); } catch (error) { fail('T2', error.message); }
   const appTags = tags.filter((t) => t.startsWith('app/'));
   if (/type="module"/.test(html)) fail('T2', 'index.html uses type="module"');
-  if (tags.length !== (html.match(/<script\b/g) ?? []).length) fail('T2', 'index.html has a script tag that is not a plain <script src="...">');
   if (appTags[0] !== 'app/state.js') fail('T2', `first app script must be app/state.js, found ${appTags[0] ?? 'none'}`);
   if (appTags[appTags.length - 1] !== 'app/boot.js') fail('T2', 'app/boot.js must be the last app script');
   for (const m of appFiles) if (!appTags.includes(m)) fail('T2', `${m} exists but is not loaded by index.html`);
