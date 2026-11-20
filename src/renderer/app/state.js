@@ -179,6 +179,7 @@
       filter: VCS.FILTERS.ALL,
       results: [],
       selected: 0,
+      sharedKey: null, // a row key two results had at the last render (listbox.js); none is expected
       els: null,
       filterEls: null, // the top bar's GitHub filter, wired with or without the palette
       opener: null,    // what had focus before the palette opened; a pick clears it
@@ -189,6 +190,7 @@
       query: '',
       results: [],
       selected: 0,
+      sharedKey: null,
       els: null,
     },
     modules: { collapsed: new Set() }, // data-module keys of the modules folded to their header

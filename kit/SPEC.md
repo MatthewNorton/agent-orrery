@@ -308,8 +308,11 @@ Design tokens (put in `:root`):
   selection on the rows as they stand, and a refresh from the store keeps the elements of every
   row whose entry is still listed, also when a row comes in or goes above it (`A.renderListbox`),
   and the list stays scrolled where it was. A row is its entry's key, and every entry has one of
-  its own: a project `p:<id>`, an agent `a:<id>`, a folder `f:<project id>` + NUL + `<folder>`
-  (no folder name holds a NUL, so no two folders share a key). A click opens the entry that was
+  its own: a project `p:<id>`, an agent `a:<id>`, a folder `f:` + the JSON of
+  `[<project id>, <folder>]`. The kinds differ in the first letter, and no two id and folder pairs
+  are written as the same JSON, whatever they hold (a folder name is shown as main sends it, and one from
+  a state file may hold a separator, a quote or a NUL). `A.renderListbox` logs, once for a key,
+  two entries that share one: a click on either row would open the first. A click opens the entry that was
   pressed (`A.wireListbox`): when the rows moved under a pointer that stayed put, the release
   lands on another row and the pressed entry, found by its key, still opens while it is listed.
   PROJECTS shares all of it (its key is the project id). While an input method

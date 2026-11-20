@@ -175,14 +175,15 @@
     // By the name its row shows, then its path, branch and repository together.
     const found = AUR.rankProjects(visible, query, { nameOf: A.projectLabel, othersOf: VCS.otherSearchTexts });
     // Security: a row is told from the others by its key, so each entry has its own. The kinds differ
-    // in their first letter; a folder's name holds no NUL, so the last one parts it from the project's
-    // id whatever the two hold (`a/b` + `c` and `a` + `b/c` are two keys).
+    // in their first letter. A folder's key is its project's id and its name as JSON, which no other
+    // pair writes the same, whatever the two hold: a separator, a quote, a NUL (a folder name is
+    // used as main sends it, and one from a state file may hold any of them).
     const rows = [
       ...found.slice(0, 6).map((hit) => ({ kind: 'project', key: 'p:' + hit.project.id, ...hit })),
       ...AUR.searchAgents([...S.store.ships.values()].filter((ship) => shown.has(ship.project)), query, 4)
         .map((hit) => ({ kind: 'agent', key: 'a:' + hit.ship.id, ...hit })),
       ...AUR.searchPlanets(visible, query, 4)
-        .map((hit) => ({ kind: 'planet', key: 'f:' + hit.project.id + '\0' + hit.planet, ...hit })),
+        .map((hit) => ({ kind: 'planet', key: 'f:' + JSON.stringify([hit.project.id, hit.planet]), ...hit })),
     ];
     // Rows found only fuzzily go after every row found otherwise, each part in the kinds' order.
     S.projectSearch.results = [...rows.filter((row) => !row.fuzzy), ...rows.filter((row) => row.fuzzy)].slice(0, 10);

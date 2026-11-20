@@ -10,7 +10,10 @@ const { fakeDocument, fakeElement } = require('./support/fake-dom');
 
 function setup(results = ['a', 'b', 'c']) {
   const document = fakeDocument();
-  const { app } = runApp(['app/project/listbox.js'], { state: {}, const: { SEARCH_DEBOUNCE_MS: 10 } }, { document });
+  const aur = runApp(['app/project/listbox.js'], { state: {}, const: { SEARCH_DEBOUNCE_MS: 10 } }, { document });
+  const { app } = aur;
+  const logged = [];
+  aur.log = (...said) => logged.push(said.join(' '));
   const input = fakeElement('input');
   const list = fakeElement('div');
   const state = { timer: null, results, selected: 0 };
@@ -22,7 +25,7 @@ function setup(results = ['a', 'b', 'c']) {
     select: () => calls.push('select ' + state.selected),
     keyOf: (entry) => entry,
   });
-  return { app, document, input, list, state, calls };
+  return { app, document, input, list, state, calls, logged };
 }
 
 test('listbox keys: arrows move the selection round the list and Enter activates it', (t) => {
@@ -141,6 +144,22 @@ test('listbox rows: a refresh keeps the row of every entry still listed, whateve
   state.selected = 5;
   assert.deepEqual(render([a, b]), ['A', 'B']);
   assert.equal(input.getAttribute('aria-activedescendant'), 'row-5');
+});
+
+test('listbox rows: two entries with one key are both drawn, and said once', () => {
+  const [a, b, twin, other] = [['a', 'A'], ['b', 'B'], ['a', 'TWIN'], ['b', 'OTHER']].map(([id, label]) => ({ id, label }));
+  const { render, logged } = drawn([a, b]);
+  assert.deepEqual([render(), logged], [['A', 'B'], []]);
+  assert.deepEqual(render([a, b, twin]), ['A', 'B', 'TWIN'], 'a row each');
+  assert.deepEqual(logged, ['listbox: two entries share the row key "a"']);
+  render([twin, b, a]);
+  render([a, twin]);
+  assert.equal(logged.length, 1, 'not again at every refresh');
+  render([a, b, other]);
+  assert.deepEqual(logged.slice(1), ['listbox: two entries share the row key "b"'], 'another key is said');
+  render([a, b]);
+  render([a, b, twin]);
+  assert.equal(logged.length, 3, 'and one that came back after the list was right');
 });
 
 test('listbox selection: an arrow key marks the rows as they stand and builds none', () => {

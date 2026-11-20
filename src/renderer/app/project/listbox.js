@@ -9,7 +9,7 @@
   const C = A.const;
   const PRESS_SLOP = 4; // px a pointer may drift between press and release and still have stayed put
 
-  // `state` is S.projectSearch or S.projectDirectory: { timer, results, selected }.
+  // `state` is S.projectSearch or S.projectDirectory: { timer, results, selected, sharedKey }.
   A.cancelListboxTimer = function cancelListboxTimer(state) {
     if (state.timer != null) clearTimeout(state.timer);
     state.timer = null;
@@ -23,12 +23,16 @@
     }, C.SEARCH_DEBOUNCE_MS);
   };
 
+  /** An entry's row key, as a row's `data-key` holds it; null for no entry. @returns {string | null} */
+  const rowKeyOf = (entry, keyOf) => (entry == null ? null : String(keyOf(entry)));
+
   /**
    * Where the entry with row key `key` is among `results`; -1 when none is. A row is its entry's
-   * key (`keyOf`), which whoever builds the entries makes one per entry.
+   * key (`keyOf`), which whoever builds the entries makes one per entry: of two entries with one
+   * key the first is the one found, and renderListbox logs the pair.
    * @returns {number}
    */
-  const indexOfKey = (results, key, keyOf) => (key == null ? -1 : results.findIndex((entry) => String(keyOf(entry)) === key));
+  const indexOfKey = (results, key, keyOf) => (key == null ? -1 : results.findIndex((entry) => rowKeyOf(entry, keyOf) === key));
 
   /**
    * The field's keys and the list's clicks. Escape runs `escape`; arrows move the selection
@@ -87,7 +91,7 @@
    * before it (`previous`, found by its key; none with no rows), else the nearest row.
    */
   A.keepSelection = function keepSelection(state, previous, queryChanged, keyOf) {
-    const previousIndex = previous == null ? -1 : indexOfKey(state.results, String(keyOf(previous)), keyOf);
+    const previousIndex = indexOfKey(state.results, rowKeyOf(previous, keyOf), keyOf);
     state.selected = queryChanged ? 0 : previousIndex >= 0
       ? previousIndex : Math.min(state.selected, Math.max(0, state.results.length - 1));
   };
@@ -145,8 +149,12 @@
     const was = list.querySelector('[aria-selected="true"]');
     const rows = /** @type {HTMLElement[]} */ ([...list.children]);
     const held = new Map(rows.map((row) => [row.dataset.key, row]));
-    const keys = state.results.map((entry) => String(opts.keyOf(entry)));
+    const keys = state.results.map((entry) => rowKeyOf(entry, opts.keyOf));
     const listed = new Set(keys);
+    // Two entries with one key: a click on either row opens the first. Said once for a key, not at every refresh.
+    const shared = listed.size === keys.length ? null : keys.find((key, index) => keys.indexOf(key) !== index);
+    if (shared != null && shared !== state.sharedKey) AUR.log('listbox: two entries share the row key', JSON.stringify(shared));
+    state.sharedKey = shared;
     let at = 0; // the next row not yet placed
     state.results.forEach((entry, index) => {
       // Rows of entries no longer listed (and the note of an empty list) leave first, so no row is moved past them.
