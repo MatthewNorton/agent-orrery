@@ -332,15 +332,9 @@
     tb.outlineWidth = opts.outline == null ? 3 : opts.outline;
     tb.outlineColor = 'rgba(4,6,11,0.8)';
     tb.resizeToFit = true;
-    gui.addControl(tb);
-    // A control links only once it is in the layer, so a label that cannot be linked is taken out again.
-    try {
-      if (opts.mesh) tb.linkWithMesh(opts.mesh);
-      if (opts.offsetY != null) tb.linkOffsetY = opts.offsetY;
-    } catch (error) {
-      tb.dispose();
-      throw error;
-    }
+    gui.addControl(tb); // first: a control links to a mesh only once it is in the layer
+    if (opts.mesh) tb.linkWithMesh(opts.mesh);
+    if (opts.offsetY != null) tb.linkOffsetY = opts.offsetY;
     return tb;
   };
 })();
