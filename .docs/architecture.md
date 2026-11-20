@@ -199,6 +199,7 @@ in a closure, and anything shared is a field of `ctx`.
 | `live/attention.js` | 81 | functions | `classifyAttention` | `live/events`, `universe/public-shape` |
 | `live/state-file.js` | 118 | functions | Load / save `universe-state.json` | `provider-adapters`, `shared/atomic-write`, `shared/values`, `transcripts/fields` |
 | `live/saved-project.js` | 73 | functions | `savedProject`, the one reader of a saved project (an entry of `universe-state.json` or of a backup): each field checked once, a plain-text name, whole counts (a total at least the largest bucket), buckets a build could start (`isBucketName`) and whether they were counted under a path (`bucketsCounted`); `validKey` for a key or name from a file | `build-buckets`, `shared/ids`, `shared/values`, `transcripts/fields` |
+| `live/backup.js` | 123 | functions | Universe backups: `createBackup` (`universe-state.json` as the model stands, plus the IDEAS queue's ideas), `parseBackup` (the parts the import uses, a project's fields read as the state file's are), `importProjects` (adds the projects the model lacks; one it has keeps the larger count of each folder through `mergeBuckets`; removes nothing) | `provider-adapters`, `path-safety`, `build-buckets`, `shared/ids`, `shared/values`, `transcripts/fields`, `live/forgotten`, `live/projects`, `live/saved-project`, `live/state-file` |
 | `live/system-view.js` | 270 | functions | `getSystem`, `getPlanet` from the project folder on disk | `universe/planets`, `universe/public-shape`, `build-buckets`, `shared/hash` |
 | `live/projects.js` | 251 | functions | Project registry: path → id, display path, folder still exists; `takeProjectPath`, the one way a project takes a path; restores the projects a state file or a backup keeps | `provider-adapters`, `path-safety`, `build-buckets`, `shared/hash`, `universe/public-shape`, `live/events`, `live/forgotten`, `live/saved-project` |
 | `live/project-edits.js` | 127 | functions | What the owner does to one project by hand: `remapProjectPath` points a missing project at the folder it moved to, `forgetProject` forgets it; each is saved to the state file before it shows | `provider-adapters`, `universe/public-shape`, `live/events`, `live/state-file`, `live/ships`, `live/projects` |
@@ -484,6 +485,7 @@ contract), `AUR`, `AUR_POLISH` and `AUR_GALAXY` (all `any` for now).
 | `scene/system/belt.js` | 45 | Asteroid belt (thin instances) |
 | `scene/system/focus.js` | 54 | Fades the other ships and hides the ship labels while one is followed |
 | `scene/system/ships.js` | 215 | Ships: build / remove, patrols, fly-to-planet builds, `refetchPlanets`, the view's `update` |
+| `scene/system/worlds.js` | 100 | The planets' generated worlds, lit from the sun: maps placeholder, then system size, and the hovered planet's detail map fetched ahead for the planet view; the sun's photosphere and billboards |
 | `scene/planet/view.js` | 195 | Planet close-up |
 | `app/state.js` | 236 | Shared state and constants (including the chrome dirty bits, `AUR.app.const.CHROME`) |
 | `app/store.js` | 132 | `seedStore`, `applyEvent`, `maybeNotifyAttention`, `refreshShipHulls`, `workedShipIds` |
@@ -502,6 +504,7 @@ contract), `AUR`, `AUR_POLISH` and `AUR_GALAXY` (all `any` for now).
 | `app/chrome.js` | 258 | Command rail, project-name helpers, agent list, feed, summary, back button |
 | `app/agent-focus.js` | 324 | Cockpit overlay, hologram mini-map |
 | `app/project/settings.js` | 337 | Moved-project dialog |
+| `app/project/forget.js` | 60 | Forgetting a project from the settings dialog or the project card: main confirms and answers with a fresh LIVE snapshot |
 | `app/project/tasks.js` | 270 | TASKS panel |
 | `app/project/control.js` | 327 | Project card, Open Terminal button, planet card |
 | `index.html` | 582 | All panels exist in the HTML up front; modules show / hide them |
