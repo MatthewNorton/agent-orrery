@@ -242,6 +242,9 @@ PlanetData = { name, key, project: Project, builds, files, sizeKb, subdirs,
 // builds, project: as they stand when the answer is made, after the folder was read. A project
 //   forgotten meanwhile answers null. A project whose folder changed during the read is read once
 //   more; if it changed again the answer is null, so counts and project are never of two folders.
+// Live answers null for a name that is not `(root)` or one plain path segment (a separator, `.`,
+//   `..`, a NUL, over 255 characters), whatever folder the project has: nothing is read for it, and
+//   a project with no folder gives it no stand-in either.
 ```
 
 Event batch entries (from `AU.onEvents`):
@@ -256,7 +259,8 @@ Event batch entries (from `AU.onEvents`):
    // project is the ID string; bucket = the edit's top-level folder as the edit wrote it, or
    // '(root)'; isNew => planet formation. Under a Windows path main keeps one bucket for a
    // folder's casings, so the planet is found by `key` (the Planet's and PlanetData's), not by
-   // the bucket's spelling.
+   // the bucket's spelling. An edit whose path holds a NUL, CR or LF, or is over 4096
+   // characters, is no build, live and in history alike (`safePath`): its tool still shows.
 { type: 'activity', project, shipId, tool, status, detail, ts }
 { type: 'feed', entry: FeedEntry }
 ```
