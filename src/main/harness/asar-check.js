@@ -4,6 +4,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const driver = require('./driver');
 
 // What the main process's fs makes of a file named *.asar in a folder it reads (kit/grade.mjs M7).
 // With Electron's asar handling off (process.noAsar, main.js), a malformed archive and a valid one
@@ -29,51 +30,43 @@ function validArchive() {
 // The codes Windows gives for a file that another process (a virus scanner, the search indexer)
 // holds for a moment after it was written.
 const HELD = new Set(['EPERM', 'EBUSY', 'EACCES']);
-
-/**
- * `call`, tried again while it throws one of HELD's codes, `tries` tries in all with `wait()`
- * between them. The last try's error is the one thrown.
- * @template T
- * @param {() => Promise<T>} call
- * @param {number} tries
- * @param {() => Promise<void>} wait
- * @returns {Promise<T>}
- */
-async function retried(call, tries, wait) {
-  for (let tried = 1; ; tried++) {
-    try {
-      return await call();
-    } catch (error) {
-      if (tried >= tries || !HELD.has(error && error.code)) throw error;
-      await wait();
-    }
-  }
-}
+const HELD_TRIES = 5, HELD_WAIT_MS = 100;
 
 /**
  * Writes both archives into a new temporary folder, reads them back and deletes them. Each is
  * written under another name and renamed, since with asar handling on the fs takes a new file's
  * *.asar name for an archive to open and cannot write it. A rename or delete is tried again while
- * the file is held (HELD). Each answer is false when its step threw, every one when the folder
- * could not be made; `errors` holds what each step threw, and names the folder when it cannot be
- * removed (an archive held open keeps it). It never rejects.
+ * the file is held (HELD), HELD_TRIES tries in all. The folder's removal goes by rm's own retries,
+ * on rm's own codes and with a longer wait each time. Each answer is false when its step threw,
+ * every one when the folder could not be made; `errors` holds what each step threw, and names the
+ * folder when it cannot be removed (an archive held open keeps it). It never rejects.
  * @param {typeof fs.promises} [files] the fs to check, Electron's own by default
- * @param {{ tries?: number, wait?: () => Promise<void> }} [options] the tries a held rename or delete gets, and the wait between them
+ * @param {{ wait?: (ms: number) => Promise<unknown> }} [options] how it waits between tries
  * @returns {Promise<{ lstatFile: boolean, direntFile: boolean, deleted: boolean, errors: string[] }>}
  */
-async function asarCheck(files = fs.promises, { tries = 5, wait = () => new Promise((done) => setTimeout(done, 100)) } = {}) {
+async function asarCheck(files = fs.promises, { wait = driver.wait } = {}) {
   /** @type {string[]} */
   const errors = [];
   /** @template T @param {string} name @param {() => Promise<T>} step @returns {Promise<T | false>} */
   const run = async (name, step) => {
     try { return await step(); } catch (error) { errors.push(`${name}: ${error && error.message}`); return false; }
   };
+  /** @template T @param {() => Promise<T>} call @returns {Promise<T>} */
+  const held = async (call) => {
+    for (let tried = 1; ; tried++) {
+      try {
+        return await call();
+      } catch (error) {
+        if (tried >= HELD_TRIES || !HELD.has(error && error.code)) throw error;
+        await wait(HELD_WAIT_MS);
+      }
+    }
+  };
   const dir = await run('mkdtemp', () => files.mkdtemp(path.join(os.tmpdir(), 'agent-orrery-asar-')));
   if (dir === false) return { lstatFile: false, direntFile: false, deleted: false, errors };
   const archives = { 'malformed.asar': Buffer.from('not an archive'), 'valid.asar': validArchive() };
   const names = Object.keys(archives);
   const at = (name) => path.join(dir, name);
-  const held = (call) => retried(call, tries, wait);
   await run('write', async () => {
     for (const name of names) {
       await files.writeFile(at(name + '.part'), archives[name]);
@@ -93,7 +86,8 @@ async function asarCheck(files = fs.promises, { tries = 5, wait = () => new Prom
     for (const name of names) await held(() => files.unlink(at(name)));
     return (await files.readdir(dir)).length === 0;
   });
-  await files.rm(dir, { recursive: true, force: true }).catch((error) => {
+  const removal = { recursive: true, force: true, maxRetries: HELD_TRIES - 1, retryDelay: HELD_WAIT_MS };
+  await files.rm(dir, removal).catch((error) => {
     errors.push(`cleanup: ${dir} stays: ${error && error.message}`);
   });
   return { lstatFile, direntFile, deleted, errors };

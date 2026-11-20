@@ -17,11 +17,12 @@ const notingRemoved = (files) => {
 };
 const NO_WAIT = { wait: async () => {} };
 
-test('asar check: plain files, read and deleted, and the temporary folder goes', async (t) => {
+test('asar check: plain files, read and deleted, and the temporary folder goes, by an rm that tries again while it is held', async (t) => {
   const rm = t.mock.method(fs.promises, 'rm');
   assert.deepEqual(await asarCheck(), { lstatFile: true, direntFile: true, deleted: true, errors: [] });
-  const [dir] = rm.mock.calls[0].arguments;
+  const [dir, options] = rm.mock.calls[0].arguments;
   assert.deepEqual([path.basename(dir).startsWith('agent-orrery-asar-'), fs.existsSync(dir)], [true, false]);
+  assert.deepEqual(options, { recursive: true, force: true, maxRetries: 4, retryDelay: 100 });
 });
 
 test('asar check: a temporary folder it cannot make fails every answer, and the check answers all the same', async () => {
