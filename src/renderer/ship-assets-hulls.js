@@ -294,10 +294,24 @@
       }
       return { correction, own: own === null ? null : template, evidence: evidenceMaterial(scene, state, ship) };
     } catch (error) {
-      correction.dispose();
-      if (template && own !== null) disposeTemplate(template);
       logFailure('Hull ' + hull.id + ' could not be built', error, 'the ship keeps the hull or dart it has.');
+      const made = template && own !== null ? template : null; // the fleet's template stays
+      discard('Unbuilt hull ' + hull.id, correction, made);
       return null;
+    }
+  }
+
+  // Lets go of a hull no ship holds: drawn by nothing before it is disposed, and what cannot be
+  // disposed is logged, not thrown, so the rest still goes and the caller's outcome stands.
+  /** @param {string} name @param {BABYLON.TransformNode} correction @param {HullTemplate | null} own */
+  function discard(name, correction, own) {
+    const steps = [() => correction.setEnabled(false), () => correction.dispose(false, false), () => own && disposeTemplate(own)];
+    for (const step of steps) {
+      try {
+        step();
+      } catch (error) {
+        logFailure(name + ' could not be disposed', error, 'it is hidden.');
+      }
     }
   }
 
@@ -333,27 +347,11 @@
     return entry;
   }
 
-  // Lets a replaced hull go: off its ship and drawn by nothing before it is disposed, so a dispose
-  // that throws leaves the ship the one hull that replaced it. The swap is done by then, so what
-  // cannot be disposed is logged, not thrown.
-  /** @param {HullEntry} hull @param {BABYLON.TransformNode} correction @param {HullTemplate | null} own */
-  function releaseHull(hull, correction, own) {
-    correction.setEnabled(false);
-    correction.parent = null;
-    const steps = [() => correction.dispose(false, false), () => own && disposeTemplate(own)];
-    for (const step of steps) {
-      try {
-        step();
-      } catch (error) {
-        logFailure('Replaced hull ' + hull.id + ' could not be disposed', error, 'it is hidden.');
-      }
-    }
-  }
-
   /**
    * Builds a hull in place of the entry's own, under the same root, on the template and in the
    * state focus mode's fade gives the ship, so a promotion lands as the hull it replaces showed.
-   * The new hull takes the root and the triangle count before the old one is let go.
+   * The new hull takes the root and the triangle count before the old one is let go, off its
+   * ship, so a dispose that throws leaves the ship the one hull that replaced it.
    * @param {ShipEntry} entry @param {HullEntry} hull @param {HullAsset} asset
    */
   function swapHull(scene, state, entry, hull, asset, ship) {
@@ -363,7 +361,8 @@
     built.correction.parent = entry.root;
     state.triangles += asset.record.triangles - entry.asset.record.triangles;
     Object.assign(entry, { correction: built.correction, own: built.own, hull, asset, ship });
-    releaseHull(old.hull, old.correction, old.own);
+    old.correction.parent = null;
+    discard('Replaced hull ' + old.hull.id, old.correction, old.own);
     entry.root.material = built.evidence;
     entry.root.metadata = { ...(entry.root.metadata || {}), ...hullMetadata(hull, asset, ship) };
     if (entry.fallback && entry.fallback.metadata) {

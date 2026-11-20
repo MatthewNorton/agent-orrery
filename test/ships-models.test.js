@@ -328,6 +328,13 @@ test('a trim copy that cannot be made leaves the model finish every map it had, 
     finish.clone = () => { throw new Error('no clone'); };
     assert.throws(wear, /no clone/);
     assert.ok(sameItems(mapsOf(finish), maps), 'the finish keeps its maps when the clone fails');
+    finish.clone = function (name) { // a clone that fails once Babylon has made the copy
+      clone.call(this, name);
+      throw new Error('no plugins');
+    };
+    assert.throws(wear, /no plugins/);
+    assert.equal(scene.materials.length, count, 'a copy the clone made before it failed is not left in the scene');
+    assert.ok(sameItems(mapsOf(finish), maps), 'and the finish keeps its maps');
     finish.clone = function (name) { // a copy made that cannot take the model's tone curve
       return Object.defineProperty(clone.call(this, name), 'imageProcessingConfiguration', { set() { throw new Error('no tone curve'); } });
     };

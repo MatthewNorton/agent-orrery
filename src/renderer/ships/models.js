@@ -124,9 +124,14 @@
   function copyMaterial(material, name) {
     const textures = TEXTURE_SLOTS.map((slot) => material[slot]);
     for (const slot of TEXTURE_SLOTS) material[slot] = null;
+    const scene = material.getScene();
+    const count = scene.materials.length;
     let copy;
     try {
       copy = material.clone(name);
+    } catch (error) {
+      for (const partial of scene.materials.slice(count)) partial.dispose(); // a clone that failed once made
+      throw error;
     } finally {
       TEXTURE_SLOTS.forEach((slot, i) => { material[slot] = textures[i]; });
     }

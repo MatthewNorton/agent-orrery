@@ -19,11 +19,11 @@
     createShipEntry, swapHull,
   } = assets;
 
-  // A hull request that throws past buildHull's own catch is logged and resolves null.
-  /** @param {HullEntry | null} hull null when the throw came before it was chosen */
-  function failed(hull, error) {
-    logFailure(hull ? 'Hull ' + hull.id + ' request failed' : 'A hull request failed', error,
-      'the ship keeps the hull or dart it has.');
+  // A hull request that throws past buildHull's own catch is logged and resolves null. `outcome`
+  // says what the ship is left with, where the request knows.
+  /** @param {HullEntry | null} hull null when the throw came before it was chosen @param {string} [outcome] */
+  function failed(hull, error, outcome) {
+    logFailure(hull ? 'Hull ' + hull.id + ' request failed' : 'A hull request failed', error, outcome);
     return null;
   }
 
@@ -59,20 +59,28 @@
         const entry = createShipEntry(scene, state, hull, asset, ship);
         if (!entry) return null;
         const assetRoot = entry.root;
-        entry.fallback = fallback;
-        // The dart root keeps the view's display scale; the hull sits inside it at unit scale.
-        assetRoot.parent = fallback;
-        fallback.isPickable = false;
-        fallback.isVisible = false; // children keep drawing; the dart itself leaves the render queues
-        AUR.markShipMesh(assetRoot, ship);
-        fallback.metadata = {
-          ...(fallback.metadata || {}),
-          isShip: false,
-          upgradedHullId: hull.id,
-        };
+        const { isPickable, isVisible } = fallback;
+        try {
+          entry.fallback = fallback;
+          // The dart root keeps the view's display scale; the hull sits inside it at unit scale.
+          assetRoot.parent = fallback;
+          fallback.isPickable = false;
+          fallback.isVisible = false; // children keep drawing; the dart itself leaves the render queues
+          AUR.markShipMesh(assetRoot, ship);
+          fallback.metadata = {
+            ...(fallback.metadata || {}),
+            isShip: false,
+            upgradedHullId: hull.id,
+          };
+        } catch (error) {
+          // A hull that cannot be installed under its dart goes, and the dart flies as it did.
+          assetRoot.dispose();
+          Object.assign(fallback, { isPickable, isVisible });
+          throw error;
+        }
         return assetRoot;
       });
-    }).catch((error) => failed(chosen, error));
+    }).catch((error) => failed(chosen, error, 'the ship keeps its dart.'));
   }
 
   /**

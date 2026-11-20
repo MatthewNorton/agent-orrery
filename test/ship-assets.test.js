@@ -254,6 +254,29 @@ test('a hull that cannot be built logs its cause once per hull and cause, for a 
   ]);
 });
 
+test('a hull that can be neither built nor disposed still ends its build: both causes are logged, the build first, and nothing is thrown', async () => {
+  const assets = loadShipAssets(LADDER_MANIFEST, {});
+  const logs = logsOf(assets);
+  const scene = assets.scene('system');
+  const a = await assets.ships.upgrade(scene, ship('a', 0), assets.fallback('a'));
+  const { Mesh, TransformNode } = assets.BABYLON;
+  const { dispose } = TransformNode.prototype;
+  Mesh.prototype.instantiateHierarchy = () => { throw new Error('no instances'); };
+  TransformNode.prototype.dispose = function () {
+    if (this.name.startsWith('ship_correction_')) throw new Error('no dispose');
+    dispose.call(this);
+  };
+  const fleet = assets.templateNodes().length;
+  assert.equal(await assets.ships.upgrade(scene, ship('b', 0), assets.fallback('b')), null, 'a new ship keeps its dart');
+  assets.ships.fade(scene, 0.16, { shipId: 'a', visibility: 1 }); // a rebuild onto a template of its own
+  assert.equal(a.children.length, 1, 'the followed ship keeps its hull');
+  assert.equal(assets.templateNodes().length, fleet, 'the template made for it goes though the hull before it could not');
+  assert.deepEqual(logs, [
+    'Hull small could not be built (no instances); the ship keeps the hull or dart it has.',
+    'Unbuilt hull small could not be disposed (no dispose); it is hidden.',
+  ]);
+});
+
 test('a hull whose provider evidence cannot be made is not built, and leaves no instance behind', async () => {
   const assets = loadShipAssets(LADDER_MANIFEST, {});
   const logs = logsOf(assets);

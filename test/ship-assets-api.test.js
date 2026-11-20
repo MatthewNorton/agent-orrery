@@ -104,15 +104,20 @@ test('a hull request that throws past the hull build resolves null and logs its 
   const scene = assets.scene('system');
   // A dart whose metadata cannot be written: upgrade writes it once the hull is built, a swap last.
   const unwritable = (dart) => Object.defineProperty(dart, 'metadata', { get: () => ({ isShip: true }), set() { throw new Error('no metadata'); } });
-  for (const id of ['a', 'b']) assert.equal(await assets.ships.upgrade(scene, ship(id, 0), unwritable(assets.fallback(id))), null, 'upgrade ' + id);
+  for (const id of ['a', 'b']) {
+    const dart = unwritable(assets.fallback(id));
+    const flown = [dart.isVisible, dart.isPickable];
+    assert.equal(await assets.ships.upgrade(scene, ship(id, 0), dart), null, 'upgrade ' + id);
+    const { ships, triangles } = assets.AUR.shipAssets.sceneStates.get(scene);
+    assert.deepEqual([dart.children.length, dart.isVisible, dart.isPickable, ships.size, triangles], [0, ...flown, 0, 0],
+      'a hull that cannot be installed is gone, uncounted, and its dart flies as it did');
+  }
   const darts = [assets.fallback('c'), assets.fallback('d')];
   const roots = [await assets.ships.upgrade(scene, ship('c', 0), darts[0]), await assets.ships.upgrade(scene, ship('d', 0), darts[1])];
   darts.forEach(unwritable);
   for (const id of ['c', 'd']) assert.equal(await assets.ships.refresh(scene, ship(id, 3)), null, 'refresh ' + id);
-  assert.deepEqual(logs, [
-    'Hull small request failed (no metadata); the ship keeps the hull or dart it has.',
-    'Hull mid request failed (no metadata); the ship keeps the hull or dart it has.',
-  ]);
+  // A throw after the swap leaves the new hull whole, so the log claims nothing of what the ship keeps.
+  assert.deepEqual(logs, ['Hull small request failed (no metadata); the ship keeps its dart.', 'Hull mid request failed (no metadata).']);
   assert.ok(roots.every((root) => root.children.length === 1 && hullId(root) === 'mid'), 'a throw after the swap leaves it whole');
 });
 

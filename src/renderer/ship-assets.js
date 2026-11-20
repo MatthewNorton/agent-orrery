@@ -32,7 +32,7 @@
  *   disposed: boolean }} SceneState `visibility` is the fleet's, which every template shows, and
  *   `apart` the one ship focus mode shows at a visibility of its own (AUR.ships.fade)
  * @typedef {object} ShipAssetsCore shared by the ship-assets*.js files as AUR.shipAssets
- * @property {(failure: string, error: any, outcome: string) => void} logFailure logged once per failure and cause
+ * @property {(failure: string, error: any, outcome?: string) => void} logFailure logged once per failure and cause
  * @property {Promise<ShipManifest | null>} manifestPromise
  * @property {() => ShipManifest | null} settledManifest null until the manifest has loaded
  * @property {WeakMap<object, SceneState>} sceneStates
@@ -53,8 +53,9 @@
   const AUR = window.AUR;
   const MANIFEST_PATH = '../../assets/ships/manifest.json';
   const HULL_ROOT = '../../assets/ships/';
-  // The triangles a view's hulls may hold, past which a ship flies its dart (a near view tries a
-  // hull's far file first). Hulls carry their detail as geometry (10k to 58k triangles each), and
+  // The triangles a view's hulls may hold. A ship whose hull does not fit keeps its dart, or its
+  // current hull when a promotion does not fit (a near view first tries the far file of a hull
+  // that has one). Hulls carry their detail as geometry (10k to 58k triangles each), and
   // a template's ships draw in one draw per part, so what grows with the fleet is the triangles
   // drawn, which is what this counts. A system or planet view holds fifty-one ships of the first
   // rank (Petrel, 17,544), the universe map seventy.
@@ -72,8 +73,8 @@
   // A failure and its cause, logged once per failure and cause: one that every ship meets is
   // logged once, and a different cause is logged too.
   function logFailure(failure, error, outcome) {
-    const cause = String((error && error.message) || error);
-    logOnce(failure + ' (' + cause + ')', failure + ' (' + cause + '); ' + outcome);
+    const what = failure + ' (' + String((error && error.message) || error) + ')';
+    logOnce(what, what + (outcome ? '; ' + outcome : '.'));
   }
 
   function loadWithFetch() {
