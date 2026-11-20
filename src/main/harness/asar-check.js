@@ -9,7 +9,7 @@ const path = require('path');
 // With Electron's asar handling off (process.noAsar, main.js), a malformed archive and a valid one
 // both read as the plain files they are, by lstat and by readdir's types, and both can be deleted
 // straight after, since nothing holds them open. With it on, lstat throws for the malformed one and
-// calls the valid one a folder, and the archive it opened stays open.
+// calls the valid one a folder, and the archive it opened stays open (Electron 45, measured).
 
 // The smallest archive Electron's asar reader accepts: a size pickle, then a header pickle that
 // holds the JSON index, then the one file's bytes.
@@ -27,8 +27,10 @@ function validArchive() {
 }
 
 /**
- * Writes both archives into a new temporary folder, reads them back and deletes them. Each answer
- * is false when its step threw; `errors` holds what each step threw.
+ * Writes both archives into a new temporary folder, reads them back and deletes them. Each is
+ * written under another name and renamed, since with asar handling on the fs takes a new file's
+ * *.asar name for an archive to open and cannot write it. Each answer is false when its step
+ * threw; `errors` holds what each step threw. An archive held open keeps the folder from going.
  * @param {typeof fs.promises} [files] the fs to check, Electron's own by default
  * @returns {Promise<{ lstatFile: boolean, direntFile: boolean, deleted: boolean, errors: string[] }>}
  */
@@ -45,7 +47,10 @@ async function asarCheck(files = fs.promises) {
   };
   try {
     await run('write', async () => {
-      for (const name of names) await files.writeFile(at(name), archives[name]);
+      for (const name of names) {
+        await files.writeFile(at(name + '.part'), archives[name]);
+        await files.rename(at(name + '.part'), at(name));
+      }
       return true;
     });
     const lstatFile = await run('lstat', async () => {

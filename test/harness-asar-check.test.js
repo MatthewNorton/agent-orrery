@@ -20,11 +20,16 @@ test('asar check: plain files, read and deleted, and the temporary folder goes',
 });
 
 test('asar check: an fs that opens archives fails every step it gets wrong, and still cleans up', async () => {
-  // As Electron 45's fs with asar handling on (measured): lstat throws for a malformed archive and
-  // calls a valid one a folder, readdir's types still say file, and an opened archive stays open.
+  // As Electron 45's fs with asar handling on (measured): it cannot write a file named *.asar,
+  // lstat throws for a malformed archive and calls a valid one a folder, readdir's types still say
+  // file, and an opened archive stays open.
   const opened = new Set();
   const electron = {
     ...fs.promises,
+    async writeFile(file, bytes) {
+      if (file.endsWith('.asar')) throw new Error(`Invalid package ${file}`);
+      return fs.promises.writeFile(file, bytes);
+    },
     async lstat(file) {
       const bytes = fs.readFileSync(file);
       if (!bytes.equals(validArchive())) throw new Error(`Invalid package ${file}`);
@@ -32,14 +37,14 @@ test('asar check: an fs that opens archives fails every step it gets wrong, and 
       return { isFile: () => false };
     },
     async unlink(file) {
-      if (opened.has(file)) throw Object.assign(new Error(`EPERM, Permission denied: '${file}'`), { code: 'EPERM' });
+      if (opened.has(file)) throw Object.assign(new Error(`EBUSY: resource busy or locked, unlink '${file}'`), { code: 'EBUSY' });
       return fs.promises.unlink(file);
     },
   };
   const before = leftovers();
   const result = await asarCheck(electron);
   assert.deepEqual([result.lstatFile, result.direntFile, result.deleted], [false, true, false]);
-  assert.match(result.errors.join('\n'), /^lstat: Invalid package .*malformed\.asar$/m);
+  assert.deepEqual(result.errors.map((error) => error.split(':')[0]), ['lstat', 'delete'], 'the archives were written, then read');
   assert.deepEqual(leftovers(), before);
   for (const file of opened) assert.equal(fs.existsSync(file), false, 'the valid archive went with the folder');
 });
