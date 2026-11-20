@@ -275,6 +275,9 @@ test('hostile ids, names, bucket counts and paths never reach the model', () => 
         "__proto__": { "totalBuilds": 1 },
         "constructor": { "totalBuilds": 1 },
         "bad\\u0007id": { "totalBuilds": 1 },
+        "   ": { "totalBuilds": 1 },
+        ${JSON.stringify('i'.repeat(256))}: { "totalBuilds": 1 },
+        ${JSON.stringify('i'.repeat(257))}: { "totalBuilds": 1 },
         "share": { "path": "\\\\\\\\evil\\\\share\\\\x", "totalBuilds": -4 },
         "device": { "path": "\\\\\\\\?\\\\C:\\\\x" },
         "relative": { "path": "work/demo", "name": "ok\\u0000name" },
@@ -287,8 +290,8 @@ test('hostile ids, names, bucket counts and paths never reach the model', () => 
   }`);
   const projects = new Map(backup.projects);
   // An id is a key of a Map and of objects with no prototype, so '__proto__' and 'constructor' are
-  // ids like others; one with a control character is not an id.
-  assert.deepEqual([...projects.keys()].sort(), ['__proto__', 'constructor', 'device', 'fine', 'relative', 'share']);
+  // ids like others; one with a control character, a blank one or one over 256 characters is not an id.
+  assert.deepEqual([...projects.keys()].sort(), ['__proto__', 'constructor', 'device', 'fine', 'i'.repeat(256), 'relative', 'share']);
   assert.deepEqual([projects.get('__proto__').totalBuilds, projects.get('__proto__').path, {}.totalBuilds], [1, null, undefined]);
   assert.equal(projects.get('share').path, null);
   assert.equal(projects.get('share').totalBuilds, 0);
