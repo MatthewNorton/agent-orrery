@@ -43,6 +43,16 @@ function loadApp() {
   return { AUR: window.AUR, app: window.AUR.app, state, old, calls, logged, document };
 }
 
+// The three views as stand-ins that build, each scene named for its view and holding the data it was
+// given; `onBuild` hears each build.
+function stubViews(onBuild = () => {}) {
+  const view = (name) => (engine, data) => {
+    onBuild();
+    return { scene: { name, data }, update() {}, dispose() {} };
+  };
+  return { universe: view('universe'), system: view('system'), planet: view('planet') };
+}
+
 test('setView: when no view can be built, the one shown and its route stay, whichever route asked', async () => {
   const { AUR, app, state, old, calls, logged, document } = loadApp();
   const failing = (engine) => {
@@ -63,9 +73,7 @@ test('setView: when no view can be built, the one shown and its route stay, whic
 test('setView: a system or planet view that cannot be built falls back to the universe', async () => {
   for (const failing of ['system', 'planet']) {
     const { AUR, app, state, old, logged, document } = loadApp();
-    const built = (name) => () => ({ scene: { name }, update() {}, dispose() {} });
-    Object.assign(AUR.views, { universe: built('universe'), system: built('system'), planet: built('planet') });
-    AUR.views[failing] = () => { throw new Error('no glyphs'); };
+    Object.assign(AUR.views, stubViews(), { [failing]: () => { throw new Error('no glyphs'); } });
     await (failing === 'system' ? app.openSystem('q') : app.openPlanet('q', 'src'));
     assert.deepEqual([state.current, state.activeScene.name, old.disposed, document.body.dataset.view, logged],
       [{ view: 'universe', projectId: null, planetName: null }, 'universe', 1, 'universe', [`view build failed: ${failing} no glyphs`]], failing);
@@ -75,11 +83,8 @@ test('setView: a system or planet view that cannot be built falls back to the un
 test('setView: a view that is built takes the place of the one shown, and only then its route', async () => {
   const { AUR, app, state, old, calls, document } = loadApp();
   const routes = [];
-  const built = (name) => (engine, data) => {
-    routes.push({ ...state.current }); // what the app says is shown while the view is built
-    return { scene: { name, data }, update() {}, dispose() {} };
-  };
-  Object.assign(AUR.views, { universe: built('universe'), system: built('system'), planet: built('planet') });
+  // What the app says is shown while each view is built.
+  Object.assign(AUR.views, stubViews(() => routes.push({ ...state.current })));
   await app.openSystem('q');
   assert.deepEqual([state.current, state.activeScene.name, old.disposed, document.body.dataset.view],
     [{ view: 'system', projectId: 'q', planetName: null }, 'system', 1, 'system']);

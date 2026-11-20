@@ -57,7 +57,7 @@ test('both models answer a planet card with as many builds as were sent with its
     records: (dir) => [claude.prompt(dir, T0),
       ...[1, 2].map((n) => claude.tool(dir, T0 + n * SEC, `toolu_${n}`, 'Write', { file_path: `${dir}\\(Root)\\${n}.md` }))],
   });
-  const cards = [[live, (name) => live.tracker.getPlanet(SLUG, name)], [replay, async (name) => replay.source.getPlanet(SLUG, name)]];
+  const cards = [[live, (name) => live.tracker.getPlanet(SLUG, name)], [replay, (name) => replay.source.getPlanet(SLUG, name)]];
   for (const [side, card] of cards) {
     const builds = ofType(side.events, 'build');
     assert.equal(builds.length, 2);
