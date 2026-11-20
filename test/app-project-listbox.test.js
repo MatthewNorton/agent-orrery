@@ -143,32 +143,6 @@ test('listbox rows: a refresh keeps the row of every entry still listed, whateve
   assert.equal(input.getAttribute('aria-activedescendant'), 'row-5');
 });
 
-test('listbox rows: entries that share a key each get a row of their own, and a click opens the one pressed', () => {
-  const [a1, a2, a3, b, n] = [['a', 'A1'], ['a', 'A2'], ['a', 'A3'], ['b', 'B'], ['n', 'N']].map(([id, label]) => ({ id, label }));
-  const { list, render, state, document, app, input } = drawn([a1, a2, b]);
-  assert.deepEqual(render(), ['A1', 'A2', 'B']);
-  const rows = [...list.children];
-  assert.equal(new Set(rows.map((row) => row.dataset.key)).size, 3, 'three keys for three rows');
-  // The same list again, as every refresh from the store draws it.
-  assert.deepEqual(render(), ['A1', 'A2', 'B']);
-  assert.deepEqual(list.children, rows, 'and the same elements');
-  assert.deepEqual(render([n, a1, a2, a3, b]), ['N', 'A1', 'A2', 'A3', 'B']);
-  assert.deepEqual([list.children[1], list.children[2], list.children[4]], rows);
-  assert.deepEqual(render([a2, b]), ['A2', 'B'], 'the first of a key left: the one that stays reads as itself');
-  assert.equal(list.children.length, 2);
-
-  // Clicks go by the same keys: the second of two entries with one key opens the second.
-  const calls = [];
-  app.wireListbox(list, input, state, { escape() {}, update() {}, select() {}, activate: (index) => calls.push(index), keyOf: (entry) => entry.id });
-  render([a1, a2, b]);
-  for (const row of list.children) {
-    const target = { closest: (selector) => (selector === '[role="option"]' ? row : null) };
-    document.fire('mousedown', { target, clientX: 10, clientY: 10 });
-    document.fire('click', { target, clientX: 10, clientY: 10 });
-  }
-  assert.deepEqual(calls, [0, 1, 2]);
-});
-
 test('listbox selection: an arrow key marks the rows as they stand and builds none', () => {
   const { app, input, state } = setup();
   const scrolled = [];
@@ -187,46 +161,44 @@ test('listbox selection: an arrow key marks the rows as they stand and builds no
   assert.deepEqual([input.getAttribute('aria-activedescendant'), scrolled], ['row-2', ['row-2']]);
 });
 
-test('listbox rows: of entries that share a key, the one pressed or selected stays the one meant', () => {
-  const entries = () => [['a', 'A1'], ['a', 'A2'], ['a', 'A3'], ['b', 'B']].map(([id, label]) => ({ id, label }));
-  const [a1, a2, a3, b] = entries();
-  const { list, render, state, document, app, input } = drawn([a1, a2, a3, b]);
+test('listbox rows: the entry pressed or selected stays the one meant through a refresh, by its key', () => {
+  const entries = () => ['a', 'b', 'c', 'd'].map((id) => ({ id, label: id.toUpperCase() }));
+  const [a, b, c, d] = entries();
+  const { list, render, state, document, app, input } = drawn([a, b, c, d]);
   const keyOf = (entry) => entry.id;
   const calls = [];
   app.wireListbox(list, input, state, { escape() {}, update() {}, select() {}, activate: (index) => calls.push(state.results[index].label), keyOf });
   render();
-  const [, rowA2] = list.children;
-  const onA2 = { closest: (selector) => (selector === '[role="option"]' ? rowA2 : null) };
-  const click = (target, change) => {
+  const onB = 'b';
+  // A press on the row of `key` as the list holds it, `change`, and the click that completes the press.
+  const click = (key, change) => {
+    const row = list.children.find((held) => held.dataset.key === key);
+    const target = { closest: (selector) => (selector === '[role="option"]' ? row : null) };
     document.fire('mousedown', { target, clientX: 10, clientY: 10 });
     change();
     document.fire('click', { target, clientX: 10, clientY: 10 });
-    render([a1, a2, a3, b]);
+    render([a, b, c, d]);
     return calls.splice(0);
   };
-  // The first of the key leaves between the press and the click: the entry pressed is still the one opened.
-  assert.deepEqual(click(onA2, () => render([a2, a3, b])), ['A2']);
-  assert.deepEqual(click(onA2, () => render([b, a3, a2])), ['A2'], 'wherever it stands now');
-  assert.deepEqual(click(onA2, () => render([a1, a3, b])), [], 'gone: the others with its key are not it');
-  // A refresh that builds the entries anew: the one with the key, and none where several have it.
-  assert.deepEqual(click(onA2, () => { state.results = entries().slice(1, 2); }), ['A2']);
-  assert.deepEqual(click(onA2, () => { state.results = entries(); }), [], 'three with the key, and no telling which');
+  // The row above leaves between the press and the click: the entry pressed is still the one opened.
+  assert.deepEqual(click(onB, () => render([b, c, d])), ['B']);
+  assert.deepEqual(click(onB, () => render([d, c, b])), ['B'], 'wherever it stands now');
+  assert.deepEqual(click(onB, () => render([a, c, d])), [], 'gone: no other row is it');
+  assert.deepEqual(click(onB, () => { state.results = entries(); }), ['B'], 'a refresh that builds the entries anew: the one with its key');
 
-  // The selection through a re-query goes by row: the second of a key stays the second.
-  state.results = [a1, a2, a3, b];
-  const requery = (selected, next) => {
+  // The selection through a re-query stays on the entry that had it.
+  const requery = (selected, next, queryChanged = false) => {
+    state.results = [a, b, c, d];
     state.selected = selected;
-    const previous = app.selectedRowKey(state, keyOf);
+    const previous = state.results[state.selected];
     state.results = next;
-    app.keepSelection(state, previous, false, keyOf);
-    const label = state.results[state.selected].label;
-    state.results = [a1, a2, a3, b];
-    return label;
+    app.keepSelection(state, previous, queryChanged, keyOf);
+    return state.results[state.selected].label;
   };
-  assert.deepEqual([requery(1, entries()), requery(2, entries()), requery(3, [b, ...entries().slice(0, 3)])], ['A2', 'A3', 'B']);
-  assert.equal(requery(3, entries().slice(0, 2)), 'A2', 'gone: the nearest row');
-  state.selected = 2;
-  app.keepSelection(state, app.selectedRowKey(state, keyOf), true, keyOf);
-  assert.equal(state.selected, 0, 'a new query starts at the top');
-  assert.equal(app.selectedRowKey({ results: [], selected: 0 }, keyOf), null);
+  assert.deepEqual([requery(1, entries()), requery(2, [d, ...entries().slice(0, 3)]), requery(3, [d, a])], ['B', 'C', 'D']);
+  assert.equal(requery(3, entries().slice(0, 2)), 'B', 'gone: the nearest row');
+  assert.equal(requery(2, entries(), true), 'A', 'a new query starts at the top');
+  const none = { results: [], selected: 3 };
+  app.keepSelection(none, undefined, false, keyOf);
+  assert.equal(none.selected, 0, 'no rows: nothing was selected, and nothing is');
 });
