@@ -291,10 +291,11 @@ Event batch entries (from `AU.onEvents`):
    // or a new one in a project that has 10,000, starts none: the build counts in the project's
    // and the ship's builds only, with isNew false and key null, so it is on no planet and no
    // planet card counts it. Under a Windows path main keeps one bucket for a folder's casings, so
-   // the planet is found by `key` (the Planet's and PlanetData's), not by the bucket's spelling. An edit's path is checked once, trimmed, where its transcript is read
-   // (`safePath`): one that holds a NUL, CR or LF, or is over 4096 characters, names no file, and one
-   // that is relative, or not in its project path's syntax (a Windows path with no drive), is in no
-   // project. Either is no build, live and in history alike; its tool still shows.
+   // the planet is found by `key` (the Planet's and PlanetData's), not by the bucket's spelling.
+   // An edit's path is checked once, trimmed, where its transcript is read (`safePath`): one that
+   // holds a NUL, CR or LF, or is over 4096 characters, names no file, and one that is relative,
+   // or not in its project path's syntax (a Windows path with no drive), is in no project. Either
+   // is no build, live and in history alike; its tool still shows.
 { type: 'activity', project, shipId, tool, status, detail, ts }
 { type: 'feed', entry: FeedEntry }
 ```
