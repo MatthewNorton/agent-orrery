@@ -37,16 +37,22 @@ function planetKey(project, name) {
 }
 
 /**
- * The one of `names` that is folder `name` under `root`: itself, or where the root ignores case
- * another casing of it. Null when none is.
- * @param {string[]} names
+ * The one of `entries` that is folder `name` under `root`: the one named so, or where the root
+ * ignores case the first in another casing of it. Null when none is. One pass.
+ * @template {{ name: string }} T
+ * @param {T[]} entries
  * @param {string} name
  * @param {string | null} root
- * @returns {string | null}
+ * @returns {T | null}
  */
-function matchingName(names, name, root) {
-  if (names.includes(name)) return name;
-  return ignoresCase(root) ? firstByFold(names).get(fold(name)) ?? null : null;
+function matchingEntry(entries, name, root) {
+  const folded = ignoresCase(root) ? fold(name) : null;
+  let other = null;
+  for (const entry of entries) {
+    if (entry.name === name) return entry;
+    if (other === null && folded !== null && fold(entry.name) === folded) other = entry;
+  }
+  return other;
 }
 
 /**
@@ -78,27 +84,23 @@ function bucketKey(project, name) {
   // or none, so a miss there looks nothing up; a root that ignores case asks the index of the
   // keys, which is one lookup however many buckets there are.
   if (!ignoresCase(project.path)) return null;
-  const key = foldedKeys(project.buckets).get(fold(name)) ?? null;
-  // A key the index names and the object no longer has was removed past setBucket: the index is
-  // built again, once, and asked again.
-  if (key === null || Object.hasOwn(project.buckets, key)) return key;
-  return foldedKeys(project.buckets, true).get(fold(name)) ?? null;
+  return foldedKeys(project.buckets).get(fold(name)) ?? null;
 }
 
 /**
- * The first key of `buckets` for each folded key, as matchingName would find it. Built on the
+ * The first key of `buckets` for each folded key, as matchingEntry would find it. Built on the
  * first miss and kept on the object, where setBucket adds each new key: so every write of a bucket
- * goes through setBucket (test/build-buckets.test.js looks for one that does not).
+ * goes through setBucket, and none is removed (test/build-buckets.test.js looks for a line that
+ * does either). An object that takes no new property (a frozen one) is searched each time.
  * @param {Record<string, number>} buckets
- * @param {boolean} [again] build it anew, whatever the object keeps
  * @returns {Map<string, string>}
  */
-function foldedKeys(buckets, again = false) {
+function foldedKeys(buckets) {
   /** @type {Map<string, string> | undefined} */
-  let index = /** @type {any} */ (buckets)[FOLDED];
-  if (index && !again) return index;
-  index = firstByFold(Object.keys(buckets));
-  Object.defineProperty(buckets, FOLDED, { value: index, configurable: true });
+  const kept = /** @type {any} */ (buckets)[FOLDED];
+  if (kept) return kept;
+  const index = firstByFold(Object.keys(buckets));
+  if (Object.isExtensible(buckets)) Object.defineProperty(buckets, FOLDED, { value: index });
   return index;
 }
 
@@ -201,5 +203,5 @@ function bucketBuilds(project, name) {
 }
 
 module.exports = {
-  addBuckets, bucketOf, bucketKey, bucketFor, countBuild, bucketBuilds, foldBuckets, matchingName, planetKey, setBucket, setProjectPath,
+  addBuckets, bucketOf, bucketKey, bucketFor, countBuild, bucketBuilds, foldBuckets, matchingEntry, planetKey, setBucket, setProjectPath,
 };

@@ -6,8 +6,7 @@
 const fs = require('fs');
 const path = require('path');
 const { fnv1a, mulberry32 } = require('../shared/hash');
-const { ignoresCase } = require('../path-safety');
-const { bucketBuilds, bucketFor, matchingName, planetKey } = require('../build-buckets');
+const { bucketBuilds, bucketFor, matchingEntry, planetKey } = require('../build-buckets');
 const { isStandInName, proceduralSystem, systemData } = require('../universe/planets');
 const { liveProject } = require('../universe/public-shape');
 
@@ -81,22 +80,23 @@ function getSystem(model, projectId) {
 async function getPlanet(model, projectId, planetName) {
   const project = model.projects.get(projectId);
   if (!project) return null;
-  const folderOf = () => (project.path && project.exists ? project.path : null);
   const root = planetName === '(root)';
-  let projectPath = folderOf();
   // Security: planetName arrives over IPC. Only a single plain directory segment
   // is a planet; anything with separators or dot-segments could walk outside the project.
-  if (projectPath && !root && !isPlanetSegment(planetName)) return null;
+  // Checked before any read, whatever folder the project has now or gets during one.
+  if (!root && !isPlanetSegment(planetName)) return null;
+  const folderOf = () => (project.path && project.exists ? project.path : null);
   // A project without a folder has stand-in planets only.
-  let folder = projectPath ? await readPlanet(projectPath, planetName, root) : null;
-  // The project is read from here on, after the disk, so a build counted during the read is in the answer.
-  if (model.projects.get(projectId) !== project) return null;
+  const readNow = async () => {
+    const projectPath = folderOf();
+    return { projectPath, folder: projectPath ? await readPlanet(projectPath, planetName, root) : null };
+  };
+  const current = () => model.projects.get(projectId) === project;
+  let { projectPath, folder } = await readNow();
   // A folder that changed meanwhile is read once more; one that changed again has no answer.
-  if (folderOf() !== projectPath) {
-    projectPath = folderOf();
-    folder = projectPath ? await readPlanet(projectPath, planetName, root) : null;
-    if (model.projects.get(projectId) !== project || folderOf() !== projectPath) return null;
-  }
+  if (current() && folderOf() !== projectPath) ({ projectPath, folder } = await readNow());
+  // The project is read from here on, after the disk, so a build counted during the read is in the answer.
+  if (!current() || folderOf() !== projectPath) return null;
   // Security follow-up: own keys only; 'constructor'/'__proto__' must not return a non-cloneable prototype value.
   const bucket = bucketFor(project, planetName);
   /** @param {string} name */
@@ -110,8 +110,8 @@ async function getPlanet(model, projectId, planetName) {
 }
 
 /**
- * What the disk has of a planet: the name its folder is listed by (null where case is ignored and
- * none is), its counts, and whether a planet of that name with no builds is a stand-in.
+ * What the disk has of a planet: the name its folder is listed by (null when none is), its
+ * counts, and whether a planet of that name with no builds is a stand-in.
  * @param {string} projectPath
  * @param {string} planetName
  * @param {boolean} root
@@ -121,26 +121,28 @@ async function readPlanet(projectPath, planetName, root) {
   if (root) return { name: planetName, read: await readFolder(projectPath, true), standIn: false };
   /** @type {fs.Dirent[] | null} */
   let entries = null;
-  let gone = false;
-  try { entries = await fs.promises.readdir(projectPath, { withFileTypes: true }); } catch (error) { gone = isGone(error); }
-  const listed = entries && matchingName(entries.map((entry) => entry.name), planetName, projectPath);
-  const entry = listed ? entries.find((candidate) => candidate.name === listed) : null;
+  /** @type {'gone' | 'none'} */
+  let failure = 'none';
+  try { entries = await fs.promises.readdir(projectPath, { withFileTypes: true }); } catch (error) { failure = isGone(error) ? 'gone' : 'none'; }
+  const entry = entries && matchingEntry(entries, planetName, projectPath);
   // Security: only what the project folder's listing calls a folder is read. A listing types every
   // link and junction as a link (lstat calls some junctions folders), so none is ever gone into.
   let read;
-  if (entry && entry.isDirectory()) read = await readFolder(path.join(projectPath, entry.name), false);
-  else if (entry ? entry.isSymbolicLink() : !entries && !gone) read = unread('none');
-  else read = unread('gone');
-  // As getSystem draws stand-ins: for a folder that is gone, or unread in a project folder that cannot be listed.
-  const standIn = isStandInName(planetName) && (read.folderRead === 'gone' || (read.folderRead === 'none' && !entries));
-  return { name: listed || (ignoresCase(projectPath) ? null : planetName), read, standIn };
+  if (!entries) read = unread(failure);
+  else if (!entry) read = unread('gone');
+  else if (entry.isDirectory()) read = await readFolder(path.join(projectPath, entry.name), false);
+  else read = unread(entry.isSymbolicLink() ? 'none' : 'gone');
+  // As getSystem draws stand-ins: in a project folder that cannot be listed, or for a folder that is gone.
+  const standIn = isStandInName(planetName) && (!entries || read.folderRead === 'gone');
+  return { name: entry ? entry.name : null, read, standIn };
 }
 
 /**
  * A planet's folder counts. '(root)' (`root`) stands for the top-level files alone, so it reads no
  * folder below them. Security: a folder is read only when its parent's listing calls it a folder,
  * so the walk never goes into a link; one swapped for a link after that listing can still be
- * followed, which takes a process already writing inside the project.
+ * followed, which takes a process already writing inside the project. getSystem and shallowCount
+ * read by the listing's type too, and the same holds for them.
  * @param {string} dir
  * @param {boolean} root
  * @returns {Promise<FolderRead>}
@@ -152,7 +154,6 @@ async function readFolder(dir, root) {
   const exts = new Map();
   /** @type {Promise<number | null>[]} one per counted file, awaited together after the walk */
   const sizes = [];
-  const list = (/** @type {string} */ d) => fs.promises.readdir(d, { withFileTypes: true });
 
   // Whether a folder the walk leaves unread holds a file at any depth, which the walk would count.
   /** @param {string} d @returns {Promise<boolean>} */
@@ -160,7 +161,7 @@ async function readFolder(dir, root) {
     if (peeks >= READ_PEEKS) return true;
     peeks++;
     let entries;
-    try { entries = await list(d); } catch { return true; }
+    try { entries = await fs.promises.readdir(d, { withFileTypes: true }); } catch { return true; }
     if (entries.some((e) => !e.isDirectory())) return true;
     for (const e of entries) {
       if (!ignored(e.name) && await holdsFiles(path.join(d, e.name))) return true;
@@ -176,7 +177,7 @@ async function readFolder(dir, root) {
     folders++;
     let entries;
     try {
-      entries = await list(d);
+      entries = await fs.promises.readdir(d, { withFileTypes: true });
     } catch (error) {
       if (depth > 0) partial = true;
       else failed = isGone(error) ? 'gone' : 'none';

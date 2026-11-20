@@ -18,4 +18,7 @@ const KEPT_APART = [['Docs', 5], ['docs', 7], ['odd', 6], ['src', 2], ['big', MA
 const KEPT_AS_ONE = [['Docs', 12], ['odd', 6], ['src', 2], ['big', MAX], ['__proto__', 3]];
 const KEPT_LARGER = [['Docs', 7], ['odd', 6], ['src', 2], ['big', MAX], ['__proto__', 3]];
 
-module.exports = { CASED_COUNTS, casedCounts, KEPT_APART, KEPT_AS_ONE, KEPT_LARGER };
+// A buckets object's own counts, in key order: reading buckets.__proto__ answers the prototype, not a count.
+const own = (buckets) => Object.keys(buckets).map((name) => [name, Object.getOwnPropertyDescriptor(buckets, name).value]);
+
+module.exports = { CASED_COUNTS, casedCounts, own, KEPT_APART, KEPT_AS_ONE, KEPT_LARGER };
