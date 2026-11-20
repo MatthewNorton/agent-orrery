@@ -88,7 +88,11 @@
         S.projectControl = { projectId, targetId, requestId, phase: 'pending', code: null };
         A.renderChromeNow(C.CHROME.PROJECT | C.CHROME.FOCUS);
       },
-      lower() { S.projectControl.phase = 'idle'; },
+      // Scheduled, not drawn here: a render that threw in raise() is not masked by a second one.
+      lower(raised) {
+        S.projectControl.phase = 'idle';
+        if (!raised) A.scheduleChrome(C.CHROME.PROJECT | C.CHROME.FOCUS);
+      },
       isCurrent,
     }, () => AU.openTerminal(targetId));
     if (!isCurrent()) return;

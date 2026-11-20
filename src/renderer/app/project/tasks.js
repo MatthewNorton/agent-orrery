@@ -148,7 +148,11 @@
         Object.assign(S.taskPanel, { saving: true, refreshAfterSave: false, status: '', error: false });
         renderTasksPanel();
       },
-      lower() { S.taskPanel.saving = false; },
+      // The panel is not on the chrome queue: its own frame draws it.
+      lower(raised) {
+        S.taskPanel.saving = false;
+        if (!raised) requestAnimationFrame(renderTasksPanel);
+      },
       isCurrent,
     }, operation);
     if (!isCurrent()) return;

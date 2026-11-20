@@ -246,15 +246,18 @@
     try { return (await call()) || FAILED; } catch (error) { if (onError) onError(error); return FAILED; }
   };
   // `call` settled as above with a busy flag up meanwhile. `busy.raise()` puts the flag up and shows
-  // it; `busy.lower()` takes it down once the call has settled, and also when raise() throws (that
-  // error is then passed on), unless `busy.isCurrent()` says the flag is no longer this call's: a
-  // newer request, or the panel opened again, holds it now.
+  // it; `busy.lower(raised)` takes it down once the call has settled, and also when raise() throws
+  // (that error is then passed on), unless `busy.isCurrent()` says the flag is no longer this call's:
+  // a newer request, or the panel opened again, holds it now. `raised` is false when raise() threw:
+  // what it drew may show the flag up, so lower() has it drawn again.
   AUR.settleBusy = async function settleBusy(busy, call, onError) {
+    let raised = false;
     try {
       busy.raise();
+      raised = true;
       return await AUR.settle(call, onError);
     } finally {
-      if (!busy.isCurrent || busy.isCurrent()) busy.lower();
+      if (!busy.isCurrent || busy.isCurrent()) busy.lower(raised);
     }
   };
   // A project's system as main has it now; null when it has none, its answer lists no planets, or

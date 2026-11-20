@@ -26,16 +26,16 @@ function setup() {
       status: '', error: false, focusAfterRender: null, interval: null, els: null,
     },
   };
-  const window = { AU: {} }, document = fakeDocument();
+  const window = { AU: {} }, document = fakeDocument(), frames = [];
   runRenderer('util.js', { window, document });
   window.AUR.app = { state };
-  runRenderer('app/project/tasks.js', { window, document }, exposed);
+  runRenderer('app/project/tasks.js', { window, document, requestAnimationFrame: (fn) => frames.push(fn) }, exposed);
   const app = window.AUR.app;
   app.wireTasksPanel();
   const asked = [];
   let answer = async (text) => ({ ok: true, items: [{ text, done: false, line: 0 }] });
   const add = (text) => app.mutateTasks(() => { asked.push(text); return answer(text); }, true, { successText: 'Task added' });
-  return { app, state, asked, add, answerWith: (next) => { answer = next; } };
+  return { app, state, asked, add, frames, answerWith: (next) => { answer = next; } };
 }
 
 test('tasks: one edit at a time, and the panel takes the next once it is answered', async () => {
@@ -50,19 +50,23 @@ test('tasks: one edit at a time, and the panel takes the next once it is answere
   assert.deepEqual([asked, state.taskPanel.saving, state.taskPanel.status], [['one'], false, 'Task added']);
 });
 
-test('tasks: an edit whose render throws leaves the panel open to the next edit', async () => {
-  const { state, asked, add } = setup();
-  const panel = state.taskPanel.els.panel;
+test('tasks: an edit whose render throws leaves the panel open to the next edit, and drawn so', async () => {
+  const { state, asked, add, frames } = setup();
+  const { panel, input } = state.taskPanel.els;
   const setAttribute = panel.setAttribute;
   panel.setAttribute = (name, value) => {
-    if (name === 'aria-busy' && value === 'true') throw new Error('render failed');
+    if (name === 'aria-busy' && value === 'true') { input.disabled = true; throw new Error('render failed'); }
     setAttribute(name, value);
   };
   await assert.rejects(add('one'), /render failed/);
   assert.deepEqual([state.taskPanel.saving, asked], [false, []], 'not left saving until the next view switch');
   panel.setAttribute = setAttribute;
+  assert.equal(frames.length, 1, 'the panel is drawn again, as the busy flag went up');
+  frames.shift()();
+  assert.deepEqual([panel.getAttribute('aria-busy'), input.disabled], ['false', false]);
   await add('two');
-  assert.deepEqual([asked, state.taskPanel.saving, state.taskPanel.status], [['two'], false, 'Task added']);
+  assert.deepEqual([asked, state.taskPanel.saving, state.taskPanel.status, frames.length], [['two'], false, 'Task added', 0],
+    'an edit drawn as it went up is drawn by its answer alone');
 });
 
 test('tasks: an edit the panel has moved on from leaves the flag to the next session\'s edit', async () => {

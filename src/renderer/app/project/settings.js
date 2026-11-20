@@ -159,7 +159,10 @@
         A.renderProjectSettings();
         S.projectSettings.els.close.focus();
       },
-      lower() { S.projectSettings.busy = false; },
+      lower(raised) {
+        S.projectSettings.busy = false;
+        if (!raised) A.scheduleChrome(A.const.CHROME.SETTINGS);
+      },
       isCurrent,
     }, call);
     return isCurrent() ? result : null;

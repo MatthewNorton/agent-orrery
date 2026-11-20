@@ -22,12 +22,13 @@ function runRenderer(file, globals, edit = (code) => code) {
 
 /**
  * Runs util.js and then `files` in a page whose AUR.app is `app`, and returns the page's AUR. `aur`
- * is what else AUR holds before the files run; `window` and `document` are the page's own.
+ * is what else AUR holds before the files run; `window` and `document` are the page's own, and
+ * `globals` the other names the files see (requestAnimationFrame, say).
  */
-function runApp(files, app, { document = {}, window = {}, aur = {} } = {}) {
+function runApp(files, app, { document = {}, window = {}, aur = {}, globals = {} } = {}) {
   runRenderer('util.js', { window, document });
   Object.assign(window.AUR, aur, { app });
-  for (const file of files) runRenderer(file, { window, document });
+  for (const file of files) runRenderer(file, { window, document, ...globals });
   return window.AUR;
 }
 

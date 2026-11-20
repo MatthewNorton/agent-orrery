@@ -14,9 +14,11 @@ function setup() {
     playback: { mode: 'live' }, replayTransitionPending: false,
   };
   state.projectSettings.els.close.focus = () => {};
-  const { app } = runApp(['app/project/settings.js'], { state }, { window: { AU: {} }, document: fakeDocument() });
+  const scheduled = [];
+  const app = { state, const: { CHROME: { SETTINGS: 32 } }, scheduleChrome: (mask) => scheduled.push(mask) };
+  runApp(['app/project/settings.js'], app, { window: { AU: {} }, document: fakeDocument() });
   app.renderProjectSettings = () => {};
-  return { app, state };
+  return { app, state, scheduled };
 }
 
 test('settings requests: one at a time; a request the dialog has left behind answers nothing and frees nothing', async () => {
@@ -40,11 +42,13 @@ test('settings requests: one at a time; a request the dialog has left behind ans
   assert.deepEqual([await current, state.projectSettings.busy], ['next', false]);
 });
 
-test('settings requests: one whose render throws leaves the dialog open to the next', async () => {
-  const { app, state } = setup();
+test('settings requests: one whose render throws leaves the dialog open to the next, and drawn so', async () => {
+  const { app, state, scheduled } = setup();
   let renders = 0;
   app.renderProjectSettings = () => { if (renders++ === 0) throw new Error('render failed'); };
   await assert.rejects(app.runSettingsRequest('Working', async () => 'never asked'), /render failed/);
   assert.equal(state.projectSettings.busy, false, 'not left busy for the session');
+  assert.deepEqual(scheduled, [32], 'the dialog is drawn again, as the busy flag went up');
   assert.equal(await app.runSettingsRequest('Working', async () => 'answered'), 'answered');
+  assert.deepEqual(scheduled, [32], 'a request drawn as it went up is drawn by its caller alone');
 });

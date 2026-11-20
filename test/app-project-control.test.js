@@ -11,9 +11,10 @@ function setup() {
   const pending = deferred();
   const state = { projectControl: { projectId: null }, terminalRequestSerial: 0,
     playback: { mode: 'live' }, replayTransitionPending: false, replayBusy: false };
-  const app = { state, const: { CHROME: { PROJECT: 1, FOCUS: 2 } }, renderChromeNow() {} };
+  const scheduled = [];
+  const app = { state, const: { CHROME: { PROJECT: 1, FOCUS: 2 } }, renderChromeNow() {}, scheduleChrome: (mask) => scheduled.push(mask) };
   runApp(['app/project/control.js'], app, { window: { AU: { openTerminal(id) { calls.push(id); return pending.promise; } } } });
-  return { app, state, calls, pending };
+  return { app, state, calls, pending, scheduled };
 }
 
 test('cockpit terminal actions preserve the exact ship ID through the bridge', async () => {
@@ -46,12 +47,13 @@ test('project actions retain their project ID and replay blocks both target type
 });
 
 test('a render that throws as a terminal is asked for leaves the button free, not disabled on Opening…', async () => {
-  const { app, calls } = setup();
+  const { app, calls, scheduled } = setup();
   let renders = 0;
   app.renderChromeNow = () => { if (renders++ === 0) throw new Error('render failed'); };
   await assert.rejects(app.requestProjectTerminal('project'), /render failed/);
   const { phase, disabled, buttonText } = app.projectControlPresentation('project');
   assert.deepEqual([phase, disabled, buttonText, calls], ['idle', false, 'Open Terminal', []], 'and main was not asked');
+  assert.deepEqual(scheduled, [1 | 2], 'the card and the cockpit are drawn again, as the request went up');
 });
 
 test('a terminal kept in the background is reported as found, not missing', async () => {

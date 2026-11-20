@@ -16,8 +16,10 @@ function setup() {
   const asked = [];
   let answer = Promise.resolve({ ok: true });
   const AU = { rootTaskRetry: (id) => { asked.push(id); return answer; } };
-  const { app } = runApp(['app/ideas.js'], { state, renderIdeas() {} }, { window: { AU }, document: fakeDocument() });
-  return { app, state, asked, answerWith: (next) => { answer = next; } };
+  const scheduled = [];
+  const app = { state, const: { CHROME: { IDEAS: 64 } }, renderIdeas() {}, scheduleChrome: (mask) => scheduled.push(mask) };
+  runApp(['app/ideas.js'], app, { window: { AU }, document: fakeDocument() });
+  return { app, state, asked, scheduled, answerWith: (next) => { answer = next; } };
 }
 
 test('ideas: one edit at a time, and the queue takes the next when it is answered', async () => {
@@ -33,12 +35,14 @@ test('ideas: one edit at a time, and the queue takes the next when it is answere
     [['one'], false, 'That idea is already being updated.', true]);
 });
 
-test('ideas: an edit whose render throws leaves the queue open to the next edit', async () => {
-  const { app, state, asked } = setup();
+test('ideas: an edit whose render throws leaves the queue open to the next edit, and drawn so', async () => {
+  const { app, state, asked, scheduled } = setup();
   let renders = 0;
   app.renderIdeas = () => { if (renders++ === 0) throw new Error('render failed'); };
   await assert.rejects(app.retryIdea('one'), /render failed/);
   assert.deepEqual([state.ideaPanel.busy, app.ideaMutationsDisabled(), asked], [false, false, []], 'not left busy for the session');
+  assert.deepEqual(scheduled, [64], 'the panel is drawn again, as the busy flag went up');
   await app.retryIdea('two');
   assert.deepEqual([asked, state.ideaPanel.busy, state.ideaPanel.status], [['two'], false, 'Agent start requested again']);
+  assert.deepEqual(scheduled, [64], 'an edit drawn as it went up is drawn by its answer alone');
 });

@@ -56,7 +56,10 @@
         S.projectForget = { projectId, pending: true, note: '' };
         A.renderChromeNow(C.CHROME.PROJECT);
       },
-      lower() { S.projectForget.pending = false; },
+      lower(raised) {
+        S.projectForget.pending = false;
+        if (!raised) A.scheduleChrome(C.CHROME.PROJECT);
+      },
     }, () => A.forgetProject(projectId));
     S.projectForget.note = result.ok === true ? '' : forgetFailureText(result.code);
     A.renderChromeNow(C.CHROME.PROJECT);

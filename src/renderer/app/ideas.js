@@ -108,7 +108,10 @@
         Object.assign(S.ideaPanel, { busy: true, refreshAfterBusy: false, status: '', error: false });
         A.renderIdeas();
       },
-      lower() { S.ideaPanel.busy = false; },
+      lower(raised) {
+        S.ideaPanel.busy = false;
+        if (!raised) A.scheduleChrome(A.const.CHROME.IDEAS);
+      },
     }, operation);
     if (result.ok === true) {
       S.ideaPanel.status = successText;

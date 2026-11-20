@@ -17,9 +17,11 @@ function setup() {
   const asked = [], logged = [];
   let answer = async () => ({ ok: true, canceled: false });
   const AU = { projectForget: (id) => { asked.push(id); return answer(); } };
+  const scheduled = [];
   const app = { state, const: { CHROME: { PROJECT: 1 } }, renderChromeNow() {}, adoptLiveRestart() {} };
+  app.scheduleChrome = (mask) => scheduled.push(mask);
   runApp(['app/project/forget.js'], app, { window: { AU }, document: fakeDocument(), aur: { log: (...args) => logged.push(args.join(' ')) } });
-  return { app, state, asked, logged, answerWith: (next) => { answer = next; } };
+  return { app, state, asked, logged, scheduled, answerWith: (next) => { answer = next; } };
 }
 
 test('forget from the card: pending while main is asked, then a note for a refusal', async () => {
@@ -37,11 +39,12 @@ test('forget from the card: pending while main is asked, then a note for a refus
 });
 
 test('forget from the card: a render or a call that throws leaves the card free to forget again', async () => {
-  const { app, state, asked, answerWith } = setup();
+  const { app, state, asked, scheduled, answerWith } = setup();
   let renders = 0;
   app.renderChromeNow = () => { if (renders++ === 0) throw new Error('render failed'); };
   await assert.rejects(app.forgetFromCard('p'), /render failed/);
   assert.deepEqual([state.projectForget.pending, asked], [false, []], 'not left pending for the session, and main was not asked');
+  assert.deepEqual(scheduled, [1], 'the card is drawn again, as the forget went up');
 
   answerWith(async () => { throw new Error('main is away'); });
   await app.forgetFromCard('p');
@@ -50,6 +53,7 @@ test('forget from the card: a render or a call that throws leaves the card free 
   answerWith(async () => ({ ok: true, canceled: false }));
   await app.forgetFromCard('p');
   assert.deepEqual([state.projectForget, asked], [{ projectId: 'p', pending: false, note: '' }, ['p', 'p']]);
+  assert.deepEqual(scheduled, [1], 'a forget drawn as it went up is drawn by its answer alone');
 });
 
 test('forget from the card: a reseed that fails after main forgot the project is logged, and the card says what main did', async () => {
