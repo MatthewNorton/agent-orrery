@@ -46,9 +46,8 @@
   const HULL_ROOT = '../../assets/ships/';
   // Hulls carry their detail as geometry (10k to 58k triangles each), and past its budget a view
   // steps down to darts. A system or planet view holds fifty-one ships of the first rank (Petrel,
-  // 17,544): the most it drew inside a 60 fps frame on an integrated GPU (about 14 ms, nearly all
-  // of it on the CPU, which a hull loads by its draws, so triangles stand in for them). The
-  // universe map instances its hulls and holds seventy (about 4 ms).
+  // 17,544) and the universe map seventy; every view draws them as instances of a template per
+  // provider.
   const TRIANGLE_BUDGET = { near: 900000, far: 1240000 };
   /** @type {WeakMap<object, SceneState>} */
   const sceneStates = new WeakMap();

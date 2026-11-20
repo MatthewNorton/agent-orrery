@@ -347,15 +347,21 @@ Design tokens (put in `:root`):
   `assets/ships/manifest.json`: the hull is the highest rank whose `minBuilds`
   the ship's `builds` has reached (Scout 0, Workhorse 5, Capital 20, Flagship
   60); display length grows 1.9× over the ladder. A drone flies the first rank
-  at `AUR.DRONE_SCALE` of its size. Each hull is one file: the universe map
-  instances it from a per-provider template, the system and planet views clone
-  it (so focus mode can fade ships one by one; an opaque hull material gives
-  its transparency mode up, because Babylon ignores a mesh's visibility while
-  its material is set opaque or cut-out; blended glass fades as it is; a
-  cut-out keeps its mode and does not fade, and no hull has one);
+  at `AUR.DRONE_SCALE` of its size. Each hull is one file, and every view
+  draws its ships as instances of a hidden template per provider (the map's
+  self-lit, the near views' lit, so the template carries the light layer: an
+  instance is lit as its source). An instance shows its template's material
+  and visibility, so focus mode fades a ship by moving it to its provider's
+  template at that visibility (`AUR.ships.fade(scene, shipId, visibility)`:
+  0.16 for the others, 0 for the ship it is inside of, 1 to restore), which
+  rebuilds the same hull file and palette and leaves the triangle budget as it
+  is; an opaque hull material gives its transparency mode up, because Babylon
+  ignores a mesh's visibility while its material is set opaque or cut-out;
+  blended glass fades as it is; a cut-out keeps its mode and does not fade,
+  and no hull has one;
   a view steps down to the dart past its hull triangle budget: 900k in a
   system or planet view, which holds fifty-one ships of the first rank, and
-  1.24M on the universe map, whose hulls are instances, which holds seventy. Ship size is one policy (`AUR.SHIP_SIZE` per
+  1.24M on the universe map, which holds seventy. Ship size is one policy (`AUR.SHIP_SIZE` per
   view, `AUR.fitShip` with a pixel floor so a hull sized to its planets still
   reads from the default orbit). `AUR.ships.refresh(scene, ship)` swaps the hull
   inside the asset root the scene already holds; `app/boot.js` calls it after
@@ -367,11 +373,11 @@ Design tokens (put in `:root`):
   `AUR.shipModels.inPlaceOf`); the frozen manifest is unchanged. Petrel
   (`ships/petrel/model.js`) flies the Scout rank, so it is also every drone.
   Its container is the ship built once per scene and merged into one mesh
-  with a sub-mesh per finish, because a hull's cost is its mesh count; from
-  there it goes the way of a hull file's container (the hull entry
-  `inPlaceOf` returns carries the `model`, which is what tells the two
-  apart): the universe map instances a per-provider template, the system and
-  planet views copy the mesh (shared geometry, the ship's own visibility). A
+  with a sub-mesh per finish, because every mesh of a hull is placed and
+  culled once per ship; from there it goes the way of a hull file's
+  container (the hull entry `inPlaceOf` returns carries the `model`, which is
+  what tells the two apart): every view instances a per-provider template, so
+  all the Petrels of a provider draw in one draw per finish. A
   model keeps the finishes it was authored with: its
   materials reflect its own probe and use their own tone curve (ACES), and in
   the views that light their ships three fixed lights are all that reaches a
