@@ -175,6 +175,13 @@ test('a hull request whose dart is gone or that is superseded while it waits on 
   assert.equal(await assets.ships.refresh(scene, ship('c', 3)), stepped);
   assert.deepEqual(assets.loads.splice(0), ['mid-far.glb'], 'the file a promotion still wanted steps down to');
 
+  // Nor is a file loaded for a ship that leaves before its hull's first file starts loading.
+  const early = assets.fallback('f');
+  const gone = assets.ships.upgrade(scene, ship('f', 10), early);
+  early.dispose();
+  assert.equal(await gone, null);
+  assert.deepEqual(assets.loads, [], 'no file for a ship gone before its first load');
+
   // Nor is a hull built for a ship that leaves while a file it fits loads.
   held = assets.hold();
   const left = assets.fallback('e');

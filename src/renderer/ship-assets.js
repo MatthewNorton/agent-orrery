@@ -37,7 +37,8 @@
  * @property {(hull: HullEntry, lod: 'far' | 'near') => HullFile[]} hullFiles
  * @property {(scene: any, state: SceneState, file: HullFile) => Promise<HullRecord | null>} ensureContainer
  * @property {(scene: any, state: SceneState, record: HullRecord, released: number) => boolean} fitsBudget
- * @property {(scene: any, state: SceneState, hull: HullEntry, released: number, live: () => boolean) => Promise<HullAsset | null>} resolveAsset
+ * @property {<T>(scene: any, state: SceneState, hull: HullEntry, released: () => number, live: () => boolean,
+ *   build: (asset: HullAsset) => T) => Promise<T | null>} resolveAsset
  */
 
 (function () {
@@ -238,23 +239,29 @@
   }
 
   /**
-   * Loads the first of the hull's files that fits the scene's triangle budget, while the request
-   * is live: one that has since ended (its ship gone, its swap superseded) starts no further load.
-   * @param {number} released triangles the ship gives back if this replaces its hull
+   * Builds the hull from the first of its files that fits the scene's triangle budget, in the
+   * callback that finds it fits. A build is synchronous, so no other hull is built between that
+   * check and this one, and ships waiting on one container keep to the budget as ships that come
+   * one by one do. A request that has ended (its scene or ship gone, its swap superseded) starts
+   * no further load and builds nothing.
+   * @template T
+   * @param {() => number} released triangles the ship gives back if this replaces its hull
    * @param {() => boolean} live
-   * @returns {Promise<HullAsset | null>}
+   * @param {(asset: HullAsset) => T} build
+   * @returns {Promise<T | null>}
    */
-  function resolveAsset(scene, state, hull, released, live) {
+  function resolveAsset(scene, state, hull, released, live, build) {
     const files = hullFiles(hull, viewLod(scene) || 'far');
+    const ended = () => isSceneDisposed(scene, state) || !live();
     const tryFile = (index) => {
-      if (!live()) return Promise.resolve(null);
+      if (ended()) return Promise.resolve(null);
       if (index >= files.length) {
         logBudget(scene);
         return Promise.resolve(null);
       }
       return ensureContainer(scene, state, files[index]).then((record) => {
-        if (!record || isSceneDisposed(scene, state)) return null;
-        if (fitsBudget(scene, state, record, released)) return { ...files[index], record };
+        if (!record || ended()) return null;
+        if (fitsBudget(scene, state, record, released())) return build({ ...files[index], record });
         return tryFile(index + 1);
       });
     };
