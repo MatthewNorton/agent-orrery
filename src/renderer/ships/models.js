@@ -106,15 +106,22 @@
   }
 
   // Material.clone() would clone each texture too (and give a painted one a blank canvas): a copy
-  // shares the model's.
+  // shares the model's. The model's finish gets its maps back whether or not the clone is made,
+  // and a copy that cannot take them is not left in the scene.
   /** @param {BABYLON.PBRMaterial} material @param {string} name */
   function copyMaterial(material, name) {
     const textures = TEXTURE_SLOTS.map((slot) => material[slot]);
     for (const slot of TEXTURE_SLOTS) material[slot] = null;
-    const copy = material.clone(name);
-    TEXTURE_SLOTS.forEach((slot, i) => { material[slot] = copy[slot] = textures[i]; });
-    copy.imageProcessingConfiguration = material.imageProcessingConfiguration;
-    return copy;
+    let copy;
+    try {
+      copy = material.clone(name);
+    } finally {
+      TEXTURE_SLOTS.forEach((slot, i) => { material[slot] = textures[i]; });
+    }
+    return AUR.dressed(copy, (made) => {
+      TEXTURE_SLOTS.forEach((slot, i) => { made[slot] = textures[i]; });
+      made.imageProcessingConfiguration = material.imageProcessingConfiguration;
+    });
   }
 
   /**

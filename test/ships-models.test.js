@@ -300,3 +300,29 @@ test('a trim copy that cannot be dressed is not left in the scene, and the next 
   assert.deepEqual(made(), [before[0] + 1, before[1] + 1]);
   assert.notEqual(worn.subMaterials[0], lamp, 'the hull wears the lamp in the ship color');
 }));
+
+test('a trim copy that cannot be made leaves the model finish every map it had, and the next copy is whole', () => {
+  onScene((scene, models, petrel) => {
+    const finish = models.container(scene, petrel).meshes[0].material.subMaterials.find((made) => made.name === 'pearl pressure hull');
+    const slots = ['albedoTexture', 'bumpTexture', 'metallicTexture', 'emissiveTexture', 'reflectionTexture'];
+    const maps = slots.map((slot) => finish[slot]);
+    const mapsOf = (material) => slots.map((slot) => material[slot]);
+    const materials = new Map();
+    const count = scene.materials.length;
+    const wear = () => models.material(materials, petrel, 'claude', '#d97757', finish);
+    const clone = finish.clone;
+
+    finish.clone = () => { throw new Error('no clone'); };
+    assert.throws(wear, /no clone/);
+    assert.ok(sameItems(mapsOf(finish), maps), 'the finish keeps its maps when the clone fails');
+    finish.clone = function (name) { // a copy made that cannot take the model's tone curve
+      return Object.defineProperty(clone.call(this, name), 'imageProcessingConfiguration', { set() { throw new Error('no tone curve'); } });
+    };
+    assert.throws(wear, /no tone curve/);
+    assert.ok(sameItems(mapsOf(finish), maps), 'and when the copy cannot take them');
+    assert.deepEqual([scene.materials.length, materials.size], [count, 0], 'no copy is left in the scene or kept');
+
+    delete finish.clone;
+    assert.ok(maps.every(Boolean) && sameItems(mapsOf(wear()), maps), 'the next copy shares every map');
+  });
+});
