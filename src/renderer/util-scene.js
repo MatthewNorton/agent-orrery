@@ -21,12 +21,13 @@
   };
 
   // Disposes what a failure left behind without losing that failure: a dispose that throws is
-  // logged, and the caller goes on to report its own cause.
+  // logged once per message, and the caller goes on to report its own cause.
   AUR.disposeLogged = function (item, name) {
     try {
       item.dispose();
     } catch (error) {
-      AUR.log(name + ' could not be disposed (' + ((error && error.message) || error) + ').');
+      const message = name + ' could not be disposed (' + ((error && error.message) || error) + ').';
+      AUR.logOnce(message, message);
     }
   };
 
@@ -36,7 +37,7 @@
     try {
       dress(material);
     } catch (error) {
-      AUR.disposeLogged(material, 'A material that could not be dressed');
+      AUR.disposeLogged(material, 'Undressed material ' + material.name);
       throw error;
     }
     return material;

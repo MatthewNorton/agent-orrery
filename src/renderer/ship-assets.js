@@ -64,19 +64,12 @@
   const TRIANGLE_BUDGET = { near: 900000, far: 1240000 };
   /** @type {WeakMap<object, SceneState>} */
   const sceneStates = new WeakMap();
-  const logged = new Set();
-
-  function logOnce(key, message) {
-    if (logged.has(key)) return;
-    logged.add(key);
-    AUR.log(message);
-  }
 
   // A failure, its cause and what it leaves, logged once per message: one that every ship meets
   // is logged once, and a different cause or outcome is logged too.
   function logFailure(failure, error, outcome) {
     const message = failure + ' (' + String((error && error.message) || error) + ')' + (outcome ? '; ' + outcome : '.');
-    logOnce(message, message);
+    AUR.logOnce(message, message);
   }
 
   // Runs each step of a clean-up, each named by what it could not do (' could not be disposed').
@@ -282,7 +275,8 @@
   }
 
   function logBudget(scene) {
-    logOnce('budget:' + scene.uid, 'Ship hull triangle budget reached; ships that do not fit keep the hull or dart they have.');
+    AUR.logOnce('budget:' + scene.uid,
+      'Ship hull triangle budget reached; ships that do not fit keep the hull or dart they have.');
   }
 
   /**

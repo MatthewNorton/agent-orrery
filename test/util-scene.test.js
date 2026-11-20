@@ -131,7 +131,20 @@ test('AUR.dressed returns a material once dressed, and disposes one that cannot 
 
   const logs = [];
   AUR.log = (message) => logs.push(message);
-  const stuck = { dispose() { throw new Error('no dispose'); } };
+  const stuck = { name: 'lamp claude', dispose() { throw new Error('no dispose'); } };
   assert.throws(() => AUR.dressed(stuck, () => { throw fault; }), (error) => error === fault, 'the cause stays the dressing\'s');
-  assert.deepEqual(logs, ['A material that could not be dressed could not be disposed (no dispose).']);
+  assert.deepEqual(logs, ['Undressed material lamp claude could not be disposed (no dispose).']);
+});
+
+test('AUR.disposeLogged logs a dispose that throws once per message', () => {
+  const AUR = loadUtilLayer();
+  const logs = [];
+  AUR.log = (message) => logs.push(message);
+  let cause = 'no dispose';
+  const stuck = { dispose() { throw new Error(cause); } };
+  AUR.disposeLogged(stuck, 'A copy');
+  AUR.disposeLogged(stuck, 'A copy');
+  cause = 'context lost';
+  AUR.disposeLogged(stuck, 'A copy');
+  assert.deepEqual(logs, ['A copy could not be disposed (no dispose).', 'A copy could not be disposed (context lost).']);
 });
