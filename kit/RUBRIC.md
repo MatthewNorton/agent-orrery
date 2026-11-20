@@ -15,7 +15,7 @@ hard-fail items.
 | M4 | Combined stdout/stderr has no `Uncaught`, `ReferenceError`, `TypeError`, `SyntaxError`, `is not defined`, `Failed to load resource` | any match (Electron GPU/`Autofill` noise is already filtered by the script) |
 | M5 (soft) | `state.json` ships length ≥ 1 | warn only — the synthetic profile always has live sessions, so a warning there means ship detection regressed; with `--real` it depends on a supported provider session being live |
 | M6 | `.shots/ux-state.json` parses; the left-rail modules folded and unfolded, and the panels button folded and opened both rails | any of the four did not happen, or the file is unreadable |
-| M7 | `ux-state.json` reports `mainProcess.noAsar: true` | the main process ran with Electron asar handling on (`process.noAsar`, set first thing in `src/main/main.js`; see `SECURITY.md`) |
+| M7 | `ux-state.json` reports `mainProcess.noAsar: true`, and `mainProcess.asar` (`src/main/harness/asar-check.js`, run in the main process at the end of the shots): a malformed and a valid `*.asar` in a temporary folder read as plain files by `fs.promises.lstat` and by `readdir` with file types, and are deleted straight after | the main process ran with Electron asar handling on (`process.noAsar`, set first thing in `src/main/main.js`; see `SECURITY.md`), or its fs opened, parsed or held open a file named `*.asar` |
 
 ## Visual — universe shot vs `3.universe-map-view.png`
 
