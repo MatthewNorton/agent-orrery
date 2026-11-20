@@ -550,7 +550,7 @@ test('the triangle budget steps near hulls down to far before falling back to th
   assert.equal(roots[1].metadata.assetLod, 'far');
 });
 
-// The counts the budget comment, kit/SPEC.md and docs/TASK-LIST.md state, at the size Petrel was imported at.
+// The counts the budget comment and kit/SPEC.md state, at the size Petrel was imported at.
 test('a near view holds fifty-one ships of the first rank and the universe map, with a budget of its own, seventy', async () => {
   const petrel = JSON.parse(fs.readFileSync(path.join(RENDERER, 'ships', 'petrel', 'source', 'source.json'), 'utf8'));
   const { triangles } = petrel.geometry;
