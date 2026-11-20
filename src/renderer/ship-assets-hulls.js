@@ -1,7 +1,7 @@
 // @ts-check
-// Builds a ship's hull from a loaded model: provider livery materials,
-// instances of a per-provider template on the universe map or clones in the system and planet
-// views, and in-place swaps on promotion.
+// Builds a ship's hull from a loaded model: provider livery materials, instances of a template
+// per provider and visibility in every view, in-place swaps on promotion and moves to the faded
+// template while focus mode fades the ship.
 'use strict';
 
 /**
@@ -10,6 +10,7 @@
  * @property {(hull: HullEntry, ship: any) => string} lookOf
  * @property {(scene: any, state: SceneState, hull: HullEntry, asset: HullAsset, ship: any) => ShipEntry | null} createShipEntry
  * @property {(scene: any, state: SceneState, entry: ShipEntry, hull: HullEntry, asset: HullAsset, ship: any) => boolean} swapHull
+ * @property {(scene: any, state: SceneState, entry: ShipEntry, visibility: number) => boolean} fadeHull
  */
 
 (function () {
@@ -206,9 +207,14 @@
 
   // ---------- building a hull ----------
 
-  /** One tinted, hidden copy of a hull per provider; universe ships (lightless, self-lit) draw as its instances. */
-  function providerTemplate(scene, state, asset, ship) {
-    const key = asset.file + '|' + paletteKey(ship);
+  /**
+   * One tinted, hidden copy of a hull per provider and visibility: every ship of that look draws
+   * as its instances. An instance takes its source's material, visibility and lights, so a ship
+   * that focus mode fades is moved to the template at its visibility (fadeHull), and the template
+   * carries the layer of the lights that reach the hull.
+   */
+  function providerTemplate(scene, state, asset, ship, visibility, layer) {
+    const key = asset.file + '|' + paletteKey(ship) + '|' + visibility;
     let roots = state.templates.get(key);
     if (roots) return roots;
     const entries = asset.record.container.instantiateModelsToScene(
@@ -216,21 +222,23 @@
       false,
       { doNotInstantiate: true }
     );
+    // The lightless map's hulls light themselves, and so does a far file stepped down to up close.
+    const selfLight = viewLod(scene) === 'far' || asset.lod === 'far';
     for (const mesh of childMeshes(entries.rootNodes)) {
-      mesh.material = hullMaterial(scene, state, asset, true, ship, mesh.material);
+      mesh.material = hullMaterial(scene, state, asset, selfLight, ship, mesh.material);
       mesh.isPickable = false;
       mesh.isVisible = false;
+      mesh.visibility = visibility;
+      mesh.layerMask |= layer;
     }
     roots = entries.rootNodes;
     state.templates.set(key, roots);
     return roots;
   }
 
-  // Instances share their source's material and visibility, so only the
-  // universe map (no focus mode fading ships one by one) instances hulls.
-  function placeInstances(scene, state, asset, ship, pivot) {
+  function placeInstances(scene, state, asset, ship, pivot, visibility, layer) {
     const created = [];
-    for (const node of providerTemplate(scene, state, asset, ship)) {
+    for (const node of providerTemplate(scene, state, asset, ship, visibility, layer)) {
       node.instantiateHierarchy(pivot, undefined, (source, copy) => {
         copy.name = 'ship_' + String(ship.id) + '_' + source.name;
         created.push(copy);
@@ -241,26 +249,12 @@
     return meshes;
   }
 
-  function placeClones(scene, state, asset, ship, pivot, selfLight) {
-    const entries = asset.record.container.instantiateModelsToScene(
-      (sourceName) => 'ship_' + String(ship.id) + '_' + sourceName,
-      false,
-      { doNotInstantiate: true }
-    );
-    for (const node of entries.rootNodes) node.parent = pivot;
-    const meshes = childMeshes(entries.rootNodes);
-    for (const mesh of meshes) {
-      mesh.material = hullMaterial(scene, state, asset, selfLight, ship, mesh.material);
-    }
-    return meshes;
-  }
-
   /**
    * Builds the correction node (rotation, class display size, offset) holding
    * the hull's meshes. Returns null when the model cannot be instantiated.
    * @param {HullEntry} hull @param {HullAsset} asset
    */
-  function buildHull(scene, state, hull, asset, ship) {
+  function buildHull(scene, state, hull, asset, ship, visibility) {
     const correction = new BABYLON.TransformNode('ship_correction_' + ship.id, scene);
     const pivot = new BABYLON.TransformNode('ship_pivot_' + ship.id, scene);
     pivot.parent = correction;
@@ -269,18 +263,16 @@
     correction.scaling.setAll(Number(data.scale) || 1);
     const offset = Array.isArray(data.offset) ? data.offset : [0, 0, 0];
     pivot.position.set(Number(offset[0]) || 0, Number(offset[1]) || 0, Number(offset[2]) || 0);
+    // Which ship-only lights reach the hull: the models' own, or the fleet's key and rim.
+    const layer = asset.model ? AUR.shipModels.LAYER : AUR.SHIP_LAYER;
     let meshes;
     try {
-      meshes = viewLod(scene) === 'far'
-        ? placeInstances(scene, state, asset, ship, pivot)
-        : placeClones(scene, state, asset, ship, pivot, asset.lod === 'far'); // a stepped-down far file lights itself
+      meshes = placeInstances(scene, state, asset, ship, pivot, visibility, layer);
     } catch (error) {
       correction.dispose();
       logOnce('instance:' + hull.id, 'Hull ' + hull.id + ' could not be instantiated; using procedural hulls.');
       return null;
     }
-    // Which ship-only lights reach the hull: the models' own, or the fleet's key and rim.
-    const layer = asset.model ? AUR.shipModels.LAYER : AUR.SHIP_LAYER;
     for (const mesh of meshes) {
       mesh.isPickable = false;
       mesh.layerMask |= layer;
@@ -306,7 +298,7 @@
 
   /** @param {HullEntry} hull @param {HullAsset} asset @returns {ShipEntry | null} */
   function createShipEntry(scene, state, hull, asset, ship) {
-    const built = buildHull(scene, state, hull, asset, ship);
+    const built = buildHull(scene, state, hull, asset, ship, 1);
     if (!built) return null;
     const root = new BABYLON.Mesh('ship_asset_' + ship.id, scene);
     built.correction.parent = root;
@@ -315,7 +307,7 @@
     root.isPickable = false;
     /** @type {ShipEntry} */
     const entry = {
-      root, correction: built.correction, hull, triangles: asset.record.triangles,
+      root, correction: built.correction, hull, asset, ship, visibility: 1, triangles: asset.record.triangles,
       look: lookOf(hull, ship), wanted: lookOf(hull, ship), fallback: null,
     };
     const shipId = String(ship.id);
@@ -328,17 +320,35 @@
     return entry;
   }
 
+  // Builds the hull at a visibility and puts it in place of the entry's own, under the same root.
   /** @param {ShipEntry} entry @param {HullEntry} hull @param {HullAsset} asset */
-  function swapHull(scene, state, entry, hull, asset, ship) {
-    const built = buildHull(scene, state, hull, asset, ship);
-    if (!built) return false;
+  function rebuild(scene, state, entry, hull, asset, ship, visibility) {
+    const built = buildHull(scene, state, hull, asset, ship, visibility);
+    if (!built) return null;
     built.correction.parent = entry.root;
     entry.correction.dispose(false, false);
     state.triangles += asset.record.triangles - entry.triangles;
-    entry.triangles = asset.record.triangles;
-    entry.correction = built.correction;
-    entry.hull = hull;
-    entry.look = lookOf(hull, ship);
+    Object.assign(entry, {
+      correction: built.correction, hull, asset, ship, visibility,
+      triangles: asset.record.triangles, look: lookOf(hull, ship),
+    });
+    return built;
+  }
+
+  /**
+   * Moves a ship's hull to the template at a visibility (focus mode's fade): the same hull file,
+   * palette and triangles, so the budget and a pending refresh are untouched.
+   * @param {ShipEntry} entry
+   */
+  function fadeHull(scene, state, entry, visibility) {
+    if (entry.visibility === visibility) return true;
+    return Boolean(rebuild(scene, state, entry, entry.hull, entry.asset, entry.ship, visibility));
+  }
+
+  /** @param {ShipEntry} entry @param {HullEntry} hull @param {HullAsset} asset */
+  function swapHull(scene, state, entry, hull, asset, ship) {
+    const built = rebuild(scene, state, entry, hull, asset, ship, entry.visibility);
+    if (!built) return false;
     entry.root.material = built.evidence;
     entry.root.metadata = { ...(entry.root.metadata || {}), ...hullMetadata(hull, asset, ship) };
     if (entry.fallback && entry.fallback.metadata) {
@@ -348,6 +358,6 @@
   }
 
   /** @type {ShipAssetsHulls} */
-  const hulls = { lookOf, createShipEntry, swapHull };
+  const hulls = { lookOf, createShipEntry, swapHull, fadeHull };
   Object.assign(core, hulls);
 })();

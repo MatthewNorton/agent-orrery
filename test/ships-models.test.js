@@ -81,15 +81,48 @@ test('a model container holds the dressed ship out of the scene, as one mesh wit
     }
     hull.visibility = 1;
     assert.equal(new Set(hull.material.subMaterials.map((finish) => finish.reflectionTexture)).size, 1, 'one probe');
-
-    // A ship is a copy: the container's geometry, its own visibility.
-    const copy = (name) => held.instantiateModelsToScene((source) => name + source, false, { doNotInstantiate: true }).rootNodes[0];
-    const a = copy('a_'), b = copy('b_');
-    a.visibility = 0.16;
-    same(scene.meshes, [a, b]);
-    same([a.geometry, a.material, b.visibility], [b.geometry, hull.material, 1]);
   });
 });
+
+// AUR.ships on the real Babylon build, Petrel flying the Scout rank of the manifest on disk.
+function loadShips() {
+  const AUR = load();
+  const fetch = async () => ({ ok: true, status: 200, json: async () => manifest });
+  for (const file of ['ship-assets.js', 'ship-assets-hulls.js', 'ship-assets-api.js']) runRenderer(file, { window: { AUR }, BABYLON, fetch });
+  return AUR;
+}
+
+test('in a system every Petrel of a provider is an instance of one template, lit by the model lights, and a faded one blends', () =>
+  withCanvas(() => onNullScene(BABYLON, async (scene) => {
+    const AUR = loadShips();
+    scene.metadata = { view: 'system' };
+    AUR.shipModels.lights(scene);
+    const fly = (id) => AUR.ships.upgrade(scene, { id, provider: 'claude', kind: 'main', project: 'p', builds: 0 }, new BABYLON.Mesh('dart ' + id, scene));
+    const a = await fly('a'), b = await fly('b');
+    const hullOf = (root) => {
+      const instances = root.getChildMeshes(false).filter((mesh) => mesh.isAnInstance);
+      assert.equal(instances.length, 1, 'one merged mesh per ship');
+      return instances[0];
+    };
+    assert.equal(a.metadata.assetHullId, 'petrel');
+    const template = hullOf(a).sourceMesh;
+    assert.equal(hullOf(b).sourceMesh, template, 'one template for the provider');
+    assert.equal(template.isVisible, false);
+    template._resyncLightSources();
+    assert.deepEqual(hullOf(a).lightSources.map((light) => light.name).sort(), ['model-fill', 'model-rim', 'model-sun'],
+      'an instance is lit as its template is');
+    const blends = (mesh) => mesh.material.subMaterials.map((finish) => finish.needAlphaBlendingForMesh(mesh));
+
+    assert.equal(AUR.ships.fade(scene, 'a', 0.16), true);
+    assert.notEqual(hullOf(a).sourceMesh, template);
+    assert.equal(hullOf(a).visibility, 0.16);
+    assert.ok(blends(hullOf(a)).every(Boolean), 'every finish of the faded ship blends');
+    assert.ok(!blends(hullOf(b)).some(Boolean), 'and none of the others');
+    AUR.ships.fade(scene, 'a', 0);
+    assert.equal(hullOf(a).visibility, 0, 'hidden from inside: Babylon skips a mesh at visibility 0');
+    AUR.ships.fade(scene, 'a', 1);
+    assert.equal(hullOf(a).sourceMesh, template, 'restored');
+  })));
 
 test('the model sits in the fleet frame its correction claims: one unit long, centred', () => {
   onScene((scene, models, petrel) => {

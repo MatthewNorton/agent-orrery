@@ -18,8 +18,10 @@
  *   triangles: number }} HullRecord
  * @typedef {{ file: string, lod: 'far' | 'near' | null, model?: ShipModel }} HullFile
  * @typedef {HullFile & { record: HullRecord }} HullAsset
- * @typedef {{ root: BABYLON.Mesh, correction: BABYLON.TransformNode, hull: HullEntry,
- *   triangles: number, look: string, wanted: string, fallback: BABYLON.AbstractMesh | null }} ShipEntry
+ * @typedef {{ root: BABYLON.Mesh, correction: BABYLON.TransformNode, hull: HullEntry, asset: HullAsset,
+ *   ship: any, visibility: number, triangles: number, look: string, wanted: string,
+ *   fallback: BABYLON.AbstractMesh | null }} ShipEntry `asset`, `ship` and `visibility` are what
+ *   its hull was last built from, so a fade rebuilds that hull exactly
  * @typedef {{ containers: Map<string, HullRecord>, materials: Map<string, any>,
  *   templates: Map<string, BABYLON.TransformNode[]>, ships: Map<string, ShipEntry>,
  *   triangles: number, disposed: boolean }} SceneState

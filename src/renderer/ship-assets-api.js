@@ -15,7 +15,7 @@
   const assets = AUR.shipAssets;
   const {
     manifestPromise, settledManifest, sceneStates, stateFor, isSceneDisposed, viewLod, selectHull,
-    hullFiles, ensureContainer, fitsBudget, resolveAsset, lookOf, createShipEntry, swapHull,
+    hullFiles, ensureContainer, fitsBudget, resolveAsset, lookOf, createShipEntry, swapHull, fadeHull,
   } = assets;
 
   function instantiate(scene, ship) {
@@ -64,12 +64,25 @@
     }).catch(() => null);
   }
 
-  // Focus mode in the system view saves and restores each mesh's visibility;
-  // a hull swapped in meanwhile would escape that, so it waits.
+  /**
+   * Shows a ship's hull at a visibility: focus mode in the system view fades the ships it does not
+   * follow and hides the one it is inside of, then restores them at 1. A hull is instances of a
+   * template, which carries the visibility, so the hull moves to the template at this one. False
+   * when the ship has no hull (a dart or a signal has meshes of its own).
+   * @param {string} shipId
+   */
+  function fade(scene, shipId, visibility) {
+    const state = sceneStates.get(scene);
+    const entry = state ? state.ships.get(String(shipId)) : null;
+    if (!entry || isSceneDisposed(scene, state) || AUR.isNodeDisposed(entry.root)) return false;
+    return fadeHull(scene, state, entry, visibility);
+  }
+
+  // A promotion waits while focus mode fades the ship: it would change the hull the chase camera
+  // has measured. A hull that arrived under a faded dart since the last frame is faded with it.
+  // app/agent-focus.js refreshes every ship once focus ends.
   function isFaded(entry) {
-    const nodes = AUR.nodeFamily(entry.root);
-    if (entry.fallback) nodes.push(entry.fallback);
-    return nodes.some((node) => typeof node.visibility === 'number' && node.visibility < 1);
+    return entry.visibility < 1 || Boolean(entry.fallback && entry.fallback.visibility < 1);
   }
 
   /**
@@ -112,5 +125,5 @@
     sceneStates.delete(scene);
   }
 
-  AUR.ships = { instantiate, upgrade, refresh, dispose };
+  AUR.ships = { instantiate, upgrade, refresh, fade, dispose };
 })();

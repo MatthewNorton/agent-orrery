@@ -134,6 +134,12 @@ test('shared hulls receive fixed provider palettes; a signal loads no model and 
       const mesh = new Node('accent');
       mesh.material = sourceMaterial;
       mesh.getChildMeshes = () => [];
+      // A ship's hull is an instance of this template mesh.
+      mesh.instantiateHierarchy = (parent, _options, created) => {
+        const instance = Object.assign(new Node('instance of accent'), { material: mesh.material, parent, getChildMeshes: () => [] });
+        created(mesh, instance);
+        return instance;
+      };
       instantiatedMeshes.push(mesh);
       return { rootNodes: [mesh] };
     },
@@ -252,13 +258,15 @@ function loadShipAssets(manifest, trianglesByFile, materials = ['hull_primary', 
       this.scaling.setAll(1);
       this.isPickable = true;
       this.isVisible = true;
-      this.visibility = 1;
+      this.ownVisibility = 1;
       this.disposed = false;
       this.children = [];
       this.parentNode = null;
       this.onDispose = [];
       this.onDisposeObservable = { addOnce: (callback) => this.onDispose.push(callback) };
     }
+    get visibility() { return this.ownVisibility; }
+    set visibility(value) { this.ownVisibility = value; }
     get parent() { return this.parentNode; }
     set parent(node) {
       if (this.parentNode) this.parentNode.children = this.parentNode.children.filter((child) => child !== this);
@@ -295,13 +303,18 @@ function loadShipAssets(manifest, trianglesByFile, materials = ['hull_primary', 
       return copy;
     }
   }
+  // An instance shows its source mesh's material and visibility; Babylon ignores (and logs) a
+  // visibility set on one, so here it fails the test.
   class InstancedMesh extends Mesh {
     constructor(source) {
       super('instance of ' + source.name);
       this.sourceMesh = source;
     }
+    get isAnInstance() { return true; }
     get material() { return this.sourceMesh.material; }
     set material(value) { /* an instance draws with its source mesh's material */ }
+    get visibility() { return this.sourceMesh.visibility; }
+    set visibility(value) { throw new Error('a visibility set on an instance does nothing'); }
   }
   const containerFor = (file) => ({
     meshes: [{ getTotalIndices: () => (trianglesByFile[file] || 1000) * 3 }],
@@ -346,6 +359,7 @@ function loadShipAssets(manifest, trianglesByFile, materials = ['hull_primary', 
   return {
     ships: AUR.ships,
     models: AUR.shipModels,
+    triangles: (scene) => AUR.shipAssets.sceneStates.get(scene).triangles,
     loads,
     Mesh,
     InstancedMesh,
@@ -403,13 +417,17 @@ test('a rank a ship model has taken flies the model, built in code, until the sh
   assert.deepEqual([hullId(root), hullId(drone)], ['coded', 'coded']);
   assert.deepEqual([built, assets.loads], [['coded'], []], 'one built container for the scene, and no hull file');
   assert.deepEqual([root.children[0].rotation.y, root.children[0].scaling.x, root.children[0].children[0].position.z], [0, 0.1, -1]);
-  // In a near view a ship is its own copy of the container's meshes, wearing what the model gives its palette.
+  // In a near view too a ship is instances of a template per palette, wearing what the model gives
+  // that palette; the template carries the model lights' layer, since an instance is lit as its source.
   const parts = (node) => node.getChildMeshes(false).filter((mesh) => mesh.material);
   assert.deepEqual(parts(root).map((mesh) => mesh.material.worn), ['coded claude #d97757 hull_primary', 'coded claude #d97757 accent_energy']);
   assert.deepEqual(parts(drone).map((mesh) => mesh.material.worn), ['coded codex #f2f0ea hull_primary', 'coded codex #f2f0ea accent_energy']);
   for (const mesh of [...parts(root), ...parts(drone)]) {
-    assert.ok(!(mesh instanceof assets.InstancedMesh) && mesh.layerMask === assets.models.LAYER, 'a copy, lit by the model lights only');
+    assert.ok(mesh instanceof assets.InstancedMesh && mesh.isVisible && !mesh.sourceMesh.isVisible, 'an instance of a hidden template');
+    assert.ok(mesh.layerMask === assets.models.LAYER && mesh.sourceMesh.layerMask === assets.models.LAYER, 'lit by the model lights only');
   }
+  const twin = await assets.ships.upgrade(system, ship('twin', 0), assets.fallback('twin'));
+  assert.ok(parts(twin).every((mesh, i) => mesh.sourceMesh === parts(root)[i].sourceMesh), 'one template per palette');
 
   assert.equal(await assets.ships.refresh(system, ship('a', 3)), root, 'promoted in place');
   assert.equal(hullId(root), 'mid');
@@ -427,7 +445,7 @@ test('a rank a ship model has taken flies the model, built in code, until the sh
   assert.deepEqual(sources[0], sources[1], 'on the map the ships of a palette are instances of one template');
 });
 
-test('the universe instances far hulls from one template per provider; other views clone near hulls', async () => {
+test('every view instances its hulls from one template per provider: far hulls on the map, near ones in a system', async () => {
   const assets = loadShipAssets(LADDER_MANIFEST, {});
   const universe = assets.scene('universe');
   const first = await assets.ships.upgrade(universe, ship('a', 0), assets.fallback('a'));
@@ -450,9 +468,14 @@ test('the universe instances far hulls from one template per provider; other vie
 
   const system = assets.scene('system');
   const near = await assets.ships.upgrade(system, ship('a', 0), assets.fallback('a'));
+  const nearTwin = await assets.ships.upgrade(system, ship('b', 0), assets.fallback('b'));
   assert.equal(assets.loads.at(-1), 'small-near.glb');
-  assert.ok(near.getChildMeshes(false).every((mesh) => !(mesh instanceof assets.InstancedMesh)));
-  assert.equal(partMaterial(near, 'hull_primary').emissiveColor.toHexString(), '#000000');
+  const nearParts = (root) => root.getChildMeshes(false).filter((mesh) => mesh.material);
+  assert.ok(nearParts(near).every((mesh) => mesh instanceof assets.InstancedMesh && mesh.sourceMesh.isVisible === false));
+  assert.ok(nearParts(nearTwin).every((mesh, i) => mesh.sourceMesh === nearParts(near)[i].sourceMesh), 'one template per provider');
+  assert.ok(nearParts(near).every((mesh) => mesh.layerMask === 0x10000000 && mesh.sourceMesh.layerMask === 0x10000000),
+    'the template carries the fleet light layer');
+  assert.equal(partMaterial(near, 'hull_primary').emissiveColor.toHexString(), '#000000', 'a near hull is lit, not self-lit');
 });
 
 test('a scene that has not declared its view loads nothing until upgrade, which defaults to far', async () => {
@@ -508,14 +531,68 @@ test('refresh re-tints a ship that turns out to run a local model, keeping its h
   assert.equal(await assets.ships.refresh(scene, ship('a', 0, { local: true })), null, 'same look: nothing to do');
 });
 
+const instancesOf = (root) => root.getChildMeshes(false).filter((mesh) => mesh.isAnInstance);
+const templatesOf = (root) => instancesOf(root).map((mesh) => mesh.sourceMesh);
+const sameItems = (a, b) => a.length === b.length && a.every((item, i) => item === b[i]);
+
+test('focus mode moves a ship to its provider\'s faded template and back, keeping its hull, scale and correction', async () => {
+  const assets = loadShipAssets(LADDER_MANIFEST, {});
+  const scene = assets.scene('system');
+  const darts = { a: assets.fallback('a'), b: assets.fallback('b'), d: assets.fallback('d') };
+  darts.d.scaling.setAll(0.6); // the view's drone scale lives on the dart root
+  const a = await assets.ships.upgrade(scene, ship('a', 0), darts.a);
+  const b = await assets.ships.upgrade(scene, ship('b', 0), darts.b);
+  const drone = await assets.ships.upgrade(scene, ship('d', 40, { kind: 'drone' }), darts.d);
+  const full = templatesOf(a);
+  const triangles = assets.triangles(scene);
+  assert.ok(sameItems(templatesOf(drone), full) && full.every((mesh) => mesh.visibility === 1), 'one full template for the provider');
+
+  assert.equal(assets.ships.fade(scene, 'a', 0.16), true);
+  const faded = templatesOf(a);
+  assert.ok(faded.every((mesh) => mesh.visibility === 0.16 && mesh.isVisible === false && !full.includes(mesh)), 'a hidden faded template');
+  assert.ok(instancesOf(a).every((mesh) => mesh.visibility === 0.16 && mesh.isVisible && mesh.layerMask === 0x10000000));
+  assert.ok(sameItems(templatesOf(b), full), 'the other ships keep theirs');
+  assert.equal(a.parent, darts.a, 'the same root under the same dart');
+  assert.deepEqual([a.children.length, a.children[0].scaling.x, a.children[0].rotation.y], [1, 0.2, Math.PI], 'the hull correction');
+  assert.deepEqual([hullId(a), assets.triangles(scene)], ['small', triangles], 'the same hull, and the budget unchanged');
+  const instances = instancesOf(a);
+  assert.equal(assets.ships.fade(scene, 'a', 0.16), true);
+  assert.ok(sameItems(instancesOf(a), instances), 'already faded: nothing is rebuilt');
+
+  assert.equal(assets.ships.fade(scene, 'd', 0.16), true);
+  assert.ok(sameItems(templatesOf(drone), faded), 'one faded template for the provider');
+  assert.deepEqual([drone.parent.scaling.x, drone.scaling.x, drone.children[0].scaling.x], [0.6, 1, 0.2], 'the drone keeps its scale');
+  assert.equal(assets.ships.fade(scene, 'b', 0), true);
+  assert.ok(templatesOf(b).every((mesh) => mesh.visibility === 0), 'the followed ship, hidden from inside');
+
+  for (const id of ['a', 'b', 'd']) assert.equal(assets.ships.fade(scene, id, 1), true);
+  for (const root of [a, b, drone]) assert.ok(sameItems(templatesOf(root), full), 'every ship restored to the full template');
+  assert.ok(instances.every((mesh) => mesh.disposed), 'the faded instances are gone');
+  assert.equal(assets.triangles(scene), triangles);
+  assert.equal(assets.ships.fade(scene, 'unknown', 0.16), false, 'no hull to fade');
+  a.dispose();
+  assert.equal(assets.ships.fade(scene, 'a', 0.16), false, 'nor once it is gone');
+});
+
 test('refresh waits while focus mode fades the ship and only applies the latest request', async () => {
   const assets = loadShipAssets(LADDER_MANIFEST, {});
   const scene = assets.scene('system');
-  const root = await assets.ships.upgrade(scene, ship('a', 0), assets.fallback('a'));
-  for (const mesh of root.getChildMeshes(false)) mesh.visibility = 0.16;
+  const dart = assets.fallback('a');
+  const root = await assets.ships.upgrade(scene, ship('a', 0), dart);
+  // A hull that arrived under a faded dart is faded on the next frame: until then the dart says so.
+  dart.visibility = 0.16;
+  assert.equal(await assets.ships.refresh(scene, ship('a', 10)), null);
+  dart.visibility = 1;
+  assets.ships.fade(scene, 'a', 0.16);
   assert.equal(await assets.ships.refresh(scene, ship('a', 10)), null);
   assert.equal(hullId(root), 'small');
-  for (const mesh of root.getChildMeshes(false)) mesh.visibility = 1;
+  assert.ok(templatesOf(root).every((mesh) => mesh.visibility === 0.16), 'still faded, on its old hull');
+  assets.ships.fade(scene, 'a', 1);
+  // Leaving focus refreshes every ship (app/agent-focus.js): the promotion lands then.
+  assert.equal(await assets.ships.refresh(scene, ship('a', 10)), root);
+  assert.equal(hullId(root), 'big');
+  assert.ok(templatesOf(root).every((mesh) => mesh.visibility === 1), 'on the full template of its new hull');
+  assert.equal(await assets.ships.refresh(scene, ship('a', 0)), root);
   const stale = assets.ships.refresh(scene, ship('a', 3));
   const latest = assets.ships.refresh(scene, ship('a', 10));
   assert.equal(await stale, null, 'superseded by a later rank');
@@ -540,6 +617,7 @@ test('the triangle budget steps near hulls down to far before falling back to th
     lods.push(root ? root.metadata.assetLod : 'dart');
   }
   assert.deepEqual(lods, ['near', 'near', 'far', 'dart']);
+  assert.ok(partMaterial(roots[2], 'hull_primary').emissiveColor.r > 0, 'a far file stepped down to up close lights itself');
   roots[0].dispose();
   const freed = await assets.ships.upgrade(scene, ship('e', 0), assets.fallback('e'));
   assert.equal(freed.metadata.assetLod, 'near', 'a disposed hull returns its triangles');

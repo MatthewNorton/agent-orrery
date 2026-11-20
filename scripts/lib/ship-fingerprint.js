@@ -33,17 +33,25 @@ class BlankCanvas {
   getContext() { return this.context; }
 }
 
-/** Runs `work` with a stand-in for the canvas Babylon makes a DynamicTexture from. */
+/**
+ * Runs `work` with a stand-in for the canvas Babylon makes a DynamicTexture from, until the
+ * promise it returns settles when it returns one.
+ */
 function withCanvas(work) {
   const had = Object.prototype.hasOwnProperty.call(globalThis, 'OffscreenCanvas');
   const before = globalThis.OffscreenCanvas;
-  globalThis.OffscreenCanvas = BlankCanvas;
-  try {
-    return work();
-  } finally {
+  const restore = () => {
     if (had) globalThis.OffscreenCanvas = before;
     else delete globalThis.OffscreenCanvas;
+  };
+  globalThis.OffscreenCanvas = BlankCanvas;
+  let result;
+  try {
+    result = work();
+  } finally {
+    if (!(result instanceof Promise)) restore();
   }
+  return result instanceof Promise ? result.finally(restore) : result;
 }
 
 /** Runs `work(scene)` on a scene of its own (a NullEngine), which is gone once the work is done. */
