@@ -122,3 +122,12 @@ test('history model: a build adds nothing to a total that is already the largest
   build('b.js', T0 + 2);
   assert.deepEqual(totals(), [MAX, MAX]);
 });
+
+test('history model: a folder named __proto__ is a bucket like any other, in a map with no prototype', () => {
+  const { model } = createModel(256);
+  model.applyRecord(record(T0, { type: 'session', cwd: PROJECT_DIR }), true);
+  model.applyRecord(record(T0 + 1, { type: 'build', files: [path.join(PROJECT_DIR, '__proto__', 'a.js')] }), true);
+  const { buckets } = model.state.projects.get('demo');
+  assert.deepEqual([Object.getPrototypeOf(buckets), Object.keys(buckets), buckets.__proto__], [null, ['__proto__'], 1]);
+  assert.deepEqual(model.snapshot().projects[0].planets, ['__proto__']);
+});
