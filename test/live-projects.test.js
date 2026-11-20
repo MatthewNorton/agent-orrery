@@ -15,7 +15,8 @@ const {
 const { ignoresCase } = require('../src/main/path-safety');
 const { canonicalProjectPath } = require('../src/main/provider-adapters');
 const { casedCounts, KEPT_APART, KEPT_AS_ONE } = require('./support/bucket-cases');
-const { hex8, readState } = require('./support/transcripts');
+const { projectsById } = require('./support/live-session');
+const { createWorld, hex8, readState, writeState } = require('./support/transcripts');
 
 function newModel(t, { statePath, persisted } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'au-live-projects-'));
@@ -181,4 +182,35 @@ test('live projects: a total or a time a state file holds is made a whole count'
   assert.deepEqual([odd.totalBuilds, odd.lastActivity, typeof odd.firstSeen, odd.firstSeen > 0], [0, 0, 'number', true]);
   const here = restoreProject(model, 'here', { path: dir('here'), ...saved(), totalBuilds: 9.5, firstSeen: 1700000000000.4 });
   assert.deepEqual([here.totalBuilds, here.firstSeen, here.lastActivity], [9, 1700000000000, 1700000000000]);
+});
+
+test('live projects: a state file with entries that are not project records starts the app with the good ones', (t) => {
+  // A file from before version 2 (its paths come from pathIds, through migrate) and one of today.
+  const world = createWorld(t);
+  for (const version of [undefined, 2]) {
+    const statePath = path.join(world.root, 'state-' + version, 'universe-state.json');
+    fs.mkdirSync(path.join(world.root, 'workspace', 'kept'), { recursive: true });
+    const kept = path.normalize(fs.realpathSync.native(path.join(world.root, 'workspace', 'kept')));
+    const keyOf = (...parts) => canonicalProjectPath(path.join(world.root, ...parts));
+    const projects = JSON.parse(`{
+      "a": null, "b": 5, "c": ["src"], "d": "demo", "e": true,
+      "good": { "name": "kept by name", "totalBuilds": 3, "buckets": { "src": 3 } },
+      "numbered": { "name": 42 }, "listed": { "name": ["x"] }, "nested": { "name": { "toString": "x" } },
+      "pathed": { "path": 7, "name": "seven" }
+    }`);
+    const state = { version, projects, pathIds: Object.fromEntries(['a', 'b', 'c', 'good'].map((id) => [keyOf('gone', id), id])) };
+    if (version) projects.here = { path: kept, name: 'ignored for a folder' };
+    else state.pathIds[keyOf('workspace', 'kept')] = 'pathed'; // the folder of an entry whose own path is not a string
+    writeState(statePath, state);
+
+    const { tracker } = world.live({ statePath });
+    const shown = projectsById(tracker);
+    const names = Object.fromEntries([...shown].map(([id, project]) => [id, project.name]));
+    assert.deepEqual(names, version
+      ? { good: 'kept by name', numbered: 'numbered', listed: 'listed', nested: 'nested', pathed: 'seven', here: 'kept' }
+      : { good: 'good', numbered: 'numbered', listed: 'listed', nested: 'nested', pathed: 'kept' },
+    `version ${version}: every name the renderer gets is a string`);
+    assert.deepEqual([shown.get('good').totalBuilds, shown.get('good').planets, shown.get('pathed').path], [3, ['src'], version ? null : kept]);
+    assert.deepEqual(Object.keys(readState(statePath + '.bak').projects).length, version ? 11 : 10, 'the file it started from is kept as the backup');
+  }
 });

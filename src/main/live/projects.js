@@ -113,7 +113,8 @@ function announceProjectUpdated(model, project) {
  */
 function restoreRememberedProjects(model) {
   for (const [id, saved] of Object.entries(model.persisted.projects)) {
-    if (!model.projects.has(id)) restoreProject(model, id, saved);
+    // A state file is read as it is: an entry that is not a project record is passed over.
+    if (plainObject(saved) && !model.projects.has(id)) restoreProject(model, id, saved);
   }
 }
 
@@ -125,11 +126,11 @@ function restoreRememberedProjects(model) {
  * @returns {LiveProject}
  */
 function restoreProject(model, id, saved) {
-  const projPath = preferredProjectPath(model, id, saved.path || null);
+  const projPath = preferredProjectPath(model, id, typeof saved.path === 'string' ? saved.path : null);
   return createProject(model, id, projPath, {
-    name: projPath ? undefined : saved.name,
-    // A state file is read as it is: its counts are made whole here (shared/values.js), and its
-    // buckets by createProject.
+    // A state file is read as it is: only a string is a name or a path, its counts are made whole
+    // here (shared/values.js), and its buckets by createProject.
+    name: !projPath && typeof saved.name === 'string' ? saved.name : undefined,
     lastActivity: wholeCount(saved.lastActivity) || wholeCount(saved.firstSeen),
     buckets: saved.buckets, totalBuilds: wholeCount(saved.totalBuilds), firstSeen: wholeCount(saved.firstSeen),
   });
