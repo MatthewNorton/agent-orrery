@@ -7,7 +7,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { getSystem, getPlanet, planetFolders, IGNORE_DIRS } = require('../src/main/live/system-view');
+const { getSystem, getPlanet, planetFolders } = require('../src/main/live/system-view');
 const { linkTo, outsideFolder, projectOnDisk, refuseReads, spyReaddir } = require('./support/system-view');
 const { SEC, SLUG, T0, claude, ofType } = require('./support/transcripts');
 const { runBoth } = require('./support/both-models');
@@ -196,8 +196,7 @@ test('live system view: one definition of a planet folder; the system draws thos
     [true, true, false, []]);
 
   // The system draws the planet folders that are not ignored; each of them is one a planet reads.
-  const drawn = getSystem(model, 'p').planets.map((planet) => planet.name);
-  assert.deepEqual([drawn, IGNORE_DIRS.has('node_modules')], [['src'], true]);
+  assert.deepEqual(getSystem(model, 'p').planets.map((planet) => planet.name), ['src']);
   // A planet reads any planet folder: one with builds that is not drawn opens and is counted (Go to lists it).
   const read = async (name) => { const planet = await getPlanet(model, 'p', name); return [planet.name, planet.files, planet.builds, planet.folderRead, 'procedural' in planet]; };
   assert.deepEqual([await read('src'), await read('.github'), await read('node_modules')],

@@ -264,4 +264,4 @@ function shallowCount(dir) {
   return count;
 }
 
-module.exports = { IGNORE_DIRS, getSystem, getPlanet, planetFolders };
+module.exports = { getSystem, getPlanet, planetFolders };
