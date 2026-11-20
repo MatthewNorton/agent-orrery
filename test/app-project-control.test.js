@@ -188,18 +188,37 @@ test('planet card: a build that starts a planet fetches the system again, one re
   await app.refreshPlanetSystem('other');
 });
 
+// The planet card with the real routes (app/route.js) in stream 1, over a stand-in for boot.js's
+// A.setView: it shows the view asked for, or, as setView does when a view cannot be built, the
+// universe once `setup.unbuildable` is set. AU.getPlanet answers `planetOf(name)`.
+function routeSetup({ system = null, streamEpoch = 1, more = {}, app = {} } = {}) {
+  const setup = planetSetup({ name: 'src', folderRead: 'full' }, {
+    system, files: ['app/replay.js', 'app/route.js'], more: { streamEpoch, ...more },
+    app: {
+      setView(name, data) {
+        if (name === 'planet' && setup.unbuildable) return setup.app.showUniverse();
+        setup.state.current.view = name;
+        if (name === 'planet') setup.state.activeView = { planetData: data.planet };
+      },
+      ...app,
+    },
+  });
+  const shown = setup.state.activeView.planetData;
+  const planetOf = (name) => ({ ...shown, name });
+  setup.window.AU.getPlanet = async (projectId, name) => planetOf(name);
+  return Object.assign(setup, { unbuildable: false, planetOf });
+}
+
 test('planet card: a planet that starts while a planet is opening reaches its card once it has opened', async () => {
-  const { app, state, window, card } = planetSetup({ name: 'src', folderRead: 'full' });
+  const setup = routeSetup();
+  const { app, state, window, card, planetOf } = setup;
   let asked = 0;
   window.AU.getSystem = async () => systemOf(++asked + 1);
-  // What boot.js openPlanet does around its own awaits: ask, wait for the planet, show it.
+  // A.openPlanet from the system view, with `meanwhile` while the planet is read.
   const open = async (projectId, handed, meanwhile = () => {}) => {
     state.current.view = 'system';
-    const request = app.requestPlanetSystem(projectId, handed);
-    meanwhile();
-    state.planetSystem.data = await request;
-    Object.assign(state.current, { view: 'planet', projectId });
-    app.planetSystemOpened(projectId);
+    window.AU.getPlanet = async (id, name) => { meanwhile(); return planetOf(name); };
+    await app.openPlanet(projectId, 'src', handed);
     await settled();
     return card().rows.PLANETS;
   };
@@ -212,14 +231,12 @@ test('planet card: a planet that starts while a planet is opening reaches its ca
   assert.deepEqual([await open('p', systemOf(1)), asked], ['1', 3], 'a planet from an earlier opening is not counted against this one');
   assert.deepEqual([state.planetSystem.awaited, state.planetSystem.missed], [null, false]);
 
-  // The planet could not be shown and the app fell back to the universe, which has no project:
-  // the planet that started meanwhile is nobody's to fetch, and is not held against the next opening.
-  state.current.view = 'system';
-  await app.requestPlanetSystem('p', systemOf(1));
-  app.refreshPlanetSystem('p');
-  Object.assign(state.current, { view: 'universe', projectId: null });
-  app.planetSystemOpened('p');
-  await settled();
+  // The planet view could not be built and the app fell back to the universe, which has no
+  // project: the planet that started meanwhile is nobody's to fetch, and is not held against the
+  // next opening.
+  setup.unbuildable = true;
+  await open('p', systemOf(1), () => app.refreshPlanetSystem('p'));
+  assert.deepEqual([state.current.view, state.current.projectId], ['universe', null]);
   assert.deepEqual([state.planetSystem.awaited, state.planetSystem.missed, asked], [null, false, 3]);
 });
 
@@ -260,38 +277,25 @@ test('planet card: a request that fails is not made again, unless a planet start
 });
 
 // The card over the real stream switch (app/replay.js): a seek adopts history's snapshot and
-// reopens the route, here through what boot.js openPlanet does around its awaits.
+// reopens the route (A.openPlanet); each planet read waits in `planetRead` to be answered.
 function streamSetup(streamEpoch) {
   const planetRead = [];
-  const setup = planetSetup({ name: 'src', folderRead: 'full' }, {
-    system: systemOf(1), files: ['app/replay.js'],
+  const setup = routeSetup({
+    system: systemOf(1), streamEpoch,
     more: {
-      streamEpoch, booting: false, replayRequest: 0, replayTransitionPending: false, replayBusy: false, historyPreviewTs: null,
+      booting: false, replayRequest: 0, replayTransitionPending: false, replayBusy: false, historyPreviewTs: null,
       retiredEpochs: new Set(), deferredEpochBatches: [], transitionEventQueue: [], notificationByShip: new Map(),
       lastNotificationAt: -Infinity, lastEventSequence: -Infinity,
       playback: { mode: 'live', available: true, indexing: false, minTs: 1, maxTs: 9, cursorTs: 9, playing: false, speed: 1, truncated: false },
     },
-    app: {
-      renderChromeNow() {}, renderChrome() {}, seedStore() {}, handleSequencedEvents() {},
-      showUniverse: () => assert.fail('the planet is reopened, not the universe'),
-      openSystem: () => assert.fail('the planet is reopened, not the system'),
-    },
+    app: { renderChromeNow() {}, renderChrome() {}, seedStore() {}, handleSequencedEvents() {} },
   });
   const { app, state, window } = setup;
+  app.showUniverse = () => assert.fail('the planet is reopened, not the universe');
+  app.openSystem = () => assert.fail('the planet is reopened, not the system');
   const asked = [];
   window.AU.getSystem = () => { asked.push(deferred()); return asked.at(-1).promise; };
-  app.openPlanet = async (projectId, name) => {
-    const request = ++state.routeRequestGeneration;
-    const requestedEpoch = state.streamEpoch;
-    const systemRequest = app.requestPlanetSystem(projectId);
-    planetRead.push(deferred());
-    await planetRead.at(-1).promise; // AU.getPlanet
-    const held = await systemRequest;
-    if (request !== state.routeRequestGeneration || !app.sameEpoch(requestedEpoch, state.streamEpoch)) return;
-    state.planetSystem.data = held;
-    Object.assign(state.current, { view: 'planet', projectId, planetName: name });
-    app.planetSystemOpened(projectId);
-  };
+  window.AU.getPlanet = () => { planetRead.push(deferred()); return planetRead.at(-1).promise; };
   // LIVE to REPLAY: history's stream is `epoch`.
   const seek = (epoch) => {
     window.AU.replay = async () => ({
@@ -305,7 +309,7 @@ function streamSetup(streamEpoch) {
 test('planet card: the live system asked for before a seek never lands on the card history reopens', async () => {
   // The live answer comes back while the planet is being reopened, or after it has reopened.
   for (const late of [false, true]) {
-    const { app, state, card, asked, planetRead, seek } = streamSetup(1);
+    const { app, state, card, asked, planetRead, seek, planetOf } = streamSetup(1);
     const refresh = app.refreshPlanetSystem('p'); // a planet starts in LIVE: asked[0] is the live system
     await seek(2);
     assert.deepEqual([state.streamEpoch, state.playback.mode, asked.length, planetRead.length], [2, 'replay', 2, 1], 'the same project and planet are reopened');
@@ -313,7 +317,7 @@ test('planet card: the live system asked for before a seek never lands on the ca
     const live = () => asked[0].resolve(systemOf(7));
     if (!late) { live(); await refresh; }
     assert.equal(card().rows.PLANETS, '1', 'not drawn while history is reopening the planet');
-    planetRead[0].resolve();
+    planetRead[0].resolve(planetOf('src'));
     asked[1].resolve(systemOf(3)); // the system as history has it
     await settled();
     assert.equal(card().rows.PLANETS, '3');
