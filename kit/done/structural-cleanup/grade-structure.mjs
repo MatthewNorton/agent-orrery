@@ -12,8 +12,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
-import { scriptTags } from '../../../scripts/lib/script-tags.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 // Works from kit/todo/ (pending) and kit/done/structural-cleanup/ (archived).
@@ -26,6 +26,7 @@ const STAGE = process.argv.includes('--stage') ? String(process.argv[process.arg
 if (!STAGES.includes(STAGE)) { console.error(`--stage must be one of: ${STAGES.join(', ')}`); process.exit(2); }
 const reached = (s) => STAGES.indexOf(STAGE) >= STAGES.indexOf(s);
 const RENDERER = path.join(ROOT, 'src', 'renderer');
+const { scriptTags } = createRequire(import.meta.url)(path.join(ROOT, 'scripts', 'lib', 'script-tags.js'));
 
 let failures = 0;
 const ok = (id, msg) => console.log(`${id} PASS  ${msg}`);
@@ -66,17 +67,19 @@ if (!reached('0')) skip('T2', '0');
 else {
   const before = failures;
   const html = read('src/renderer/index.html');
-  let tags = [];
+  // Any script tag that is not a plain one (a module, a deferred script) makes scriptTags throw.
+  let tags = null;
   try { tags = scriptTags(html); } catch (error) { fail('T2', error.message); }
-  const appTags = tags.filter((t) => t.startsWith('app/'));
-  if (/type="module"/.test(html)) fail('T2', 'index.html uses type="module"');
-  if (appTags[0] !== 'app/state.js') fail('T2', `first app script must be app/state.js, found ${appTags[0] ?? 'none'}`);
-  if (appTags[appTags.length - 1] !== 'app/boot.js') fail('T2', 'app/boot.js must be the last app script');
-  for (const m of appFiles) if (!appTags.includes(m)) fail('T2', `${m} exists but is not loaded by index.html`);
-  for (const t of appTags) if (!appFiles.includes(t)) fail('T2', `index.html loads ${t} which does not exist`);
-  const lastSceneIdx = tags.findLastIndex((t) => t.startsWith('scene/'));
-  if (tags.includes('app/state.js') && (lastSceneIdx < 0 || tags.indexOf('app/state.js') < lastSceneIdx)) {
-    fail('T2', 'app/state.js must load after every scene/ script');
+  if (tags) {
+    const appTags = tags.filter((t) => t.startsWith('app/'));
+    if (appTags[0] !== 'app/state.js') fail('T2', `first app script must be app/state.js, found ${appTags[0] ?? 'none'}`);
+    if (appTags[appTags.length - 1] !== 'app/boot.js') fail('T2', 'app/boot.js must be the last app script');
+    for (const m of appFiles) if (!appTags.includes(m)) fail('T2', `${m} exists but is not loaded by index.html`);
+    for (const t of appTags) if (!appFiles.includes(t)) fail('T2', `index.html loads ${t} which does not exist`);
+    const lastSceneIdx = tags.findLastIndex((t) => t.startsWith('scene/'));
+    if (tags.includes('app/state.js') && (lastSceneIdx < 0 || tags.indexOf('app/state.js') < lastSceneIdx)) {
+      fail('T2', 'app/state.js must load after every scene/ script');
+    }
   }
   for (const f of rendererFiles) {
     if (/^\s*(import\s.+from\s|export\s)/m.test(read('src/renderer/' + f))) fail('T2', `${f} uses ES module syntax`);

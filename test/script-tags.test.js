@@ -18,6 +18,16 @@ test('a commented-out tag is not listed, and a comment may mention a script tag'
   assert.deepEqual(scriptTags('<script src="a.js"></script><!-- <script src="cut.js"></script>'), ['a.js'], 'an unclosed comment runs to the end');
 });
 
+test('a comment ends where HTML ends it, so a tag after it is read', () => {
+  for (const comment of ['<!-->', '<!--->', '<!---->', '<!-- a --!>', '<!-- a <!-- b -->']) {
+    const page = comment + '<script src="a.js"></script><!-- note -->';
+    assert.deepEqual(scriptTags(page), ['a.js'], comment);
+    assert.throws(() => scriptTags(comment + '<script src="a.js" defer></script><!-- note -->'), NOT_PLAIN, comment);
+  }
+  assert.deepEqual(scriptTags('<!-- a <!--><script src="in.js"></script> --><script src="a.js"></script>'), ['in.js', 'a.js'],
+    'inside a comment, the --> of <!--> closes it');
+});
+
 test('a tag in any other form is named, not dropped', () => {
   for (const tag of [
     '<script src="a.js" defer></script>',

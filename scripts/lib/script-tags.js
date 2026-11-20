@@ -2,12 +2,19 @@
 
 // The renderer page's script tags, read the same way by the tests and the structure gate.
 
+// A comment ends at `-->` or `--!>`; `<!-->` and `<!--->` are whole comments; an unclosed one runs
+// to the end of the page.
 function withoutComments(html) {
-  return html.split('<!--').map((part, index) => {
-    if (!index) return part;
-    const end = part.indexOf('-->');
-    return end < 0 ? '' : part.slice(end + 3);
-  }).join('');
+  let page = '';
+  let at = 0;
+  for (;;) {
+    const open = html.indexOf('<!--', at);
+    if (open < 0) return page + html.slice(at);
+    page += html.slice(at, open);
+    const close = /^-?>|--!?>/.exec(html.slice(open + 4));
+    if (!close) return page;
+    at = open + 4 + close.index + close[0].length;
+  }
 }
 
 /**
