@@ -3,9 +3,7 @@
 
 // Build counts per top-level project folder; '(root)' counts files at the top level. Under a
 // case-insensitive root, one folder written in several casings keeps a single bucket: the
-// first key recorded for it, which may be a lower-cased key saved by an earlier version. A
-// bucket is named as a planet is, with no control character (isBucketName), and a project keeps
-// MAX_BUCKETS of them at most.
+// first key recorded for it, which may be a lower-cased key saved by an earlier version.
 
 const { ignoresCase } = require('./path-safety');
 const { hasControlChars } = require('./shared/ids');
@@ -53,10 +51,7 @@ function isPlanetSegment(value) {
 }
 
 /**
- * Whether `name` can be a bucket: a planet's name (isPlanetSegment) with no control character. The
- * one rule for a bucket, where a build is counted (both models) and where a file is read
- * (live/saved-project.js), so a bucket that is counted is saved, read back, listed by Go to and
- * opened as it was.
+ * Whether `name` can be a bucket: a planet's name (isPlanetSegment) with no control character.
  * @param {unknown} name
  * @returns {name is string}
  */
@@ -129,8 +124,8 @@ function bucketKey(project, name) {
 /**
  * The first key of `buckets` for each folded key, as matchingEntry would find it. Built on the
  * first miss and kept on the object, where setBucket adds each new key: so every write of a bucket
- * goes through setBucket, and none is removed (test/build-buckets.test.js looks for a line that
- * does either). An object that takes no new property (a frozen one) is searched each time.
+ * goes through setBucket, and none is removed (test/build-buckets-writes.test.js looks for a line
+ * that does either). An object that takes no new property (a frozen one) is searched each time.
  * @param {Record<string, number>} buckets
  * @returns {Map<string, string>}
  */
@@ -254,10 +249,6 @@ function joinCasings(counted, total) {
  *   project's totalBuilds), and none is lowered below the larger casing. That also bounds a
  *   project whose buckets merged a counted side with one that was not, which one flag cannot
  *   tell apart.
- * A project the app makes counts under its own path. A saved project's flag is its file's, or for
- * a file written before the flag, whether the record had a path (live/saved-project.js). Once a
- * path that makes a folder's casings one has joined them, each folder has one bucket, so the
- * flag is true from then on (setProjectPath, mergeBuckets).
  * @param {string | null} root
  * @param {Record<string, number>} counts
  * @param {boolean} counted whether the counts were made under a path

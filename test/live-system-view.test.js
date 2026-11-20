@@ -68,7 +68,7 @@ test('both models answer a planet card with as many builds as were sent with its
   assert.deepEqual(replay.source.getSystem(SLUG).planets.map((planet) => planet.name), ['(Root)']);
 });
 
-test('live system view: the system view and the planet card count a planet\'s files alike, a link as the one file it is', async (t) => {
+test('live system view: the system view and the planet card take a link as the one file it is, by one rule', async (t) => {
   const { root, model } = projectOnDisk(t, ['src/a.js', 'README.md'], { src: 1, '(root)': 1 });
   const outside = outsideFolder(t, ['one.txt']);
   linkTo(outside, path.join(root, 'linked'));

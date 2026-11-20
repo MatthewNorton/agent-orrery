@@ -33,14 +33,8 @@ const isGone = (/** @type {any} */ error) => Boolean(error) && (error.code === '
  */
 const unread = (folderRead) => ({ files: 0, sizeKb: 0, subdirs: 0, resources: [], folderRead });
 
-/**
- * The one definition of a planet's file, over a folder's listing: an entry the listing types as
- * anything but a folder (a file, a link, a junction). A link counts as the one file it is and is
- * never followed. The system view (getSystem, shallowCount) and the planet card (readFolder)
- * count by it, so the two agree.
- * @param {fs.Dirent} entry
- */
-const isPlanetFile = (entry) => !entry.isDirectory();
+// A planet's file, one rule for the system view and the card: an entry not typed a folder, so a link or junction is one file.
+const isPlanetFile = (/** @type {fs.Dirent} */ entry) => !entry.isDirectory();
 
 /**
  * The one definition of a planet folder, over a project folder's listing (`entries`; null when the

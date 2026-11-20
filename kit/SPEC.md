@@ -152,9 +152,8 @@ AU.universeImport()                    -> Promise<{ok, canceled, added, merged, 
    // One JSON file: universe-state.json as the model stands plus the IDEAS queue's texts.
    // Import merges (larger build counts, earlier firstSeen, later lastActivity) and never
    // removes; new projects arrive as project-added events, imported ideas as new items.
-   // A bucket is kept under any name a build can start one under (`isBucketName`), `__proto__`
-   // and `constructor` too. A project is kept under its id when the id is plain text, not blank
-   // and 256 characters at most (`validProjectId`), those two names included. A folder keeps one
+   // A project is kept under its id when the id is plain text, not blank and 256 characters at
+   // most (`validProjectId`), `__proto__` and `constructor` included. A folder keeps one
    // bucket, by the rule of the path the project ends with (its own, else the one the file gives
    // it): under a Windows path each side's counts for `docs` and `Docs` are made one, and the
    // larger of the two sides is kept. How one side's casings are made one follows whether its
@@ -168,10 +167,10 @@ AU.universeImport()                    -> Promise<{ok, canceled, added, merged, 
    // for both files: an entry that is not a record is passed over; a name is kept only as plain
    // text (no control character, 4,096 characters at most, and not `__proto__`, `constructor`
    // or `prototype`) and otherwise the project goes by its folder or its id; a bucket is a name
-   // a build can start one under (`isBucketName`, below) with a whole count above none, 10,000 of
-   // them at most, and a project's total is at least its largest bucket. The path alone has a
-   // rule per file: the state file's is used when it is local, a backup's only when it is also
-   // absolute, and normalized.
+   // a build can start one under (`isBucketName`, below), `__proto__` and `constructor` too,
+   // with a whole count above none, and a project's total is at least its largest bucket. The
+   // path alone has a rule per file: the state file's is used when it is local, a backup's only
+   // when it is also absolute, and normalized.
 ```
 
 ```js
@@ -235,17 +234,18 @@ Planet     = { name, key, files, builds, procedural? }   // name '(root)' possib
 //   A build then goes to the one it spelled (`bucket`), else the first (`AUR.planetOfBuild`).
 // A planet folder, live: an entry the project folder's listing types as a folder (`planetFolders`
 //   in `src/main/live/system-view.js`); a link or junction is typed a link, so it is never one. A
-//   planet's file is every other entry, a link or junction too, which counts as the one file it is
-//   and is never followed (`isPlanetFile`): a planet's `files` and `beltDensity` in the system view
-//   and the planet card's `files` count alike. getSystem draws the planet folders that are not
-//   ignored (a name starting with `.`, or one of `IGNORE_DIRS` such as `node_modules`), and
-//   `(root)` from the top-level files' own bucket, by that exact key, when it has builds. getPlanet
-//   reads any planet folder. So a folder with builds that the system view does not draw
-//   (`.github`) stays in `Project.planets` (every bucket's key), which Go to lists, and opens as a
-//   planet that reads its folder. Every bucket opens: a bucket's name is one a planet can have
-//   (one plain path segment) with no control character (`isBucketName` in
-//   `src/main/build-buckets.js`), and a project keeps 10,000 at most. One rule for both models'
-//   counting and both files' reader, so a bucket reads back after a restart as it was.
+//   planet's file is every other entry, a link or junction too, and is never followed: one rule
+//   (`isPlanetFile`) says what a file is for a planet's `files` and `beltDensity` in the system
+//   view and for the planet card's `files`, so a link or junction is the one file it is in each.
+//   getSystem draws the planet folders that are not ignored (a name starting with `.`, or one of
+//   `IGNORE_DIRS` such as `node_modules`), and `(root)` from the top-level files' own bucket, by
+//   that exact key, when it has builds. getPlanet reads any planet folder. So a folder with builds
+//   that the system view does not draw (`.github`) stays in `Project.planets` (every bucket's
+//   key), which Go to lists, and opens as a planet that reads its folder. Every bucket opens: a
+//   bucket's name is one a planet can have (one plain path segment) with no control character
+//   (`isBucketName` in `src/main/build-buckets.js`), and a project keeps 10,000 at most. One rule
+//   for both models' counting and both files' reader, so a bucket reads back after a restart as
+//   it was.
 
 PlanetData = { name, key, project: Project, builds, files, sizeKb, subdirs,
                resources: string[], procedural?, folderRead? }   // resources = top file exts;
