@@ -56,36 +56,37 @@
       if (!hull) return null;
       chosen = hull;
       return resolveAsset(scene, state, hull, () => 0, () => !AUR.isNodeDisposed(fallback), (asset) => {
+        const { isPickable, isVisible } = fallback;
         const entry = createShipEntry(scene, state, hull, asset, ship);
         if (!entry) return null;
         const assetRoot = entry.root;
-        const { isPickable, isVisible } = fallback;
         try {
           entry.fallback = fallback;
           // The dart root keeps the view's display scale; the hull sits inside it at unit scale.
           assetRoot.parent = fallback;
           fallback.isPickable = false;
           fallback.isVisible = false; // children keep drawing; the dart itself leaves the render queues
-          AUR.markShipMesh(assetRoot, ship);
           fallback.metadata = {
             ...(fallback.metadata || {}),
             isShip: false,
             upgradedHullId: hull.id,
           };
+          AUR.markShipMesh(assetRoot, ship);
         } catch (error) {
-          // A hull that cannot be installed under its dart: the dart flies as it did, then the
-          // hull is let go, and the cause reported is the install's.
-          Object.assign(fallback, { isPickable, isVisible });
+          // A hull that cannot be installed under its dart: the install's cause is logged, then the
+          // dart flies as it did and the hull is let go, each step guarded.
+          failed(hull, error, 'the ship keeps its dart.');
           guarded('Uninstalled hull ' + hull.id, [
+            [' could not restore its dart', () => Object.assign(fallback, { isPickable, isVisible })],
             [' could not be hidden', () => assetRoot.setEnabled(false)],
             [' could not be disposed', () => assetRoot.dispose()],
           ]);
           forget(state, entry); // off the books, though its root could not go
-          throw error;
+          return null;
         }
         return assetRoot;
       });
-    }).catch((error) => failed(chosen, error, 'the ship keeps its dart.'));
+    }).catch((error) => failed(chosen, error));
   }
 
   /**

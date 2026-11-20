@@ -132,6 +132,7 @@ test('a hull that cannot be installed leaves its dart as it was, a swap that can
   const stuck = Object.assign(unwritable(assets.fallback('f'), 'no metadata on f'), { isVisible: true, isPickable: true });
   assert.equal(await assets.ships.upgrade(scene, ship('f', 0), stuck), null);
   assert.deepEqual([stuck.isVisible, stuck.isPickable, stuck.children[0].isEnabled(), ...books()], [true, true, false, 1, 1000]);
+  assert.equal(stuck.children[0].metadata.isShip, undefined, 'a hull that is not installed is not marked a ship');
   Mesh.prototype.dispose = dispose;
   assets.ships.fade(scene, 1);
 
@@ -152,12 +153,37 @@ test('a hull that cannot be installed leaves its dart as it was, a swap that can
   assert.equal(hullId(roots[0]), 'mid', 'and the ship keeps the hull it had');
   assert.deepEqual(logs, [
     'Hull small request failed (no metadata); the ship keeps its dart.',
-    "Hull small's own template could not be disposed (no template dispose).",
     'Hull small request failed (no metadata on e); the ship keeps its dart.',
-    'Uninstalled hull small could not be disposed (no dispose).',
+    "Hull small's own template could not be disposed (no template dispose).",
     'Hull small request failed (no metadata on f); the ship keeps its dart.',
+    'Uninstalled hull small could not be disposed (no dispose).',
     'Hull mid could not be named on its dart (no metadata).',
     'Hull big request failed (no node).',
+  ]);
+});
+
+test('a dart that cannot be read builds no hull, and one that cannot be shown again still lets its hull go', async () => {
+  const assets = loadShipAssets(LADDER_MANIFEST, {});
+  const logs = [];
+  assets.AUR.log = (message) => logs.push(message);
+  const scene = assets.scene('system');
+  const books = () => { const { ships, triangles } = assets.AUR.shipAssets.sceneStates.get(scene); return [ships.size, triangles]; };
+  const unread = Object.defineProperty(assets.fallback('a'), 'isVisible', { get() { throw new Error('no isVisible'); } });
+  assert.equal(await assets.ships.upgrade(scene, ship('a', 0), unread), null);
+  assert.deepEqual([unread.children.length, ...books()], [0, 0, 0], 'nothing is built for it');
+  // Its metadata cannot be written either, so the install fails and the dart is to be shown again.
+  let visible = true;
+  const unshown = Object.defineProperty(assets.fallback('b'), 'isVisible', {
+    get: () => visible,
+    set(value) { if (value) throw new Error('no show'); visible = value; },
+  });
+  Object.defineProperty(unshown, 'metadata', { get: () => ({ isShip: true }), set() { throw new Error('no metadata'); } });
+  assert.equal(await assets.ships.upgrade(scene, ship('b', 0), unshown), null);
+  assert.deepEqual([unshown.children.length, ...books()], [0, 0, 0], 'its hull is let go and off the books');
+  assert.deepEqual(logs, [
+    'Hull small request failed (no isVisible).',
+    'Hull small request failed (no metadata); the ship keeps its dart.',
+    'Uninstalled hull small could not restore its dart (no show).',
   ]);
 });
 
