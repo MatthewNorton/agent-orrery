@@ -206,9 +206,12 @@ test('an opaque material fades with its mesh once it gives its transparency mode
   mesh.visibility = 1;
   assert.equal(opaque.needAlphaBlendingForMesh(mesh), false, 'and is solid at full visibility');
   assert.equal(glass.transparencyMode, BABYLON.Material.MATERIAL_ALPHABLEND, 'a blended material keeps its mode');
+  assert.equal(glass.needAlphaBlendingForMesh(mesh), true, 'and blends as it is, so it fades with its mesh');
   // Without its mode a faded cut-out would blend and no longer be tested: its holes would fill.
   assert.equal(cutOut.transparencyMode, BABYLON.Material.MATERIAL_ALPHATEST);
   mesh.visibility = 0.16;
+  assert.deepEqual([cutOut.needAlphaBlendingForMesh(mesh), cutOut.needAlphaTestingForMesh(mesh)], [false, true],
+    'with its mode kept a cut-out does not fade');
   cutOut.transparencyMode = null;
   assert.deepEqual([cutOut.needAlphaBlendingForMesh(mesh), cutOut.needAlphaTestingForMesh(mesh)], [true, false]);
 }));
