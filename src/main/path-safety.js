@@ -94,15 +94,15 @@ function isInsidePath(root, candidate) {
  * @returns {string | null}
  */
 function relativeInside(root, file, { separator = path.sep } = {}) {
+  if (typeof root !== 'string' || typeof file !== 'string') return null;
   // Security: a relative path, or a Windows path with no drive, would resolve against the process's
   // working folder or its drive, which says nothing about where a transcript's file is.
   const flavorName = pathFlavor(root);
   if (!flavorName || pathFlavor(file) !== flavorName) return null;
   const windows = flavorName === 'win32';
   const flavor = path[flavorName];
-  // pathFlavor names the syntax of strings only.
-  const normalizedRoot = flavor.normalize(/** @type {string} */ (root));
-  const normalizedFile = flavor.normalize(/** @type {string} */ (file));
+  const normalizedRoot = flavor.normalize(root);
+  const normalizedFile = flavor.normalize(file);
   const comparableRoot = windows ? normalizedRoot.toLowerCase() : normalizedRoot;
   const comparableFile = windows ? normalizedFile.toLowerCase() : normalizedFile;
   const rel = flavor.relative(comparableRoot, comparableFile);
