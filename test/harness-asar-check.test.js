@@ -6,17 +6,61 @@
 
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
-const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
 const { asarCheck, validArchive } = require('../src/main/harness/asar-check');
 
-const leftovers = () => fs.readdirSync(os.tmpdir()).filter((name) => name.startsWith('agent-orrery-asar-'));
+// `files` with its rm noting the folder it is asked to remove, which it then removes.
+const notingRemoved = (files) => {
+  const noted = { dir: null };
+  return { noted, files: { ...files, rm: (dir, options) => { noted.dir = dir; return fs.promises.rm(dir, options); } } };
+};
+const NO_WAIT = { wait: async () => {} };
 
-test('asar check: plain files, read and deleted, and the temporary folder goes', async () => {
-  const before = leftovers();
+test('asar check: plain files, read and deleted, and the temporary folder goes', async (t) => {
+  const rm = t.mock.method(fs.promises, 'rm');
   assert.deepEqual(await asarCheck(), { lstatFile: true, direntFile: true, deleted: true, errors: [] });
-  assert.deepEqual(leftovers(), before);
+  const [dir] = rm.mock.calls[0].arguments;
+  assert.deepEqual([path.basename(dir).startsWith('agent-orrery-asar-'), fs.existsSync(dir)], [true, false]);
+});
+
+test('asar check: a temporary folder it cannot make fails every answer, and the check answers all the same', async () => {
+  const result = await asarCheck({
+    ...fs.promises,
+    mkdtemp: async () => { throw Object.assign(new Error('ENOENT: no such file or directory, mkdtemp'), { code: 'ENOENT' }); },
+  });
+  assert.deepEqual(result, { lstatFile: false, direntFile: false, deleted: false, errors: ['mkdtemp: ENOENT: no such file or directory, mkdtemp'] });
+});
+
+// fs.promises whose rename and unlink fail for each file as `fails` says ({ call: [code, times] }), then
+// go through; `tried` lists the calls.
+function holding(fails) {
+  const tried = [], counts = new Map();
+  const call = (name) => async (target, ...rest) => {
+    tried.push(name);
+    const [code, times] = fails[name] || [null, 0];
+    const n = counts.get(name + target) ?? 0;
+    counts.set(name + target, n + 1);
+    if (n < times) throw Object.assign(new Error(`${code}: ${name} '${path.basename(target)}'`), { code });
+    return fs.promises[name](target, ...rest);
+  };
+  return { tried, files: { ...fs.promises, rename: call('rename'), unlink: call('unlink') } };
+}
+
+test('asar check: a rename or delete held for a moment is tried again, five tries at most and only while held', async () => {
+  let waits = 0;
+  const options = { wait: async () => { waits++; } };
+  const brief = holding({ rename: ['EPERM', 2], unlink: ['EBUSY', 2] });
+  assert.deepEqual(await asarCheck(brief.files, options), { lstatFile: true, direntFile: true, deleted: true, errors: [] });
+  assert.deepEqual([brief.tried.length, waits], [12, 8], 'two renames and two deletes, three tries each');
+  waits = 0;
+  const long = holding({ unlink: ['EACCES', 9] });
+  const kept = await asarCheck(long.files, options);
+  assert.deepEqual([kept.deleted, kept.errors, long.tried.filter((name) => name === 'unlink').length, waits],
+    [false, ["delete: EACCES: unlink 'malformed.asar'"], 5, 4], 'the last try\'s error');
+  waits = 0;
+  const gone = holding({ unlink: ['ENOENT', 1] });
+  assert.deepEqual([(await asarCheck(gone.files, options)).errors, waits], [["delete: ENOENT: unlink 'malformed.asar'"], 0]);
 });
 
 test('asar check: an fs that opens archives fails every step it gets wrong, and still cleans up', async () => {
@@ -41,12 +85,11 @@ test('asar check: an fs that opens archives fails every step it gets wrong, and 
       return fs.promises.unlink(file);
     },
   };
-  const before = leftovers();
-  const result = await asarCheck(electron);
+  const { noted, files } = notingRemoved(electron);
+  const result = await asarCheck(files, NO_WAIT);
   assert.deepEqual([result.lstatFile, result.direntFile, result.deleted], [false, true, false]);
   assert.deepEqual(result.errors.map((error) => error.split(':')[0]), ['lstat', 'delete'], 'the archives were written, then read');
-  assert.deepEqual(leftovers(), before);
-  for (const file of opened) assert.equal(fs.existsSync(file), false, 'the valid archive went with the folder');
+  assert.deepEqual([fs.existsSync(noted.dir), [...opened].some((file) => fs.existsSync(file))], [false, false], 'the valid archive went with the folder');
 });
 
 test('asar check: a temporary folder it cannot remove is named in its errors', async () => {
