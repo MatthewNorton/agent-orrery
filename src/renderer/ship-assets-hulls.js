@@ -45,6 +45,33 @@
     for (const root of template.roots) root.dispose(false, false); // its materials are the scene's
   }
 
+  // Babylon writes a template's instance matrices before each part's draw, in each pass; on ANGLE
+  // D3D11 a buffer rewritten after a draw of the same frame has read it stalls the GPU process, so
+  // a part drawn with the same ships as the frame's last write reuses it. This wraps Babylon 9.36
+  // internals; test/ship-assets-hulls.test.js fails if they move and it stops applying.
+  function writeInstancesOnce(mesh) {
+    const update = mesh._updateInstancedBuffers;
+    if (typeof update !== 'function' || !mesh._instanceDataStorage) return;
+    /** @type {{ frame: number, instances: any[] }} */
+    let written = { frame: -1, instances: [] };
+    mesh._updateInstancedBuffers = function (subMesh, batch, ...rest) {
+      const instances = batch.visibleInstances[subMesh._id] || [];
+      const frame = mesh.getScene().getFrameId();
+      const storage = mesh._instanceDataStorage;
+      if (storage.isFrozen || batch.renderSelf[subMesh._id] || frame !== written.frame ||
+        instances.length !== written.instances.length || instances.some((instance, i) => instance !== written.instances[i])) {
+        written = { frame, instances: instances.slice() };
+        return update.call(this, subMesh, batch, ...rest);
+      }
+      storage.isFrozen = true; // Babylon then draws from the buffer as it is
+      try {
+        return update.call(this, subMesh, batch, ...rest);
+      } finally {
+        storage.isFrozen = false;
+      }
+    };
+  }
+
   /**
    * A tinted, hidden copy of a hull: every ship of that look draws as its instances, in one draw
    * per part. An instance takes its source's material, visibility and lights, so the template
@@ -76,6 +103,7 @@
         // never with the glow or a planet's shell between its parts. Only a faded hull blends: no
         // flown hull has a blended material in full.
         mesh.alphaIndex = Number.POSITIVE_INFINITY;
+        writeInstancesOnce(mesh);
       }
       return { roots, meshes };
     } catch (error) {

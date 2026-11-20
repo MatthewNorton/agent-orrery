@@ -362,6 +362,8 @@ Design tokens (put in `:root`):
     `alphaIndex` of `Infinity`, past the default (`Number.MAX_VALUE`) that
     every other mesh keeps: a faded fleet draws after every other blended mesh
     (the sun's corona and glow, the planets' shells), wherever its ships are.
+    A template uploads its ships' matrices once a frame, not before each
+    part's draw in each pass; `test/ship-assets-hulls.test.js` guards it.
   - **Focus fade.** `AUR.ships.fade(scene, visibility, apart)` shows every
     hull at `visibility`, written on the templates, and a hull built later
     starts at it. The ship `apart` names (`{ shipId, visibility }`) shows its

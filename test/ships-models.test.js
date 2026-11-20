@@ -3,29 +3,13 @@
 // AUR.shipModels and the Petrel model on the real Babylon build (a NullEngine and a stand-in canvas).
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
 const BABYLON = require('babylonjs');
-const { withCanvas, onNullScene, loadShipModules } = require('../scripts/lib/ship-fingerprint.js');
-const { loadUtilLayer, logsOf, readRenderer, runRenderer } = require('./support/renderer-source');
-const { SHIP_ASSET_FILES, ship, hullOf, sameItems } = require('./support/ship-assets');
+const { withCanvas, onNullScene } = require('../scripts/lib/ship-fingerprint.js');
+const { logsOf, readRenderer } = require('./support/renderer-source');
+const { hullOf, sameItems } = require('./support/ship-assets');
+const { manifest, loadShipModels: load, onSystem } = require('./support/ship-models');
 
-const ROOT = path.join(__dirname, '..');
-const SHIPS = path.join(ROOT, 'src', 'renderer', 'ships');
-const SOURCE = path.join(SHIPS, 'petrel', 'source');
-const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'assets', 'ships', 'manifest.json'), 'utf8'));
 const SCOUT = manifest.hulls.find((hull) => hull.id === 'aur-lance-interceptor-v3');
-
-// The registry and Petrel on the renderer's own helpers, as the page loads them.
-function load() {
-  const AUR = loadUtilLayer({}, BABYLON);
-  const sources = fs.readdirSync(SOURCE).filter((name) => name.endsWith('.js')).map((name) => path.join(SOURCE, name));
-  loadShipModules(BABYLON, path.join(SHIPS, 'modules.js'),
-    [...sources, path.join(SHIPS, 'models.js'), path.join(SHIPS, 'petrel', 'model.js')], AUR);
-  // A NullEngine cannot make the raw cube texture the probe is, so the model reflects a stand-in here.
-  AUR.shipModule('petrel/light-probe', () => ({ createInspectionProbe: (scene) => new BABYLON.Texture(null, scene) }));
-  return AUR;
-}
 
 // Runs `work(scene, models, petrel, AUR)` on a fresh scene.
 function onScene(work) {
@@ -79,19 +63,6 @@ test('a model container holds the dressed ship out of the scene, as one mesh wit
     assert.equal(new Set(hull.material.subMaterials.map((finish) => finish.reflectionTexture)).size, 1, 'one probe');
   });
 });
-
-// Runs `work(scene, AUR, fly)` on a system view's scene, with AUR.ships on the real Babylon build
-// and Petrel flying the Scout rank of the manifest on disk; `fly(id)` resolves to a ship's hull.
-function onSystem(work) {
-  return withCanvas(() => onNullScene(BABYLON, async (scene) => {
-    const AUR = load();
-    const fetch = async () => ({ ok: true, status: 200, json: async () => manifest });
-    for (const file of SHIP_ASSET_FILES) runRenderer(file, { window: { AUR }, BABYLON, fetch });
-    scene.metadata = { view: 'system' };
-    const fly = (id) => AUR.ships.upgrade(scene, ship(id, 0), new BABYLON.Mesh('dart ' + id, scene));
-    return work(scene, AUR, fly);
-  }));
-}
 
 test('in a system every Petrel of a provider is an instance of one template, lit by the model lights, and a faded one blends', () =>
   onSystem(async (scene, AUR, fly) => {
