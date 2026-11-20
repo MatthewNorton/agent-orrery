@@ -108,7 +108,6 @@ test('in a system every Petrel of a provider is an instance of one template, lit
     const template = hullOf(a).sourceMesh;
     assert.equal(hullOf(b).sourceMesh, template, 'one template for the provider');
     assert.equal(template.isVisible, false);
-    template._resyncLightSources();
     assert.deepEqual(hullOf(a).lightSources.map((light) => light.name).sort(), ['model-fill', 'model-rim', 'model-sun'],
       'an instance is lit as its template is');
     const blends = (mesh) => mesh.material.subMaterials.map((finish) => finish.needAlphaBlendingForMesh(mesh));

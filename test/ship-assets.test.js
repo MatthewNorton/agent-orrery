@@ -224,6 +224,11 @@ test('shared hulls receive fixed provider palettes; a signal loads no model and 
 
 // ---------- rank ladder, LODs and in-place refresh ----------
 
+// Every camera sees Babylon's default layer mask: a hull keeps it and adds the layer of its lights.
+const CAMERA_LAYERS = 0x0FFFFFFF;
+const SHIP_LAYER = 0x10000000;
+const onLayer = (mesh, layer) => mesh.layerMask === (CAMERA_LAYERS | layer);
+
 // A small scene graph: enough of Babylon's node, mesh and instance behaviour
 // for ship-assets.js to build, swap and dispose hulls. Every hull file carries
 // `materials`: a material name, or { name, textured, albedo } for an authored one.
@@ -258,6 +263,7 @@ function loadShipAssets(manifest, trianglesByFile, materials = ['hull_primary', 
       this.scaling.setAll(1);
       this.isPickable = true;
       this.isVisible = true;
+      this.layerMask = CAMERA_LAYERS; // Babylon's default, as an instance has too
       this.ownVisibility = 1;
       this.disposed = false;
       this.children = [];
@@ -424,7 +430,7 @@ test('a rank a ship model has taken flies the model, built in code, until the sh
   assert.deepEqual(parts(drone).map((mesh) => mesh.material.worn), ['coded codex #f2f0ea hull_primary', 'coded codex #f2f0ea accent_energy']);
   for (const mesh of [...parts(root), ...parts(drone)]) {
     assert.ok(mesh instanceof assets.InstancedMesh && mesh.isVisible && !mesh.sourceMesh.isVisible, 'an instance of a hidden template');
-    assert.ok(mesh.layerMask === assets.models.LAYER && mesh.sourceMesh.layerMask === assets.models.LAYER, 'lit by the model lights only');
+    assert.ok(onLayer(mesh, assets.models.LAYER) && onLayer(mesh.sourceMesh, assets.models.LAYER), 'seen by the camera, lit by the model lights only');
   }
   const twin = await assets.ships.upgrade(system, ship('twin', 0), assets.fallback('twin'));
   assert.ok(parts(twin).every((mesh, i) => mesh.sourceMesh === parts(root)[i].sourceMesh), 'one template per palette');
@@ -432,14 +438,15 @@ test('a rank a ship model has taken flies the model, built in code, until the sh
   assert.equal(await assets.ships.refresh(system, ship('a', 3)), root, 'promoted in place');
   assert.equal(hullId(root), 'mid');
   assert.deepEqual(assets.loads, ['mid-near.glb']);
-  assert.ok(parts(root).every((mesh) => mesh.layerMask === 0x10000000 && !mesh.material.worn), 'a manifest hull wears the fleet livery');
+  assert.ok(parts(root).every((mesh) => onLayer(mesh, SHIP_LAYER) && onLayer(mesh.sourceMesh, SHIP_LAYER) && !mesh.material.worn),
+    'a manifest hull wears the fleet livery and is lit by the fleet lights, not the model ones');
 
   const universe = assets.scene('universe');
   const far = [];
   for (const id of ['x', 'y']) far.push(await assets.ships.upgrade(universe, ship(id, 0), assets.fallback(id)));
   assert.deepEqual(built, ['coded', 'coded'], 'one built container per scene');
   const sources = far.map((entry) => parts(entry).map((mesh) => {
-    assert.ok(mesh instanceof assets.InstancedMesh && mesh.isVisible && mesh.layerMask === assets.models.LAYER);
+    assert.ok(mesh instanceof assets.InstancedMesh && mesh.isVisible && onLayer(mesh, assets.models.LAYER));
     return mesh.sourceMesh;
   }));
   assert.deepEqual(sources[0], sources[1], 'on the map the ships of a palette are instances of one template');
@@ -473,8 +480,8 @@ test('every view instances its hulls from one template per provider: far hulls o
   const nearParts = (root) => root.getChildMeshes(false).filter((mesh) => mesh.material);
   assert.ok(nearParts(near).every((mesh) => mesh instanceof assets.InstancedMesh && mesh.sourceMesh.isVisible === false));
   assert.ok(nearParts(nearTwin).every((mesh, i) => mesh.sourceMesh === nearParts(near)[i].sourceMesh), 'one template per provider');
-  assert.ok(nearParts(near).every((mesh) => mesh.layerMask === 0x10000000 && mesh.sourceMesh.layerMask === 0x10000000),
-    'the template carries the fleet light layer');
+  assert.ok(nearParts(near).every((mesh) => onLayer(mesh, SHIP_LAYER) && onLayer(mesh.sourceMesh, SHIP_LAYER)),
+    'the template carries the fleet light layer, and both keep the camera\'s');
   assert.equal(partMaterial(near, 'hull_primary').emissiveColor.toHexString(), '#000000', 'a near hull is lit, not self-lit');
 });
 
@@ -550,7 +557,7 @@ test('focus mode moves a ship to its provider\'s faded template and back, keepin
   assert.equal(assets.ships.fade(scene, 'a', 0.16), true);
   const faded = templatesOf(a);
   assert.ok(faded.every((mesh) => mesh.visibility === 0.16 && mesh.isVisible === false && !full.includes(mesh)), 'a hidden faded template');
-  assert.ok(instancesOf(a).every((mesh) => mesh.visibility === 0.16 && mesh.isVisible && mesh.layerMask === 0x10000000));
+  assert.ok(instancesOf(a).every((mesh) => mesh.visibility === 0.16 && mesh.isVisible && onLayer(mesh, SHIP_LAYER) && onLayer(mesh.sourceMesh, SHIP_LAYER)));
   assert.ok(sameItems(templatesOf(b), full), 'the other ships keep theirs');
   assert.equal(a.parent, darts.a, 'the same root under the same dart');
   assert.deepEqual([a.children.length, a.children[0].scaling.x, a.children[0].rotation.y], [1, 0.2, Math.PI], 'the hull correction');
