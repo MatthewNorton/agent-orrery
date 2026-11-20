@@ -12,7 +12,6 @@
     const SIZE = AUR.SHIP_SIZE.system;
     const STANDOFF = 0.9;        // clear water between a planet's surface and a ship at work
     const BELT_CLEARANCE = 0.9;  // and between the belt's outer edge and the patrol ring
-    const REFETCH_TRIES = 3;     // fetches of the system that may fail in a row before the refetch rests
     const shipLookTarget = new BABYLON.Vector3();
     const standoff = new BABYLON.Vector3();
     let refetching = false, refetchAgain = false;
@@ -173,22 +172,21 @@
     // A build started a planet this view does not draw: the system is fetched again, one request
     // at a time, and once more for a planet that started while one was out. Until an answer from
     // after the build is in, view.sys is behind it (view.sysBehind) and is not handed to a planet.
-    // A fetch that fails keeps a refetch queued behind it, and after REFETCH_TRIES failures in a
-    // row the loop rests until the next such build. Whatever goes wrong, it ends not fetching.
+    // A fetch that fails ends the loop and leaves the view behind, until the next planet starts or
+    // the view is built again. Whatever goes wrong, it ends not fetching.
     async function refetchPlanets() {
       view.sysBehind = refetchAgain = true;
       if (refetching) return;
       refetching = true;
+      // An answer is drawn only while the app still shows this view, in the stream it was asked in:
+      // the view of another project, or of history, may have taken its place while the fetch was out.
+      const stream = view.shown();
+      const shown = () => stream !== null && view.shown() === stream;
       try {
-        for (let failures = 0; refetchAgain && !scene.isDisposed;) {
+        while (refetchAgain && shown()) {
           refetchAgain = false;
           const ns = await AUR.settle(() => AU.getSystem(projectId));
-          if (scene.isDisposed) break;
-          if (!Array.isArray(ns.planets)) {
-            if (++failures >= REFETCH_TRIES) break;
-            continue;
-          }
-          failures = 0;
+          if (!shown() || !Array.isArray(ns.planets)) break;
           view.sys = ns;
           view.sysBehind = refetchAgain;
           drawNewPlanets(ns.planets);

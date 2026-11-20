@@ -9,7 +9,8 @@ const { runRenderer } = require('./support/renderer-source');
 const { deferred } = require('./support/main-wiring');
 
 // The part over `planets` ({ name, key } each, by name as the view keeps them); getSystem() calls
-// wait in `asked` to be answered.
+// wait in `asked` to be answered. `view.stream` is the stream the app shows the view in; null once
+// another view has its place.
 function loadPart(planets) {
   const asked = [], built = [], logged = [];
   const window = { AU: { getSystem: () => { asked.push(deferred()); return asked.at(-1).promise; } } };
@@ -18,6 +19,7 @@ function loadPart(planets) {
   runRenderer('scene/system/ships.js', { window, BABYLON: { Vector3: function Vector3() {} } });
   const view = {
     scene: { isDisposed: false }, gui: {}, ships: new Map(), projectId: 'p', outer: 10, beltR: 6, beltWidth: 3, sys: null, sysBehind: false,
+    stream: 'live-1', shown: () => (view.scene.isDisposed ? null : view.stream),
     planets: new Map(planets.map((planet) => [planet.name, { ...planet, pulseUntil: 0 }])),
     buildPlanet(pd) {
       built.push(pd.name);
@@ -71,19 +73,30 @@ test('system ships: a build that starts a planet fetches the system again, and i
   await settled();
   assert.deepEqual([asked.length, view.sysBehind, built, view.sys.planets.length], [3, false, ['docs', 'lib', 'web'], 4]);
 
-  // No answer: the system stays behind, and the next such build asks again.
-  build('api', 'api', { isNew: true });
-  asked[3].reject(new Error('main is away'));
-  await settled();
-  assert.deepEqual([view.sysBehind, view.sys.planets.length], [true, 4]);
-  build('cli', 'cli', { isNew: true });
-  assert.equal(asked.length, 5);
+});
 
-  // An answer for a view that has closed builds nothing.
-  view.scene.isDisposed = true;
-  asked[4].resolve(systemOf('src', 'docs', 'lib', 'web', 'api', 'cli'));
-  await settled();
-  assert.deepEqual([built.length, view.sys.planets.length, asked.length], [3, 4, 5]);
+test('system ships: an answer is drawn only while the app still shows the view, in the stream it was asked in', async () => {
+  const systems = systemOf('src', 'docs', 'lib');
+  // The view closed; another view took its place; history took the place of the live stream.
+  const changes = {
+    closed: (view) => { view.scene.isDisposed = true; },
+    'not shown': (view) => { view.stream = null; },
+    'another stream': (view) => { view.stream = 'replay-2'; },
+  };
+  for (const [what, change] of Object.entries(changes)) {
+    const { view, asked, built, build } = loadPart([{ name: 'src', key: 'src' }]);
+    build('docs', 'docs', { isNew: true });
+    build('lib', 'lib', { isNew: true });
+    change(view);
+    asked[0].resolve(systems);
+    await settled();
+    assert.deepEqual([built, view.sys, view.sysBehind, asked.length], [[], null, true, 1], `${what}: nothing drawn, and the queued fetch is not sent`);
+  }
+  // A view that is not shown when its planet starts asks for nothing.
+  const { view, asked, build } = loadPart([{ name: 'src', key: 'src' }]);
+  view.stream = null;
+  build('docs', 'docs', { isNew: true });
+  assert.deepEqual([asked.length, view.sysBehind], [0, true]);
 });
 
 test('system ships: a planet that cannot be built stops neither the others nor the next refetch', async () => {
@@ -123,25 +136,28 @@ test('system ships: a folder renamed in case only stays its one globe; two folde
   assert.deepEqual(built, ['lib', 'Docs', 'web']);
 });
 
-test('system ships: a failed fetch keeps the refetch queued behind it, three failures in a row at most', async () => {
+test('system ships: a failed fetch leaves the view behind until the next planet starts', async () => {
   const { view, asked, built, build } = loadPart([{ name: 'src', key: 'src' }]);
-  const fail = async (request) => { asked[request].reject(new Error('main is away')); await settled(); };
+  // One build, one fetch that fails: the loop stops there.
   build('docs', 'docs', { isNew: true });
-  build('lib', 'lib', { isNew: true });
-  await fail(0);
-  assert.equal(asked.length, 2, 'the planet that started while the fetch was out is still asked for');
-  build('web', 'web', { isNew: true });
-  await fail(1);
-  build('api', 'api', { isNew: true });
-  await fail(2);
-  assert.deepEqual([asked.length, view.sysBehind, built], [3, true, []], 'three in a row: it rests');
-
-  // The next planet starts it again, and an answer clears the count.
-  build('cli', 'cli', { isNew: true });
-  assert.equal(asked.length, 4);
-  build('app', 'app', { isNew: true });
-  await fail(3);
-  asked[4].resolve(systemOf('src', 'docs', 'lib', 'web', 'api', 'cli', 'app'));
+  asked[0].reject(new Error('main is away'));
   await settled();
-  assert.deepEqual([asked.length, view.sysBehind, built], [5, false, ['docs', 'lib', 'web', 'api', 'cli', 'app']]);
+  assert.deepEqual([asked.length, view.sysBehind, view.sys, built], [1, true, null, []], 'no retry, and the system is not handed to a planet');
+  // The next planet to start fetches again, and the answer has both.
+  build('lib', 'lib', { isNew: true });
+  assert.equal(asked.length, 2, 'the refetch is not left fetching');
+  asked[1].resolve(systemOf('src', 'docs', 'lib'));
+  await settled();
+  assert.deepEqual([asked.length, view.sysBehind, built], [2, false, ['docs', 'lib']]);
+
+  // A planet that started while the failed fetch was out waits for the next one too.
+  build('web', 'web', { isNew: true });
+  build('api', 'api', { isNew: true });
+  asked[2].resolve(null); // main has no such system
+  await settled();
+  assert.deepEqual([asked.length, view.sysBehind, built.length], [3, true, 2]);
+  build('cli', 'cli', { isNew: true });
+  asked[3].resolve(systemOf('src', 'docs', 'lib', 'web', 'api', 'cli'));
+  await settled();
+  assert.deepEqual([asked.length, view.sysBehind, built], [4, false, ['docs', 'lib', 'web', 'api', 'cli']]);
 });

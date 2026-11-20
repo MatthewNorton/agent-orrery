@@ -81,6 +81,8 @@
     const view = {
       scene, gui, sys, projectId, orbitR, outer, beltR, beltWidth: 3.4, planets, ships, topNames, ringRoot,
       camera, canvas, glow, shipFocus: null, sysBehind: false,
+      // The stream the app shows this view in; null once it is closed or another view has its place.
+      shown: () => (scene.isDisposed ? null : ctx.shown(scene)),
       sun, sunHex, sunDia, worldMaps: ctx.worldMaps, quality: ctx.quality,
     };
     const parts = AUR.sceneParts.system;
