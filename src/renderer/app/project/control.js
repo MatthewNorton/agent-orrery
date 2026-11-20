@@ -88,7 +88,7 @@
         S.projectControl = { projectId, targetId, requestId, phase: 'pending', code: null };
         A.renderChromeNow(C.CHROME.PROJECT | C.CHROME.FOCUS);
       },
-      lower() { if (S.projectControl.phase === 'pending') S.projectControl.phase = 'idle'; },
+      lower() { S.projectControl.phase = 'idle'; },
       isCurrent,
     }, () => AU.openTerminal(targetId));
     if (!isCurrent()) return;
