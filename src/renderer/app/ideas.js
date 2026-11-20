@@ -102,19 +102,14 @@
   /** @param {() => Promise<RootTaskResult>} operation */
   async function mutateIdea(operation, successText, clearInput = false, onSuccess = null) {
     if (A.ideaMutationsDisabled()) return;
-    S.ideaPanel.busy = true;
     /** @type {RootTaskResult} */
-    let result;
-    // Whatever goes wrong, it ends not busy: a render that throws must not refuse every edit from then on.
-    try {
-      S.ideaPanel.refreshAfterBusy = false;
-      S.ideaPanel.status = '';
-      S.ideaPanel.error = false;
-      A.renderIdeas();
-      result = await AUR.settle(operation);
-    } finally {
-      S.ideaPanel.busy = false;
-    }
+    const result = await AUR.settleBusy({
+      raise() {
+        Object.assign(S.ideaPanel, { busy: true, refreshAfterBusy: false, status: '', error: false });
+        A.renderIdeas();
+      },
+      lower() { S.ideaPanel.busy = false; },
+    }, operation);
     if (result.ok === true) {
       S.ideaPanel.status = successText;
       S.ideaPanel.error = false;

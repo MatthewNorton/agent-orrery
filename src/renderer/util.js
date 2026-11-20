@@ -245,6 +245,18 @@
   AUR.settle = async function settle(call, onError) {
     try { return (await call()) || FAILED; } catch (error) { if (onError) onError(error); return FAILED; }
   };
+  // `call` settled as above with a busy flag up meanwhile. `busy.raise()` puts the flag up and shows
+  // it; `busy.lower()` takes it down once the call has settled, and also when raise() throws (that
+  // error is then passed on), unless `busy.isCurrent()` says the flag is no longer this call's: a
+  // newer request, or the panel opened again, holds it now.
+  AUR.settleBusy = async function settleBusy(busy, call, onError) {
+    try {
+      busy.raise();
+      return await AUR.settle(call, onError);
+    } finally {
+      if (!busy.isCurrent || busy.isCurrent()) busy.lower();
+    }
+  };
   // A project's system as main has it now; null when it has none, its answer lists no planets, or
   // the call fails, which is logged.
   AUR.fetchSystem = async function fetchSystem(projectId) {

@@ -139,16 +139,19 @@
     const owner = S.taskPanel.owner;
     const projectId = S.taskPanel.projectId;
     if (!taskOwnerIsActive(owner, projectId) || !S.taskPanel.trusted || S.taskPanel.saving) return;
-    S.taskPanel.saving = true;
-    S.taskPanel.refreshAfterSave = false;
-    S.taskPanel.status = '';
-    S.taskPanel.error = false;
     const request = ++S.taskPanel.request;
-    renderTasksPanel();
+    // Once the panel has moved on (another project or view), the flag is the next session's.
+    const isCurrent = () => taskOwnerIsActive(owner, projectId) && request === S.taskPanel.request;
     /** @type {TaskMutationResult} */
-    const result = await AUR.settle(operation);
-    if (!taskOwnerIsActive(owner, projectId) || request !== S.taskPanel.request) return;
-    S.taskPanel.saving = false;
+    const result = await AUR.settleBusy({
+      raise() {
+        Object.assign(S.taskPanel, { saving: true, refreshAfterSave: false, status: '', error: false });
+        renderTasksPanel();
+      },
+      lower() { S.taskPanel.saving = false; },
+      isCurrent,
+    }, operation);
+    if (!isCurrent()) return;
     const refreshAfterSave = S.taskPanel.refreshAfterSave;
     S.taskPanel.refreshAfterSave = false;
     if (result.ok === true && Array.isArray(result.items)) {

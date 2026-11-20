@@ -149,18 +149,20 @@
     if (S.projectSettings.busy || S.playback.mode !== 'live' || S.replayTransitionPending) return null;
     const owner = S.projectSettings.owner;
     const request = ++S.projectSettings.request;
-    S.projectSettings.busy = true;
-    try {
-      setStatus(statusText);
-      A.renderProjectSettings();
-      S.projectSettings.els.close.focus();
-      const result = await AUR.settle(call);
-      return settingsRequestIsCurrent(owner, request) ? result : null;
-    } finally {
-      // Whatever goes wrong, it ends not busy. Its own flag only: once superseded, the flag is the
-      // session's that followed (resetSettingsSession cleared it, and a request there may hold it).
-      if (settingsRequestIsCurrent(owner, request)) S.projectSettings.busy = false;
-    }
+    // Once superseded, the flag is the session's that followed (resetSettingsSession cleared it,
+    // and a request there may hold it).
+    const isCurrent = () => settingsRequestIsCurrent(owner, request);
+    const result = await AUR.settleBusy({
+      raise() {
+        S.projectSettings.busy = true;
+        setStatus(statusText);
+        A.renderProjectSettings();
+        S.projectSettings.els.close.focus();
+      },
+      lower() { S.projectSettings.busy = false; },
+      isCurrent,
+    }, call);
+    return isCurrent() ? result : null;
   }
   A.runSettingsRequest = runSettingsRequest;
 

@@ -46,11 +46,15 @@
 
   A.forgetFromCard = async function forgetFromCard(projectId) {
     if (S.projectForget.pending) return;
-    S.projectForget = { projectId, pending: true, note: '' };
-    A.renderChromeNow(C.CHROME.PROJECT);
-    const result = await A.forgetProject(projectId);
-    const note = result.ok === true ? '' : forgetFailureText(result.code);
-    S.projectForget = { projectId, pending: false, note };
+    /** @type {ProjectForgetResult} */
+    const result = await AUR.settleBusy({
+      raise() {
+        S.projectForget = { projectId, pending: true, note: '' };
+        A.renderChromeNow(C.CHROME.PROJECT);
+      },
+      lower() { S.projectForget.pending = false; },
+    }, () => A.forgetProject(projectId));
+    S.projectForget.note = result.ok === true ? '' : forgetFailureText(result.code);
     A.renderChromeNow(C.CHROME.PROJECT);
   };
 })();
