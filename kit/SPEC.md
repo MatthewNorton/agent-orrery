@@ -356,7 +356,9 @@ Design tokens (put in `:root`):
   template at that visibility (`AUR.ships.fade(scene, shipId, visibility)`:
   0.16 for the others, 0 for the ship it is inside of, 1 to restore), which
   rebuilds the same hull file and palette and leaves the triangle budget as it
-  is; an opaque hull material gives its transparency mode up, because Babylon
+  is. The system view moves a hull on its next frame, to the last visibility
+  focus mode asked for, so following another ship rebuilds only the hulls whose
+  visibility changes, and a view left before that frame rebuilds none; an opaque hull material gives its transparency mode up, because Babylon
   ignores a mesh's visibility while its material is set opaque or cut-out;
   blended glass fades as it is; a cut-out keeps its mode and does not fade,
   and no hull has one. Babylon sorts a template's ships as one, at the

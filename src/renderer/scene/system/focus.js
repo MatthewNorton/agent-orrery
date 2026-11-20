@@ -40,15 +40,25 @@
       return saved.get(rec.id);
     }
 
+    // A hull moves to the template at another visibility by rebuilding its instances
+    // (AUR.ships.fade), so focus mode notes the visibility each hull is to show and the view's next
+    // frame moves it: following another ship (leave focus, enter it again) then moves only the
+    // hulls whose visibility changed, and a view disposed before its next frame moves none.
+    const hullFades = new Map(); // ship id -> the visibility its hull shows from the next frame
+    function applyHullFades() {
+      for (const [id, visibility] of hullFades) AUR.ships.fade(scene, id, visibility);
+      hullFades.clear();
+    }
+
     // What focus mode shows of a ship: the focused one in full from outside, hidden from inside
     // (the viewer sits in it), every other ship faded. A hull is instances, which show their
-    // template's visibility, so AUR.ships moves it to the template at this one; the dart, a
-    // signal's glyph and the plumes are meshes of their own.
+    // template's visibility, so it moves to the template at this one; the dart, a signal's glyph
+    // and the plumes are meshes of their own.
     function applyShipFocusVisual(rec) {
       const { shipFocus } = view;
       if (!shipFocus) return;
       const visibility = rec.id !== shipFocus.shipId ? 0.16 : shipFocus.exterior ? 1 : 0;
-      AUR.ships.fade(scene, rec.id, visibility);
+      hullFades.set(rec.id, visibility);
       const saved = savedVisibilities(rec);
       for (const node of recordVisualNodes(rec)) {
         if (node.isAnInstance) continue;
@@ -67,7 +77,7 @@
         for (const [node, visibility] of saved) {
           if (!AUR.isNodeDisposed(node)) node.visibility = visibility;
         }
-        AUR.ships.fade(scene, id, 1);
+        hullFades.set(id, 1);
         const rec = ships.get(id);
         if (!rec) continue;
         if (rec.label) rec.label.isVisible = true;
@@ -268,7 +278,7 @@
     }
 
     return {
-      applyShipFocusVisual, focusShip, setShipFocus, clearShipFocus, shipFocusState,
+      applyShipFocusVisual, applyHullFades, focusShip, setShipFocus, clearShipFocus, shipFocusState,
       updateShipFocusCamera, orbitShipFocus,
     };
   };
