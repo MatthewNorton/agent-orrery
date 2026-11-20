@@ -200,7 +200,7 @@ test('an opaque material fades with its mesh once it gives its transparency mode
   const cutOut = made('cut-out', BABYLON.Material.MATERIAL_ALPHATEST);
   cutOut.albedoTexture = Object.assign(new BABYLON.Texture(null, scene), { hasAlpha: true });
   mesh.visibility = 0.16;
-  assert.equal(opaque.needAlphaBlendingForMesh(mesh), false, 'with a mode set, Babylon ignores visibility');
+  assert.equal(opaque.needAlphaBlendingForMesh(mesh), false, 'set opaque, Babylon ignores visibility');
   for (const material of [opaque, cutOut, glass]) AUR.fadeWithMesh(material);
   assert.equal(opaque.needAlphaBlendingForMesh(mesh), true, 'it fades');
   mesh.visibility = 1;
