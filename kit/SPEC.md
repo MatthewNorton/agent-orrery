@@ -624,14 +624,15 @@ route logs that and shows the universe instead (`app/route.js`).
   planet in from zero, feed shows planet formation. An answer is drawn only while the app still
   shows the view in the stream it was asked in (`ctx.shown`). A fetch that fails is not tried
   again, unless a planet started while it was out, which is a new reason to ask once more. Until
-  an answer is drawn or the view is built again the view stays behind: its system is not handed
-  to a planet, which fetches its own. A planet that cannot be built, when
-  the view opens or later, leaves no ring, globe, shell, material or label behind and gives its
-  maps back to the map service (a world's own `dispose()`, `worlds/material.js`, which never
-  disposes the blank texture its scene shares); it is logged once and does not stop the others,
-  and the next re-fetch builds it again. A folder is one planet whatever its casing:
-  one renamed in case only keeps the globe it has, under the name it was drawn with, until the
-  view is built again; a key gets a second globe only when the answer lists it twice.
+  an answer comes back while the app shows the view in the stream it was asked in, or the view is
+  built again, the view stays behind: its system is not handed to a planet, which fetches its
+  own. A planet that cannot be built, when the view opens or later, leaves no ring, globe,
+  shell, material or label behind and gives its maps back to the map service (a world's own
+  `dispose()`, `worlds/material.js`, which never disposes the blank texture its scene shares); it
+  is logged once and does not stop the others, and the next re-fetch builds it again. A folder is
+  one planet whatever its casing: one renamed in case only keeps the globe it has, under the name
+  it was drawn with, until the view is built again; a key gets a second globe only when the
+  answer lists it twice.
   On `activity`: brief thruster flash.
 - Project card (top-left, panel): `PROJECT: <NAME>`; rows: `STATE` (any ship
   Building → `Building` in accent blue; else the busiest ship status; no ships →
