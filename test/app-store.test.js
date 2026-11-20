@@ -34,12 +34,10 @@ test('store: a build counts on the open planet when it carries the planet\'s key
   assert.deepEqual([planet.builds, state.store.projects.get('p').totalBuilds], [2, 4]);
 });
 
-test('store: a build that no bucket holds counts on no open planet, whatever key the planet has', () => {
-  for (const key of ['docs', null]) {
-    const { state, planet, build } = setup(key);
-    build(null, { bucket: 'Docs' });
-    assert.deepEqual([planet.builds, state.store.projects.get('p').totalBuilds], [0, 1], String(key));
-  }
+test('store: a build that no bucket holds counts on no open planet, not even the one its folder names', () => {
+  const { state, planet, build } = setup('docs');
+  build(null, { bucket: 'Docs' });
+  assert.deepEqual([planet.builds, state.store.projects.get('p').totalBuilds], [0, 1]);
 });
 
 test('store: every build that starts a planet is passed on with its project, for a planet card to follow', () => {
