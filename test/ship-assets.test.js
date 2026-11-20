@@ -145,6 +145,21 @@ test('every view instances its hulls from one template per provider: far hulls o
   assert.equal(partMaterial(near, 'hull_primary').emissiveColor.toHexString(), '#000000', 'a near hull is lit, not self-lit');
 });
 
+// The fleet's upper ranks have one file for every view, so the map's view alone lights them.
+test('a hull without levels of detail lights itself on the lightless map, and not in a lit view', async () => {
+  const manifest = {
+    schemaVersion: 1,
+    providerFamilies: { claude: 'one' },
+    hulls: [{ id: 'one', file: 'one.glb', family: 'one', role: 'main', minBuilds: 0 }],
+  };
+  const assets = loadShipAssets(manifest, {});
+  const map = await assets.ships.upgrade(assets.scene('universe'), ship('a', 0), assets.fallback('a'));
+  const system = await assets.ships.upgrade(assets.scene('system'), ship('a', 0), assets.fallback('a'));
+  assert.deepEqual([map.metadata.assetLod, system.metadata.assetLod, assets.loads], [null, null, ['one.glb', 'one.glb']]);
+  assert.ok(partMaterial(map, 'hull_primary').emissiveColor.r > 0, 'self-lit on the map');
+  assert.equal(partMaterial(system, 'hull_primary').emissiveColor.toHexString(), '#000000', 'lit by the system view');
+});
+
 test('a scene that has not declared its view loads nothing until upgrade, which defaults to far', async () => {
   const assets = loadShipAssets(LADDER_MANIFEST, {});
   const scene = assets.scene(null);
