@@ -4,9 +4,10 @@
 // fade, and the triangle budget.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
-const { RENDERER, SHIP_LAYER, onLayer, loadShipAssets, LADDER_MANIFEST, ship, hullId, partMaterial } = require('./support/ship-assets');
+const { readRenderer } = require('./support/renderer-source');
+const {
+  SHIP_LAYER, onLayer, loadShipAssets, LADDER_MANIFEST, ship, hullId, partMaterial, instancesOf, templatesOf, sameItems,
+} = require('./support/ship-assets');
 
 test('refresh swaps the hull inside the same root and keeps the fallback valid', async () => {
   const assets = loadShipAssets(LADDER_MANIFEST, {});
@@ -44,10 +45,6 @@ test('refresh re-tints a ship that turns out to run a local model, keeping its h
   assert.equal(root.metadata.providerTint, '#ff3344');
   assert.equal(await assets.ships.refresh(scene, ship('a', 0, { local: true })), null, 'same look: nothing to do');
 });
-
-const instancesOf = (root) => root.getChildMeshes(false).filter((mesh) => mesh.isAnInstance);
-const templatesOf = (root) => instancesOf(root).map((mesh) => mesh.sourceMesh);
-const sameItems = (a, b) => a.length === b.length && a.every((item, i) => item === b[i]);
 
 test('focus mode moves a ship to its provider\'s faded template and back, keeping its hull, scale and correction', async () => {
   const assets = loadShipAssets(LADDER_MANIFEST, {});
@@ -196,7 +193,7 @@ test('a hull request whose dart is gone or that is superseded while it waits on 
 
 // The counts the budget comment and kit/SPEC.md state, at the size Petrel was imported at.
 test('a near view holds fifty-one ships of the first rank and the universe map, with a budget of its own, seventy', async () => {
-  const petrel = JSON.parse(fs.readFileSync(path.join(RENDERER, 'ships', 'petrel', 'source', 'source.json'), 'utf8'));
+  const petrel = JSON.parse(readRenderer('ships/petrel/source/source.json'));
   const { triangles } = petrel.geometry;
   const assets = loadShipAssets(LADDER_MANIFEST, { 'small-near.glb': triangles, 'small-far.glb': triangles });
   const hulled = async (view) => {

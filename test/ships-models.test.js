@@ -7,7 +7,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const BABYLON = require('babylonjs');
 const { withCanvas, onNullScene, loadShipModules } = require('../scripts/lib/ship-fingerprint.js');
-const { readRenderer, runRenderer } = require('./support/renderer-source');
+const { loadUtilLayer, readRenderer, runRenderer } = require('./support/renderer-source');
+const { SHIP_ASSET_FILES, ship, hullOf, sameItems } = require('./support/ship-assets');
 
 const ROOT = path.join(__dirname, '..');
 const SHIPS = path.join(ROOT, 'src', 'renderer', 'ships');
@@ -17,10 +18,7 @@ const SCOUT = manifest.hulls.find((hull) => hull.id === 'aur-lance-interceptor-v
 
 // The registry and Petrel on the renderer's own helpers, as the page loads them.
 function load() {
-  const window = {};
-  runRenderer('util.js', { window });
-  runRenderer('util-scene.js', { window, BABYLON });
-  const { AUR } = window;
+  const AUR = loadUtilLayer({}, BABYLON);
   const sources = fs.readdirSync(SOURCE).filter((name) => name.endsWith('.js')).map((name) => path.join(SOURCE, name));
   loadShipModules(BABYLON, path.join(SHIPS, 'modules.js'),
     [...sources, path.join(SHIPS, 'models.js'), path.join(SHIPS, 'petrel', 'model.js')], AUR);
@@ -38,8 +36,6 @@ function onScene(work) {
 }
 
 const trianglesOf = (mesh) => mesh.getTotalIndices() / 3;
-// Babylon objects compare by identity: a deepEqual that fails tries to print them whole.
-const same = (actual, expected, message) => assert.ok(actual.length === expected.length && actual.every((item, i) => item === expected[i]), message);
 
 test('Petrel flies the Scout rank: the first rank of the family both providers fly', () => {
   const models = load().shipModels;
@@ -84,26 +80,23 @@ test('a model container holds the dressed ship out of the scene, as one mesh wit
   });
 });
 
-// AUR.ships on the real Babylon build, Petrel flying the Scout rank of the manifest on disk.
-function loadShips() {
-  const AUR = load();
-  const fetch = async () => ({ ok: true, status: 200, json: async () => manifest });
-  for (const file of ['ship-assets.js', 'ship-assets-hulls.js', 'ship-assets-api.js']) runRenderer(file, { window: { AUR }, BABYLON, fetch });
-  return AUR;
+// Runs `work(scene, AUR, fly)` on a system view's scene, with AUR.ships on the real Babylon build
+// and Petrel flying the Scout rank of the manifest on disk; `fly(id)` resolves to a ship's hull.
+function onSystem(work) {
+  return withCanvas(() => onNullScene(BABYLON, async (scene) => {
+    const AUR = load();
+    const fetch = async () => ({ ok: true, status: 200, json: async () => manifest });
+    for (const file of SHIP_ASSET_FILES) runRenderer(file, { window: { AUR }, BABYLON, fetch });
+    scene.metadata = { view: 'system' };
+    const fly = (id) => AUR.ships.upgrade(scene, ship(id, 0), new BABYLON.Mesh('dart ' + id, scene));
+    return work(scene, AUR, fly);
+  }));
 }
 
 test('in a system every Petrel of a provider is an instance of one template, lit by the model lights, and a faded one blends', () =>
-  withCanvas(() => onNullScene(BABYLON, async (scene) => {
-    const AUR = loadShips();
-    scene.metadata = { view: 'system' };
+  onSystem(async (scene, AUR, fly) => {
     AUR.shipModels.lights(scene);
-    const fly = (id) => AUR.ships.upgrade(scene, { id, provider: 'claude', kind: 'main', project: 'p', builds: 0 }, new BABYLON.Mesh('dart ' + id, scene));
     const a = await fly('a'), b = await fly('b');
-    const hullOf = (root) => {
-      const instances = root.getChildMeshes(false).filter((mesh) => mesh.isAnInstance);
-      assert.equal(instances.length, 1, 'one merged mesh per ship');
-      return instances[0];
-    };
     assert.equal(a.metadata.assetHullId, 'petrel');
     const template = hullOf(a).sourceMesh;
     assert.equal(hullOf(b).sourceMesh, template, 'one template for the provider');
@@ -121,18 +114,15 @@ test('in a system every Petrel of a provider is an instance of one template, lit
     assert.equal(hullOf(a).visibility, 0, 'hidden from inside: Babylon skips a mesh at visibility 0');
     AUR.ships.fade(scene, 'a', 1);
     assert.equal(hullOf(a).sourceMesh, template, 'restored');
-  })));
+  }));
 
 // Babylon sorts a frame's blended sub-meshes by alphaIndex, then back to front; an instance batch
 // is sorted as its template's sub-mesh, at the template's place (the origin, like the sun's glow).
 test('a faded fleet draws after every other blended mesh, from either side of the sun', () =>
-  withCanvas(() => onNullScene(BABYLON, async (scene) => {
-    const AUR = loadShips();
-    scene.metadata = { view: 'system' };
-    const fly = (id) => AUR.ships.upgrade(scene, { id, provider: 'claude', kind: 'main', project: 'p', builds: 0 }, new BABYLON.Mesh('dart ' + id, scene));
-    const ship = await fly('a');
+  onSystem(async (scene, AUR, fly) => {
+    const a = await fly('a');
     AUR.ships.fade(scene, 'a', 0.16);
-    const template = ship.getChildMeshes(false).find((mesh) => mesh.isAnInstance).sourceMesh;
+    const template = hullOf(a).sourceMesh;
     const glow = Object.assign(BABYLON.MeshBuilder.CreatePlane('sun-glow', { size: 40 }, scene), { material: new BABYLON.StandardMaterial('glow', scene) });
     const camera = new BABYLON.UniversalCamera('camera', BABYLON.Vector3.Zero(), scene);
     const drawn = (z) => {
@@ -157,7 +147,7 @@ test('a faded fleet draws after every other blended mesh, from either side of th
       assert.equal(names[0], 'sun-glow', `the glow first, the faded finishes after it, with the camera at z ${z}`);
     }
     assert.equal(glow.alphaIndex, Number.MAX_VALUE, 'every other mesh keeps Babylon\'s default');
-  })));
+  }));
 
 test('the model sits in the fleet frame its correction claims: one unit long, centred', () => {
   onScene((scene, models, petrel) => {
@@ -225,7 +215,7 @@ test('a ship wears the model finishes, with its trim copied once per palette in 
     // The whole hull's material for a palette: each finish in its place, the trim swapped for its copy.
     const worn = models.material(materials, petrel, 'claude', '#d97757', whole);
     assert.equal(models.material(materials, petrel, 'claude', '#d97757', whole), worn, 'one per palette');
-    same(worn.subMaterials, whole.subMaterials.map((finish) => wear(finish.name, 'claude', '#d97757')));
+    assert.ok(sameItems(worn.subMaterials, whole.subMaterials.map((finish) => wear(finish.name, 'claude', '#d97757'))));
     assert.equal(worn.subMaterials.filter((finish, i) => finish !== whole.subMaterials[i]).length, Object.keys(petrel.trim).length);
     assert.equal(scene.textures.length, textures, 'a copy makes no texture of its own');
   });

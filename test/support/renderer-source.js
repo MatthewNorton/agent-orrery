@@ -1,7 +1,7 @@
 'use strict';
 
 // Renderer source for the source-text tests, listed by folder under src/renderer, and
-// runRenderer() for the tests that run a renderer script.
+// runRenderer() and loadUtilLayer() for the tests that run renderer scripts.
 
 const fs = require('node:fs');
 const path = require('node:path');
@@ -25,6 +25,16 @@ function runRenderer(file, globals, edit = (code) => code) {
   vm.runInThisContext(source, { filename: `src/renderer/${file}` })(...Object.values(globals));
 }
 
+/**
+ * Runs util.js, which makes window.AUR, and util-scene.js, which adds its Babylon helpers, as the
+ * page loads them before any other renderer file. Returns AUR.
+ */
+function loadUtilLayer(window = {}, BABYLON = undefined) {
+  runRenderer('util.js', { window });
+  runRenderer('util-scene.js', { window, BABYLON });
+  return window.AUR;
+}
+
 /** Sorted `<dir>/...` paths of every file under src/renderer/<dir> that passes `keep`. */
 function rendererFiles(dir, keep = (file) => file.endsWith('.js')) {
   return fs.readdirSync(path.join(RENDERER, dir), { recursive: true })
@@ -33,4 +43,4 @@ function rendererFiles(dir, keep = (file) => file.endsWith('.js')) {
 
 const rendererSource = (dir, keep) => rendererFiles(dir, keep).map(readRenderer).join('\n');
 
-module.exports = { readRenderer, rendererFiles, rendererSource, runRenderer, scriptTags };
+module.exports = { loadUtilLayer, readRenderer, rendererFiles, rendererSource, runRenderer, scriptTags };

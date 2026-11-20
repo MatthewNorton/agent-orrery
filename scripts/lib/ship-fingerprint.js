@@ -33,37 +33,32 @@ class BlankCanvas {
   getContext() { return this.context; }
 }
 
-/**
- * Runs `work` with a stand-in for the canvas Babylon makes a DynamicTexture from, until the
- * promise it returns settles when it returns one.
- */
-function withCanvas(work) {
-  const had = Object.prototype.hasOwnProperty.call(globalThis, 'OffscreenCanvas');
-  const before = globalThis.OffscreenCanvas;
-  const restore = () => {
-    if (had) globalThis.OffscreenCanvas = before;
-    else delete globalThis.OffscreenCanvas;
-  };
-  globalThis.OffscreenCanvas = BlankCanvas;
+/** Returns what `work()` returns and runs `cleanUp`: at once, or when the promise it returns settles. */
+function cleanUpAfter(work, cleanUp) {
   let result;
   try {
     result = work();
   } finally {
-    if (!(result instanceof Promise)) restore();
+    if (!(result instanceof Promise)) cleanUp();
   }
-  return result instanceof Promise ? result.finally(restore) : result;
+  return result instanceof Promise ? result.finally(cleanUp) : result;
+}
+
+/** Runs `work` with a stand-in for the canvas Babylon makes a DynamicTexture from. */
+function withCanvas(work) {
+  const had = Object.prototype.hasOwnProperty.call(globalThis, 'OffscreenCanvas');
+  const before = globalThis.OffscreenCanvas;
+  globalThis.OffscreenCanvas = BlankCanvas;
+  return cleanUpAfter(work, () => {
+    if (had) globalThis.OffscreenCanvas = before;
+    else delete globalThis.OffscreenCanvas;
+  });
 }
 
 /** Runs `work(scene)` on a scene of its own (a NullEngine), which is gone once the work is done. */
 function onNullScene(BABYLON, work) {
   const engine = new BABYLON.NullEngine();
-  let result;
-  try {
-    result = work(new BABYLON.Scene(engine));
-  } finally {
-    if (!(result instanceof Promise)) engine.dispose();
-  }
-  return result instanceof Promise ? result.finally(() => engine.dispose()) : result;
+  return cleanUpAfter(() => work(new BABYLON.Scene(engine)), () => engine.dispose());
 }
 
 // Positions, normals and UVs are rounded to 1e-5 so the last bit of a sine never changes the result.

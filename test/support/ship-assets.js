@@ -1,32 +1,23 @@
 'use strict';
 
-// The ship-assets files (src/renderer/ship-assets*.js) on enough of Babylon to build, fade, swap
-// and dispose hulls, for test/ship-assets.test.js and test/ship-assets-api.test.js.
+// The ship-assets files (src/renderer/ship-assets*.js) on the renderer's own util layer and enough
+// of Babylon to build, fade, swap and dispose hulls, for test/ship-assets.test.js and
+// test/ship-assets-api.test.js; and the hull pickers those and test/ships-models.test.js share.
 
-const fs = require('node:fs');
-const path = require('node:path');
-const vm = require('node:vm');
-const { scriptTags } = require('./renderer-source');
+const assert = require('node:assert/strict');
+const { loadUtilLayer, runRenderer, scriptTags } = require('./renderer-source');
 
-const RENDERER = path.join(__dirname, '..', '..', 'src', 'renderer');
 // The core loads first; the files after it extend AUR.shipAssets and publish AUR.ships.
 const SHIP_ASSET_FILES = scriptTags().filter((file) => /^ship-assets[a-z-]*\.js$/.test(file));
-
-// The model registry loads before them (ship-assets asks it which ranks a model has taken); these
-// tests register no model unless they say so, so every rank flies its manifest hull.
-function loadShipAssetFiles(context) {
-  vm.createContext(context);
-  for (const file of ['ships/models.js', ...SHIP_ASSET_FILES]) {
-    vm.runInContext(fs.readFileSync(path.join(RENDERER, file), 'utf8'), context, { filename: file });
-  }
-}
-
-const providerKey = (value) => value === 'codex' ? 'codex' :
-  value === 'signal' ? 'generic' : 'claude';
-const colors = { claude: '#d97757', codex: '#f2f0ea', generic: '#94a3b8' };
+// AUR.SHIP_LAYER, the fleet lights' layer; every camera sees Babylon's default mask, which a
+// hull's template keeps when it adds the layer of its lights.
+const SHIP_LAYER = 0x10000000;
+const CAMERA_LAYERS = 0x0FFFFFFF;
+const onLayer = (mesh, layer) => mesh.layerMask === (CAMERA_LAYERS | layer);
 
 // Enough of BABYLON.Color3 for the livery: hex in, channels, scale, linearization, hex out.
 class Color {
+  static FromHexString(hex) { return new Color(hex); }
   constructor(r, g, b) {
     if (typeof r === 'string') {
       this.hex = r.toLowerCase();
@@ -47,46 +38,15 @@ class Color {
   }
 }
 
-// The AUR helpers ship-assets reads. Each test brings its own Color and Material classes and ship marker.
-function fakeAur({ Color, Material, markShipMesh }) {
-  return {
-    log() {},
-    fnv1a() { return 0; },
-    providerKey,
-    providerMeta(value) {
-      const key = providerKey(value);
-      return { key, label: key, color: colors[key] };
-    },
-    shipTint(_id, provider) { return colors[providerKey(provider)]; },
-    shipColor(ship) { return ship && ship.local === true ? '#ff3344' : colors[providerKey(ship && ship.provider)]; },
-    color3(hex) { return new Color(hex); },
-    unlitMaterial(_scene, name, emissive) {
-      const material = new Material(name);
-      material.emissiveColor = emissive;
-      return material;
-    },
-    memo(map, key, build) {
-      if (!map.has(key)) map.set(key, build());
-      return map.get(key);
-    },
-    fadeWithMesh() {},
-    isNodeDisposed(node) { return !node || node.isDisposed(); },
-    SHIP_LAYER: 0x10000000,
-    nodeFamily(node) { return !node ? [] : typeof node.getChildMeshes === 'function' ? [node, ...node.getChildMeshes(false)] : [node]; },
-    markShipMesh,
-  };
-}
-
-// Every camera sees Babylon's default layer mask: a hull keeps it and adds the layer of its lights.
-const CAMERA_LAYERS = 0x0FFFFFFF;
-const SHIP_LAYER = 0x10000000;
-const onLayer = (mesh, layer) => mesh.layerMask === (CAMERA_LAYERS | layer);
-
-// A small scene graph: enough of Babylon's node, mesh and instance behaviour
-// for ship-assets.js to build, swap and dispose hulls. Every hull file carries
-// `materials`: a material name, or { name, textured, albedo } for an authored one.
+// A small scene graph: enough of Babylon's node, mesh and instance behaviour for ship-assets to
+// build, swap and dispose hulls. Every hull file carries `materials`: a material name, or
+// { name, textured, albedo } for an authored one. The ship-assets files run on the real util
+// layer (util.js, util-scene.js) over this Babylon, with the model registry before them, which
+// registers no model unless a test does, so every rank flies its manifest hull.
 function loadShipAssets(manifest, trianglesByFile, materials = ['hull_primary', 'accent_energy']) {
   const loads = [];
+  const built = []; // the ship id of every hull built, in order
+  let clones = 0;
   let held = null; // while a test holds the loads (hold()), each waits on this
   class Vector {
     constructor() { this.x = 0; this.y = 0; this.z = 0; }
@@ -100,6 +60,7 @@ function loadShipAssets(manifest, trianglesByFile, materials = ['hull_primary', 
       this.emissiveColor = new Color(0, 0, 0);
     }
     clone(name) {
+      clones++;
       const copy = new Material(name);
       copy.albedoTexture = this.albedoTexture;
       copy.albedoColor = this.albedoColor.clone();
@@ -107,6 +68,7 @@ function loadShipAssets(manifest, trianglesByFile, materials = ['hull_primary', 
     }
     dispose() {}
   }
+  Material.MATERIAL_OPAQUE = 0;
   class Node {
     constructor(name) {
       this.name = name;
@@ -117,6 +79,7 @@ function loadShipAssets(manifest, trianglesByFile, materials = ['hull_primary', 
       this.scaling.setAll(1);
       this.isPickable = true;
       this.isVisible = true;
+      this.enabled = true;
       this.layerMask = CAMERA_LAYERS; // Babylon's default, as an instance has too
       this.ownVisibility = 1;
       this.disposed = false;
@@ -133,6 +96,8 @@ function loadShipAssets(manifest, trianglesByFile, materials = ['hull_primary', 
       this.parentNode = node;
       if (node) node.children.push(this);
     }
+    setEnabled(value) { this.enabled = value; }
+    isEnabled() { return this.enabled && (!this.parentNode || this.parentNode.isEnabled()); }
     getChildMeshes(directOnly) {
       const out = [];
       for (const child of this.children) {
@@ -150,10 +115,17 @@ function loadShipAssets(manifest, trianglesByFile, materials = ['hull_primary', 
       for (const callback of this.onDispose) callback();
     }
   }
-  class TransformNode extends Node {}
+  class TransformNode extends Node {
+    constructor(name) {
+      super(name);
+      if (name.startsWith('ship_correction_')) built.push(name.slice('ship_correction_'.length));
+    }
+  }
+  // A mesh disposes its instances with it, as Babylon's does.
   class Mesh extends Node {
-    clone(name, parent) {
-      return Object.assign(new Mesh(name), { hasGeometry: this.hasGeometry, material: this.material, isVisible: this.isVisible, parent });
+    constructor(name) {
+      super(name);
+      this.instances = [];
     }
     instantiateHierarchy(newParent, options, onNewNodeCreated) {
       const copy = this.hasGeometry ? new InstancedMesh(this) : new Mesh(this.name);
@@ -162,6 +134,10 @@ function loadShipAssets(manifest, trianglesByFile, materials = ['hull_primary', 
       for (const child of this.children) child.instantiateHierarchy(copy, options, onNewNodeCreated);
       return copy;
     }
+    dispose() {
+      for (const instance of [...this.instances]) instance.dispose();
+      super.dispose();
+    }
   }
   // An instance shows its source mesh's material and visibility; Babylon ignores (and logs) a
   // visibility set on one, so here it fails the test.
@@ -169,12 +145,17 @@ function loadShipAssets(manifest, trianglesByFile, materials = ['hull_primary', 
     constructor(source) {
       super('instance of ' + source.name);
       this.sourceMesh = source;
+      source.instances.push(this);
     }
     get isAnInstance() { return true; }
     get material() { return this.sourceMesh.material; }
     set material(value) { /* an instance draws with its source mesh's material */ }
     get visibility() { return this.sourceMesh.visibility; }
     set visibility(value) { throw new Error('a visibility set on an instance does nothing'); }
+    dispose() {
+      this.sourceMesh.instances = this.sourceMesh.instances.filter((instance) => instance !== this);
+      super.dispose();
+    }
   }
   const containerFor = (file) => ({
     meshes: [{ getTotalIndices: () => (trianglesByFile[file] || 1000) * 3 }],
@@ -193,36 +174,30 @@ function loadShipAssets(manifest, trianglesByFile, materials = ['hull_primary', 
     },
     dispose() {},
   });
-  const AUR = fakeAur({
-    Color,
-    Material,
-    markShipMesh(mesh, ship) {
-      mesh.metadata = { ...(mesh.metadata || {}), isShip: true, shipId: ship.id };
-      return { key: providerKey(ship.provider), label: '' };
-    },
-  });
-  const context = {
-    window: { AUR },
-    fetch: async () => ({ ok: true, status: 200, json: async () => manifest }),
-    BABYLON: {
-      SceneLoader: {
-        LoadAssetContainerAsync: async (_root, file) => {
-          loads.push(file);
-          if (held) await held;
-          return containerFor(file);
-        },
+  const BABYLON = {
+    SceneLoader: {
+      LoadAssetContainerAsync: async (_root, file) => {
+        loads.push(file);
+        if (held) await held;
+        return containerFor(file);
       },
-      Color3: Color, Mesh, TransformNode, StandardMaterial: Material,
     },
+    Color3: Color, Material, Mesh, TransformNode, StandardMaterial: Material,
   };
-  loadShipAssetFiles(context);
+  const AUR = loadUtilLayer({}, BABYLON);
+  AUR.log = () => {};
+  const fetch = async () => ({ ok: true, status: 200, json: async () => manifest });
+  for (const file of ['ships/models.js', ...SHIP_ASSET_FILES]) runRenderer(file, { window: { AUR }, BABYLON, fetch });
   let sceneCount = 0;
   return {
+    AUR,
     ships: AUR.ships,
     models: AUR.shipModels,
     triangles: (scene) => AUR.shipAssets.sceneStates.get(scene).triangles,
     loads,
-    Mesh,
+    // The ship ids of the hulls built since the last call.
+    built: () => built.splice(0),
+    materialClones: () => clones,
     InstancedMesh,
     containerFor,
     scene: (view) => ({ uid: 'scene-' + (++sceneCount), metadata: view ? { view } : null, isDisposed: () => false }),
@@ -256,7 +231,19 @@ const ship = (id, builds, extra) => ({ id, provider: 'claude', kind: 'main', pro
 const hullId = (root) => root && root.metadata.assetHullId;
 const partMaterial = (root, name) => root.getChildMeshes(false).find((mesh) => mesh.material && mesh.material.name.includes(name)).material;
 
+// A ship's hull is instances of its template's meshes, under its asset root.
+const instancesOf = (root) => root.getChildMeshes(false).filter((mesh) => mesh.isAnInstance);
+const templatesOf = (root) => instancesOf(root).map((mesh) => mesh.sourceMesh);
+// Babylon objects compare by identity: a deepEqual that fails tries to print them whole.
+const sameItems = (a, b) => a.length === b.length && a.every((item, i) => item === b[i]);
+// A ship model is one merged mesh (ships/models.js), so its hull is one instance.
+function hullOf(root) {
+  const instances = instancesOf(root);
+  assert.equal(instances.length, 1, 'one merged mesh per ship');
+  return instances[0];
+}
+
 module.exports = {
-  RENDERER, SHIP_ASSET_FILES, loadShipAssetFiles, providerKey, Color, fakeAur, SHIP_LAYER, onLayer,
-  loadShipAssets, LADDER_MANIFEST, ship, hullId, partMaterial,
+  SHIP_ASSET_FILES, SHIP_LAYER, onLayer, Color, loadShipAssets, LADDER_MANIFEST, ship, hullId, partMaterial,
+  instancesOf, templatesOf, sameItems, hullOf,
 };

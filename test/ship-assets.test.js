@@ -6,81 +6,19 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const path = require('node:path');
 const {
-  RENDERER, SHIP_ASSET_FILES, loadShipAssetFiles, providerKey, Color, fakeAur, SHIP_LAYER, onLayer,
-  loadShipAssets, LADDER_MANIFEST, ship, hullId, partMaterial,
+  SHIP_ASSET_FILES, SHIP_LAYER, onLayer, Color, loadShipAssets, LADDER_MANIFEST, ship, hullId, partMaterial,
+  instancesOf, templatesOf, sameItems,
 } = require('./support/ship-assets');
 
 test('index.html loads every ship-assets file, the core first', () => {
-  const onDisk = fs.readdirSync(RENDERER).filter((file) => /^ship-assets.*\.js$/.test(file)).sort();
+  const onDisk = fs.readdirSync(path.join(__dirname, '..', 'src', 'renderer')).filter((file) => /^ship-assets.*\.js$/.test(file)).sort();
   assert.equal(SHIP_ASSET_FILES[0], 'ship-assets.js');
   assert.deepEqual([...SHIP_ASSET_FILES].sort(), onDisk);
 });
 
 test('shared hulls receive fixed provider palettes; a signal loads no model and a drone flies its family hull', async () => {
-  let containerLoads = 0;
-  let materialClones = 0;
-  const instantiatedMeshes = [];
-
-  class Vector {
-    setAll(value) { this.x = value; this.y = value; this.z = value; }
-    set(x, y, z) { this.x = x; this.y = y; this.z = z; }
-  }
-
-  class Material {
-    constructor(name) {
-      this.name = name;
-      this.diffuseColor = new Color('#000000');
-      this.emissiveColor = new Color('#000000');
-    }
-    clone(name) {
-      materialClones += 1;
-      return new Material(name);
-    }
-    dispose() {}
-  }
-
-  class Node {
-    constructor(name) {
-      this.name = name;
-      this.metadata = null;
-      this.position = new Vector();
-      this.rotation = new Vector();
-      this.scaling = new Vector();
-      this.isPickable = true;
-      this.disposed = false;
-      this.onDisposeObservable = { addOnce: (callback) => { this.onDispose = callback; } };
-    }
-    isDisposed() { return this.disposed; }
-    dispose() {
-      this.disposed = true;
-      if (this.onDispose) this.onDispose();
-    }
-  }
-
-  class Mesh extends Node {}
-  Mesh.BILLBOARDMODE_ALL = 7;
-  class TransformNode extends Node {}
-
-  const sourceMaterial = new Material('accent_energy');
-  const container = {
-    meshes: [{ getTotalIndices: () => 300 }],
-    instantiateModelsToScene() {
-      const mesh = new Node('accent');
-      mesh.material = sourceMaterial;
-      mesh.getChildMeshes = () => [];
-      // A ship's hull is an instance of this template mesh.
-      mesh.instantiateHierarchy = (parent, _options, created) => {
-        const instance = Object.assign(new Node('instance of accent'), { material: mesh.material, parent, getChildMeshes: () => [] });
-        created(mesh, instance);
-        return instance;
-      };
-      instantiatedMeshes.push(mesh);
-      return { rootNodes: [mesh] };
-    },
-    dispose() {},
-  };
-
   const manifest = {
     schemaVersion: 1,
     providerFamilies: { claude: 'shared', codex: 'shared' },
@@ -89,51 +27,15 @@ test('shared hulls receive fixed provider palettes; a signal loads no model and 
       correction: { rotateY: 0, scale: 1, offset: [0, 0, 0] },
     }],
   };
-  const AUR = fakeAur({
-    Color,
-    Material,
-    markShipMesh(mesh, ship) {
-      mesh.metadata = {
-        ...(mesh.metadata || {}), isShip: true, shipId: ship.id,
-        projectId: ship.project, providerKey: providerKey(ship.provider), kind: ship.kind,
-      };
-      const key = providerKey(ship.provider);
-      return { key, label: key };
-    },
-  });
-  const context = {
-    window: { AUR },
-    fetch: async () => ({ ok: true, status: 200, json: async () => manifest }),
-    BABYLON: {
-      SceneLoader: {
-        LoadAssetContainerAsync: async () => {
-          containerLoads += 1;
-          return container;
-        },
-      },
-      Color3: Color,
-      Mesh,
-      TransformNode,
-      StandardMaterial: Material,
-    },
-  };
-  loadShipAssetFiles(context);
+  const assets = loadShipAssets(manifest, {}, ['accent_energy']);
+  const scene = assets.scene(null);
+  const claudeFallback = assets.fallback('claude-a');
+  const codexFallback = assets.fallback('codex-a');
+  const claude = await assets.ships.upgrade(scene, { id: 'claude-a', provider: 'claude', project: 'project-1' }, claudeFallback);
+  const codex = await assets.ships.upgrade(scene, { id: 'codex-a', provider: 'codex', project: 'project-1' }, codexFallback);
 
-  const scene = { uid: 'scene-1', isDisposed: () => false };
-  const fallback = (id) => Object.assign(new Mesh('fallback-' + id), {
-    material: { alpha: 1 }, metadata: { isShip: true, shipId: id },
-  });
-  const claudeFallback = fallback('claude-a');
-  const codexFallback = fallback('codex-a');
-  const claude = await AUR.ships.upgrade(scene, {
-    id: 'claude-a', provider: 'claude', project: 'project-1',
-  }, claudeFallback);
-  const codex = await AUR.ships.upgrade(scene, {
-    id: 'codex-a', provider: 'codex', project: 'project-1',
-  }, codexFallback);
-
-  assert.equal(containerLoads, 1);
-  assert.equal(materialClones, 2);
+  assert.deepEqual(assets.loads, ['shared-small.glb']);
+  assert.equal(assets.materialClones(), 2, 'one livery per palette');
   assert.notEqual(claude.material, codex.material);
   assert.equal(claude.material.emissiveColor.toHexString(), '#d97757');
   assert.equal(codex.material.emissiveColor.toHexString(), '#f2f0ea');
@@ -141,17 +43,13 @@ test('shared hulls receive fixed provider palettes; a signal loads no model and 
   assert.equal(codex.metadata.providerTint, '#f2f0ea');
   assert.equal(claudeFallback.metadata.isShip, false);
   assert.equal(codexFallback.metadata.isShip, false);
-  assert.ok(instantiatedMeshes.every((mesh) => mesh.isPickable === false));
+  assert.ok([...templatesOf(claude), ...templatesOf(codex)].every((mesh) => mesh.isPickable === false));
 
-  const signalFallback = fallback('signal-a');
-  const droneFallback = fallback('drone-a');
-  assert.equal(await AUR.ships.upgrade(scene, {
-    id: 'signal-a', provider: 'signal', project: 'project-1',
-  }, signalFallback), null);
-  const drone = await AUR.ships.upgrade(scene, {
-    id: 'drone-a', provider: 'codex', kind: 'drone', project: 'project-1',
-  }, droneFallback);
-  assert.equal(containerLoads, 1, 'a signal requests no model; a drone shares its family container');
+  const signalFallback = assets.fallback('signal-a');
+  const droneFallback = assets.fallback('drone-a');
+  assert.equal(await assets.ships.upgrade(scene, { id: 'signal-a', provider: 'signal', project: 'project-1' }, signalFallback), null);
+  const drone = await assets.ships.upgrade(scene, { id: 'drone-a', provider: 'codex', kind: 'drone', project: 'project-1' }, droneFallback);
+  assert.deepEqual(assets.loads, ['shared-small.glb'], 'a signal requests no model; a drone shares its family container');
   assert.equal(signalFallback.metadata.isShip, true);
   assert.notEqual(drone, null, 'a drone flies its family hull');
   assert.equal(droneFallback.metadata.isShip, false);
@@ -190,31 +88,27 @@ test('a rank a ship model has taken flies the model, built in code, until the sh
   assert.deepEqual([root.children[0].rotation.y, root.children[0].scaling.x, root.children[0].children[0].position.z], [0, 0.1, -1]);
   // In a near view too a ship is instances of a template per palette, wearing what the model gives
   // that palette; the template carries the model lights' layer, since an instance is lit as its source.
-  const parts = (node) => node.getChildMeshes(false).filter((mesh) => mesh.material);
-  assert.deepEqual(parts(root).map((mesh) => mesh.material.worn), ['coded claude #d97757 hull_primary', 'coded claude #d97757 accent_energy']);
-  assert.deepEqual(parts(drone).map((mesh) => mesh.material.worn), ['coded codex #f2f0ea hull_primary', 'coded codex #f2f0ea accent_energy']);
-  for (const mesh of [...parts(root), ...parts(drone)]) {
-    assert.ok(mesh instanceof assets.InstancedMesh && mesh.isVisible && !mesh.sourceMesh.isVisible, 'an instance of a hidden template');
+  assert.deepEqual(instancesOf(root).map((mesh) => mesh.material.worn), ['coded claude #d97757 hull_primary', 'coded claude #d97757 accent_energy']);
+  assert.deepEqual(instancesOf(drone).map((mesh) => mesh.material.worn), ['coded codex #f2f0ea hull_primary', 'coded codex #f2f0ea accent_energy']);
+  for (const mesh of [...instancesOf(root), ...instancesOf(drone)]) {
+    assert.ok(mesh.isVisible && !mesh.sourceMesh.isVisible, 'an instance of a hidden template');
     assert.ok(onLayer(mesh, assets.models.LAYER) && onLayer(mesh.sourceMesh, assets.models.LAYER), 'seen by the camera, lit by the model lights only');
   }
   const twin = await assets.ships.upgrade(system, ship('twin', 0), assets.fallback('twin'));
-  assert.ok(parts(twin).every((mesh, i) => mesh.sourceMesh === parts(root)[i].sourceMesh), 'one template per palette');
+  assert.ok(sameItems(templatesOf(twin), templatesOf(root)), 'one template per palette');
 
   assert.equal(await assets.ships.refresh(system, ship('a', 3)), root, 'promoted in place');
   assert.equal(hullId(root), 'mid');
   assert.deepEqual(assets.loads, ['mid-near.glb']);
-  assert.ok(parts(root).every((mesh) => onLayer(mesh, SHIP_LAYER) && onLayer(mesh.sourceMesh, SHIP_LAYER) && !mesh.material.worn),
+  assert.ok(instancesOf(root).every((mesh) => onLayer(mesh, SHIP_LAYER) && onLayer(mesh.sourceMesh, SHIP_LAYER) && !mesh.material.worn),
     'a manifest hull wears the fleet livery and is lit by the fleet lights, not the model ones');
 
   const universe = assets.scene('universe');
   const far = [];
   for (const id of ['x', 'y']) far.push(await assets.ships.upgrade(universe, ship(id, 0), assets.fallback(id)));
   assert.deepEqual(built, ['coded', 'coded'], 'one built container per scene');
-  const sources = far.map((entry) => parts(entry).map((mesh) => {
-    assert.ok(mesh instanceof assets.InstancedMesh && mesh.isVisible && onLayer(mesh, assets.models.LAYER));
-    return mesh.sourceMesh;
-  }));
-  assert.deepEqual(sources[0], sources[1], 'on the map the ships of a palette are instances of one template');
+  assert.ok(far.every((root) => instancesOf(root).every((mesh) => mesh.isVisible && onLayer(mesh, assets.models.LAYER))));
+  assert.ok(sameItems(templatesOf(far[0]), templatesOf(far[1])), 'on the map the ships of a palette are instances of one template');
 });
 
 test('every view instances its hulls from one template per provider: far hulls on the map, near ones in a system', async () => {
@@ -224,16 +118,16 @@ test('every view instances its hulls from one template per provider: far hulls o
   const second = await assets.ships.upgrade(universe, ship('b', 0), assets.fallback('b'));
   const codex = await assets.ships.upgrade(universe, ship('c', 0, { provider: 'codex' }), assets.fallback('c'));
   assert.deepEqual(assets.loads, ['small-far.glb']);
+  // Every part of a hull that has a material is an instance: nothing is drawn as a copy of its own.
+  const parts = (root) => root.getChildMeshes(false).filter((mesh) => mesh.material);
   for (const root of [first, second, codex]) {
-    const parts = root.getChildMeshes(false).filter((mesh) => mesh.material);
-    assert.equal(parts.length, 2);
-    assert.ok(parts.every((mesh) => mesh instanceof assets.InstancedMesh && mesh.isVisible));
-    assert.ok(parts.every((mesh) => mesh.sourceMesh.isVisible === false), 'templates stay hidden');
+    assert.equal(parts(root).length, 2);
+    assert.ok(sameItems(parts(root), instancesOf(root)) && parts(root).every((mesh) => mesh.isVisible));
+    assert.ok(templatesOf(root).every((mesh) => mesh.isVisible === false), 'templates stay hidden');
     assert.equal(root.metadata.assetLod, 'far');
   }
-  const sources = (root) => root.getChildMeshes(false).filter((mesh) => mesh.sourceMesh).map((mesh) => mesh.sourceMesh);
-  assert.deepEqual(sources(first), sources(second), 'one template per provider');
-  assert.notDeepEqual(sources(first), sources(codex));
+  assert.ok(sameItems(templatesOf(first), templatesOf(second)), 'one template per provider');
+  assert.ok(!templatesOf(codex).some((mesh) => templatesOf(first).includes(mesh)));
   assert.equal(first.material.emissiveColor.toHexString(), '#d97757');
   assert.equal(codex.material.emissiveColor.toHexString(), '#f2f0ea');
   assert.ok(partMaterial(first, 'hull_primary').emissiveColor.r > 0, 'far hulls carry a faint self-light on the unlit map');
@@ -242,10 +136,9 @@ test('every view instances its hulls from one template per provider: far hulls o
   const near = await assets.ships.upgrade(system, ship('a', 0), assets.fallback('a'));
   const nearTwin = await assets.ships.upgrade(system, ship('b', 0), assets.fallback('b'));
   assert.equal(assets.loads.at(-1), 'small-near.glb');
-  const nearParts = (root) => root.getChildMeshes(false).filter((mesh) => mesh.material);
-  assert.ok(nearParts(near).every((mesh) => mesh instanceof assets.InstancedMesh && mesh.sourceMesh.isVisible === false));
-  assert.ok(nearParts(nearTwin).every((mesh, i) => mesh.sourceMesh === nearParts(near)[i].sourceMesh), 'one template per provider');
-  assert.ok(nearParts(near).every((mesh) => onLayer(mesh, SHIP_LAYER) && onLayer(mesh.sourceMesh, SHIP_LAYER)),
+  assert.ok(sameItems(parts(near), instancesOf(near)) && templatesOf(near).every((mesh) => mesh.isVisible === false));
+  assert.ok(sameItems(templatesOf(nearTwin), templatesOf(near)), 'one template per provider');
+  assert.ok(instancesOf(near).every((mesh) => onLayer(mesh, SHIP_LAYER) && onLayer(mesh.sourceMesh, SHIP_LAYER)),
     'the template carries the fleet light layer, and both keep the camera\'s');
   assert.equal(partMaterial(near, 'hull_primary').emissiveColor.toHexString(), '#000000', 'a near hull is lit, not self-lit');
 });

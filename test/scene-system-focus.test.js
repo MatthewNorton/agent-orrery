@@ -6,13 +6,11 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const BABYLON = require('babylonjs');
 const { onNullScene } = require('../scripts/lib/ship-fingerprint.js');
-const { readRenderer, runRenderer } = require('./support/renderer-source');
+const { loadUtilLayer, readRenderer, runRenderer } = require('./support/renderer-source');
 
 function loadFocus(scene) {
   const window = { matchMedia: () => ({ matches: false }) };
-  runRenderer('util.js', { window });
-  runRenderer('util-scene.js', { window, BABYLON });
-  const { AUR } = window;
+  const AUR = loadUtilLayer(window, BABYLON);
   AUR.sceneParts = { system: {} };
   const hulls = new Map(); // ship id -> the visibility its hull shows (each is built at 1)
   const moves = []; // [id, visibility] per rebuilt hull: AUR.ships.fade rebuilds only for a new visibility

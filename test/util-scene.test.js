@@ -4,19 +4,9 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const vm = require('node:vm');
-const { scriptTags } = require('./support/renderer-source');
+const { loadUtilLayer, scriptTags } = require('./support/renderer-source');
 
 const RENDERER = path.join(__dirname, '..', 'src', 'renderer');
-
-// util.js creates window.AUR; util-scene.js adds the Babylon-facing helpers to it.
-function loadUtilLayer() {
-  const sandbox = { window: {} };
-  for (const file of ['util.js', 'util-scene.js']) {
-    vm.runInNewContext(fs.readFileSync(path.join(RENDERER, file), 'utf8'), sandbox, { filename: file });
-  }
-  return sandbox.window.AUR;
-}
 
 test('index.html loads every util-*.js file directly after util.js', () => {
   const tags = scriptTags();
@@ -79,8 +69,7 @@ test('meshIslands splits a mesh into its connected pieces, each with a centre an
   const indices = [0, 1, 2, 0, 2, 3, 4, 5, 6, 7, 8, 9];
   const islands = AUR.meshIslands(positions, indices).sort((a, b) => a.center[0] - b.center[0]);
 
-  // Copied out of the sandbox realm: deepEqual also compares prototypes.
-  assert.deepEqual(Array.from(islands, (island) => [...island.center]), [[0.5, 0.5, 0], [10.5, 0.5, 0]], 'a vertex no triangle uses is no island');
+  assert.deepEqual(islands.map((island) => island.center), [[0.5, 0.5, 0], [10.5, 0.5, 0]], 'a vertex no triangle uses is no island');
   for (const island of islands) assert.ok(Math.abs(island.radius - Math.SQRT1_2) < 1e-9);
 });
 
