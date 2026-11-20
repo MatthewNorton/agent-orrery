@@ -366,12 +366,15 @@ Design tokens (put in `:root`):
     starts at it. The ship `apart` names (`{ shipId, visibility }`) shows its
     own: above 0 on a template of its own, at 0 disabled where it is. Focus
     mode fades the fleet to 0.16 and shows the followed ship at 1 from outside
-    and 0 from inside, then restores 1: entering or leaving focus rebuilds at
-    most one hull, following another ship at most two, and switching between
-    inside and outside none, except the first time out of a focus that began
-    inside (one). A ship whose rebuild fails keeps the hull it has, drawn
-    exactly when the fade shows it and at the fade's visibility as far as that
-    hull allows, and is rebuilt at a later fade. An opaque hull material gives
+    and 0 from inside, then restores 1. A ship is rebuilt exactly when it must
+    move onto or off a template of its own (onto one when it is shown apart
+    above 0 at a visibility other than the fleet's, off it when it is shown at
+    the fleet's); hiding or showing a ship that stays on the template it has
+    rebuilds nothing. Focus mode shows one ship apart at a time, so entering or
+    leaving focus rebuilds at most one hull and following another ship at most
+    two. A ship whose rebuild fails keeps the hull it has, drawn exactly when
+    the fade shows it and at the fade's visibility as far as that hull allows,
+    and is rebuilt at a later fade. An opaque hull material gives
     its transparency mode up, because Babylon ignores a mesh's visibility while
     its material is set opaque or cut-out. No flown hull has a blended material
     in full, its glass included; a cut-out would keep its mode and not fade,

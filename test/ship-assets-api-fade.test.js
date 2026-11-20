@@ -72,6 +72,22 @@ test('focus mode fades the fleet on its templates and rebuilds only the followed
   assets.ships.fade(scene, 0.16, { shipId: 'a', visibility: 0 });
   assets.ships.fade(scene, 0.16, { shipId: 'a', visibility: 1 });
   assert.ok(assets.built().length === 0 && shows(a, 1), 'and in and out again rebuild nothing');
+
+  // Leaving from inside, having been outside: off the template of its own it kept.
+  assets.ships.fade(scene, 0.16, { shipId: 'a', visibility: 0 });
+  assets.ships.fade(scene, 1);
+  assert.ok(sameItems(assets.built(), ['a']) && sameItems(templatesOf(a), fleet) && shows(a, 1), 'leaving from inside, after outside');
+
+  // A hull built while the viewer is inside goes on the fleet's template, so the next way out rebuilds it.
+  assets.ships.fade(scene, 0.16, { shipId: 'a', visibility: 0 });
+  assert.equal(await assets.ships.refresh(scene, ship('a', 3)), a);
+  assets.ships.fade(scene, 0.16, { shipId: 'a', visibility: 1 });
+  assert.deepEqual(assets.built(), ['a', 'a'], 'promoted inside, then out');
+  assets.ships.fade(scene, 0.16, { shipId: 'n', visibility: 0 });
+  const n = await assets.ships.upgrade(scene, ship('n', 0), assets.fallback('n'));
+  assets.ships.fade(scene, 0.16, { shipId: 'n', visibility: 1 });
+  assert.deepEqual(assets.built(), ['a', 'n', 'n'], 'arrived inside, then out, the ship followed before back with the fleet');
+  assert.ok(shows(n, 1) && shows(a, 0.16));
 });
 
 test('a hull built while focus mode fades the fleet is built faded, the followed ship apart, and a ship that leaves takes its template', async () => {

@@ -67,13 +67,15 @@
    * Shows every hull in the scene at `visibility`, except the ship `apart` names, at its own (0
    * hides it): focus mode in the system view fades the ships it does not follow and shows the one
    * it follows in full, or hides it from inside, then restores them all at 1. It holds for hulls
-   * built later too (a ship that arrives, a promotion). The fleet fades on its templates, so only
-   * a ship moving apart or back is rebuilt, onto or off a template of its own. A hidden one is
-   * disabled on the template it has, which rebuilds nothing; shown again, it is rebuilt only if it
-   * has no template of its own yet (focus began inside it). A ship that cannot be rebuilt keeps
-   * the hull it has, drawn exactly when the fade shows it and at the fade's visibility as far as
-   * that hull's template allows, and is rebuilt at a later fade. A dart or a signal has meshes of
-   * its own, which focus mode fades itself.
+   * built later too (a ship that arrives, a promotion). The fleet fades on its templates. A ship
+   * is rebuilt exactly when it must move onto or off a template of its own: onto one when it is
+   * shown apart above 0 at a visibility other than the fleet's, off it when it is shown at the
+   * fleet's. Hiding or showing a ship that stays on the template it has rebuilds nothing. Focus
+   * mode shows one ship apart at a time, so entering or leaving focus rebuilds at most one hull
+   * and following another ship at most two. A ship that cannot be rebuilt keeps the hull it has,
+   * drawn exactly when the fade shows it and at the fade's visibility as far as that hull's
+   * template allows, and is rebuilt at a later fade. A dart or a signal has meshes of its own,
+   * which focus mode fades itself.
    * @param {number} visibility
    * @param {{ shipId: string, visibility: number }} [apart]
    */
