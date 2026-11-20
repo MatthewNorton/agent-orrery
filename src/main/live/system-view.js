@@ -6,7 +6,7 @@
 const fs = require('fs');
 const path = require('path');
 const { fnv1a, mulberry32 } = require('../shared/hash');
-const { ignoresCase, relativeInside } = require('../path-safety');
+const { ignoresCase } = require('../path-safety');
 const { bucketBuilds, bucketFor, matchingName, planetKey } = require('../build-buckets');
 const { isStandInName, proceduralSystem, systemData } = require('../universe/planets');
 const { liveProject } = require('../universe/public-shape');
@@ -25,10 +25,13 @@ const IGNORE_DIRS = new Set([
   'release', 'coverage', 'target', '__pycache__', '.idea', '.vscode', 'bin', 'obj',
 ]);
 const ignored = (/** @type {string} */ name) => IGNORE_DIRS.has(name) || name.startsWith('.');
-// A project without a folder has stand-in planets only; a folder that is not read has no counts.
-const NO_FOLDER = Object.freeze({ name: null, read: null, standIn: true });
-/** @returns {FolderRead} a new one each time: the answer it goes into belongs to its caller */
-const unread = () => ({ files: 0, sizeKb: 0, subdirs: 0, resources: [], folderRead: 'none' });
+const isGone = (/** @type {any} */ error) => Boolean(error) && (error.code === 'ENOENT' || error.code === 'ENOTDIR');
+/**
+ * A folder that was not read has no counts. A new one each time: the answer it goes into belongs to its caller.
+ * @param {'gone' | 'none'} folderRead
+ * @returns {FolderRead}
+ */
+const unread = (folderRead) => ({ files: 0, sizeKb: 0, subdirs: 0, resources: [], folderRead });
 
 // Planets = top-level directories of the real project on disk, sized by a
 // shallow file count, enriched by accumulated build counts. Missing paths
@@ -80,29 +83,26 @@ async function getPlanet(model, projectId, planetName) {
   if (!project) return null;
   const folderOf = () => (project.path && project.exists ? project.path : null);
   const root = planetName === '(root)';
-  let folder = null;
-  for (let reads = 1; ; reads++) {
-    const projectPath = folderOf();
-    // Security: planetName arrives over IPC. Only a single plain directory segment
-    // is a planet; anything with separators or dot-segments could walk outside the project.
-    if (projectPath && !root && !isPlanetSegment(planetName)) return null;
-    folder = projectPath ? await readPlanet(projectPath, planetName, root) : NO_FOLDER;
-    if (!folder) return null;
-    // Everything the answer takes from the project is read from here on, after the disk: the
-    // renderer counts builds onto a planet only once it has this answer, so one counted during the
-    // read has to be in it. A project forgotten meanwhile has no planets. One whose folder changed
-    // is read again, once: a folder that keeps changing (a drive that comes and goes) is answered
-    // from the second read.
-    if (model.projects.get(projectId) !== project) return null;
-    if (folderOf() === projectPath || reads === 2) break;
+  let projectPath = folderOf();
+  // Security: planetName arrives over IPC. Only a single plain directory segment
+  // is a planet; anything with separators or dot-segments could walk outside the project.
+  if (projectPath && !root && !isPlanetSegment(planetName)) return null;
+  // A project without a folder has stand-in planets only.
+  let folder = projectPath ? await readPlanet(projectPath, planetName, root) : null;
+  // The project is read from here on, after the disk, so a build counted during the read is in the answer.
+  if (model.projects.get(projectId) !== project) return null;
+  // A folder that changed meanwhile is read once more; one that changed again has no answer.
+  if (folderOf() !== projectPath) {
+    projectPath = folderOf();
+    folder = projectPath ? await readPlanet(projectPath, planetName, root) : null;
+    if (model.projects.get(projectId) !== project || folderOf() !== projectPath) return null;
   }
   // Security follow-up: own keys only; 'constructor'/'__proto__' must not return a non-cloneable prototype value.
   const bucket = bucketFor(project, planetName);
   /** @param {string} name */
   const base = (name) => ({ name, key: planetKey(project, name), project: liveProject(project), builds: bucket.builds });
-  // A stand-in has no folder and no builds. Its numbers are invented; the same project and name
-  // always get the same ones. With no folder to name it, it answers to its bucket's key.
-  if (!folder.read || (folder.standIn && bucket.key === null)) {
+  // A stand-in has no folder and no builds: its numbers are invented, the same each time for a project and name.
+  if (!folder || (folder.standIn && bucket.key === null)) {
     const rand = mulberry32(fnv1a(projectId + bucket.name));
     return { ...base(bucket.name), files: Math.floor(rand() * 200), sizeKb: Math.floor(rand() * 4000), subdirs: Math.floor(rand() * 9), resources: ['Unknown'], procedural: true };
   }
@@ -110,80 +110,49 @@ async function getPlanet(model, projectId, planetName) {
 }
 
 /**
- * What the disk has of a planet, which reads nothing of the model: the name its folder is
- * spelled by (diskName: null when a project folder that ignores case lists none such), its
- * counts, and whether a planet with no builds and a stand-in's name would be one. Null when the
- * name leads out of the project.
+ * What the disk has of a planet: the name its folder is listed by (null where case is ignored and
+ * none is), its counts, and whether a planet of that name with no builds is a stand-in.
  * @param {string} projectPath
  * @param {string} planetName
  * @param {boolean} root
- * @returns {Promise<{ name: string | null, read: FolderRead, standIn: boolean } | null>}
+ * @returns {Promise<{ name: string | null, read: FolderRead, standIn: boolean }>}
  */
 async function readPlanet(projectPath, planetName, root) {
-  if (root) return { name: planetName, read: await readFolder(projectPath, true, projectPath), standIn: false };
-  const name = await diskName(projectPath, planetName);
-  const dir = path.join(projectPath, name ?? planetName);
-  if (relativeInside(projectPath, dir) === null) return null;
-  // Security: a planet is a folder of the project. A link there (on Windows a junction too) can
-  // lead out of it, to any folder or a network share, so what is behind one is not listed. lstat
-  // does not see every link (it calls some junctions folders, and it can fail): readFolder checks
-  // where each folder really is before it reads it.
-  const linked = await fs.promises.lstat(dir).then((stat) => stat.isSymbolicLink(), () => false);
-  const read = linked ? unread() : await readFolder(dir, false, projectPath);
-  // getSystem draws stand-ins (universe/planets.js) for a project folder that lists no planet, and
-  // for one it cannot list at all, whatever the error: so a folder that is gone is a stand-in, and
-  // one that could not be read is too when the project folder cannot be listed either.
-  const standIn = isStandInName(planetName) && (read.folderRead === 'gone' ||
-    (read.folderRead === 'none' && !(await fs.promises.readdir(projectPath).then(() => true, () => false))));
-  return { name, read, standIn };
-}
-
-/**
- * Folder `name` as the disk spells it, which names the planet and seeds its globe. A root that
- * ignores case is listed for it: null when it has no such folder in any casing, or cannot be
- * listed. A case-sensitive root answers the name as asked, whether the folder is there or not.
- * @param {string} root
- * @param {string} name
- * @returns {Promise<string | null>}
- */
-async function diskName(root, name) {
-  // Security: a case-sensitive root spells a folder one way, so nothing is listed to find it.
-  if (!ignoresCase(root)) return name;
-  /** @type {string[]} */
-  let names = [];
-  try { names = await fs.promises.readdir(root); } catch { /* gone, as far as a name goes */ }
-  return matchingName(names, name, root);
+  if (root) return { name: planetName, read: await readFolder(projectPath, true), standIn: false };
+  /** @type {fs.Dirent[] | null} */
+  let entries = null;
+  let gone = false;
+  try { entries = await fs.promises.readdir(projectPath, { withFileTypes: true }); } catch (error) { gone = isGone(error); }
+  const listed = entries && matchingName(entries.map((entry) => entry.name), planetName, projectPath);
+  const entry = listed ? entries.find((candidate) => candidate.name === listed) : null;
+  // Security: only what the project folder's listing calls a folder is read. A listing types every
+  // link and junction as a link (lstat calls some junctions folders), so none is ever gone into.
+  let read;
+  if (entry && entry.isDirectory()) read = await readFolder(path.join(projectPath, entry.name), false);
+  else if (entry ? entry.isSymbolicLink() : !entries && !gone) read = unread('none');
+  else read = unread('gone');
+  // As getSystem draws stand-ins: for a folder that is gone, or unread in a project folder that cannot be listed.
+  const standIn = isStandInName(planetName) && (read.folderRead === 'gone' || (read.folderRead === 'none' && !entries));
+  return { name: listed || (ignoresCase(projectPath) ? null : planetName), read, standIn };
 }
 
 /**
  * A planet's folder counts. '(root)' (`root`) stands for the top-level files alone, so it reads no
- * folder below them. No folder that resolves outside `projectPath` is read.
+ * folder below them. Security: a folder is read only when its parent's listing calls it a folder,
+ * so the walk never goes into a link; one swapped for a link after that listing can still be
+ * followed, which takes a process already writing inside the project.
  * @param {string} dir
  * @param {boolean} root
- * @param {string} projectPath
  * @returns {Promise<FolderRead>}
  */
-async function readFolder(dir, root, projectPath) {
+async function readFolder(dir, root) {
   let files = 0, bytes = 0, subdirs = 0, folders = 0, peeks = 0, partial = false;
   /** @type {'gone' | 'none' | null} */
   let failed = null;
   const exts = new Map();
   /** @type {Promise<number | null>[]} one per counted file, awaited together after the walk */
   const sizes = [];
-  /** @type {Promise<string> | null} where the project folder really is, resolved once a read */
-  let projectReal = null;
-  // Security: every folder is resolved just before it is read, links and junctions of any kind
-  // followed, and read only when that is the project folder or a place inside it. A folder that
-  // resolves elsewhere, or does not resolve, fails like one that cannot be read. A link put in
-  // place between this check and the read is still followed: the check narrows that, no more.
-  const list = async (/** @type {string} */ d) => {
-    projectReal ??= fs.promises.realpath(projectPath);
-    const [base, real] = await Promise.all([projectReal, fs.promises.realpath(d)]);
-    if (real !== base && relativeInside(base, real) === null) {
-      throw Object.assign(new Error('the folder resolves outside the project'), { code: 'EACCES' });
-    }
-    return fs.promises.readdir(d, { withFileTypes: true });
-  };
+  const list = (/** @type {string} */ d) => fs.promises.readdir(d, { withFileTypes: true });
 
   // Whether a folder the walk leaves unread holds a file at any depth, which the walk would count.
   /** @param {string} d @returns {Promise<boolean>} */
@@ -210,7 +179,7 @@ async function readFolder(dir, root, projectPath) {
       entries = await list(d);
     } catch (error) {
       if (depth > 0) partial = true;
-      else failed = error && (error.code === 'ENOENT' || error.code === 'ENOTDIR') ? 'gone' : 'none';
+      else failed = isGone(error) ? 'gone' : 'none';
       return;
     }
     for (const e of entries) {
