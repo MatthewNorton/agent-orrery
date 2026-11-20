@@ -10,12 +10,14 @@ const path = require('node:path');
 const test = require('node:test');
 const { asarCheck, validArchive } = require('../src/main/harness/asar-check');
 
-test('asar check: plain files, read and deleted, and the temporary folder goes, by an rm that tries again while it is held', async (t) => {
+test('asar check: plain files, read and deleted, and the temporary folder it made goes, by an rm that tries again while it is held', async (t) => {
+  const mkdtemp = t.mock.method(fs.promises, 'mkdtemp');
   const rm = t.mock.method(fs.promises, 'rm');
   assert.deepEqual(await asarCheck(), { lstatFile: true, direntFile: true, deleted: true, errors: [] });
-  const [dir, options] = rm.mock.calls[0].arguments;
-  assert.deepEqual([path.basename(dir).startsWith('agent-orrery-asar-'), fs.existsSync(dir)], [true, false]);
-  assert.deepEqual(options, { recursive: true, force: true, maxRetries: 4, retryDelay: 100 });
+  const made = await Promise.all(mkdtemp.mock.calls.map((call) => call.result));
+  assert.deepEqual(rm.mock.calls.map((call) => call.arguments[0]), made, 'the folder it made, and no other');
+  assert.deepEqual([made.length, path.basename(made[0]).startsWith('agent-orrery-asar-'), fs.existsSync(made[0])], [1, true, false]);
+  assert.deepEqual(rm.mock.calls[0].arguments[1], { recursive: true, force: true, maxRetries: 4, retryDelay: 100 });
 });
 
 test('asar check: a temporary folder it cannot make fails every answer, and the check answers all the same', async () => {
