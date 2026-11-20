@@ -83,6 +83,13 @@ test('live system view: planets are top-level folders ranked by files plus five 
   assert.equal(getSystem(model, 'missing'), null);
 });
 
+test('live system view: the root planet\'s builds are read as any bucket\'s, a whole count', (t) => {
+  // A count held past the rule (shared/values.js) is made whole on the way out, and one that is none starts no planet.
+  const builds = (root) => getSystem(projectOnDisk(t, ['src/a.js', 'README.md'], { '(root)': root, src: 2 }).model, 'p').planets.map((planet) => [planet.name, planet.builds]);
+  assert.deepEqual(builds(2.9), [['src', 2], ['(root)', 2]]);
+  assert.deepEqual(builds('3'), [['src', 2]]);
+});
+
 test('live system view: the biggest eight planets, and of how many; a system is cached for 30 s', (t) => {
   t.mock.timers.enable({ apis: ['Date'], now: 1_000_000 });
   const { root, model } = projectOnDisk(t, [

@@ -14,6 +14,7 @@ const {
 } = require('../src/main/live/projects');
 const { ignoresCase } = require('../src/main/path-safety');
 const { canonicalProjectPath } = require('../src/main/provider-adapters');
+const { savedProject } = require('../src/main/live/saved-project');
 const { casedCounts, KEPT_APART, KEPT_AS_ONE, KEPT_LARGER } = require('./support/bucket-cases');
 const { newModel, record } = require('./support/live-model');
 const { projectsById } = require('./support/live-session');
@@ -108,31 +109,31 @@ test('live projects: a folder keeps one bucket by the rule of the path its proje
   // A temp folder is a Windows path on Windows only: there Docs and docs are one folder.
   const kept = (project) => [Object.entries(project.buckets), ignoresCase(project.path) ? KEPT_AS_ONE : KEPT_APART];
   // From a state file or a backup: every count a whole one, and the casings a path joins added up.
-  const here = restoreProject(model, 'here', { path: dir('here'), buckets: casedCounts(), totalBuilds: 15 });
+  const here = restoreProject(model, 'here', savedProject({ path: dir('here'), buckets: casedCounts(), totalBuilds: 15 }));
   assert.deepEqual(...kept(here));
   assert.equal(here.totalBuilds, 15);
   // No path tells no two names apart or together; the folder the project then gets decides. It
   // counted no build without a path, so two casings may be two records of the same builds: the
   // larger stays, by adoption and by recovery alike.
   const larger = (project) => [Object.entries(project.buckets), ignoresCase(project.path) ? KEPT_LARGER : KEPT_APART];
-  const pathless = restoreProject(model, 'pathless', { name: 'pathless', buckets: casedCounts() });
+  const pathless = restoreProject(model, 'pathless', savedProject({ name: 'pathless', buckets: casedCounts() }));
   assert.deepEqual(Object.entries(pathless.buckets), KEPT_APART);
   adoptProjectPath(model, pathless, dir('adopted'));
   assert.deepEqual(...larger(pathless));
-  const recovered = restoreProject(model, 'recovered', { name: 'recovered', buckets: casedCounts() });
+  const recovered = restoreProject(model, 'recovered', savedProject({ name: 'recovered', buckets: casedCounts() }));
   remapProjectPath(model, 'recovered', dir('recovered'));
   assert.deepEqual(...larger(recovered));
   // A saved project with no path of its own that an override gives a folder.
   model.pathOverrides.overridden = dir('overridden');
-  assert.deepEqual(...larger(restoreProject(model, 'overridden', { buckets: casedCounts() })));
+  assert.deepEqual(...larger(restoreProject(model, 'overridden', savedProject({ buckets: casedCounts() }))));
   // Counted under a POSIX path, on another machine, and recovered to a folder here.
-  const moved = restoreProject(model, 'moved', { path: '/work/elsewhere', buckets: casedCounts() });
+  const moved = restoreProject(model, 'moved', savedProject({ path: '/work/elsewhere', buckets: casedCounts() }));
   assert.deepEqual([moved.path, Object.entries(moved.buckets)], ['/work/elsewhere', KEPT_APART]);
   remapProjectPath(model, 'moved', dir('moved'));
   assert.deepEqual(...kept(moved));
   // Buckets that are no object count nothing.
   ['text', [3, 4], null, 7].forEach((odd, i) => {
-    assert.deepEqual(restoreProject(model, 'odd' + i, { path: dir('odd' + i), buckets: /** @type {any} */ (odd) }).buckets, {}, String(odd));
+    assert.deepEqual(restoreProject(model, 'odd' + i, savedProject({ path: dir('odd' + i), buckets: odd })).buckets, {}, String(odd));
   });
   // The state file the recovery wrote holds whole counts only: no "46", and no null for an Infinity.
   const written = Object.values(readState(file).projects).flatMap((project) => Object.values(project.buckets));
@@ -143,9 +144,9 @@ test('live projects: a total or a time a state file holds is made a whole count'
   const { model, dir } = newModel(t);
   // 1e400 reads as Infinity.
   const saved = () => JSON.parse('{ "totalBuilds": "9", "firstSeen": "soon", "lastActivity": 1e400 }');
-  const odd = restoreProject(model, 'odd', { path: dir('odd'), ...saved() });
+  const odd = restoreProject(model, 'odd', savedProject({ path: dir('odd'), ...saved() }));
   assert.deepEqual([odd.totalBuilds, odd.lastActivity, typeof odd.firstSeen, odd.firstSeen > 0], [0, 0, 'number', true]);
-  const here = restoreProject(model, 'here', { path: dir('here'), ...saved(), totalBuilds: 9.5, firstSeen: 1700000000000.4 });
+  const here = restoreProject(model, 'here', savedProject({ path: dir('here'), ...saved(), totalBuilds: 9.5, firstSeen: 1700000000000.4 }));
   assert.deepEqual([here.totalBuilds, here.firstSeen, here.lastActivity], [9, 1700000000000, 1700000000000]);
 });
 

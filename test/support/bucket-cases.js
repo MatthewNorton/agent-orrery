@@ -5,11 +5,16 @@
 // they stood they made "46"); a fraction; two casings of 1e308 (added as they stood they made
 // Infinity, which saves as null); counts that are none; and a folder named __proto__.
 
+const { savedProject } = require('../../src/main/live/saved-project');
+
 const MAX = Number.MAX_SAFE_INTEGER;
 // As text: '__proto__' is an own key only out of JSON.parse.
 const CASED_COUNTS = '{ "Docs": 5, "docs": 7, "Odd": "4", "odd": 6, "src": 2.9, "big": 1e308, "BIG": 1e308,'
   + ' "neg": -1, "none": null, "zero": 0, "__proto__": 3 }';
 const casedCounts = () => JSON.parse(CASED_COUNTS);
+// The same as a project's code gets them, from the one reader of a saved project: whole counts, and
+// what is no count is no bucket.
+const readCounts = () => savedProject({ buckets: casedCounts() }).buckets;
 
 // What a project keeps of them where two casings are two folders, and where they are one: added
 // up when they were counted under a path, the larger alone when they came from a record with no
@@ -21,4 +26,4 @@ const KEPT_LARGER = [['Docs', 7], ['odd', 6], ['src', 2], ['big', MAX], ['__prot
 // A buckets object's own counts, in key order: reading buckets.__proto__ answers the prototype, not a count.
 const own = (buckets) => Object.keys(buckets).map((name) => [name, Object.getOwnPropertyDescriptor(buckets, name).value]);
 
-module.exports = { CASED_COUNTS, casedCounts, own, KEPT_APART, KEPT_AS_ONE, KEPT_LARGER };
+module.exports = { CASED_COUNTS, casedCounts, readCounts, own, KEPT_APART, KEPT_AS_ONE, KEPT_LARGER };

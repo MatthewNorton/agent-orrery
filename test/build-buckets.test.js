@@ -7,7 +7,7 @@ const path = require('node:path');
 const {
   addBuckets, bucketOf, bucketKey, bucketFor, countBuild, bucketBuilds, foldBuckets, matchingEntry, planetKey, setBucket, setProjectPath,
 } = require('../src/main/build-buckets');
-const { casedCounts, own, KEPT_APART, KEPT_AS_ONE, KEPT_LARGER } = require('./support/bucket-cases');
+const { readCounts, own, KEPT_APART, KEPT_AS_ONE, KEPT_LARGER } = require('./support/bucket-cases');
 
 // The name matchingEntry finds among names, as it finds a folder among a listing's entries.
 const matchingName = (names, name, root) => matchingEntry(names.map((each) => ({ name: each })), name, root)?.name ?? null;
@@ -181,18 +181,19 @@ test('addBuckets puts each count under the key its folder has, by the rule of th
   assert.deepEqual(own(summed.buckets), [['docs', 7], ['SRC', 1], ['lib', 5], ['__proto__', 4]]);
 });
 
-test('every bucket count is a whole count, and no sum passes the largest one kept', () => {
+test('every bucket count stays a whole count, and no sum passes the largest one kept', () => {
   const MAX = Number.MAX_SAFE_INTEGER;
-  const windows = foldBuckets('C:\\Work\\Demo', casedCounts());
-  assert.deepEqual(own(windows), KEPT_AS_ONE, 'a string is no count, so it is no bucket and is not joined to the 6 of its other casing');
-  assert.deepEqual(own(foldBuckets('/work/demo', casedCounts())), KEPT_APART);
+  // A saved project's counts come whole from its reader (test/live-saved-project.test.js); a fold keeps them so.
+  const windows = foldBuckets('C:\\Work\\Demo', readCounts());
+  assert.deepEqual(own(windows), KEPT_AS_ONE, 'two full counts joined are one full count');
+  assert.deepEqual(own(foldBuckets('/work/demo', readCounts())), KEPT_APART);
   assert.equal(JSON.stringify(windows).includes('null'), false, 'nothing saves as null');
-  assert.deepEqual(own(foldBuckets(null, casedCounts())), KEPT_APART, 'no path joins no two names');
+  assert.deepEqual(own(foldBuckets(null, readCounts())), KEPT_APART, 'no path joins no two names');
 
   const project = { path: 'C:\\Work\\Demo', buckets: windows };
   assert.deepEqual([countBuild(project, 'BIG'), countBuild(project, 'big'), project.buckets.big], [false, false, MAX], 'a full count stays full');
   addBuckets(project, { DOCS: MAX, Src: 1 }, (held, added) => held + added);
-  addBuckets(project, { docs: 3, SRC: 9, lib: '4' }, Math.max);
+  addBuckets(project, { docs: 3, SRC: 9 }, Math.max);
   assert.deepEqual(own(project.buckets), [['Docs', MAX], ['odd', 6], ['src', 9], ['big', MAX], ['__proto__', 3]]);
   // A count put there past the rule (an older state, read by other code) is made whole when it is next added to.
   const odd = { path: '/work/demo', buckets: {} };
@@ -202,7 +203,7 @@ test('every bucket count is a whole count, and no sum passes the largest one kep
 });
 
 test('setProjectPath writes the path and counts the buckets by it in one step', () => {
-  const project = { path: null, buckets: JSON.parse('{ "Docs": 3, "docs": 2, "src": "1", "__proto__": 4 }') };
+  const project = { path: null, buckets: JSON.parse('{ "Docs": 3, "docs": 2, "__proto__": 4 }') };
   setProjectPath(project, '/work/demo');
   assert.deepEqual([project.path, own(project.buckets)], ['/work/demo', [['Docs', 3], ['docs', 2], ['__proto__', 4]]]);
   setProjectPath(project, 'C:\\Work\\Demo');
@@ -223,8 +224,8 @@ test('casings counted under a path are added up; those of a project that had no 
   setProjectPath(pathless, 'C:\\Work\\Demo');
   assert.deepEqual(own(pathless.buckets), [['Docs', 3], ['src', 1]]);
   // The caller says so where the project's own path does not: a saved record, a backup's entry.
-  assert.deepEqual(own(foldBuckets('C:\\Work\\Demo', casedCounts(), false)), KEPT_LARGER);
-  assert.deepEqual(own(foldBuckets(null, casedCounts(), false)), KEPT_APART);
+  assert.deepEqual(own(foldBuckets('C:\\Work\\Demo', readCounts(), false)), KEPT_LARGER);
+  assert.deepEqual(own(foldBuckets(null, readCounts(), false)), KEPT_APART);
   const restored = { path: null, buckets: { docs: 2, Docs: 5 } };
   setProjectPath(restored, 'C:\\Work\\Demo', true);
   assert.deepEqual(own(restored.buckets), [['docs', 7]]);

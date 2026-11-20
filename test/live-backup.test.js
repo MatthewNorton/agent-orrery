@@ -144,18 +144,21 @@ test('a backup\'s casings of one folder, counted under a path, are added up befo
     held: { name: 'held', buckets: { Docs: 1, SRC: 20 }, totalBuilds: 21, firstSeen: T0 },
     bare: { name: 'bare', buckets: {}, totalBuilds: 0, firstSeen: T0 },
     loose: { name: 'loose', buckets: {}, totalBuilds: 0, firstSeen: T0 },
+    far: { name: 'far', buckets: {}, totalBuilds: 0, firstSeen: T0 },
   } });
   const { tracker } = w.live();
-  // A folder of a Windows path on every host: the three projects are known by one each.
-  for (const id of ['held', 'bare', 'loose']) setProjectPath(tracker.model.projects.get(id), `C:\\Work\\${id}`);
+  // A folder of a Windows path on every host: the four projects are known by one each.
+  for (const id of ['held', 'bare', 'loose', 'far']) setProjectPath(tracker.model.projects.get(id), `C:\\Work\\${id}`);
   // The file's held and bare had a folder where the file was written: any local path, which no project here has.
   const counted = JSON.stringify(path.join(w.root, 'elsewhere'));
   const backup = parseBackup(`{ "format": "agent-orrery-backup", "version": 1, "universe": { "projects": {
     "held": { "path": ${counted}, "buckets": ${CASED_COUNTS} }, "bare": { "path": ${counted}, "buckets": ${CASED_COUNTS} },
-    "loose": { "buckets": ${CASED_COUNTS} } } } }`);
-  assert.deepEqual(tracker.importBackup(backup), { added: 0, merged: 3 });
+    "loose": { "buckets": ${CASED_COUNTS} }, "far": { "path": "work/elsewhere", "buckets": ${CASED_COUNTS} } } } }`);
+  assert.deepEqual(tracker.importBackup(backup), { added: 0, merged: 4 });
   const buckets = (id) => Object.entries(tracker.model.projects.get(id).buckets);
   assert.deepEqual(buckets('bare'), KEPT_AS_ONE);
+  // A path this machine does not take (it is not absolute) is no folder here, but its builds were counted under it all the same.
+  assert.deepEqual([backup.projects.find(([id]) => id === 'far')[1].path, buckets('far')], [null, KEPT_AS_ONE]);
   assert.deepEqual(buckets('held'), [['Docs', 12], ['SRC', 20], ...KEPT_AS_ONE.filter(([name]) => name !== 'Docs' && name !== 'src')],
     'the same 12, not the larger casing alone; src keeps its key here and the larger count');
   // A project the file holds with no path counted nothing where the file was written: its two

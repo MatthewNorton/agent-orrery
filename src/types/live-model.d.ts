@@ -54,6 +54,20 @@ export interface PersistedProject {
   firstSeen?: number;
 }
 
+/**
+ * A saved project as the one reader gives it (live/saved-project.js), every field checked.
+ * `counted` is whether the record had a path, so whether its builds were counted under one.
+ */
+export interface SavedProject {
+  path: string | null;
+  counted: boolean;
+  name: string | undefined;
+  lastActivity: number;
+  buckets: Record<string, number>;
+  totalBuilds: number;
+  firstSeen: number;
+}
+
 /** A project the user forgot: when, and the folder it showed then. */
 export interface ForgottenProject {
   at: number;

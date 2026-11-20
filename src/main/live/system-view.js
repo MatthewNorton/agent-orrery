@@ -58,8 +58,9 @@ function getSystem(model, projectId) {
         files: shallowCount(path.join(project.path, d.name)),
         builds: bucketBuilds(project, d.name),
       }));
-      if (project.buckets['(root)']) {
-        planets.push({ name: '(root)', files: beltDensity, builds: project.buckets['(root)'] });
+      const rootBuilds = bucketBuilds(project, '(root)');
+      if (rootBuilds) {
+        planets.push({ name: '(root)', files: beltDensity, builds: rootBuilds });
       }
       planets.sort((a, b) => b.files + b.builds * 5 - (a.files + a.builds * 5));
     } catch { /* fall through to procedural */ }

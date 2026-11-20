@@ -8,15 +8,14 @@ const fs = require('fs');
 const path = require('path');
 const { setProjectPath } = require('../build-buckets');
 const { canonicalProjectPath, isLocalProjectPath } = require('../provider-adapters');
-const { plainObject } = require('../transcripts/fields');
 const { localAbsolutePath } = require('../path-safety');
 const { hex8 } = require('../shared/hash');
-const { wholeCount } = require('../shared/values');
 const { liveProject } = require('../universe/public-shape');
 const { queue } = require('./events');
 const { stillForgotten } = require('./forgotten');
+const { savedProject } = require('./saved-project');
 
-/** @import { LiveModel, LiveProject, PersistedProject } from '../../types/live-model' */
+/** @import { LiveModel, LiveProject, SavedProject } from '../../types/live-model' */
 
 function isProjectDirectory(projectPath) {
   // Security: transcript-derived paths reach the filesystem here on every scan.
@@ -51,7 +50,7 @@ function createProject(model, id, projPath, fields, counted = true) {
     totalBytes: fields.totalBytes || 0,
     claudeBytes: fields.claudeBytes || 0,
     codexBytes: fields.codexBytes || 0,
-    buckets: plainObject(fields.buckets) ? fields.buckets : {},
+    buckets: fields.buckets || {},
     totalBuilds: fields.totalBuilds || 0,
     firstSeen: fields.firstSeen || Date.now(),
   };
@@ -122,29 +121,26 @@ function announceProjectUpdated(model, project) {
  * @param {LiveModel} model
  */
 function restoreRememberedProjects(model) {
-  for (const [id, saved] of Object.entries(model.persisted.projects)) {
+  for (const [id, entry] of Object.entries(model.persisted.projects)) {
     // A state file is read as it is: an entry that is not a project record is passed over.
-    if (plainObject(saved) && !model.projects.has(id)) restoreProject(model, id, saved);
+    const saved = savedProject(entry);
+    if (saved && !model.projects.has(id)) restoreProject(model, id, saved);
   }
 }
 
 /**
- * A project as the state file, or a backup, keeps it.
+ * A project as the state file, or a backup, keeps it: `saved` is from the one reader
+ * (saved-project.js), so its fields are taken as they are.
  * @param {LiveModel} model
  * @param {string} id
- * @param {PersistedProject} saved
+ * @param {SavedProject} saved
  * @returns {LiveProject}
  */
 function restoreProject(model, id, saved) {
-  const savedPath = typeof saved.path === 'string' && saved.path ? saved.path : null;
-  const projPath = preferredProjectPath(model, id, savedPath);
-  return createProject(model, id, projPath, {
-    // A state file is read as it is: only a string is a name or a path, its counts are made whole
-    // here (shared/values.js), and its buckets by createProject.
-    name: !projPath && typeof saved.name === 'string' ? saved.name : undefined,
-    lastActivity: wholeCount(saved.lastActivity) || wholeCount(saved.firstSeen),
-    buckets: saved.buckets, totalBuilds: wholeCount(saved.totalBuilds), firstSeen: wholeCount(saved.firstSeen),
-  }, savedPath !== null);
+  return createProject(model, id, preferredProjectPath(model, id, saved.path), {
+    name: saved.name, lastActivity: saved.lastActivity || saved.firstSeen,
+    buckets: saved.buckets, totalBuilds: saved.totalBuilds, firstSeen: saved.firstSeen,
+  }, saved.counted);
 }
 
 /**

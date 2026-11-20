@@ -144,16 +144,15 @@ function countBuild(project, bucket) {
 /**
  * Adds `counts` to the project's buckets, each under the key its folder has there (bucketKey), so
  * a folder keeps one bucket whatever casing the counts name it by. Where the folder has a count
- * already, `both` makes one of the two. Every count is a whole count (shared/values.js): one that
- * is none (a string in a state file, a zero) adds no bucket, and no sum passes the largest kept.
+ * already, `both` makes one of the two, and no sum passes the largest count kept (shared/values.js).
+ * `counts` are whole counts above none: a project's own, or a saved project's from its reader
+ * (live/saved-project.js), which is where a count from a file is made one.
  * @param {BucketedProject} project
- * @param {Record<string, unknown>} counts
+ * @param {Record<string, number>} counts
  * @param {(held: number, added: number) => number} both
  */
 function addBuckets(project, counts, both) {
-  for (const [name, counted] of Object.entries(counts)) {
-    const builds = wholeCount(counted);
-    if (builds === 0) continue;
+  for (const [name, builds] of Object.entries(counts)) {
     const held = bucketFor(project, name);
     // Security: an own count read and written, whatever the bucket is called.
     setBucket(project.buckets, held.name, held.key === null ? builds : wholeCount(both(held.builds, builds)));
@@ -162,14 +161,14 @@ function addBuckets(project, counts, both) {
 
 /**
  * `counts` as the buckets of a project at `root`: one bucket per folder by that root's rule, under
- * the first key that names it. What counts from outside (a state file, a backup) go through before
- * they are a project's. Counts made under a path (`counted`) hold each build once, so the casings
+ * the first key that names it. What a saved project's counts (a state file's, a backup's) go through
+ * before they are a project's. Counts made under a path (`counted`) hold each build once, so the casings
  * of a folder are added up. A project with no path counts no build, since a build is bucketed
  * relative to the path: what it holds came from files, merged name by name, where two casings can
  * be two records of the same builds. Of those the larger is kept, so a folder never gets more
  * builds than its project has.
  * @param {string | null} root
- * @param {Record<string, unknown>} counts
+ * @param {Record<string, number>} counts
  * @param {boolean} [counted] whether the counts were made under a path
  * @returns {Record<string, number>}
  */
