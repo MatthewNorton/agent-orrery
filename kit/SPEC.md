@@ -354,8 +354,9 @@ Design tokens (put in `:root`):
     instances of a hidden template, one per hull file and palette (the
     provider's, or local red), in one draw per part. An instance shows its
     template's material, visibility and lights, so the template carries the
-    light layer. A far file lights itself faintly, on the lightless map and
-    where a near view steps down to it; the near views light their hulls.
+    light layer. On the lightless map every hull file lights itself faintly,
+    one with no far file too, and so does a far file a near view steps down
+    to; the near views light their hulls.
     Babylon sorts a template's ships as one, at the template's place (the
     scene origin, where the sun's glow is too), so every template carries an
     `alphaIndex` of `Infinity`, past the default (`Number.MAX_VALUE`) that
