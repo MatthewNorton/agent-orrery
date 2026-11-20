@@ -458,16 +458,16 @@ contract), `AUR`, `AUR_POLISH` and `AUR_GALAXY` (all `any` for now).
 
 | File | Lines | Job |
 |---|---|---|
-| `util.js` | 252 | Creates `AUR`; hashes, colours, provider metadata, motion tuning, asset paths, DOM helpers |
-| `util-scene.js` | 274 | Babylon helpers on `AUR`: skybox (PhotoDome), starfield, orbit rings, ship and signal markers, GUI labels |
+| `util.js` | 306 | Creates `AUR`; hashes, colours, provider metadata, motion tuning, asset paths, DOM helpers |
+| `util-scene.js` | 387 | Babylon helpers on `AUR`: skybox (PhotoDome), starfield, orbit rings, ship and signal markers, GUI labels |
 | `procedural-worlds.js` | 329 | Planet and asteroid surfaces (authored textures + generated normal maps) |
 | `ships/modules.js` | 32 | The registry the converted ship models load into: a module registers a factory with `AUR.shipModule` and runs the first time `AUR.useShipModule` asks for it, so loading the page builds nothing and the modules' script order does not matter |
-| `ships/models.js` | 236 | `AUR.shipModels`, the ship models built in code: a model flies the rank of the manifest hull it replaces (`inPlaceOf`); its container is the ship built once per scene as one merged mesh with a sub-mesh per finish, and owns its materials and textures; its trim is copied once per palette in the ship color; the three model lights a view adds reach model hulls only; `nozzles` for the plumes |
+| `ships/models.js` | 238 | `AUR.shipModels`, the ship models built in code: a model flies the rank of the manifest hull it replaces (`inPlaceOf`); its container is the ship built once per scene as one merged mesh with a sub-mesh per finish, and owns its materials and textures; its trim is copied once per palette in the ship color; the three model lights a view adds reach model hulls only; `nozzles` for the plumes |
 | `ships/petrel/` | 1,394 | Petrel, the Scout: `model.js` (33) registers it in the Scout rank, in place of the manifest's interceptor; `source/` (12 files, 1,361 lines, and `source.json`) builds it, written by `scripts/import-ship.mjs` from the ship's own modules and never edited by hand |
-| `ship-assets.js` | 325 | Manifest, per-scene state, hull choice by rank (`builds` against the manifest ladder; a rank a ship model has taken flies the model), container loading, and the triangle budget a view's hulls stay under: 900k in a system or planet view, 1.24M on the universe map (in a near view a hull with levels of detail steps down to its far file first; a ship that does not fit keeps its dart or current hull) |
+| `ship-assets.js` | 320 | Manifest, per-scene state, hull choice by rank (`builds` against the manifest ladder; a rank a ship model has taken flies the model), container loading, and the triangle budget a view's hulls stay under: 900k in a system or planet view, 1.24M on the universe map (in a near view a hull with levels of detail steps down to its far file first; a ship that does not fit keeps its dart or current hull) |
 | `ships/livery.js` | 195 | What a hull wears, on `AUR.shipAssets`: the procedural studio sky its reflections show, a hull file's materials in the livery of a palette (a ship model keeps its own finishes and wears the ship color on its trim), and the root's provider evidence; loads between `ship-assets.js` and `ship-assets-hulls.js` |
-| `ship-assets-hulls.js` | 242 | Builds a hull from a loaded container, in its livery: instances of a hidden template per hull file and palette in every view, a template of its own for the ship focus mode shows apart, and in-place swaps on promotion or a fade |
-| `ship-assets-api.js` | 173 | `AUR.ships`: `instantiate`, `upgrade` a fallback dart, `refresh` in place on promotion or new colors, `fade` the fleet on its templates while focus mode follows a ship, `dispose` a scene's hull state |
+| `ship-assets-hulls.js` | 243 | Builds a hull from a loaded container, in its livery: instances of a hidden template per hull file and palette in every view, a template of its own for the ship focus mode shows apart, and in-place swaps on promotion or a fade |
+| `ship-assets-api.js` | 176 | `AUR.ships`: `instantiate`, `upgrade` a fallback dart, `refresh` in place on promotion or new colors, `fade` the fleet on its templates while focus mode follows a ship, `dispose` a scene's hull state |
 | `galaxy-layout.js` | 284 | Pure: galaxy grouping, spiral placement, Graveyard |
 | `polish-math.js` | 67 | Pure: label overlap, sun pulse |
 | `search-core.js` | 87 | Pure: project ranking |
