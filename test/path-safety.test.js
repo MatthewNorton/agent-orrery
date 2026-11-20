@@ -186,7 +186,7 @@ test('localAbsolutePath normalizes a local absolute path and refuses UNC, device
   assert.equal(localAbsolutePath(local), path.normalize(local));
 });
 
-test('relativeInside ignores case only under a Windows-style root and keeps the file\'s casing', () => {
+test('relativeInside ignores case only under a Windows-style root and keeps the file\'s casing', (t) => {
   const { relativeInside } = pathSafety;
   assert.equal(relativeInside('C:\\Work\\Demo', 'c:/work/demo/Docs/Guide.md', { separator: '/' }), 'Docs/Guide.md');
   assert.equal(relativeInside('c:\\work\\demo', 'C:\\WORK\\DEMO\\Src\\A.js', { separator: '\\' }), 'Src\\A.js');
@@ -199,9 +199,10 @@ test('relativeInside ignores case only under a Windows-style root and keeps the 
     ['Demo', path.posix.resolve('Demo', 'Docs', 'x.md')], ['Demo\\x', path.win32.resolve('Demo\\x', 'Docs', 'x.md')]]) {
     assert.equal(relativeInside(root, file), null, JSON.stringify([root, file]));
   }
-  // Nor does a Windows path with no drive, which would resolve against the working folder's drive.
-  const drive = process.platform === 'win32' ? process.cwd().slice(0, 2) : 'C:';
-  for (const file of ['\\Demo\\src\\a.js', '/Demo/src/a.js']) assert.equal(relativeInside(`${drive}\\Demo`, file), null, file);
+  // Nor does a Windows path with no drive, which would resolve against the working folder's drive:
+  // C: here, on every host, the root's own drive.
+  t.mock.method(process, 'cwd', () => 'C:\\Work');
+  for (const file of ['\\Demo\\src\\a.js', '/Demo/src/a.js']) assert.equal(relativeInside('C:\\Demo', file), null, file);
 });
 
 test('relativeInside takes a POSIX file\'s leading slashes as one, as the system opens it, and no share under any root', () => {
