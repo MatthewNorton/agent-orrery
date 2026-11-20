@@ -200,7 +200,6 @@
       belt.rotation.y += dt * 0.03;
 
       view.animateShips(dt, now, t);
-      view.applyHullFades();
       if (view.shipFocus) view.updateShipFocusCamera(false, dt);
     });
 

@@ -14,6 +14,7 @@
   // The chase camera's default orbit: how far back it stands in hull diagonals, how high it looks
   // down, and how far it swings off the vantage so a long hull shows its length, not its stern.
   const CHASE = Object.freeze({ distance: 1.3, pitch: 0.42, yaw: 0.6 });
+  const FADED = 0.16; // the visibility of the ships focus mode does not follow
   // The viewer's orbit: the zoom per pixel of wheel delta and the limits that keep the hull in
   // view. The drag takes its feel from the system camera (orbitShipFocus).
   const ORBIT = Object.freeze({
@@ -40,25 +41,14 @@
       return saved.get(rec.id);
     }
 
-    // A hull moves to the template at another visibility by rebuilding its instances
-    // (AUR.ships.fade), so focus mode notes the visibility each hull is to show and the view's next
-    // frame moves it: following another ship (leave focus, enter it again) then moves only the
-    // hulls whose visibility changed, and a view disposed before its next frame moves none.
-    const hullFades = new Map(); // ship id -> the visibility its hull shows from the next frame
-    function applyHullFades() {
-      for (const [id, visibility] of hullFades) AUR.ships.fade(scene, id, visibility);
-      hullFades.clear();
-    }
-
     // What focus mode shows of a ship: the focused one in full from outside, hidden from inside
     // (the viewer sits in it), every other ship faded. A hull is instances, which show their
-    // template's visibility, so it moves to the template at this one; the dart, a signal's glyph
-    // and the plumes are meshes of their own.
+    // template's visibility, so AUR.ships fades the hulls (setShipFocus); the dart, a signal's
+    // glyph and the plumes are meshes of their own, faded here.
     function applyShipFocusVisual(rec) {
       const { shipFocus } = view;
       if (!shipFocus) return;
-      const visibility = rec.id !== shipFocus.shipId ? 0.16 : shipFocus.exterior ? 1 : 0;
-      hullFades.set(rec.id, visibility);
+      const visibility = rec.id !== shipFocus.shipId ? FADED : shipFocus.exterior ? 1 : 0;
       const saved = savedVisibilities(rec);
       for (const node of recordVisualNodes(rec)) {
         if (node.isAnInstance) continue;
@@ -73,11 +63,11 @@
     function restoreShipFocusVisuals() {
       const { shipFocus } = view;
       if (!shipFocus) return;
+      AUR.ships.fade(scene, 1);
       for (const [id, saved] of shipFocus.saved) {
         for (const [node, visibility] of saved) {
           if (!AUR.isNodeDisposed(node)) node.visibility = visibility;
         }
-        hullFades.set(id, 1);
         const rec = ships.get(id);
         if (!rec) continue;
         if (rec.label) rec.label.isVisible = true;
@@ -244,6 +234,7 @@
       shipFocus.vantage = typeof vantage === 'string' && Object.hasOwn(SHIP_FOCUS_VANTAGE_YAW, vantage) ? vantage : 'forward';
       shipFocus.exterior = exterior !== false;
       shipFocus.orbit = { yaw: CHASE.yaw, pitch: CHASE.pitch, zoom: 1 };
+      AUR.ships.fade(scene, FADED, { shipId: shipFocus.shipId, visibility: shipFocus.exterior ? 1 : 0 });
       for (const item of ships.values()) applyShipFocusVisual(item);
       return true;
     }
@@ -280,7 +271,7 @@
     }
 
     return {
-      applyShipFocusVisual, applyHullFades, focusShip, setShipFocus, clearShipFocus, shipFocusState,
+      applyShipFocusVisual, focusShip, setShipFocus, clearShipFocus, shipFocusState,
       updateShipFocusCamera, orbitShipFocus,
     };
   };

@@ -352,20 +352,20 @@ Design tokens (put in `:root`):
   lights itself faintly, on the lightless map and where a near view steps down
   to it; the near views light their hulls, so the template carries the light
   layer (an instance is lit as its source). An instance shows its template's material
-  and visibility, so focus mode fades a ship by moving it to its provider's
-  template at that visibility (`AUR.ships.fade(scene, shipId, visibility)`:
-  0.16 for the others, 0 for the ship it is inside of, 1 to restore), which
-  rebuilds the same hull file and palette and leaves the triangle budget as it
-  is. The system view moves a hull on its next frame, to the last visibility
-  focus mode asked for, so following another ship rebuilds only the hulls whose
-  visibility changes, and a view left before that frame rebuilds none; an opaque hull material gives its transparency mode up, because Babylon
+  and visibility, so focus mode fades the fleet on its templates
+  (`AUR.ships.fade(scene, visibility, apart)`: 0.16, then 1 to restore), and a
+  hull built later starts as the fade says. The ship it follows (`apart`) moves
+  to a template of its own in full from outside, and is disabled from inside:
+  entering or leaving focus rebuilds at most one hull, following another ship
+  at most two, and changing seats none; an opaque hull material gives its transparency mode up, because Babylon
   ignores a mesh's visibility while its material is set opaque or cut-out;
-  blended glass fades as it is; a cut-out keeps its mode and does not fade,
-  and no hull has one. Babylon sorts a template's ships as one, at the
-  template's place (the scene origin, where the sun is), so every template
-  carries an `alphaIndex` of `Infinity`, past the default (`Number.MAX_VALUE`)
-  that every other blended mesh keeps: a faded fleet draws after them all,
-  over the sun's corona and glow and the planets' shells. A view steps down to the dart past its hull triangle budget (checked again
+  no flown hull has a blended material in full, its glass included; a cut-out
+  keeps its mode and does not fade, and no hull has one. Babylon sorts a
+  template's ships as one, at the template's place (the scene origin, where
+  the sun's glow is too), so every template carries an `alphaIndex` of
+  `Infinity`, past the default (`Number.MAX_VALUE`) that every other mesh
+  keeps: a faded fleet draws after every other blended mesh, the sun's corona
+  and glow and the planets' shells, wherever its ships are. A view steps down to the dart past its hull triangle budget (checked again
   in the step that builds a hull, so ships waiting on one container keep to
   it; a request that ends while it waits, its dart gone or its swap
   superseded, loads and builds nothing more): 900k in a
@@ -374,8 +374,8 @@ Design tokens (put in `:root`):
   view, `AUR.fitShip` with a pixel floor so a hull sized to its planets still
   reads from the default orbit). `AUR.ships.refresh(scene, ship)` swaps the hull
   inside the asset root the scene already holds; `app/boot.js` calls it after
-  `ship-updated` and `build` events, and the new hull keeps the visibility
-  focus mode gave the old one.
+  `ship-updated` and `build` events, and the new hull lands as the fade shows
+  the ship.
 - A rank can be flown by a ship model built in code instead of a file
   (`AUR.shipModels`, `ships/models.js`). A model names the manifest hull it
   `replaces` and flies in that hull's rank (`selectHull` asks

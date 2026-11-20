@@ -1,23 +1,21 @@
 // @ts-check
 // Builds a ship's hull from a loaded model: provider livery materials, instances of a template
-// per provider and visibility in every view, in-place swaps on promotion and moves to the faded
-// template while focus mode fades the ship.
+// per hull file and palette in every view, in-place swaps on promotion, and focus mode's fade.
 'use strict';
 
 /**
- * @import { HullAsset, HullEntry, SceneState, ShipAssetsCore, ShipEntry } from './ship-assets.js'
+ * @import { HullAsset, HullEntry, HullTemplate, SceneState, ShipAssetsCore, ShipEntry } from './ship-assets.js'
  * @typedef {object} ShipAssetsHulls added to AUR.shipAssets by ship-assets-hulls.js
  * @property {(hull: HullEntry, ship: any) => string} lookOf
  * @property {(scene: any, state: SceneState, hull: HullEntry, asset: HullAsset, ship: any) => ShipEntry | null} createShipEntry
  * @property {(scene: any, state: SceneState, entry: ShipEntry, hull: HullEntry, asset: HullAsset, ship: any) => boolean} swapHull
- * @property {(scene: any, state: SceneState, entry: ShipEntry, visibility: number) => boolean} fadeHull
  */
 
 (function () {
   const AUR = window.AUR;
   /** @type {ShipAssetsCore} */
   const core = AUR.shipAssets;
-  const { logOnce, viewLod } = core;
+  const { logOnce, viewLod, apartVisibility, ownVisibility } = core;
   // The universe map has no lights, so far hulls carry a faint tint of their
   // own; without it they read as black cut-outs behind their accent lights.
   const FAR_SELF_LIGHT = 0.1;
@@ -207,43 +205,55 @@
 
   // ---------- building a hull ----------
 
+  /** @param {HullTemplate} template */
+  function disposeTemplate(template) {
+    for (const root of template.roots) root.dispose(false, false); // its materials are the scene's
+  }
+
   /**
-   * One tinted, hidden copy of a hull per provider and visibility: every ship of that look draws
-   * as its instances. An instance takes its source's material, visibility and lights, so a ship
-   * that focus mode fades is moved to the template at its visibility (fadeHull), and the template
-   * carries the layer of the lights that reach the hull. Its ships are also sorted as one, at the
-   * template's place (the scene origin, where the sun is), not each at its own, so the template
-   * takes an alphaIndex past Babylon's default (Number.MAX_VALUE), which every other blended mesh
-   * keeps: its blended parts (a faded fleet) draw after them all, over the sun's glow and the
-   * planets' shells, as a ship in front of them.
+   * A tinted, hidden copy of a hull: every ship of that look draws as its instances, in one draw
+   * per part. An instance takes its source's material, visibility and lights, so the template
+   * carries the layer of the lights that reach the hull, and the visibility its ships show: the
+   * fleet's, which focus mode fades by writing it on every template (AUR.ships.fade), or one of its own
+   * for the ship it shows apart.
+   * @returns {HullTemplate}
    */
-  function providerTemplate(scene, state, asset, ship, visibility, layer) {
-    const key = asset.file + '|' + paletteKey(ship) + '|' + visibility;
-    let roots = state.templates.get(key);
-    if (roots) return roots;
+  function makeTemplate(scene, state, asset, ship, name, visibility, layer) {
     const entries = asset.record.container.instantiateModelsToScene(
-      (sourceName) => 'ship_template_' + key + '_' + sourceName,
+      (sourceName) => name + '_' + sourceName,
       false,
       { doNotInstantiate: true }
     );
     // The lightless map's hulls light themselves, and so does a far file stepped down to up close.
     const selfLight = viewLod(scene) === 'far' || asset.lod === 'far';
-    for (const mesh of childMeshes(entries.rootNodes)) {
+    const meshes = childMeshes(entries.rootNodes);
+    for (const mesh of meshes) {
       mesh.material = hullMaterial(scene, state, asset, selfLight, ship, mesh.material);
       mesh.isPickable = false;
       mesh.isVisible = false;
       mesh.visibility = visibility;
       mesh.layerMask |= layer;
+      // Babylon sorts a template's ships as one, at the template's place: the scene origin, where
+      // the sun's glow is too, so the glow and the planets' shells fell between a faded ship's
+      // parts. Past the default (Number.MAX_VALUE), which every other mesh keeps, a faded fleet
+      // draws after every other blended mesh, wherever its ships are. Only a faded hull blends:
+      // no flown hull has a blended material in full.
       mesh.alphaIndex = Number.POSITIVE_INFINITY;
     }
-    roots = entries.rootNodes;
-    state.templates.set(key, roots);
-    return roots;
+    return { roots: entries.rootNodes, meshes };
   }
 
-  function placeInstances(scene, state, asset, ship, pivot, visibility, layer) {
+  // The template a ship's hull is built on: its look's, one per hull file and palette at the
+  // fleet's visibility, or one of its own while focus mode shows it apart (`own`).
+  function templateFor(scene, state, asset, ship, own, layer) {
+    const key = asset.file + '|' + paletteKey(ship);
+    if (own !== null) return makeTemplate(scene, state, asset, ship, 'ship_template_' + key + '|' + ship.id, own, layer);
+    return AUR.memo(state.templates, key, () => makeTemplate(scene, state, asset, ship, 'ship_template_' + key, state.visibility, layer));
+  }
+
+  function placeInstances(template, ship, pivot) {
     const created = [];
-    for (const node of providerTemplate(scene, state, asset, ship, visibility, layer)) {
+    for (const node of template.roots) {
       node.instantiateHierarchy(pivot, undefined, (source, copy) => {
         copy.name = 'ship_' + String(ship.id) + '_' + source.name;
         created.push(copy);
@@ -255,11 +265,12 @@
   }
 
   /**
-   * Builds the correction node (rotation, class display size, offset) holding
-   * the hull's meshes. Returns null when the model cannot be instantiated.
+   * Builds the correction node (rotation, class display size, offset) holding the hull's meshes,
+   * on the template and in the state focus mode's fade gives the ship: disabled when it is hidden.
+   * Returns null when the model cannot be instantiated.
    * @param {HullEntry} hull @param {HullAsset} asset
    */
-  function buildHull(scene, state, hull, asset, ship, visibility) {
+  function buildHull(scene, state, hull, asset, ship) {
     const correction = new BABYLON.TransformNode('ship_correction_' + ship.id, scene);
     const pivot = new BABYLON.TransformNode('ship_pivot_' + ship.id, scene);
     pivot.parent = correction;
@@ -268,13 +279,18 @@
     correction.scaling.setAll(Number(data.scale) || 1);
     const offset = Array.isArray(data.offset) ? data.offset : [0, 0, 0];
     pivot.position.set(Number(offset[0]) || 0, Number(offset[1]) || 0, Number(offset[2]) || 0);
+    correction.setEnabled(apartVisibility(state, ship) !== 0);
     // Which ship-only lights reach the hull: the models' own, or the fleet's key and rim.
     const layer = asset.model ? AUR.shipModels.LAYER : AUR.SHIP_LAYER;
+    const own = ownVisibility(state, ship);
+    let template = null;
     let meshes;
     try {
-      meshes = placeInstances(scene, state, asset, ship, pivot, visibility, layer);
+      template = templateFor(scene, state, asset, ship, own, layer);
+      meshes = placeInstances(template, ship, pivot);
     } catch (error) {
       correction.dispose();
+      if (template && own !== null) disposeTemplate(template);
       logOnce('instance:' + hull.id, 'Hull ' + hull.id + ' could not be instantiated; using procedural hulls.');
       return null;
     }
@@ -288,7 +304,7 @@
         assetHullId: hull.id,
       };
     }
-    return { correction, evidence: evidenceMaterial(scene, state, ship) };
+    return { correction, own: own === null ? null : template, evidence: evidenceMaterial(scene, state, ship) };
   }
 
   function hullMetadata(hull, asset, ship) {
@@ -303,7 +319,7 @@
 
   /** @param {HullEntry} hull @param {HullAsset} asset @returns {ShipEntry | null} */
   function createShipEntry(scene, state, hull, asset, ship) {
-    const built = buildHull(scene, state, hull, asset, ship, 1);
+    const built = buildHull(scene, state, hull, asset, ship);
     if (!built) return null;
     const root = new BABYLON.Mesh('ship_asset_' + ship.id, scene);
     built.correction.parent = root;
@@ -312,7 +328,7 @@
     root.isPickable = false;
     /** @type {ShipEntry} */
     const entry = {
-      root, correction: built.correction, hull, asset, ship, visibility: 1, triangles: asset.record.triangles,
+      root, correction: built.correction, own: built.own, hull, asset, ship, triangles: asset.record.triangles,
       look: lookOf(hull, ship), wanted: lookOf(hull, ship), fallback: null,
     };
     const shipId = String(ship.id);
@@ -320,40 +336,28 @@
     state.ships.set(shipId, entry);
     root.onDisposeObservable.addOnce(() => {
       state.triangles = Math.max(0, state.triangles - entry.triangles);
+      if (entry.own) disposeTemplate(entry.own); // a template of its own leaves with its ship
       if (state.ships.get(shipId) === entry) state.ships.delete(shipId);
     });
     return entry;
   }
 
-  // Builds the hull at a visibility and puts it in place of the entry's own, under the same root.
-  /** @param {ShipEntry} entry @param {HullEntry} hull @param {HullAsset} asset */
-  function rebuild(scene, state, entry, hull, asset, ship, visibility) {
-    const built = buildHull(scene, state, hull, asset, ship, visibility);
-    if (!built) return null;
+  /**
+   * Builds a hull in place of the entry's own, under the same root, on the template and in the
+   * state focus mode's fade gives the ship, so a promotion lands as the hull it replaces showed.
+   * @param {ShipEntry} entry @param {HullEntry} hull @param {HullAsset} asset
+   */
+  function swapHull(scene, state, entry, hull, asset, ship) {
+    const built = buildHull(scene, state, hull, asset, ship);
+    if (!built) return false;
     built.correction.parent = entry.root;
     entry.correction.dispose(false, false);
+    if (entry.own) disposeTemplate(entry.own); // its instances went with the old hull
     state.triangles += asset.record.triangles - entry.triangles;
     Object.assign(entry, {
-      correction: built.correction, hull, asset, ship, visibility,
+      correction: built.correction, own: built.own, hull, asset, ship,
       triangles: asset.record.triangles, look: lookOf(hull, ship),
     });
-    return built;
-  }
-
-  /**
-   * Moves a ship's hull to the template at a visibility (focus mode's fade): the same hull file,
-   * palette and triangles, so the budget and a pending refresh are untouched.
-   * @param {ShipEntry} entry
-   */
-  function fadeHull(scene, state, entry, visibility) {
-    if (entry.visibility === visibility) return true;
-    return Boolean(rebuild(scene, state, entry, entry.hull, entry.asset, entry.ship, visibility));
-  }
-
-  /** @param {ShipEntry} entry @param {HullEntry} hull @param {HullAsset} asset */
-  function swapHull(scene, state, entry, hull, asset, ship) {
-    const built = rebuild(scene, state, entry, hull, asset, ship, entry.visibility);
-    if (!built) return false;
     entry.root.material = built.evidence;
     entry.root.metadata = { ...(entry.root.metadata || {}), ...hullMetadata(hull, asset, ship) };
     if (entry.fallback && entry.fallback.metadata) {
@@ -363,6 +367,6 @@
   }
 
   /** @type {ShipAssetsHulls} */
-  const hulls = { lookOf, createShipEntry, swapHull, fadeHull };
+  const hulls = { lookOf, createShipEntry, swapHull };
   Object.assign(core, hulls);
 })();

@@ -1,6 +1,6 @@
 // @ts-check
 // AUR.ships: instantiate a ship's hull, upgrade a fallback dart to one, refresh it in place on
-// promotion, fade it while focus mode follows another ship, and dispose a scene's hull state.
+// promotion, fade the fleet while focus mode follows a ship, and dispose a scene's hull state.
 'use strict';
 
 /**
@@ -14,8 +14,8 @@
   /** @type {ShipAssetsCore & ShipAssetsHulls} */
   const assets = AUR.shipAssets;
   const {
-    manifestPromise, settledManifest, sceneStates, stateFor, isSceneDisposed, viewLod, selectHull,
-    hullFiles, ensureContainer, fitsBudget, resolveAsset, lookOf, createShipEntry, swapHull, fadeHull,
+    manifestPromise, settledManifest, sceneStates, stateFor, isSceneDisposed, apartVisibility, ownVisibility,
+    viewLod, selectHull, hullFiles, ensureContainer, fitsBudget, resolveAsset, lookOf, createShipEntry, swapHull,
   } = assets;
 
   function instantiate(scene, ship) {
@@ -64,24 +64,43 @@
   }
 
   /**
-   * Shows a ship's hull at a visibility: focus mode in the system view fades the ships it does not
-   * follow and hides the one it is inside of, then restores them at 1. A hull is instances of a
-   * template, which carries the visibility, so the hull moves to the template at this one. False
-   * when the ship has no hull (a dart or a signal has meshes of its own).
-   * @param {string} shipId
+   * Shows every hull in the scene at `visibility`, except the ship `apart` names, at its own (0
+   * hides it): focus mode in the system view fades the ships it does not follow and shows the one
+   * it follows in full, or hides it from inside, then restores them all at 1. It holds for hulls
+   * built later too (a ship that arrives, a promotion). The fleet fades on its templates, so only
+   * a ship moving apart or back is rebuilt, onto or off a template of its own; a hidden one is
+   * disabled on the template it has, so the viewer looks out from inside it and back without a
+   * rebuild. A dart or a signal has meshes of its own, which focus mode fades itself.
+   * @param {number} visibility
+   * @param {{ shipId: string, visibility: number }} [apart]
    */
-  function fade(scene, shipId, visibility) {
-    const state = sceneStates.get(scene);
-    const entry = state ? state.ships.get(String(shipId)) : null;
-    if (!entry || isSceneDisposed(scene, state) || AUR.isNodeDisposed(entry.root)) return false;
-    return fadeHull(scene, state, entry, visibility);
+  function fade(scene, visibility, apart) {
+    const state = stateFor(scene);
+    if (isSceneDisposed(scene, state)) return;
+    const before = state.apart;
+    state.visibility = visibility;
+    state.apart = apart ? { shipId: String(apart.shipId), visibility: apart.visibility } : null;
+    const show = (template, value) => { for (const mesh of template.meshes) mesh.visibility = value; };
+    for (const template of state.templates.values()) show(template, visibility);
+    for (const id of new Set([before && before.shipId, state.apart && state.apart.shipId])) {
+      const entry = id ? state.ships.get(id) : null;
+      if (!entry) continue;
+      const shown = apartVisibility(state, entry.ship);
+      const own = ownVisibility(state, entry.ship);
+      if (shown !== 0 && (own !== null) !== Boolean(entry.own)) {
+        swapHull(scene, state, entry, entry.hull, entry.asset, entry.ship); // lands as the fade says
+        continue;
+      }
+      if (entry.own && own !== null) show(entry.own, own);
+      entry.correction.setEnabled(shown !== 0);
+    }
   }
 
   /**
    * Swaps a ship's hull in place when its rank or colors have changed (a ship
    * learns it runs a local model after it spawns). The asset root the scene
    * holds (directly, or under its fallback dart) stays the same node, and the
-   * new hull shows the visibility focus mode gave the old one. Resolves to the
+   * new hull lands as focus mode's fade shows the ship (fade). Resolves to the
    * root once swapped, else null (no model yet, same look, or superseded).
    * @param {Ship} ship
    * @returns {Promise<BABYLON.Mesh | null>}

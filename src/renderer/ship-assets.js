@@ -18,13 +18,18 @@
  *   triangles: number }} HullRecord
  * @typedef {{ file: string, lod: 'far' | 'near' | null, model?: ShipModel }} HullFile
  * @typedef {HullFile & { record: HullRecord }} HullAsset
- * @typedef {{ root: BABYLON.Mesh, correction: BABYLON.TransformNode, hull: HullEntry, asset: HullAsset,
- *   ship: any, visibility: number, triangles: number, look: string, wanted: string,
- *   fallback: BABYLON.AbstractMesh | null }} ShipEntry `asset`, `ship` and `visibility` are what
- *   its hull was last built from, so a fade rebuilds that hull exactly
+ * @typedef {{ roots: BABYLON.TransformNode[], meshes: BABYLON.AbstractMesh[] }} HullTemplate a hidden
+ *   copy of a hull that ships draw as instances of, and its meshes
+ * @typedef {{ root: BABYLON.Mesh, correction: BABYLON.TransformNode, own: HullTemplate | null,
+ *   hull: HullEntry, asset: HullAsset, ship: any, triangles: number, look: string, wanted: string,
+ *   fallback: BABYLON.AbstractMesh | null }} ShipEntry `asset` and `ship` are what its hull was last
+ *   built from, so a fade can rebuild that hull exactly; `own` is the template of its own it is
+ *   built on while focus mode shows it apart
  * @typedef {{ containers: Map<string, HullRecord>, materials: Map<string, any>,
- *   templates: Map<string, BABYLON.TransformNode[]>, ships: Map<string, ShipEntry>,
- *   triangles: number, disposed: boolean }} SceneState
+ *   templates: Map<string, HullTemplate>, ships: Map<string, ShipEntry>, triangles: number,
+ *   visibility: number, apart: { shipId: string, visibility: number } | null,
+ *   disposed: boolean }} SceneState `visibility` is the fleet's, which every template shows, and
+ *   `apart` the one ship focus mode shows at a visibility of its own (AUR.ships.fade)
  * @typedef {object} ShipAssetsCore shared by the ship-assets*.js files as AUR.shipAssets
  * @property {(key: string, message: string) => void} logOnce
  * @property {Promise<ShipManifest | null>} manifestPromise
@@ -32,6 +37,8 @@
  * @property {WeakMap<object, SceneState>} sceneStates
  * @property {(scene: any) => SceneState} stateFor
  * @property {(scene: any, state: SceneState) => boolean} isSceneDisposed
+ * @property {(state: SceneState, ship: any) => number | null} apartVisibility
+ * @property {(state: SceneState, ship: any) => number | null} ownVisibility
  * @property {(scene: any) => 'far' | 'near' | null} viewLod
  * @property {(manifest: ShipManifest | null, ship: Ship) => HullEntry | null} selectHull
  * @property {(hull: HullEntry, lod: 'far' | 'near') => HullFile[]} hullFiles
@@ -121,11 +128,24 @@
     if (!state) {
       state = {
         containers: new Map(), materials: new Map(), templates: new Map(), ships: new Map(),
-        triangles: 0, disposed: false,
+        triangles: 0, visibility: 1, apart: null, disposed: false,
       };
       sceneStates.set(scene, state);
     }
     return state;
+  }
+
+  // What focus mode's fade shows of a ship apart from the fleet, or null when it shows the fleet's.
+  function apartVisibility(state, ship) {
+    const { apart } = state;
+    return apart && apart.shipId === String(ship.id) ? apart.visibility : null;
+  }
+
+  // The visibility of the template of its own a ship's hull is built on, or null for the fleet's
+  // template of its look. A hidden ship (0) is disabled, never built on a template at 0.
+  function ownVisibility(state, ship) {
+    const visibility = apartVisibility(state, ship);
+    return visibility === null || visibility === 0 || visibility === state.visibility ? null : visibility;
   }
 
   // ---------- hull choice ----------
@@ -270,7 +290,7 @@
 
   /** @type {ShipAssetsCore} */
   const core = {
-    logOnce, manifestPromise, sceneStates, stateFor, isSceneDisposed,
+    logOnce, manifestPromise, sceneStates, stateFor, isSceneDisposed, apartVisibility, ownVisibility,
     settledManifest: () => (manifestSettled ? manifestValue : null),
     viewLod, selectHull, hullFiles, ensureContainer, fitsBudget, resolveAsset,
   };

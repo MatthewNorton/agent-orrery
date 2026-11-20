@@ -1,24 +1,22 @@
 'use strict';
 
 // The system view's focus part (src/renderer/scene/system/focus.js) on the real Babylon build: what
-// focus mode shows of each ship. AUR.ships records the visibility each hull was moved to.
+// focus mode shows of each ship. AUR.ships records the fades it is asked for: the hulls are its own.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const BABYLON = require('babylonjs');
 const { onNullScene } = require('../scripts/lib/ship-fingerprint.js');
-const { loadUtilLayer, readRenderer, runRenderer } = require('./support/renderer-source');
+const { loadUtilLayer, runRenderer } = require('./support/renderer-source');
 
 function loadFocus(scene) {
   const window = { matchMedia: () => ({ matches: false }) };
   const AUR = loadUtilLayer(window, BABYLON);
   AUR.sceneParts = { system: {} };
-  const hulls = new Map(); // ship id -> the visibility its hull shows (each is built at 1)
-  const moves = []; // [id, visibility] per rebuilt hull: AUR.ships.fade rebuilds only for a new visibility
+  const fades = []; // [visibility, apart] per AUR.ships.fade
   AUR.ships = {
-    fade(_scene, id, visibility) {
-      if ((hulls.get(id) ?? 1) !== visibility) moves.push([id, visibility]);
-      hulls.set(id, visibility);
-      return true;
+    fade(on, visibility, apart) {
+      assert.equal(on, scene);
+      fades.push([visibility, apart]);
     },
   };
   runRenderer('scene/system/focus.js', { window, BABYLON });
@@ -28,8 +26,7 @@ function loadFocus(scene) {
   });
   const view = { scene, canvas: {}, camera, ships: new Map(), outer: 20, shipFocus: null };
   Object.assign(view, AUR.sceneParts.system.focus(view));
-  // The view's frame moves the hulls focus mode asked for (scene/system/view.js).
-  return { view, hulls, moves, frame: () => view.applyHullFades() };
+  return { view, fades };
 }
 
 function hiddenTemplate(scene, size = 1) {
@@ -90,72 +87,45 @@ function swapHull(scene, rec, template, hullId) {
 const shown = (rec) => [...new Set([...rec.mesh.getChildMeshes(false), rec.mesh].filter((node) => !node.isAnInstance)
   .concat(rec.plumes.map((plume) => plume.trail)).map((node) => node.visibility))];
 
-test('focus mode fades the other ships\' hulls and hides the followed one from inside, and clearing restores every ship', () =>
+// AUR.ships fades every hull, those built later too, so focus mode asks it once per change of focus
+// and fades only the meshes of a ship's own.
+test('focus mode fades the other ships and hides the followed one from inside, and clearing restores every ship', () =>
   onNullScene(BABYLON, (scene) => {
-    const { view, hulls, frame } = loadFocus(scene);
+    const { view, fades } = loadFocus(scene);
     const template = hiddenTemplate(scene);
     const recs = [addShip(scene, view, template, 'a'), addShip(scene, view, template, 'b', { dart: true }), addShip(scene, view, template, 'c')];
     recs[2].suffix.text = '· needs you';
 
     assert.equal(view.focusShip('a', { exterior: true }), true);
-    frame();
-    assert.deepEqual(Object.fromEntries(hulls), { a: 1, b: 0.16, c: 0.16 }, 'outside: the followed hull in full, the others faded');
+    assert.deepEqual(fades.splice(0), [[0.16, { shipId: 'a', visibility: 1 }]], 'outside: the followed hull in full, the others faded');
     assert.deepEqual(recs.map(shown), [[1], [0.16], [0.16]], 'the meshes of their own fade with them');
     assert.ok(recs.every((rec) => !rec.label.isVisible && !rec.suffix.isVisible), 'labels hidden');
 
     view.setShipFocus({ exterior: false });
-    frame();
-    assert.deepEqual(Object.fromEntries(hulls), { a: 0, b: 0.16, c: 0.16 }, 'inside: the followed hull hidden');
+    assert.deepEqual(fades.splice(0), [[0.16, { shipId: 'a', visibility: 0 }]], 'inside: the followed hull hidden');
     assert.deepEqual(shown(recs[0]), [0]);
 
     const built = addShip(scene, view, template, 'd'); // a ship that spawns during focus
     view.applyShipFocusVisual(built);
-    frame();
-    assert.equal(hulls.get('d'), 0.16);
+    assert.deepEqual([fades.length, shown(built)], [0, [0.16]], 'its hull is built faded; its meshes fade here');
 
     // Following another ship: app/agent-focus.js leaves focus and enters it again.
     view.clearShipFocus();
     assert.equal(view.focusShip('b', { exterior: true }), true);
-    frame();
-    assert.deepEqual(Object.fromEntries(hulls), { a: 0.16, b: 1, c: 0.16, d: 0.16 });
+    assert.deepEqual(fades.splice(0), [[1, undefined], [0.16, { shipId: 'b', visibility: 1 }]]);
+    assert.deepEqual(recs.map(shown), [[0.16], [1], [0.16]]);
     const late = addShip(scene, view, template, 'e');
     view.applyShipFocusVisual(late);
 
     view.clearShipFocus();
-    frame();
-    assert.deepEqual(Object.fromEntries(hulls), { a: 1, b: 1, c: 1, d: 1, e: 1 }, 'every ship restored, those built during focus too');
-    assert.deepEqual([...view.ships.values()].map(shown), [[1], [1], [1], [1], [1]]);
+    view.clearShipFocus();
+    assert.deepEqual(fades.splice(0), [[1, undefined]], 'every hull restored, once');
+    assert.deepEqual([...view.ships.values()].map(shown), [[1], [1], [1], [1], [1]], 'every ship restored, those built during focus too');
     assert.ok([...view.ships.values()].every((rec) => rec.label.isVisible), 'labels back');
     assert.deepEqual([...view.ships.values()].map((rec) => rec.suffix.isVisible), [false, false, true, false, false],
       'an attention suffix shows again when it has text');
     assert.deepEqual([...view.ships.values()].flatMap((rec) => rec.writes), [], 'no visibility is set on an instance');
     assert.equal(view.shipFocus, null);
-  }));
-
-// Each move rebuilds a hull's instances (AUR.ships.fade), so the frame moves only the hulls whose
-// visibility focus mode changed.
-test('following another ship rebuilds only the two hulls that change, and a view left before its next frame rebuilds none', () =>
-  onNullScene(BABYLON, (scene) => {
-    const { view, hulls, moves, frame } = loadFocus(scene);
-    const template = hiddenTemplate(scene);
-    for (const id of ['a', 'b', 'c', 'd']) addShip(scene, view, template, id);
-    view.focusShip('a', { exterior: true });
-    frame();
-    assert.deepEqual(moves.splice(0), [['b', 0.16], ['c', 0.16], ['d', 0.16]]);
-
-    // app/agent-focus.js follows another ship by leaving focus and entering it again.
-    view.clearShipFocus();
-    view.focusShip('b', { exterior: true });
-    frame();
-    assert.deepEqual(moves.splice(0), [['a', 0.16], ['b', 1]], 'the old ship fades, the new one shows; the rest stay');
-
-    // Leaving the view: app/boot.js leaves focus, then disposes the view, which clears it again.
-    view.clearShipFocus();
-    view.clearShipFocus();
-    assert.deepEqual(moves, [], 'no hull is rebuilt for a scene that is going away');
-    assert.deepEqual(Object.fromEntries(hulls), { a: 0.16, b: 1, c: 0.16, d: 0.16 });
-    frame(); // a view that stays on screen restores them on its next frame
-    assert.deepEqual(moves.splice(0), [['a', 1], ['c', 1], ['d', 1]]);
   }));
 
 // The chase camera stands back in proportion to the hull's diagonal (CHASE.distance in focus.js).
@@ -187,8 +157,3 @@ test('the chase camera measures a hull again when a promotion swaps it in place,
     view.focusShip('c', { exterior: true });
     near(back(arrived), unit, 'the hull, not the anchor before it');
   }));
-
-test('the system view moves the hulls each frame after the ships, before the chase camera measures one', () => {
-  assert.match(readRenderer('scene/system/view.js'),
-    /view\.animateShips\(dt, now, t\);\s+view\.applyHullFades\(\);\s+if \(view\.shipFocus\) view\.updateShipFocusCamera\(false, dt\);/);
-});

@@ -46,6 +46,7 @@ class Color {
 function loadShipAssets(manifest, trianglesByFile, materials = ['hull_primary', 'accent_energy']) {
   const loads = [];
   const built = []; // the ship id of every hull built, in order
+  const parts = []; // every template part made from a hull file
   let clones = 0;
   let held = null; // while a test holds the loads (hold()), each waits on this
   class Vector {
@@ -169,6 +170,7 @@ function loadShipAssets(manifest, trianglesByFile, materials = ['hull_primary', 
         if (textured) part.material.albedoTexture = { name: name + '_map' };
         if (albedo) part.material.albedoColor = new Color(albedo);
         part.parent = root;
+        parts.push(part);
       }
       return { rootNodes: [root] };
     },
@@ -197,6 +199,8 @@ function loadShipAssets(manifest, trianglesByFile, materials = ['hull_primary', 
     loads,
     // The ship ids of the hulls built since the last call.
     built: () => built.splice(0),
+    // The parts of every template made from a hull file and not disposed.
+    templates: () => parts.filter((part) => !part.disposed),
     materialClones: () => clones,
     InstancedMesh,
     containerFor,

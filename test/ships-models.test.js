@@ -101,19 +101,22 @@ test('in a system every Petrel of a provider is an instance of one template, lit
     const template = hullOf(a).sourceMesh;
     assert.equal(hullOf(b).sourceMesh, template, 'one template for the provider');
     assert.equal(template.isVisible, false);
-    assert.deepEqual(hullOf(a).lightSources.map((light) => light.name).sort(), ['model-fill', 'model-rim', 'model-sun'],
-      'an instance is lit as its template is');
+    const lights = (mesh) => mesh.lightSources.map((light) => light.name).sort();
+    assert.deepEqual(lights(hullOf(a)), ['model-fill', 'model-rim', 'model-sun'], 'an instance is lit as its template is');
     const blends = (mesh) => mesh.material.subMaterials.map((finish) => finish.needAlphaBlendingForMesh(mesh));
+    assert.ok(!blends(hullOf(a)).some(Boolean), 'no finish blends in full');
 
-    assert.equal(AUR.ships.fade(scene, 'a', 0.16), true);
-    assert.notEqual(hullOf(a).sourceMesh, template);
-    assert.equal(hullOf(a).visibility, 0.16);
-    assert.ok(blends(hullOf(a)).every(Boolean), 'every finish of the faded ship blends');
-    assert.ok(!blends(hullOf(b)).some(Boolean), 'and none of the others');
-    AUR.ships.fade(scene, 'a', 0);
-    assert.equal(hullOf(a).visibility, 0, 'hidden from inside: Babylon skips a mesh at visibility 0');
-    AUR.ships.fade(scene, 'a', 1);
-    assert.equal(hullOf(a).sourceMesh, template, 'restored');
+    AUR.ships.fade(scene, 0.16, { shipId: 'a', visibility: 1 });
+    assert.deepEqual([hullOf(b).sourceMesh, hullOf(b).visibility], [template, 0.16], 'the fleet fades on its template');
+    assert.ok(blends(hullOf(b)).every(Boolean), 'every finish of a faded ship blends');
+    const own = hullOf(a).sourceMesh;
+    assert.ok(own !== template && hullOf(a).visibility === 1 && !blends(hullOf(a)).some(Boolean), 'the followed ship, apart and in full');
+    assert.deepEqual(lights(hullOf(a)), ['model-fill', 'model-rim', 'model-sun'], 'and lit as the fleet is');
+    AUR.ships.fade(scene, 0.16, { shipId: 'a', visibility: 0 });
+    assert.ok(!hullOf(a).isEnabled() && hullOf(b).isEnabled(), 'hidden from inside: a disabled mesh is never drawn');
+    AUR.ships.fade(scene, 1);
+    assert.deepEqual([hullOf(a).sourceMesh, template.visibility, own.isDisposed()], [template, 1, true], 'restored');
+    assert.ok(hullOf(a).isEnabled());
   }));
 
 // Babylon sorts a frame's blended sub-meshes by alphaIndex, then back to front; an instance batch
@@ -121,7 +124,7 @@ test('in a system every Petrel of a provider is an instance of one template, lit
 test('a faded fleet draws after every other blended mesh, from either side of the sun', () =>
   onSystem(async (scene, AUR, fly) => {
     const a = await fly('a');
-    AUR.ships.fade(scene, 'a', 0.16);
+    AUR.ships.fade(scene, 0.16);
     const template = hullOf(a).sourceMesh;
     const glow = Object.assign(BABYLON.MeshBuilder.CreatePlane('sun-glow', { size: 40 }, scene), { material: new BABYLON.StandardMaterial('glow', scene) });
     const camera = new BABYLON.UniversalCamera('camera', BABYLON.Vector3.Zero(), scene);
