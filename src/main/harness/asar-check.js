@@ -41,15 +41,21 @@ const HELD_TRIES = 5, HELD_WAIT_MS = 100;
  * every one when the folder could not be made; `errors` holds what each step threw, and names the
  * folder when it cannot be removed (an archive held open keeps it). It never rejects.
  * @param {typeof fs.promises} [files] the fs to check, Electron's own by default
- * @param {{ wait?: (ms: number) => Promise<unknown> }} [options] how it waits between tries
+ * @param {{ wait?: (ms: number) => Promise<unknown> } | null} [options] how it waits between tries;
+ *   null is none
  * @returns {Promise<{ lstatFile: boolean, direntFile: boolean, deleted: boolean, errors: string[] }>}
  */
-async function asarCheck(files = fs.promises, { wait = driver.wait } = {}) {
+async function asarCheck(files = fs.promises, options = {}) {
+  const { wait = driver.wait } = options || {};
   /** @type {string[]} */
   const errors = [];
+  // What a step threw, as text: String() takes any value, and whatever cannot be read is said so.
+  const describe = (/** @type {any} */ error) => {
+    try { return String(error && error.message); } catch { return 'an error with no readable text'; }
+  };
   /** @template T @param {string} name @param {() => Promise<T>} step @returns {Promise<T | false>} */
   const run = async (name, step) => {
-    try { return await step(); } catch (error) { errors.push(`${name}: ${error && error.message}`); return false; }
+    try { return await step(); } catch (error) { errors.push(`${name}: ${describe(error)}`); return false; }
   };
   /** @template T @param {() => Promise<T>} call @returns {Promise<T>} */
   const held = async (call) => {
@@ -87,9 +93,7 @@ async function asarCheck(files = fs.promises, { wait = driver.wait } = {}) {
     return (await files.readdir(dir)).length === 0;
   });
   const removal = { recursive: true, force: true, maxRetries: HELD_TRIES - 1, retryDelay: HELD_WAIT_MS };
-  await files.rm(dir, removal).catch((error) => {
-    errors.push(`cleanup: ${dir} stays: ${error && error.message}`);
-  });
+  await run(`cleanup: ${String(dir)} stays`, () => files.rm(dir, removal));
   return { lstatFile, direntFile, deleted, errors };
 }
 

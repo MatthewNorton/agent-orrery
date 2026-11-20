@@ -92,14 +92,14 @@ test('asar check: an fs that opens archives fails every step it gets wrong, and 
 test('asar check: a temporary folder it cannot remove is named in its errors', async () => {
   // As on Windows with asar handling on, where the archive the fs opened keeps the folder.
   let kept = null;
-  const result = await asarCheck({
-    ...fs.promises,
-    async rm(dir) {
-      kept = dir;
-      throw Object.assign(new Error(`EBUSY: resource busy or locked, rmdir '${dir}'`), { code: 'EBUSY' });
-    },
-  });
   try {
+    const result = await asarCheck({
+      ...fs.promises,
+      async rm(dir) {
+        kept = dir;
+        throw Object.assign(new Error(`EBUSY: resource busy or locked, rmdir '${dir}'`), { code: 'EBUSY' });
+      },
+    });
     assert.ok(kept, 'the check removes its folder through the fs it checks');
     assert.deepEqual([result.lstatFile, result.direntFile, result.deleted], [true, true, true]);
     assert.deepEqual(result.errors, [`cleanup: ${kept} stays: EBUSY: resource busy or locked, rmdir '${kept}'`]);
@@ -126,4 +126,20 @@ test('asar check: the valid archive is one Electron could open: its header pickl
   assert.deepEqual([bytes.readUInt32LE(0), bytes.readUInt32LE(8), headerSize % 4], [4, headerSize - 4, 0]);
   assert.deepEqual(index, { files: { 'a.txt': { size: 5, offset: '0' } } });
   assert.equal(bytes.subarray(8 + headerSize).toString(), 'hello');
+});
+
+test('asar check: it never rejects: options given as null, an rm that throws as it is called, an error with no string', async () => {
+  assert.deepEqual(await asarCheck(fs.promises, null), { lstatFile: true, direntFile: true, deleted: true, errors: [] });
+  let kept = null;
+  try {
+    const result = await asarCheck({
+      ...fs.promises,
+      lstat: async () => { throw { message: Symbol('odd') }; },
+      rm(dir) { kept = dir; throw new Error('no rm here'); },
+    });
+    assert.ok(kept, 'the check removes its folder through the fs it checks');
+    assert.deepEqual(result.errors, ['lstat: Symbol(odd)', `cleanup: ${kept} stays: no rm here`]);
+  } finally {
+    if (kept) fs.rmSync(kept, { recursive: true, force: true });
+  }
 });
