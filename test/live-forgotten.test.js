@@ -9,16 +9,14 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { canonicalProjectPath } = require('../src/main/provider-adapters');
 const {
-  CODEX_SESSION, MIN, SLUG, T0, appendJsonl, claude, codex, createWorld, writeState,
+  CODEX_SESSION, MIN, SLUG, T0, appendJsonl, claude, codex, createWorld, readState, writeState,
 } = require('./support/transcripts');
 
 function ids(tracker) {
   return tracker.snapshot().projects.map((project) => project.id).sort();
 }
 
-function savedState(w) {
-  return JSON.parse(fs.readFileSync(w.statePath, 'utf8'));
-}
+const savedState = (w) => readState(w.statePath);
 
 test('a forgotten project stays gone across scans and restarts while its transcripts are older', (t) => {
   const w = createWorld(t);

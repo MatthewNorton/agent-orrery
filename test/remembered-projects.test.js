@@ -9,7 +9,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { loadState } = require('../src/main/live/state-file');
 const { canonicalProjectPath } = require('../src/main/provider-adapters');
-const { createWorld, writeState } = require('./support/transcripts');
+const { createWorld, readState, writeState } = require('./support/transcripts');
 
 test('a version 1 file with no transcripts left still yields its projects, folder casing restored', (t) => {
   const w = createWorld(t);
@@ -40,7 +40,7 @@ test('a version 1 file with no transcripts left still yields its projects, folde
   assert.equal(gone.lastActivity, 2000);
 
   assert.ok(tracker.saveState(true));
-  const saved = JSON.parse(fs.readFileSync(w.statePath, 'utf8'));
+  const saved = readState(w.statePath);
   assert.equal(saved.version, 2);
   assert.equal(saved.projects['demo-app'].name, 'Demo-App');
   assert.equal(path.basename(saved.projects['demo-app'].path), 'Demo-App');
@@ -66,9 +66,9 @@ test('loading keeps the file it found as the backup for the whole run', (t) => {
   tracker.start();
   assert.ok(tracker.saveState(true));
   assert.ok(tracker.saveState(true));
-  const backup = JSON.parse(fs.readFileSync(w.statePath + '.bak', 'utf8'));
+  const backup = readState(w.statePath + '.bak');
   assert.deepEqual(backup.projects, { kept: { totalBuilds: 3, firstSeen: 1 } });
-  assert.equal(JSON.parse(fs.readFileSync(w.statePath, 'utf8')).projects.kept.totalBuilds, 3);
+  assert.equal(readState(w.statePath).projects.kept.totalBuilds, 3);
 });
 
 test('an unreadable file falls back to its backup; a missing one starts empty', (t) => {
