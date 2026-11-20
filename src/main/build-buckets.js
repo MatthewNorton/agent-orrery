@@ -61,7 +61,12 @@ function bucketKey(project, name) {
   // Security: a transcript can start a bucket per edit. A case-sensitive root has the exact key
   // or none, so a miss there looks nothing up; a root that ignores case asks the index of the
   // keys, which is one lookup however many buckets there are.
-  return ignoresCase(project.path) ? foldedKeys(project.buckets).get(fold(name)) ?? null : null;
+  if (!ignoresCase(project.path)) return null;
+  const key = foldedKeys(project.buckets).get(fold(name)) ?? null;
+  // A key the index names and the object no longer has was removed past setBucket: the index is
+  // built again, once, and asked again.
+  if (key === null || Object.hasOwn(project.buckets, key)) return key;
+  return foldedKeys(project.buckets, true).get(fold(name)) ?? null;
 }
 
 /**
@@ -69,15 +74,16 @@ function bucketKey(project, name) {
  * first miss and kept on the object, where setBucket adds each new key: so every write of a bucket
  * goes through setBucket (test/build-buckets.test.js looks for one that does not).
  * @param {Record<string, number>} buckets
+ * @param {boolean} [again] build it anew, whatever the object keeps
  * @returns {Map<string, string>}
  */
-function foldedKeys(buckets) {
+function foldedKeys(buckets, again = false) {
   /** @type {Map<string, string> | undefined} */
   let index = /** @type {any} */ (buckets)[FOLDED];
-  if (index) return index;
+  if (index && !again) return index;
   index = new Map();
   for (const key of Object.keys(buckets)) addFolded(index, key);
-  if (Object.isExtensible(buckets)) Object.defineProperty(buckets, FOLDED, { value: index });
+  if (Object.isExtensible(buckets) || Object.hasOwn(buckets, FOLDED)) Object.defineProperty(buckets, FOLDED, { value: index, configurable: true });
   return index;
 }
 

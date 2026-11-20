@@ -176,38 +176,84 @@ test('addBuckets puts each count under the key its folder has, by the rule of th
   assert.deepEqual(own(summed.buckets), [['docs', 7], ['SRC', 1], ['lib', 5], ['__proto__', 4]]);
 });
 
+test('a key removed past setBucket is not answered from the index of the keys', () => {
+  const project = { path: 'C:\\Work\\Demo', buckets: {} };
+  countBuild(project, 'Docs');
+  countBuild(project, 'src');
+  assert.equal(bucketKey(project, 'docs'), 'Docs');
+  delete project.buckets.Docs; // not how src/main removes one (it never does): the scan below sees to that
+  assert.deepEqual([bucketKey(project, 'docs'), bucketKey(project, 'DOCS'), bucketKey(project, 'SRC')], [null, null, 'src']);
+  assert.equal(countBuild(project, 'docs'), true, 'the folder starts again');
+  assert.deepEqual([bucketKey(project, 'DOCS'), own(project.buckets)], ['docs', [['src', 1], ['docs', 1]]]);
+  // Removed, with another casing put in its place: the index is built again from what is there.
+  delete project.buckets.docs;
+  Object.defineProperty(project.buckets, 'DOCS', { value: 4, writable: true, enumerable: true, configurable: true });
+  assert.deepEqual([bucketKey(project, 'docs'), bucketBuilds(project, 'Docs')], ['DOCS', 4]);
+});
+
+// The lines of `source` that write a key of a buckets object: through a name that ends in
+// `buckets`, or through another name the object was given (`const b = project.buckets`,
+// `{ buckets: b }`, and a name given one of those).
+function bucketWrites(source) {
+  const lines = source.split('\n').map((line) => (/^\s*(\/\/|\/?\*)/.test(line) ? '' : line));
+  const ASSIGN = '(?:=(?![=>])|\\+=|-=|\\*=|\\+\\+|--|\\|\\|=|&&=|\\?\\?=)';
+  const TO = '(?:assign|defineProperty|defineProperties|setPrototypeOf|set|deleteProperty)';
+  // Through a name that ends in `buckets`, with anything before it (project.buckets, a call's result).
+  const writes = [
+    new RegExp(`buckets\\s*(?:\\[[^\\]]*\\]|\\.[\\w$]+)\\s*${ASSIGN}`),
+    /(?:\+\+|--)\s*[\w.$#]*buckets\s*[[.]/,
+    /\bdelete\s+[^;]*buckets\s*[[.]/,
+    new RegExp(`\\b(?:Object|Reflect)\\.${TO}\\(\\s*[^,()]*buckets\\b[^,()]*[,)]`),
+  ];
+  // Through another name the object was given.
+  const writesOf = (name) => [
+    new RegExp(`(?<![\\w.$])${name}\\s*(?:\\[[^\\]]*\\]|\\.[\\w$]+)\\s*${ASSIGN}`),
+    new RegExp(`(?:\\+\\+|--)\\s*${name}\\s*[\\[.]`),
+    new RegExp(`\\bdelete\\s+${name}\\s*[\\[.]`),
+    new RegExp(`\\b(?:Object|Reflect)\\.${TO}\\(\\s*${name}\\b[^,()]*[,)]`),
+  ];
+  const names = new Set();
+  for (const line of lines) {
+    const given = line.match(/\b(?:const|let|var)\s+(\w+)\s*=\s*[^;]*\bbuckets\b\s*(?:(?:\|\||\?\?)\s*\{\s*\})?\s*;?\s*$/) || line.match(/\bbuckets\s*:\s*(\w+)\s*[,}]/);
+    if (given && !given[1].endsWith('buckets')) names.add(given[1]);
+  }
+  for (let size = -1; size !== names.size;) {
+    size = names.size;
+    for (const line of lines) {
+      const given = line.match(/\b(?:const|let|var)\s+(\w+)\s*=\s*(\w+)\s*;/);
+      if (given && names.has(given[2])) names.add(given[1]);
+    }
+  }
+  for (const name of names) writes.push(...writesOf(name));
+  return lines.map((line, index) => [index + 1, line.trim()]).filter(([, line]) => line && writes.some((write) => write.test(line)));
+}
+
 test('every write of a bucket in src/main goes through setBucket', () => {
   // setBucket keeps the index of a buckets object in step; a write past it would leave a key the
   // lookups under a root that ignores case never find.
-  const WRITES = [
-    /buckets\s*\[[^\]]*\]\s*(?:=(?!=)|\+=|-=|\+\+|--|\|\|=|&&=|\?\?=)/,
-    /(?:\+\+|--)\s*[\w.$]*buckets\s*\[/,
-    /delete\s+[\w.$]*buckets\b/,
-    /Object\.(?:assign|defineProperty|defineProperties|setPrototypeOf)\(\s*[\w.$]*buckets\b/,
-    /Reflect\.(?:set|defineProperty|deleteProperty)\(\s*[\w.$]*buckets\b/,
-  ];
   const main = path.join(__dirname, '..', 'src', 'main');
   const files = fs.readdirSync(main, { recursive: true }).map(String).filter((file) => file.endsWith('.js'));
   assert.ok(files.length > 50, 'src/main was read');
-  const found = [];
-  for (const file of files) {
-    fs.readFileSync(path.join(main, file), 'utf8').split('\n').forEach((line, index) => {
-      if (/^\s*(\/\/|\*)/.test(line) || !WRITES.some((write) => write.test(line))) return;
-      found.push(`${file.replace(/\\/g, '/')}:${index + 1}: ${line.trim()}`);
-    });
-  }
+  const found = files.flatMap((file) => bucketWrites(fs.readFileSync(path.join(main, file), 'utf8'))
+    .map(([, line]) => `${file.replace(/\\/g, '/')}: ${line.replace(/\{.*$/, '')}`));
   // build-buckets.js has two: the index it hangs on the object, and setBucket's own.
-  assert.deepEqual(found.map((line) => line.replace(/:\d+:/, ':').replace(/\{.*$/, '')), [
-    'build-buckets.js: if (Object.isExtensible(buckets)) Object.defineProperty(buckets, FOLDED, ',
+  assert.deepEqual(found, [
+    'build-buckets.js: if (Object.isExtensible(buckets) || Object.hasOwn(buckets, FOLDED)) Object.defineProperty(buckets, FOLDED, ',
     'build-buckets.js: Object.defineProperty(buckets, key, ',
   ]);
-  // And the patterns do see a write.
-  for (const line of ['project.buckets[name] = 1;', 'p.buckets[key] += n', 'buckets[k]++', 'delete project.buckets[key]',
-    'Object.assign(project.buckets, more)', '++buckets[name]']) {
-    assert.equal(WRITES.some((write) => write.test(line)), true, line);
+  // And the scan does see a write: through the name, and through another name for the object.
+  const seen = (source) => bucketWrites(source).map(([line]) => line);
+  for (const line of ['project.buckets[name] = 1;', 'p.buckets[key] += n', 'buckets[k]++', 'delete project.buckets[key]', 'delete (model.projects.get(id)).buckets[key];',
+    'Object.assign(project.buckets, more)', 'Object.assign(existing.buckets ?? {}, saved)', '++buckets[name]', 'buckets.docs = 2;', 'Reflect.set(project.buckets, key, 1)']) {
+    assert.deepEqual(seen(line), [1], line);
   }
-  for (const line of ['if (project.buckets[key] === 1) return;', 'Object.assign(Object.create(null), project.buckets)', 'const n = buckets[key] || 0;']) {
-    assert.equal(WRITES.some((write) => write.test(line)), false, line);
+  assert.deepEqual(seen('const b = project.buckets;\nb[key] = 1;\nconst c = b;\ndelete c[key];\nObject.assign(c, more);\nb.docs++;'), [2, 4, 5, 6], 'an alias, and an alias of it');
+  assert.deepEqual(seen('const held = saved.buckets || {};\nheld[name] ??= 0;'), [2]);
+  assert.deepEqual(seen('const target = { path: root, buckets: folded };\nfolded[name] = 1;\nfolded.x = 2;'), [2, 3], 'an object given as some project\'s buckets');
+  for (const source of ['if (project.buckets[key] === 1) return;', 'Object.assign(Object.create(null), project.buckets)', 'const n = buckets[key] || 0;',
+    'project.buckets = foldBuckets(root, project.buckets);', 'const counted = project.buckets;\nfor (const key of Object.keys(counted)) total += counted[key];',
+    'const same = (key) => a.buckets[key] === b.buckets[key];', '// project.buckets[name] = 1;', 'const b = project.buckets;\nconst n = b[key];\nother[key] = n;']) {
+    assert.deepEqual(seen(source), [], source);
   }
   const buckets = {};
   setBucket(buckets, 'src', 3);
