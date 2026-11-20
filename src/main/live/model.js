@@ -65,7 +65,7 @@ function createLiveModel(statePath, options, publish) {
     files: new Map(),
     claudeTails: new Map(),
     persisted,
-    pathIds: bareCopy(persisted.pathIds || {}),
+    pathIds: bareCopy(persisted.pathIds),
     pathOverrides,
     forgotten: loadForgotten(persisted),
     forgottenSlugs: new Map(),

@@ -16,8 +16,6 @@ function ids(tracker) {
   return tracker.snapshot().projects.map((project) => project.id).sort();
 }
 
-const savedState = (w) => readState(w.statePath);
-
 test('a forgotten project stays gone across scans and restarts while its transcripts are older', (t) => {
   const w = createWorld(t);
   const other = path.join(w.root, 'workspace', 'other');
@@ -34,7 +32,7 @@ test('a forgotten project stays gone across scans and restarts while its transcr
   tracker.scan(false);
   tracker.scan(false);
   assert.deepEqual(ids(tracker), []);
-  const saved = savedState(w);
+  const saved = readState(w.statePath);
   assert.deepEqual(saved.projects, {});
   assert.deepEqual(Object.values(saved.pathIds).sort(), [SLUG, codexId].sort(), 'path keys lead to the records');
   assert.deepEqual(Object.keys(saved.forgotten).sort(), [SLUG, codexId].sort());
@@ -65,7 +63,7 @@ test('newer work brings a forgotten project back as a new system', (t) => {
   assert.deepEqual(back.map((project) => project.id), [SLUG]);
   assert.equal(back[0].totalBuilds, 0, 'the old build history stays forgotten');
   assert.ok(tracker.saveState(true));
-  assert.deepEqual(savedState(w).forgotten, {});
+  assert.deepEqual(readState(w.statePath).forgotten, {});
 });
 
 test('a Claude folder mapped to another id is read once, then skipped by name', (t) => {
@@ -157,13 +155,13 @@ test('a project whose id is __proto__ is saved, restored and forgotten like any 
   assert.deepEqual(ids(tracker), ['__proto__']);
 
   tracker.saveState();
-  assert.deepEqual(Object.keys(savedState(w).projects), ['__proto__'], 'saved as an own key of the file');
+  assert.deepEqual(Object.keys(readState(w.statePath).projects), ['__proto__'], 'saved as an own key of the file');
   const restored = w.live({ claudeProjectsDir: path.join(w.root, 'none') }).tracker;
   assert.deepEqual(restored.snapshot().projects.map((project) => [project.id, project.path]), [['__proto__', w.projectDir]]);
   restored.stop();
 
   tracker.forgetProject('__proto__');
-  const saved = savedState(w);
+  const saved = readState(w.statePath);
   assert.deepEqual([Object.keys(saved.projects), Object.keys(saved.forgotten)], [[], ['__proto__']]);
   assert.deepEqual(Object.getOwnPropertyDescriptor(saved.forgotten, '__proto__').value, { at: T0, path: w.projectDir });
   tracker.scan(false);

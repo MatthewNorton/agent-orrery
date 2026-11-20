@@ -31,7 +31,9 @@ function loadPart(refuse = () => false) {
   });
   runRenderer('scene/system/planets.js', { window });
   const view = {
-    scene: {}, gui: {}, projectId: 'p', orbitR: (i) => 11 + i * 6, planets: new Map(), topNames: ['src'], ringRoot: { name: 'orbitRings' },
+    scene: {}, gui: {}, projectId: 'p', orbitR: (i) => 11 + i * 6, planets: new Map(), ringRoot: { name: 'orbitRings' },
+    // The system as it opened: its three heaviest planets keep their labels up.
+    sys: { planets: [{ name: 'Docs', files: 1 }, { name: 'lib', files: 30 }, { name: 'src', files: 40, builds: 2 }, { name: 'app', files: 20 }] },
     // The world owns its globe: only world.dispose() takes it out of the scene.
     makeWorld: (name) => thing('world', name, { spec: { cls: 'rocky' }, globe: { position: {}, dispose() { throw new Error('the globe is the world\'s to dispose'); } } }),
   };
@@ -122,7 +124,7 @@ function loadSystem(t, { refuseLabel = () => false, refuseMaps = () => false } =
   const service = AUR.worlds.textures.create();
   const scene = { isDisposed: false, getEngine: () => ({ getCaps: () => ({ maxAnisotropy: 16 }) }), onDisposeObservable: { addOnce() {} } };
   const view = {
-    scene, gui: {}, projectId: 'p', orbitR: (i) => 11 + i * 6, planets: new Map(), topNames: [], ringRoot: {},
+    scene, gui: {}, projectId: 'p', orbitR: (i) => 11 + i * 6, planets: new Map(), sys: { planets: [] }, ringRoot: {},
     glow: babylon.glow(), sun: { material: {} }, sunHex: '#ffffff', sunDia: 6, worldMaps: service, quality: { key: 'high' },
   };
   Object.assign(view, AUR.sceneParts.system.worlds(view), AUR.sceneParts.system.planets(view));

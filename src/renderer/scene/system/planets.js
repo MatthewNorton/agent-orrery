@@ -7,7 +7,11 @@
   const AUR = window.AUR;
 
   AUR.sceneParts.system.planets = function (view) {
-    const { scene, gui, projectId, orbitR, planets, topNames, ringRoot } = view;
+    const { scene, gui, projectId, orbitR, planets, ringRoot } = view;
+    // The three heaviest planets of the system as it opened keep their labels up.
+    const topNames = (view.sys.planets || []).slice()
+      .sort((a, b) => AUR.planetWeight(b) - AUR.planetWeight(a))
+      .slice(0, 3).map((p) => p.name);
 
     // The planet `pd` on orbit `i`, added to the view's planets. One that cannot be finished is
     // logged and answered with null, and leaves nothing in the scene: a ring or a globe left

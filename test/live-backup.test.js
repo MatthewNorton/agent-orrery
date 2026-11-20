@@ -11,7 +11,7 @@ const { setProjectPath } = require('../src/main/build-buckets');
 const { parseBackup } = require('../src/main/live/backup');
 const { adoptProjectPath } = require('../src/main/live/projects');
 const { ignoresCase } = require('../src/main/path-safety');
-const { CASED_COUNTS, KEPT_APART, KEPT_AS_ONE, KEPT_LARGER } = require('./support/bucket-cases');
+const { CASED_COUNTS, own, KEPT_APART, KEPT_AS_ONE, KEPT_LARGER } = require('./support/bucket-cases');
 const { projectsById } = require('./support/live-session');
 const { MIN, T0, appendJsonl, claude, createWorld, readState, writeState } = require('./support/transcripts');
 
@@ -41,7 +41,7 @@ test('an export imported into an empty universe brings back every project, path 
   assert.equal(projects.get('demo').exists, true);
   assert.equal(projects.get('demo').totalBuilds, 4);
   assert.deepEqual({ ...target.model.projects.get('moved').buckets }, { lib: 2 });
-  const saved = JSON.parse(fs.readFileSync(freshState, 'utf8'));
+  const saved = readState(freshState);
   assert.deepEqual(Object.keys(saved.projects).sort(), ['demo', 'moved']);
   assert.equal(saved.pathOverrides.moved, moved);
 });
@@ -93,13 +93,13 @@ test('a folder named __proto__, constructor or prototype keeps its builds throug
     } }
   }`);
   assert.deepEqual(tracker.importBackup(backup), { added: 1, merged: 1 });
-  const own = (id) => {
+  const ownOf = (id) => {
     const { buckets } = tracker.model.projects.get(id);
     assert.equal(Object.getPrototypeOf(buckets), Object.prototype, id);
-    return Object.keys(buckets).sort().map((name) => [name, Object.getOwnPropertyDescriptor(buckets, name).value]);
+    return own(buckets).sort();
   };
-  assert.deepEqual(own('kept'), [['__proto__', 4], ['constructor', 2], ['prototype', 1], ['src', 3]]);
-  assert.deepEqual(own('fresh'), [['__proto__', 5]]);
+  assert.deepEqual(ownOf('kept'), [['__proto__', 4], ['constructor', 2], ['prototype', 1], ['src', 3]]);
+  assert.deepEqual(ownOf('fresh'), [['__proto__', 5]]);
   assert.deepEqual(projectsById(tracker).get('fresh').planets, ['__proto__']);
 
   // And out again: the export of that universe, imported into an empty one.
@@ -258,7 +258,7 @@ test('a project whose id is __proto__ or constructor goes out in an export and c
   assert.deepEqual([...projectsById(empty)].map(([id, project]) => [id, project.path]).sort(),
     [['__proto__', dirs.__proto__], ['constructor', dirs.constructor]]);
   // The import saved them, as own keys of the file.
-  const saved = JSON.parse(fs.readFileSync(emptyState, 'utf8'));
+  const saved = readState(emptyState);
   assert.deepEqual(Object.keys(saved.projects).sort(), ['__proto__', 'constructor']);
   assert.deepEqual([{}.path, Object.getPrototypeOf(empty.model.pathIds), Object.getPrototypeOf(empty.model.forgotten)], [undefined, null, null]);
 });
@@ -296,7 +296,7 @@ test('hostile ids, names, bucket counts and paths never reach the model', () => 
   assert.equal(projects.get('fine').totalBuilds, 2);
   // A bucket is a folder's name, which may be one of those: an own count, and no prototype.
   const { buckets } = projects.get('fine');
-  assert.deepEqual(Object.keys(buckets).sort().map((name) => [name, Object.getOwnPropertyDescriptor(buckets, name).value]),
+  assert.deepEqual(own(buckets).sort(),
     [['__proto__', 9], ['constructor', 9], ['src', 2]]);
   assert.equal(Object.getPrototypeOf(buckets), Object.prototype);
   assert.deepEqual(backup.pathIds, [['posix:/work/demo', 'fine']]);

@@ -72,14 +72,10 @@
     // The asteroid belt sits between the middle orbits (past the last one in a small system),
     // `beltWidth` across; ships patrol outside it.
     const beltR = planetList.length >= 2 ? (orbitR(Math.floor(planetList.length / 2) - 1) + orbitR(Math.floor(planetList.length / 2))) / 2 : outer + 4;
-    // The three heaviest planets keep their labels up.
-    const topNames = planetList.slice()
-      .sort((a, b) => AUR.planetWeight(b) - AUR.planetWeight(a))
-      .slice(0, 3).map((p) => p.name);
     const ringRoot = new BABYLON.TransformNode('orbitRings', scene); // every orbit ring; Settings turns it off
     ringRoot.setEnabled(ctx.orbitRings);
     const view = {
-      scene, gui, sys, projectId, orbitR, outer, beltR, beltWidth: 3.4, planets, ships, topNames, ringRoot,
+      scene, gui, sys, projectId, orbitR, outer, beltR, beltWidth: 3.4, planets, ships, ringRoot,
       camera, canvas, glow, shipFocus: null, sysBehind: false,
       // The stream the app shows this view in; null once it is closed or another view has its place.
       shown: () => (scene.isDisposed ? null : ctx.shown(scene)),

@@ -61,4 +61,4 @@ function shipOf(tracker, id) {
   return tracker.snapshot().ships.find((ship) => ship.id === id);
 }
 
-module.exports = { PROJECT_KEYS, SHIP_KEYS, start, startClaude, startCodex, projectsById, appendAndPoll, pollAt, sweepAt, shipOf };
+module.exports = { PROJECT_KEYS, SHIP_KEYS, startClaude, startCodex, projectsById, appendAndPoll, pollAt, sweepAt, shipOf };

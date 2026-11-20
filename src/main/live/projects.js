@@ -257,6 +257,7 @@ function remapProjectPath(model, projectId, nextPath) {
   } catch {
     setProjectPath(project, previous.path);
     // The buckets as they were: once joined by the new path's rule, they cannot be told apart again.
+    // Put back after the path, as the very object they were: a fold of them would be a copy.
     project.buckets = previous.buckets;
     project.name = previous.name;
     project.exists = previous.exists;
