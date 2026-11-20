@@ -1,7 +1,7 @@
 'use strict';
 
-// AUR.ships (src/renderer/ship-assets-api.js): a hull refreshed in place on promotion, and the
-// triangle budget. Focus mode's fade is test/ship-assets-api-fade.test.js.
+// AUR.ships (src/renderer/ship-assets-api.js): a hull refreshed in place on promotion, the triangle
+// budget, and a scene's hull state disposed. Focus mode's fade is test/ship-assets-api-fade.test.js.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { readRenderer } = require('./support/renderer-source');
@@ -192,4 +192,19 @@ test('a near view holds fifty-one ships of the first rank and the universe map, 
   };
   assert.equal(await hulled('system'), 51);
   assert.equal(await hulled('universe'), 70);
+});
+
+test('disposing a scene\'s hull state empties it, though a load still waiting holds on to it', async () => {
+  const assets = loadShipAssets(LADDER_MANIFEST, {});
+  const scene = assets.scene('system');
+  await assets.ships.upgrade(scene, ship('a', 0), assets.fallback('a'));
+  assets.ships.fade(scene, 0.16, { shipId: 'a', visibility: 1 }); // a template of its own too
+  const held = assets.hold();
+  const waiting = assets.ships.upgrade(scene, ship('b', 10), assets.fallback('b'));
+  await held.waiting();
+  const state = assets.AUR.shipAssets.sceneStates.get(scene);
+  assets.ships.dispose(scene);
+  held.release();
+  assert.equal(await waiting, null);
+  assert.deepEqual([state.containers.size, state.materials.size, state.templates.size, state.ships.size], [0, 0, 0, 0]);
 });

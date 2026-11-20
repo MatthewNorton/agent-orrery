@@ -116,6 +116,31 @@ test('a hull built while focus mode fades the fleet is built faded, the followed
   assert.deepEqual(assets.built(), ['f', 'h', 'g'], 'a ship that is gone is not rebuilt');
 });
 
+test('a ship shown apart at the fleet\'s visibility stays on the fleet template, and moves back onto it when the fleet comes up to its own', async () => {
+  const assets = loadShipAssets(LADDER_MANIFEST, {});
+  const scene = assets.scene('system');
+  const a = await assets.ships.upgrade(scene, ship('a', 0), assets.fallback('a'));
+  const fleet = templatesOf(a);
+  assets.built();
+  assets.ships.fade(scene, 0.16, { shipId: 'a', visibility: 0.16 });
+  assert.ok(assets.built().length === 0 && sameItems(templatesOf(a), fleet) && shows(a, 0.16), 'no template of its own');
+  assets.ships.fade(scene, 0.16, { shipId: 'a', visibility: 1 });
+  assets.ships.fade(scene, 1, { shipId: 'a', visibility: 1 });
+  assert.ok(sameItems(assets.built(), ['a', 'a']) && sameItems(templatesOf(a), fleet) && shows(a, 1), 'back on the fleet\'s');
+});
+
+test('a fade on a scene Babylon has disposed rebuilds and writes nothing', async () => {
+  const assets = loadShipAssets(LADDER_MANIFEST, {});
+  const scene = assets.scene('system');
+  const a = await assets.ships.upgrade(scene, ship('a', 0), assets.fallback('a'));
+  const b = await assets.ships.upgrade(scene, ship('b', 0), assets.fallback('b'));
+  assets.ships.fade(scene, 0.16, { shipId: 'a', visibility: 1 });
+  assets.built();
+  scene.isDisposed = () => true; // before AUR.ships.dispose let go of its hull state
+  assets.ships.fade(scene, 1);
+  assert.ok(assets.built().length === 0 && shows(a, 1) && shows(b, 0.16));
+});
+
 test('a followed ship whose hull cannot be instantiated keeps the hull it has, and leaves no template of its own behind', async () => {
   const assets = loadShipAssets(LADDER_MANIFEST, {});
   const scene = assets.scene('system');
