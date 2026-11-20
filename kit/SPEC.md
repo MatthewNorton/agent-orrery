@@ -351,11 +351,11 @@ Design tokens (put in `:root`):
   and the list stays scrolled where it was. A row is its entry's key, and every entry has one of
   its own: a project `p:<id>`, an agent `a:<id>`, a folder `f:` + the JSON of
   `[<project id>, <folder>]`. The kinds differ in the first letter, and no two id and folder pairs
-  are written as the same JSON, whatever they hold (a folder name, one main counts builds under,
-  may hold a quote; a project id from a state file may hold anything). `A.renderListbox` logs,
-  once for a key, two entries that share one: a click on either row would open the first. A click opens the entry that was
-  pressed (`A.wireListbox`): when the rows moved under a pointer that stayed put, the release
-  lands on another row and the pressed entry, found by its key, still opens while it is listed.
+  are written as the same JSON, whatever they hold (an id and a folder name may each hold a
+  quote). `A.renderListbox` logs, once for a key, two entries that share one: a click on either
+  row would open the first. A click opens the entry that was pressed (`A.wireListbox`): when the
+  rows moved under a pointer that stayed put, the release lands on another row and the pressed
+  entry, found by its key, still opens while it is listed.
   PROJECTS shares all of it (its key is the project id). While an input method
   composes text (`AUR.composing`), Enter, Escape and the arrows are its own. Escape, a click
   outside (pressed and released outside the dialog's own box with the main button, so a drag out

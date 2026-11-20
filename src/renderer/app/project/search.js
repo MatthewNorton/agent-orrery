@@ -176,8 +176,7 @@
     const found = AUR.rankProjects(visible, query, { nameOf: A.projectLabel, othersOf: VCS.otherSearchTexts });
     // Security: a row is told from the others by its key, so each entry has its own. The kinds differ
     // in their first letter. A folder's key is its project's id and its name as JSON, which no other
-    // pair writes the same, whatever the two hold: a folder name, one main counts builds under, may
-    // hold a quote, and a project id from a state file may hold anything.
+    // pair writes the same, whatever the two hold: an id and a folder name may each hold a quote.
     const rows = [
       ...found.slice(0, 6).map((hit) => ({ kind: 'project', key: 'p:' + hit.project.id, ...hit })),
       ...AUR.searchAgents([...S.store.ships.values()].filter((ship) => shown.has(ship.project)), query, 4)
