@@ -6,6 +6,7 @@
 // first key recorded for it, which may be a lower-cased key saved by an earlier version.
 
 const { ignoresCase } = require('./path-safety');
+const { wholeCount } = require('./shared/values');
 
 /** @typedef {{ path: string | null, buckets: Record<string, number> }} BucketedProject */
 
@@ -125,24 +126,41 @@ function setBucket(buckets, key, count) {
  */
 function countBuild(project, bucket) {
   const key = bucketKey(project, bucket);
-  setBucket(project.buckets, key ?? bucket, (key === null ? 0 : project.buckets[key] || 0) + 1);
+  setBucket(project.buckets, key ?? bucket, wholeCount(wholeCount(key === null ? 0 : project.buckets[key]) + 1));
   return key === null;
 }
 
 /**
  * Adds `counts` to the project's buckets, each under the key its folder has there (bucketKey), so
  * a folder keeps one bucket whatever casing the counts name it by. Where the folder has a count
- * already, `both` makes one of the two.
+ * already, `both` makes one of the two. Every count is a whole count (shared/values.js): one that
+ * is none (a string in a state file, a zero) adds no bucket, and no sum passes the largest kept.
  * @param {BucketedProject} project
- * @param {Record<string, number>} counts
+ * @param {Record<string, unknown>} counts
  * @param {(held: number, added: number) => number} both
  */
 function addBuckets(project, counts, both) {
-  for (const [name, builds] of Object.entries(counts)) {
+  for (const [name, counted] of Object.entries(counts)) {
+    const builds = wholeCount(counted);
+    if (builds === 0) continue;
     const key = bucketKey(project, name);
     // Security: an own count read and written, whatever the bucket is called.
-    setBucket(project.buckets, key ?? name, key === null ? builds : both(project.buckets[key], builds));
+    setBucket(project.buckets, key ?? name, key === null ? builds : wholeCount(both(wholeCount(project.buckets[key]), builds)));
   }
+}
+
+/**
+ * `counts` as the buckets of a project at `root`: one bucket per folder by that root's rule, under
+ * the first key that names it, with the counts of its casings added up. What a project's buckets
+ * go through wherever they or its path come from outside: a state file, a backup, a new path.
+ * @param {string | null} root
+ * @param {Record<string, unknown>} counts
+ * @returns {Record<string, number>}
+ */
+function foldBuckets(root, counts) {
+  const project = { path: root, buckets: {} };
+  addBuckets(project, counts, (held, added) => held + added);
+  return project.buckets;
 }
 
 /**
@@ -154,4 +172,4 @@ function bucketBuilds(project, name) {
   return bucketFor(project, name).builds;
 }
 
-module.exports = { addBuckets, bucketOf, bucketKey, bucketFor, countBuild, bucketBuilds, matchingName, planetKey, setBucket };
+module.exports = { addBuckets, bucketOf, bucketKey, bucketFor, countBuild, bucketBuilds, foldBuckets, matchingName, planetKey, setBucket };

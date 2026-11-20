@@ -168,3 +168,22 @@ test('live projects: a folder keeps one bucket by the rule of the path its proje
   // Buckets that are no object count nothing.
   assert.deepEqual(restoreProject(model, 'odd', { path: dir('odd'), buckets: /** @type {any} */ ('text') }).buckets, {});
 });
+
+test('live projects: a count a state file holds is made a whole count, and casings of 1e308 add up to the largest kept', (t) => {
+  const { model, file, dir } = newModel(t);
+  const MAX = Number.MAX_SAFE_INTEGER;
+  // 1e400 reads as Infinity. Joined as they stood, "5" and 7 made the string "57", and the two 1e308 Infinity, which saves as null.
+  const saved = () => JSON.parse('{ "buckets": { "Docs": "5", "docs": 7, "src": 2.9, "big": 1e308, "BIG": 1e308, "none": null, "neg": -3 },'
+    + ' "totalBuilds": "9", "firstSeen": "soon", "lastActivity": 1e400 }');
+  const exact = restoreProject(model, 'exact', { path: '/work/elsewhere', ...saved() });
+  assert.deepEqual(Object.entries(exact.buckets), [['docs', 7], ['src', 2], ['big', MAX], ['BIG', MAX]]);
+  assert.deepEqual([exact.totalBuilds, exact.lastActivity, typeof exact.firstSeen, exact.firstSeen > 0], [0, 0, 'number', true]);
+  const here = restoreProject(model, 'here', { path: dir('here'), ...saved(), totalBuilds: 9.5, firstSeen: 1700000000000.4 });
+  assert.deepEqual(Object.entries(here.buckets), ignoresCase(here.path) ? [['docs', 7], ['src', 2], ['big', MAX]] : Object.entries(exact.buckets));
+  assert.deepEqual([here.totalBuilds, here.firstSeen, here.lastActivity], [9, 1700000000000, 1700000000000]);
+  // A path that joins the casings adds them up, and stops at the largest count kept.
+  remapProjectPath(model, 'exact', dir('moved'));
+  if (ignoresCase(exact.path)) assert.deepEqual(Object.entries(exact.buckets), [['docs', 7], ['src', 2], ['big', MAX]]);
+  const written = fs.readFileSync(file, 'utf8');
+  assert.equal(/null|Infinity|"57"/.test(JSON.stringify(Object.values(JSON.parse(written).projects).map((project) => project.buckets))), false, written);
+});

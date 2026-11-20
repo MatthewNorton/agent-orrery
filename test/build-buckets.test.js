@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const {
-  addBuckets, bucketOf, bucketKey, bucketFor, countBuild, bucketBuilds, matchingName, planetKey, setBucket,
+  addBuckets, bucketOf, bucketKey, bucketFor, countBuild, bucketBuilds, foldBuckets, matchingName, planetKey, setBucket,
 } = require('../src/main/build-buckets');
 
 const own = (buckets) => Object.keys(buckets).map((name) => [name, Object.getOwnPropertyDescriptor(buckets, name).value]);
@@ -174,6 +174,28 @@ test('addBuckets puts each count under the key its folder has, by the rule of th
   const summed = { path: 'C:\\Work\\Demo', buckets: {} };
   addBuckets(summed, counts(), (held, added) => held + added);
   assert.deepEqual(own(summed.buckets), [['docs', 7], ['SRC', 1], ['lib', 5], ['__proto__', 4]]);
+});
+
+test('every bucket count is a whole count, and no sum passes the largest one kept', () => {
+  const MAX = Number.MAX_SAFE_INTEGER;
+  // As a state file may hold them: a string, a fraction, a negative, null, zero, and two casings of 1e308.
+  const counts = () => JSON.parse('{ "Docs": "5", "docs": 7, "src": 2.9, "neg": -1, "none": null, "zero": 0, "big": 1e308, "BIG": 1e308, "__proto__": 3 }');
+  const windows = foldBuckets('C:\\Work\\Demo', counts());
+  assert.deepEqual(own(windows), [['docs', 7], ['src', 2], ['big', MAX], ['__proto__', 3]], 'the string is no count, so it is no bucket and is not joined to 7');
+  assert.deepEqual(own(foldBuckets('/work/demo', counts())), [['docs', 7], ['src', 2], ['big', MAX], ['BIG', MAX], ['__proto__', 3]]);
+  assert.equal(JSON.stringify(windows).includes('null'), false, 'nothing saves as null');
+  assert.deepEqual(own(foldBuckets(null, { Docs: 5, docs: 7 })), [['Docs', 5], ['docs', 7]], 'no path joins no two names');
+
+  const project = { path: 'C:\\Work\\Demo', buckets: windows };
+  assert.deepEqual([countBuild(project, 'BIG'), countBuild(project, 'big'), project.buckets.big], [false, false, MAX], 'a full count stays full');
+  addBuckets(project, { DOCS: MAX, Src: 1 }, (held, added) => held + added);
+  addBuckets(project, { docs: 3, SRC: 9, lib: '4' }, Math.max);
+  assert.deepEqual(own(project.buckets), [['docs', MAX], ['src', 9], ['big', MAX], ['__proto__', 3]]);
+  // A count put there past the rule (an older state, read by other code) is made whole when it is next added to.
+  const odd = { path: '/work/demo', buckets: {} };
+  setBucket(odd.buckets, 'src', /** @type {any} */ ('5'));
+  setBucket(odd.buckets, 'lib', NaN);
+  assert.deepEqual([countBuild(odd, 'src'), countBuild(odd, 'lib'), own(odd.buckets)], [false, false, [['src', 1], ['lib', 1]]]);
 });
 
 test('a key removed past setBucket is not answered from the index of the keys', () => {

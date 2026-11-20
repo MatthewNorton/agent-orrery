@@ -2,7 +2,16 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { boundedInteger, ownString, bufferValue } = require('../src/main/shared/values');
+const { boundedInteger, ownString, bufferValue, wholeCount } = require('../src/main/shared/values');
+
+test('wholeCount is a whole number from 0 to the largest safe one, and 0 for anything that is no count', () => {
+  const MAX = Number.MAX_SAFE_INTEGER;
+  assert.deepEqual([0, 1, 7, 2.9, 0.99, MAX, MAX + 2, 1e308, Number.MAX_VALUE].map(wholeCount), [0, 1, 7, 2, 0, MAX, MAX, MAX, MAX]);
+  for (const value of ['5', '', null, undefined, NaN, Infinity, -Infinity, -1, -0.5, true, [3], { valueOf: () => 3 }, 3n]) {
+    assert.equal(wholeCount(value), 0, String(value));
+  }
+  assert.equal(wholeCount(wholeCount(MAX) + wholeCount(MAX)), MAX, 'a sum of counts is a count');
+});
 
 test('boundedInteger keeps safe integers inside the inclusive range', () => {
   assert.equal(boundedInteger(250, 4_000, 250, 30_000), 250);

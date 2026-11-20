@@ -7,9 +7,9 @@
 
 const { canonicalProjectPath } = require('../provider-adapters');
 const { localAbsolutePath } = require('../path-safety');
-const { addBuckets, setBucket } = require('../build-buckets');
+const { addBuckets, foldBuckets, setBucket } = require('../build-buckets');
 const { hasControlChars, validProjectId } = require('../shared/ids');
-const { ownString } = require('../shared/values');
+const { ownString, wholeCount } = require('../shared/values');
 const { plainObject } = require('../transcripts/fields');
 const { liftForgotten } = require('./forgotten');
 const {
@@ -71,9 +71,9 @@ function parseBackup(text) {
       path: localAbsolutePath(saved.path),
       override: localAbsolutePath(Object.hasOwn(overrides, id) ? overrides[id] : null),
       name: validKey(saved.name) ? saved.name : undefined,
-      lastActivity: count(saved.lastActivity),
-      firstSeen: count(saved.firstSeen),
-      totalBuilds: count(saved.totalBuilds),
+      lastActivity: wholeCount(saved.lastActivity),
+      firstSeen: wholeCount(saved.firstSeen),
+      totalBuilds: wholeCount(saved.totalBuilds),
       buckets: buckets(saved.buckets),
     }]);
   }
@@ -112,8 +112,11 @@ function importProjects(model, backup) {
     }
     const adopted = existing.path ? null : preferredProjectPath(model, target, saved.path);
     // A folder has one bucket in whatever casing it was written, by the rule of the folder the
-    // project has or is about to take: the backup's count goes to the key that holds it here.
-    addBuckets({ path: existing.path || adopted, buckets: existing.buckets }, saved.buckets, Math.max);
+    // project has or is about to take. The backup's counts are folded by that rule first, as
+    // they are for a project that is new here (createProject), and each then goes to the key
+    // that holds it here: what a backup brings does not depend on what was here before it.
+    const under = existing.path || adopted;
+    addBuckets({ path: under, buckets: existing.buckets }, foldBuckets(under, saved.buckets), Math.max);
     existing.totalBuilds = Math.max(existing.totalBuilds, saved.totalBuilds);
     if (saved.firstSeen && saved.firstSeen < existing.firstSeen) existing.firstSeen = saved.firstSeen;
     existing.lastActivity = Math.max(existing.lastActivity, saved.lastActivity);
@@ -141,16 +144,12 @@ function plainText(value) {
   return typeof value === 'string' && value.length > 0 && value.length <= MAX_KEY_LENGTH && !hasControlChars(value);
 }
 
-function count(value) {
-  return Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
-}
-
 function buckets(value) {
   /** @type {Record<string, number>} */
   const out = {};
   if (!plainObject(value)) return out;
   for (const [name, saved] of Object.entries(value).slice(0, MAX_ENTRIES)) {
-    const builds = count(saved);
+    const builds = wholeCount(saved);
     if (plainText(name) && builds > 0) setBucket(out, name, builds);
   }
   return out;

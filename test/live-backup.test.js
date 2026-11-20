@@ -138,6 +138,36 @@ test('a backup\'s count for a folder goes to the bucket the folder has here, in 
   assert.equal(byId(tracker).get('kept').planets.length, oneFolder ? 3 : 5);
 });
 
+test('a backup\'s casings of one folder are added up before they meet what is here, whatever is here', (t) => {
+  const w = createWorld(t);
+  const MAX = Number.MAX_SAFE_INTEGER;
+  writeState(w.statePath, { version: 2, projects: {
+    held: { name: 'held', buckets: { Docs: 1, lib: 20 }, totalBuilds: 21, firstSeen: T0 },
+    bare: { name: 'bare', buckets: {}, totalBuilds: 0, firstSeen: T0 },
+  } });
+  const { tracker } = w.live();
+  // A folder of a Windows path on every host: the two projects are known by one each.
+  for (const id of ['held', 'bare']) tracker.model.projects.get(id).path = `C:\\Work\\${id}`;
+  const counts = '{ "Docs": 5, "docs": 7, "LIB": 3, "big": 1e308, "BIG": 1e308, "odd": "4" }';
+  const backup = parseBackup(`{ "format": "agent-orrery-backup", "version": 1, "universe": { "projects": {
+    "held": { "buckets": ${counts} }, "bare": { "buckets": ${counts} } } } }`);
+  assert.deepEqual(tracker.importBackup(backup), { added: 0, merged: 2 });
+  const buckets = (id) => Object.entries(tracker.model.projects.get(id).buckets);
+  assert.deepEqual(buckets('bare'), [['Docs', 12], ['LIB', 3], ['big', MAX]]);
+  assert.deepEqual(buckets('held'), [['Docs', 12], ['lib', 20], ['big', MAX]], 'the same 12, not the larger casing alone; lib keeps the larger count');
+  // What the import saved holds numbers only.
+  const saved = JSON.parse(fs.readFileSync(w.statePath, 'utf8'));
+  assert.deepEqual(saved.projects.held.buckets, { Docs: 12, lib: 20, big: MAX });
+
+  // A project that is new here goes through the same fold, by the rule of the folder it gets.
+  const other = path.join(w.root, 'workspace', 'other');
+  fs.mkdirSync(other);
+  tracker.importBackup(parseBackup(`{ "format": "agent-orrery-backup", "version": 1, "universe": { "projects": {
+    "fresh": { "path": ${JSON.stringify(other)}, "buckets": ${counts} } } } }`));
+  assert.deepEqual(buckets('fresh'), ignoresCase(other) ? [['Docs', 12], ['LIB', 3], ['big', MAX]]
+    : [['Docs', 5], ['docs', 7], ['LIB', 3], ['big', MAX], ['BIG', MAX]]);
+});
+
 test('a project whose id is __proto__ or constructor goes out in an export and comes back from it', (t) => {
   const w = createWorld(t);
   const dirs = { ['__proto__']: w.projectDir, constructor: path.join(w.root, 'workspace', 'other') };
