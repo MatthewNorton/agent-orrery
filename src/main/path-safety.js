@@ -84,15 +84,6 @@ function isInsidePath(root, candidate) {
 }
 
 /**
- * Whether names under root compare case-insensitively: a Windows-style root (a drive letter
- * or a backslash), on every host.
- * @param {string | null | undefined} root
- */
-function ignoresCase(root) {
-  return typeof root === 'string' && (/^[a-z]:[\\/]/i.test(root) || root.includes('\\'));
-}
-
-/**
  * file relative to root, joined with `separator`, or null unless it lies strictly beneath
  * root. Both must be absolute in one path syntax (pathFlavor). The syntax, and with it Windows
  * case folding, comes from root's own text, so every host agrees. Case folding only decides
@@ -129,7 +120,6 @@ module.exports = {
   isAbsolutePosixPath,
   localAbsolutePath,
   isInsidePath,
-  ignoresCase,
   relativeInside,
   // Re-exported unchanged from provider-adapters.js, which owns them.
   isLocalProjectPath,

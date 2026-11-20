@@ -6,12 +6,13 @@ const {
   MAX_BUCKETS, addBuckets, bucketOf, bucketKey, bucketFor, countBuild, bucketBuilds, foldBuckets, isBucketName, isPlanetSegment, matchingEntry, mergeBuckets,
   planetKey, setBucket, setProjectPath,
 } = require('../src/main/build-buckets');
+const { relativeInside } = require('../src/main/path-safety');
 const { readCounts, own, KEPT_APART, KEPT_AS_ONE, KEPT_LARGER } = require('./support/bucket-cases');
 const { SEC, T0, ofType, claude } = require('./support/transcripts');
 const { runBoth } = require('./support/both-models');
 
-// The name matchingEntry finds among names, as it finds a folder among a listing's entries.
-const matchingName = (names, name, root) => matchingEntry(names.map((each) => ({ name: each })), name, root)?.name ?? null;
+// The name matchingEntry finds among names, as it finds a folder among a listing's entries, in a folder at `root`.
+const matchingName = (names, name, root) => matchingEntry(names.map((each) => ({ name: each })), name, { path: root })?.name ?? null;
 
 test('bucketOf names the top-level folder, or (root) for a file at the top level', () => {
   assert.equal(bucketOf('Docs/Guide.md', '/'), 'Docs');
@@ -89,9 +90,12 @@ test('planetKey is one key for every casing main counts as the folder, and the n
   assert.deepEqual(['Docs', 'docs', 'DOCS', '(root)'].map((name) => planetKey(windows, name)), ['docs', 'docs', 'docs', '(root)']);
   assert.deepEqual(['Docs', 'docs', '(root)'].map((name) => planetKey(posix, name)), ['Docs', 'docs', '(root)']);
   assert.equal(planetKey({ path: null }, 'Docs'), 'Docs', 'a project without a path folds nothing');
+  // A path in Windows syntax folds, on every host; one in POSIX syntax or in none does not, whatever it holds.
+  const others = ['c:/work/demo', '/a\\b', 'relative\\dir', '\\\\server\\share\\demo', 'C:demo\\x'].map((root) => ({ path: root }));
+  assert.deepEqual(others.map((project) => planetKey(project, 'Docs')), ['docs', 'Docs', 'Docs', 'Docs', 'Docs']);
   // The key and both lookups are one rule: two names share a bucket, and one finds the other's folder,
   // exactly when they share a key.
-  for (const project of [windows, posix, { path: 'relative\\dir' }, { path: null }]) {
+  for (const project of [windows, posix, ...others, { path: null }]) {
     for (const [saved, asked] of [['Docs', 'docs'], ['docs', 'DOCS'], ['Docs', 'Docs'], ['src', 'Src2'], ['(root)', '(root)']]) {
       const shared = bucketKey({ ...project, buckets: { [saved]: 1 } }, asked) !== null;
       assert.equal(planetKey(project, saved) === planetKey(project, asked), shared, `${project.path}: ${saved} / ${asked}`);
@@ -111,7 +115,14 @@ test('matchingEntry finds a folder among names: itself first, another casing onl
   assert.equal(matchingName([], 'lib', null), null);
   assert.equal(matchingName(['DOCS', 'Docs', 'docs2'], 'docs', 'C:\\Work'), 'DOCS', 'of two other casings, the first');
   const entries = [{ name: 'Docs', kind: 'folder' }, { name: 'docs', kind: 'file' }];
-  assert.equal(matchingEntry(entries, 'docs', 'C:\\Work'), entries[1], 'the entry itself is answered');
+  assert.equal(matchingEntry(entries, 'docs', { path: 'C:\\Work' }), entries[1], 'the entry itself is answered');
+});
+
+test('containment and folding go by one rule: a file under the root in another casing is inside exactly where a folder\'s casings are one', () => {
+  for (const root of ['C:\\Work\\Demo', 'c:/work/demo', '/work/demo', '/a\\b', 'relative\\dir', '\\\\server\\share\\demo', 'C:demo\\x', null]) {
+    const inside = root !== null && relativeInside(root, `${root.toUpperCase()}/x`) !== null;
+    assert.equal(planetKey({ path: root }, 'Docs') === planetKey({ path: root }, 'docs'), inside, String(root));
+  }
 });
 
 test('bucketFor answers a folder\'s key, builds and the name it goes by, in one lookup', () => {

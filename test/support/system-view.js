@@ -6,12 +6,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { liveProject, tempDir } = require('./main-wiring');
 
-// `files` are written; a path ending in '/' is an empty folder. `under` nests the project below the
-// temp folder: 'case\\root' gives it a Windows-style path on every host (one folder with a
-// backslash in its name on POSIX), so folder names compare in any case.
-function projectOnDisk(t, files, buckets = {}, under = '') {
-  const root = path.join(tempDir(t, 'au-live-system-'), under);
-  fs.mkdirSync(root, { recursive: true });
+// `files` are written; a path ending in '/' is an empty folder.
+function projectOnDisk(t, files, buckets = {}) {
+  const root = tempDir(t, 'au-live-system-');
   for (const rel of files) {
     if (rel.endsWith('/')) { fs.mkdirSync(path.join(root, rel), { recursive: true }); continue; }
     fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true });

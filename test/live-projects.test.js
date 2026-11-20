@@ -8,11 +8,11 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { namesIgnoreCase } = require('../src/main/build-buckets');
 const { remapProjectPath } = require('../src/main/live/project-edits');
 const {
   adoptProjectPath, createProject, ensureProjectForPath, preferredProjectPath, refreshProjectExistence, restoreProject, takeProjectPath,
 } = require('../src/main/live/projects');
-const { ignoresCase } = require('../src/main/path-safety');
 const { canonicalProjectPath } = require('../src/main/provider-adapters');
 const { savedProject } = require('../src/main/live/saved-project');
 const { casedCounts, KEPT_APART, KEPT_AS_ONE, KEPT_LARGER } = require('./support/bucket-cases');
@@ -107,7 +107,7 @@ test('live projects: a project takes a path in one step, and gives it back as ev
 test('live projects: a folder keeps one bucket by the rule of the path its project has', (t) => {
   const { model, file, dir } = newModel(t);
   // A temp folder is a Windows path on Windows only: there Docs and docs are one folder.
-  const kept = (project) => [Object.entries(project.buckets), ignoresCase(project.path) ? KEPT_AS_ONE : KEPT_APART];
+  const kept = (project) => [Object.entries(project.buckets), namesIgnoreCase(project) ? KEPT_AS_ONE : KEPT_APART];
   // From a state file or a backup: every count a whole one, and the casings a path joins added up.
   const here = restoreProject(model, 'here', savedProject({ path: dir('here'), buckets: casedCounts(), totalBuilds: 15 }));
   assert.deepEqual(...kept(here));
@@ -116,7 +116,7 @@ test('live projects: a folder keeps one bucket by the rule of the path its proje
   // No path tells no two names apart or together; the folder the project then gets decides. It
   // counted no build without a path, so two casings may be two records of the same builds: the
   // larger stays, by adoption and by recovery alike.
-  const larger = (project) => [Object.entries(project.buckets), ignoresCase(project.path) ? KEPT_LARGER : KEPT_APART];
+  const larger = (project) => [Object.entries(project.buckets), namesIgnoreCase(project) ? KEPT_LARGER : KEPT_APART];
   const pathless = restoreProject(model, 'pathless', savedProject({ name: 'pathless', buckets: casedCounts() }));
   assert.deepEqual(Object.entries(pathless.buckets), KEPT_APART);
   adoptProjectPath(model, pathless, dir('adopted'));

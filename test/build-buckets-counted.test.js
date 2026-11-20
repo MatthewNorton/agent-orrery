@@ -8,13 +8,12 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { mergeBuckets, setProjectPath } = require('../src/main/build-buckets');
+const { mergeBuckets, namesIgnoreCase, setProjectPath } = require('../src/main/build-buckets');
 const { parseBackup } = require('../src/main/live/backup');
 const { remapProjectPath } = require('../src/main/live/project-edits');
 const { adoptProjectPath, restoreProject, takeProjectPath } = require('../src/main/live/projects');
 const { savedProject } = require('../src/main/live/saved-project');
 const { getPlanet, getSystem } = require('../src/main/live/system-view');
-const { ignoresCase } = require('../src/main/path-safety');
 const { own } = require('./support/bucket-cases');
 const { newModel } = require('./support/live-model');
 const { T0, createWorld, readState, writeState } = require('./support/transcripts');
@@ -45,7 +44,7 @@ test('casings counted under a path the app does not keep are added up by every l
   for (const dir of Object.values(dirs)) fs.mkdirSync(dir);
   remapProjectPath(first.model, 'remap', dirs.remap);
   first.importBackup(backupOf({ merge: { path: dirs.merge, buckets: { src: 1 }, totalBuilds: 1 } }));
-  const joined = ignoresCase(dirs.remap) ? [['Docs', 5]] : [['Docs', 3], ['docs', 2]];
+  const joined = namesIgnoreCase({ path: dirs.remap }) ? [['Docs', 5]] : [['Docs', 3], ['docs', 2]];
   assert.deepEqual([buckets(first, 'remap'), buckets(first, 'merge')], [joined, [...joined, ['src', 1]]]);
   // The state file holds no path for it, and says its buckets were counted under one.
   const { restart } = readState(w.statePath).projects;
@@ -129,7 +128,8 @@ test('the flag goes out in the state file and a backup and comes back, and stays
 });
 
 test('a path that joins a folder\'s casings has its buckets counted from then on, given to a project or merged into one', () => {
-  for (const [root, joins] of [['C:\\Work\\Demo', true], ['c:/work/demo', true], ['/work/demo', false], [null, false]]) {
+  // A path in Windows syntax joins them; one in POSIX syntax or in none does not, whatever it holds.
+  for (const [root, joins] of [['C:\\Work\\Demo', true], ['c:/work/demo', true], ['/work/demo', false], ['/a\\b', false], ['relative\\dir', false], [null, false]]) {
     const given = { path: null, buckets: { Docs: 1, docs: 1 }, bucketsCounted: false, totalBuilds: 2 };
     setProjectPath(given, root);
     const merged = { path: root, buckets: {}, bucketsCounted: false };

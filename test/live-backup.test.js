@@ -7,10 +7,9 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { setProjectPath } = require('../src/main/build-buckets');
+const { namesIgnoreCase, setProjectPath } = require('../src/main/build-buckets');
 const { parseBackup } = require('../src/main/live/backup');
 const { adoptProjectPath } = require('../src/main/live/projects');
-const { ignoresCase } = require('../src/main/path-safety');
 const { CASED_COUNTS, own, KEPT_APART, KEPT_AS_ONE, KEPT_LARGER } = require('./support/bucket-cases');
 const { projectsById } = require('./support/live-session');
 const { MIN, T0, appendJsonl, claude, createWorld, readState, writeState } = require('./support/transcripts');
@@ -131,7 +130,7 @@ test('a backup\'s count for a folder goes to the bucket the folder has here, in 
   } } }))), { added: 1, merged: 1 });
   const buckets = (id) => Object.entries(tracker.model.projects.get(id).buckets);
   // The temp folder is a Windows path on Windows only: there one folder is one bucket.
-  const oneFolder = ignoresCase(w.projectDir);
+  const oneFolder = namesIgnoreCase({ path: w.projectDir });
   assert.deepEqual(buckets('kept'), oneFolder ? [['Docs', 7], ['src', 3], ['lib', 2]]
     : [['Docs', 5], ['src', 3], ['docs', 7], ['SRC', 1], ['lib', 2]]);
   assert.deepEqual(buckets('fresh'), oneFolder ? [['Docs', 12]] : [['Docs', 5], ['docs', 7]]);
@@ -172,7 +171,7 @@ test('a backup\'s casings of one folder, counted under a path, are added up befo
   fs.mkdirSync(other);
   tracker.importBackup(parseBackup(`{ "format": "agent-orrery-backup", "version": 1, "universe": { "projects": {
     "fresh": { "path": ${JSON.stringify(other)}, "buckets": ${CASED_COUNTS} } } } }`));
-  assert.deepEqual(buckets('fresh'), ignoresCase(other) ? KEPT_AS_ONE : KEPT_APART);
+  assert.deepEqual(buckets('fresh'), namesIgnoreCase({ path: other }) ? KEPT_AS_ONE : KEPT_APART);
 });
 
 test('an import counts both sides by the folder the project ends with, and then keeps the larger', (t) => {
@@ -196,7 +195,7 @@ test('an import counts both sides by the folder the project ends with, and then 
     split: { path: dirs.split, buckets: { Docs: 5 }, totalBuilds: 5 },
   } } }))), { added: 0, merged: 3 });
   // The temp folder is a Windows path on Windows only: there Docs and docs are one folder.
-  const oneFolder = ignoresCase(dirs.had);
+  const oneFolder = namesIgnoreCase({ path: dirs.had });
   const buckets = (id) => Object.entries(project(id).buckets);
   assert.deepEqual([project('took').path, project('split').path], [dirs.took, dirs.split]);
   for (const id of ['had', 'took']) {

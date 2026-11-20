@@ -57,7 +57,7 @@ function planetFolders(entries, projectPath) {
      * @param {string} name
      */
     named(name) {
-      const entry = entries ? matchingEntry(entries, name, projectPath) : null;
+      const entry = entries ? matchingEntry(entries, name, { path: projectPath }) : null;
       const folder = entry && entry.isDirectory() ? entry : null;
       /** @type {'gone' | 'none' | null} */
       const missing = folder ? null : entry && entry.isSymbolicLink() ? 'none' : 'gone';

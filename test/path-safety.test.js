@@ -187,7 +187,7 @@ test('localAbsolutePath normalizes a local absolute path and refuses UNC, device
 });
 
 test('relativeInside ignores case only under a Windows-style root and keeps the file\'s casing', () => {
-  const { relativeInside, ignoresCase } = pathSafety;
+  const { relativeInside } = pathSafety;
   assert.equal(relativeInside('C:\\Work\\Demo', 'c:/work/demo/Docs/Guide.md', { separator: '/' }), 'Docs/Guide.md');
   assert.equal(relativeInside('c:\\work\\demo', 'C:\\WORK\\DEMO\\Src\\A.js', { separator: '\\' }), 'Src\\A.js');
   assert.equal(relativeInside('C:\\Work\\Demo', 'C:\\WORK\\Other\\x.js'), null);
@@ -202,8 +202,6 @@ test('relativeInside ignores case only under a Windows-style root and keeps the 
   // Nor does a Windows path with no drive, which would resolve against the working folder's drive.
   const drive = process.platform === 'win32' ? process.cwd().slice(0, 2) : 'C:';
   for (const file of ['\\Demo\\src\\a.js', '/Demo/src/a.js']) assert.equal(relativeInside(`${drive}\\Demo`, file), null, file);
-  assert.deepEqual(['C:\\Work', 'c:/work', 'relative\\dir', '/Work', null].map(ignoresCase),
-    [true, true, true, false, false]);
 });
 
 test('pathFlavor names drive-rooted and POSIX paths and rejects UNC and //host/share', () => {

@@ -5,7 +5,7 @@
 // case-insensitive root, one folder written in several casings keeps a single bucket: the
 // first key recorded for it, which may be a lower-cased key saved by an earlier version.
 
-const { ignoresCase } = require('./path-safety');
+const { pathFlavor } = require('./path-safety');
 const { hasControlChars } = require('./shared/ids');
 const { wholeCount } = require('./shared/values');
 
@@ -26,9 +26,16 @@ const FOLDED = Symbol('bucket keys by lower case');
 const SIZE = Symbol('bucket key count');
 // A name as every casing of it compares where the root ignores case: the one place that says how.
 const fold = (/** @type {string} */ name) => name.toLowerCase();
-// Whether a project at `root` takes every casing of a folder's name for one folder: the one place
-// that says when. A Windows-style path does (path-safety.js ignoresCase), on every host.
-const joinsCasings = (/** @type {string | null | undefined} */ root) => ignoresCase(root);
+
+/**
+ * Whether `project` takes every casing of a folder's name for one folder: the one place that says
+ * when. A path in Windows syntax does (path-safety.js pathFlavor), on every host, as containment
+ * (relativeInside) ignores case under it; a path in POSIX syntax, or in none, does not.
+ * @param {{ path: string | null }} project
+ */
+function namesIgnoreCase(project) {
+  return pathFlavor(project.path) === 'win32';
+}
 
 /**
  * The bucket of a project-relative path.
@@ -67,20 +74,20 @@ function isBucketName(name) {
  * @param {string} name
  */
 function planetKey(project, name) {
-  return joinsCasings(project.path) ? fold(name) : name;
+  return namesIgnoreCase(project) ? fold(name) : name;
 }
 
 /**
- * The one of `entries` that is folder `name` under `root`: the one named so, or where the root
- * ignores case the first in another casing of it. Null when none is. One pass.
+ * The one of `entries` that is folder `name` in `project`'s folder: the one named so, or where its
+ * names ignore case the first in another casing of it. Null when none is. One pass.
  * @template {{ name: string }} T
  * @param {T[]} entries
  * @param {string} name
- * @param {string | null} root
+ * @param {{ path: string | null }} project
  * @returns {T | null}
  */
-function matchingEntry(entries, name, root) {
-  const folded = joinsCasings(root) ? fold(name) : null;
+function matchingEntry(entries, name, project) {
+  const folded = namesIgnoreCase(project) ? fold(name) : null;
   let other = null;
   for (const entry of entries) {
     if (entry.name === name) return entry;
@@ -117,7 +124,7 @@ function bucketKey(project, name) {
   // Security: a transcript can start a bucket per edit. A case-sensitive root has the exact key
   // or none, so a miss there looks nothing up; a root that ignores case asks the index of the
   // keys, which is one lookup however many buckets there are.
-  if (!joinsCasings(project.path)) return null;
+  if (!namesIgnoreCase(project)) return null;
   return foldedKeys(project.buckets).get(fold(name)) ?? null;
 }
 
@@ -272,7 +279,7 @@ function foldBuckets(root, counts, counted, total) {
 function setProjectPath(project, projectPath) {
   project.path = projectPath;
   project.buckets = foldBuckets(projectPath, project.buckets, project.bucketsCounted === true, project.totalBuilds);
-  if (joinsCasings(projectPath)) project.bucketsCounted = true;
+  if (namesIgnoreCase(project)) project.bucketsCounted = true;
 }
 
 /**
@@ -286,7 +293,7 @@ function setProjectPath(project, projectPath) {
  */
 function mergeBuckets(project, saved) {
   if (bucketCount(saved.buckets) > 0) {
-    project.bucketsCounted = joinsCasings(project.path) || saved.bucketsCounted
+    project.bucketsCounted = namesIgnoreCase(project) || saved.bucketsCounted
       || (project.bucketsCounted === true && bucketCount(project.buckets) > 0);
   }
   addBuckets(project, foldBuckets(project.path, saved.buckets, saved.bucketsCounted, saved.totalBuilds), Math.max);
@@ -303,5 +310,5 @@ function bucketBuilds(project, name) {
 
 module.exports = {
   MAX_BUCKETS, addBuckets, bucketOf, bucketKey, bucketFor, countBuild, bucketBuilds, foldBuckets, isBucketName, isPlanetSegment,
-  matchingEntry, mergeBuckets, planetKey, setBucket, setProjectPath,
+  matchingEntry, mergeBuckets, namesIgnoreCase, planetKey, setBucket, setProjectPath,
 };

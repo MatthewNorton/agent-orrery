@@ -40,7 +40,8 @@ test('live system view: the root planet\'s builds are the top-level files\' own 
 });
 
 test('live system view: a folder whose name a Windows path folds to (root) draws no root planet', (t) => {
-  const { root, model } = projectOnDisk(t, ['(Root)/a.js', 'src/b.js', 'README.md'], { '(Root)': 3 }, 'case\\root');
+  if (path.sep !== '\\') return t.skip('a temp folder has a Windows path on Windows only');
+  const { root, model } = projectOnDisk(t, ['(Root)/a.js', 'src/b.js', 'README.md'], { '(Root)': 3 });
   const planets = () => getSystem(model, 'p').planets.map((planet) => [planet.name, planet.builds]);
   assert.deepEqual(planets(), [['(Root)', 3], ['src', 0]]);
   // Nor once the folder is gone.
@@ -148,7 +149,8 @@ test('live system view: a name that is no plain segment has no planet, whatever 
 });
 
 test('live system view: under a Windows path a planet answers to any casing, by the name on disk', async (t) => {
-  const { model } = projectOnDisk(t, ['Docs/a.md', 'Docs/b.md', 'src/a.js'], { docs: 3, Gone: 2 }, 'case\\root');
+  if (path.sep !== '\\') return t.skip('a temp folder has a Windows path on Windows only');
+  const { model } = projectOnDisk(t, ['Docs/a.md', 'Docs/b.md', 'src/a.js'], { docs: 3, Gone: 2 });
   // One key for the folder, in the system and in the planet, whatever casing asked for it.
   assert.deepEqual(getSystem(model, 'p').planets.map((planet) => [planet.name, planet.key, planet.builds]),
     [['Docs', 'docs', 3], ['src', 'src', 0]]);
