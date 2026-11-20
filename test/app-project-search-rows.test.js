@@ -9,7 +9,7 @@ const { fakeDocument, fakeElement, textOf, withClass } = require('./support/fake
 
 function setup() {
   return runApp(['app/project/search-rows.js'], {
-    state: { store: { projects: new Map(), ships: new Map() }, projectSubtitles: { facts: [], lines: new Map() } },
+    state: { store: { projects: new Map(), ships: new Map() } },
     projectLabel: (project) => project.name || project.id,
     projectGalaxyLabel: (project) => (project.galaxy ? project.galaxy.label : ''),
     shipsInProject: () => [],
@@ -86,15 +86,13 @@ test('project lines: namesakes lead with the end of the path that tells them apa
   ]);
 });
 
-test('project lines: worked out once for the same projects, again when a fact in them changes', () => {
+test('project lines: a line follows every fact it is made of, each time it is asked for', () => {
   const app = setup();
   const projects = () => [
     { id: 'a', name: 'web', path: '/work/client-a/web', git: { branch: 'main' } },
     { id: 'b', name: 'web', path: '/work/client-b/web' },
   ];
-  const first = app.projectSubtitles(projects());
-  assert.deepEqual([...first], [['a', '…/client-a/web · main'], ['b', '…/client-b/web']]);
-  assert.equal(app.projectSubtitles(projects()), first, 'the same facts in new objects: the same lines, not worked out again');
+  assert.deepEqual([...app.projectSubtitles(projects())], [['a', '…/client-a/web · main'], ['b', '…/client-b/web']]);
 
   const changes = [
     [(list) => { list[0].git.branch = 'next'; }, 'a', '…/client-a/web · next'],
@@ -107,11 +105,7 @@ test('project lines: worked out once for the same projects, again when a fact in
   for (const [change, id, line] of changes) {
     const list = projects();
     change(list);
-    const lines = app.projectSubtitles(list);
-    assert.notEqual(lines, first, line);
-    assert.equal(lines.get(id), line);
-    assert.equal(app.projectSubtitles(list), lines);
-    app.projectSubtitles(projects());
+    assert.equal(app.projectSubtitles(list).get(id), line);
   }
 });
 

@@ -115,8 +115,6 @@
     // again (one request at a time) when a build starts a planet, also one that came while the
     // planet of project `awaited` was opening (`missed`) (app/project/control.js).
     planetSystem: { data: null, loading: false, stale: false, awaited: null, missed: false },
-    // The IDEAS picker's project lines as last worked out, and what they were worked out from.
-    projectSubtitles: { facts: [], lines: new Map() },
     routeRequestGeneration: 0,
     booting: true,
     bootEventQueue: [],

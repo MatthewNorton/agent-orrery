@@ -117,25 +117,18 @@
    * place of the whole path: a list cuts a long line short at its end, where the path was.
    */
   A.projectSubtitles = function projectSubtitles(projects) {
-    // What a line is made of: the id, the name it is grouped by, the path, then the rest of the line.
-    const facts = projects.map((project) => {
-      const vcs = VCS.normalize(project);
-      return [project.id, String(A.projectLabel(project)), String(project.path || ''), A.projectGalaxyLabel(project), vcs.nameWithOwner, vcs.branch];
-    });
-    // Security: the IDEAS panel asks on every render, before it knows whether anything changed.
-    // The lines are worked out again only when one of the facts they are made of has changed.
-    const kept = S.projectSubtitles;
-    if (kept.facts.length === facts.length && facts.every((fact, i) => fact.every((value, j) => value === kept.facts[i][j]))) return kept.lines;
     const lines = new Map();
-    for (const group of grouped(facts, (fact) => fact[1])) {
-      const apart = group.length > 1 ? tailsApart(group.map((fact) => fact[2])) : null;
-      group.forEach(([id, , path, ...rest], i) => {
+    for (const group of grouped(projects, (project) => String(A.projectLabel(project)))) {
+      const paths = group.map((project) => String(project.path || ''));
+      const apart = group.length > 1 ? tailsApart(paths) : null;
+      group.forEach((project, i) => {
+        const vcs = VCS.normalize(project), path = paths[i];
+        const rest = [A.projectGalaxyLabel(project), vcs.nameWithOwner, vcs.branch];
         const cut = apart ? tailStart(path, apart[i]) : 0;
         const detail = apart && path ? [(cut > 0 ? '…' : '') + path.slice(cut), ...rest] : [...rest, path];
-        lines.set(id, detail.filter(Boolean).map(String).join(' · '));
+        lines.set(project.id, detail.filter(Boolean).map(String).join(' · '));
       });
     }
-    S.projectSubtitles = { facts, lines };
     return lines;
   };
 
