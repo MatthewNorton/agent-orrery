@@ -77,8 +77,9 @@ export interface FeedEntry {
 
 /**
  * What main compares a planet by (build-buckets.js planetKey): the same for a folder, its bucket
- * and every build in it, in whatever casing each was written. Match on it with `===`; it is not a
- * name to show.
+ * and every build the bucket holds, in whatever casing each was written. A build no bucket holds
+ * (a name a bucket cannot have, or a project at the 10,000 cap) carries null and is on no planet,
+ * not even the one its folder names. Match on it with `===`; it is not a name to show.
  */
 export type PlanetKey = string;
 

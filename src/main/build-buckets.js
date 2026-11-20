@@ -67,9 +67,11 @@ function isBucketName(name) {
 }
 
 /**
- * What a planet is compared by: one key for a folder, its bucket and every build in it, in whatever
- * casing each was written. The renderer matches planets and build events on it and reads nothing
- * into it.
+ * What a planet is compared by: one key for a folder, its bucket and every build the bucket holds,
+ * in whatever casing each was written. A build no bucket holds (isBucketName refuses its name, or
+ * the project is at MAX_BUCKETS) is counted under no key (countBuild), so it is on no planet, not
+ * even the one its folder names. The renderer matches planets and build events on it and reads
+ * nothing into it.
  * @param {{ path: string | null }} project
  * @param {string} name
  */
