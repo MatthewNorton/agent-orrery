@@ -137,8 +137,10 @@
    * new request that ends the ones before it, so only the latest builds: a call
    * for the look already loading takes over from the one before, and the hull
    * is built once; a call for the look the ship has builds nothing. Resolves to
-   * the root once this request has swapped it in full, else null (no model, the
-   * same look, ended, or a throw, which is logged).
+   * the root once the new hull is in place, else null (no model, the same look,
+   * ended, or a throw, which is logged). The new hull's provider evidence or a
+   * label that cannot be written on the root or the dart is logged, and the
+   * root still resolves.
    * @param {Ship} ship
    * @returns {Promise<BABYLON.Mesh | null>}
    */

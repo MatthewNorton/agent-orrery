@@ -72,8 +72,9 @@
     AUR.logOnce(message, message);
   }
 
-  // Runs each step of a clean-up, each named by what it could not do (' could not be disposed').
-  // One that throws is logged, not thrown, so the rest still run and what the caller reports stands.
+  // Runs steps that must not throw past their caller, each named by what it could not do
+  // (' could not be disposed'). One that throws is logged, not thrown, so the rest still run and
+  // what the caller reports stands.
   /** @param {string} name @param {[string, () => void][]} steps */
   function guarded(name, steps) {
     for (const [what, step] of steps) {
