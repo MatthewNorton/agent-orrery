@@ -77,6 +77,26 @@ test('refresh promotes a ship focus mode shows apart or fades and lands it in th
   assert.equal(hullId(root), 'big');
 });
 
+test('a refresh that a later one ends while its file loads stays ended, and the latest request alone builds', async () => {
+  const assets = loadShipAssets(LADDER_MANIFEST, {});
+  // A ship of the first rank, in a scene of its own, asks for these ranks in turn while the files load.
+  const requests = async (ranks) => {
+    const scene = assets.scene('system');
+    const root = await assets.ships.upgrade(scene, ship('a', 0), assets.fallback('a'));
+    assets.built();
+    const held = assets.hold();
+    const asked = ranks.map((builds) => assets.ships.refresh(scene, ship('a', builds)));
+    await held.waiting();
+    held.release();
+    const results = (await Promise.all(asked)).map((result) => (result === root ? 'root' : result));
+    return { results, built: assets.built(), hull: hullId(root) };
+  };
+  const once = { results: [null, null, 'root'], built: ['a'], hull: 'mid' };
+  assert.deepEqual(await requests([3, 10, 3]), once, 'asked again after another rank');
+  assert.deepEqual(await requests([3, 0, 3]), once, 'asked again after the rank it has');
+  assert.deepEqual(await requests([3, 3, 3]), once, 'asked again for the look already loading');
+});
+
 test('the triangle budget steps near hulls down to far before falling back to the dart', async () => {
   const assets = loadShipAssets(LADDER_MANIFEST, {
     'small-near.glb': 360000, 'small-far.glb': 135000, 'mid-near.glb': 540000, 'mid-far.glb': 180000, // a 900k budget

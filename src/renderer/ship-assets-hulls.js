@@ -312,7 +312,7 @@
     root.metadata = hullMetadata(hull, asset, ship);
     root.isPickable = false;
     /** @type {ShipEntry} */
-    const entry = { root, correction: built.correction, own: built.own, hull, asset, ship, wanted: lookOf(hull, ship), fallback: null };
+    const entry = { root, correction: built.correction, own: built.own, hull, asset, ship, request: 0, fallback: null };
     const shipId = String(ship.id);
     state.triangles += asset.record.triangles;
     state.ships.set(shipId, entry);

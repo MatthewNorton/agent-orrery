@@ -21,11 +21,11 @@
  * @typedef {{ roots: BABYLON.TransformNode[], meshes: BABYLON.AbstractMesh[] }} HullTemplate a hidden
  *   copy of a hull that ships draw as instances of, and its meshes
  * @typedef {{ root: BABYLON.Mesh, correction: BABYLON.TransformNode, own: HullTemplate | null,
- *   hull: HullEntry, asset: HullAsset, ship: any, wanted: string,
+ *   hull: HullEntry, asset: HullAsset, ship: any, request: number,
  *   fallback: BABYLON.AbstractMesh | null }} ShipEntry `hull`, `asset` and `ship` are what its hull
  *   was last built from, so a fade can rebuild that hull exactly (its triangles are its asset's,
- *   its look lookOf(hull, ship)); `wanted` is the look the latest refresh asked for; `own` is the
- *   template of its own it is built on while focus mode shows it apart
+ *   its look lookOf(hull, ship)); `request` counts its refresh calls, so a waiting one can tell a
+ *   later one came; `own` is the template of its own it is built on while focus mode shows it apart
  * @typedef {{ containers: Map<string, HullRecord>, materials: Map<string, any>,
  *   templates: Map<string, HullTemplate>, ships: Map<string, ShipEntry>, triangles: number,
  *   visibility: number, apart: { shipId: string, visibility: number } | null,

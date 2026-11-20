@@ -101,8 +101,12 @@
    * Swaps a ship's hull in place when its rank or colors have changed (a ship
    * learns it runs a local model after it spawns). The asset root the scene
    * holds (directly, or under its fallback dart) stays the same node, and the
-   * new hull lands as focus mode's fade shows the ship (fade). Resolves to the
-   * root once swapped, else null (no model yet, same look, or superseded).
+   * new hull lands as focus mode's fade shows the ship (fade). Every call is a
+   * new request that ends the ones before it, so only the latest builds: a call
+   * for the look already loading takes over from the one before, and the hull
+   * is built once; a call for the look the ship has builds nothing. Resolves to
+   * the root once this request swapped it, else null (no model, the same look,
+   * or ended).
    * @param {Ship} ship
    * @returns {Promise<BABYLON.Mesh | null>}
    */
@@ -110,12 +114,10 @@
     const state = sceneStates.get(scene);
     const entry = state && ship ? state.ships.get(String(ship.id)) : null;
     if (!entry || isSceneDisposed(scene, state)) return Promise.resolve(null);
+    const request = ++entry.request;
     const hull = selectHull(settledManifest(), ship);
-    if (!hull) return Promise.resolve(null);
-    const look = lookOf(hull, ship);
-    entry.wanted = look; // also cancels a pending swap when the rank falls back
-    if (look === lookOf(entry.hull, entry.ship)) return Promise.resolve(null);
-    const live = () => entry.wanted === look && !AUR.isNodeDisposed(entry.root);
+    if (!hull || lookOf(hull, ship) === lookOf(entry.hull, entry.ship)) return Promise.resolve(null);
+    const live = () => entry.request === request && !AUR.isNodeDisposed(entry.root);
     return resolveAsset(scene, state, hull, () => entry.asset.record.triangles, live,
       (asset) => (swapHull(scene, state, entry, hull, asset, ship) ? entry.root : null)).catch(() => null);
   }
