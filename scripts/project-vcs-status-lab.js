@@ -1,5 +1,8 @@
 'use strict';
 
+// Security: asar handling is off before any module is loaded, as in src/main/main.js (SECURITY.md).
+process.noAsar = true;
+
 const { app, BrowserWindow } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');

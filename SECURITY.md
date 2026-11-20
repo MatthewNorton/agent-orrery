@@ -32,8 +32,8 @@ especially welcome:
   a tagged `GOALS.md` item).
 - Electron web-contents hardening (CSP, navigation, permissions).
 - Reads of a project folder by the main process. It turns Electron's asar handling off
-  (`process.noAsar`, first thing in `src/main/main.js`), so every read sees plain files and a
-  file named `*.asar` is never opened as an archive. The planet read
+  (`process.noAsar`, first thing in `src/main/main.js` and in each script Electron starts), so
+  every read sees plain files and a file named `*.asar` is never opened as an archive. The planet read
   (`src/main/live/system-view.js`) goes by what each folder's listing calls a folder and never
   goes into a link. It accepts that a folder swapped for a link between its parent's listing and
   its own read is read through: that takes a process already writing inside the project, on a
