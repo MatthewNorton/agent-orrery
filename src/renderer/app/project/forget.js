@@ -20,8 +20,17 @@
   ]);
 
   /**
+   * Runs `step`; what it throws is logged, as `what` not done, and not raised.
+   * @param {string} what
+   * @param {() => void} step
+   */
+  function orLog(what, step) {
+    try { step(); } catch (error) { AUR.log(`forget: ${what}`, error && error.message); }
+  }
+
+  /**
    * Main's answer, also when the reseed after a forget fails: main has forgotten the project then,
-   * and the failure is logged.
+   * the failure is logged, and the search and the panels are drawn again from the store.
    * @param {string} projectId
    * @returns {Promise<ProjectForgetResult>}
    */
@@ -29,7 +38,15 @@
     /** @type {ProjectForgetResult} */
     const result = await AUR.settle(() => AU.projectForget(projectId));
     if (result.ok === true && !result.canceled) {
-      try { A.adoptLiveRestart(result); } catch (error) { AUR.log('forget: the live state was not reseeded', error && error.message); }
+      try {
+        A.adoptLiveRestart(result);
+      } catch (error) {
+        AUR.log('forget: the live state was not reseeded', error && error.message);
+        // The reseed stopped part way, perhaps before the search and the panels were drawn from
+        // the store it had reseeded: they would show the forgotten project.
+        orLog('the search was not refreshed', () => A.refreshProjectSearchFromStore());
+        requestAnimationFrame(() => orLog('the panels were not drawn again', () => A.renderChrome()));
+      }
     }
     return result;
   };

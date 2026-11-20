@@ -11,17 +11,21 @@ const { deferred } = require('./support/main-wiring');
 const COULD_NOT = 'The project could not be forgotten.';
 
 // The card's forget with main's answer from `answerWith`, by default that it forgot the project;
-// `asked` lists the projects main was asked to forget; `logged` holds what AUR.log was given.
+// `asked` lists the projects main was asked to forget; `logged` holds what AUR.log was given, and
+// `frames` the frames asked for.
 function setup() {
   const state = { projectForget: { projectId: null, pending: false, note: '' } };
   const asked = [], logged = [];
   let answer = async () => ({ ok: true, canceled: false });
   const AU = { projectForget: (id) => { asked.push(id); return answer(); } };
-  const scheduled = [];
+  const scheduled = [], frames = [];
   const app = { state, const: { CHROME: { PROJECT: 1 } }, renderChromeNow() {}, adoptLiveRestart() {} };
-  app.scheduleChrome = (mask) => scheduled.push(mask);
-  runApp(['app/project/forget.js'], app, { window: { AU }, document: fakeDocument(), aur: { log: (...args) => logged.push(args.join(' ')) } });
-  return { app, state, asked, logged, scheduled, answerWith: (next) => { answer = next; } };
+  Object.assign(app, { scheduleChrome: (mask) => scheduled.push(mask), refreshProjectSearchFromStore() {}, renderChrome() {} });
+  runApp(['app/project/forget.js'], app, {
+    window: { AU }, document: fakeDocument(), aur: { log: (...args) => logged.push(args.join(' ')) },
+    globals: { requestAnimationFrame: (fn) => frames.push(fn) },
+  });
+  return { app, state, asked, logged, scheduled, frames, answerWith: (next) => { answer = next; } };
 }
 
 test('forget from the card: pending while main is asked, then a note for a refusal', async () => {
@@ -66,4 +70,34 @@ test('forget from the card: a reseed that fails after main forgot the project is
   answerWith(async () => ({ ok: false, code: 'NOT_FOUND' }));
   await app.forgetFromCard('p');
   assert.deepEqual([state.projectForget.note, asked], ['This project is already gone.', ['p', 'p']]);
+});
+
+test('forget: a reseed that throws part way leaves the project out of the search, and the panels drawn again', async () => {
+  const { app, state, logged, frames } = setup();
+  state.store = { projects: new Map([['p', {}], ['q', {}]]) };
+  let listed = ['p', 'q'], draws = 0;
+  app.refreshProjectSearchFromStore = () => { listed = [...state.store.projects.keys()]; };
+  app.renderChrome = () => { if (draws++ === 0) throw new Error('render failed'); };
+  // As the reseed goes: the store, then the panels, then the search.
+  app.adoptLiveRestart = () => { state.store.projects.delete('p'); app.renderChrome(); app.refreshProjectSearchFromStore(); };
+  await app.forgetFromCard('p');
+  assert.deepEqual([listed, logged], [['q'], ['forget: the live state was not reseeded render failed']]);
+  assert.equal(frames.length, 1, 'a frame draws the panels again');
+  frames.shift()();
+  assert.deepEqual([draws, listed, logged.length], [2, ['q'], 1]);
+});
+
+test('forget: after a reseed that throws, a search refresh or a redraw that throws is logged, not raised', async () => {
+  const { app, state, logged, frames } = setup();
+  app.adoptLiveRestart = () => { throw new Error('no snapshot'); };
+  app.refreshProjectSearchFromStore = () => { throw new Error('search failed'); };
+  app.renderChrome = () => { throw new Error('draw failed'); };
+  await app.forgetFromCard('p');
+  assert.equal(state.projectForget.note, '', 'forgotten, as main says');
+  frames.shift()();
+  assert.deepEqual(logged, [
+    'forget: the live state was not reseeded no snapshot',
+    'forget: the search was not refreshed search failed',
+    'forget: the panels were not drawn again draw failed',
+  ]);
 });
