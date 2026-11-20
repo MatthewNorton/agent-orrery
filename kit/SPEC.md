@@ -632,8 +632,9 @@ route logs that and shows the universe instead (`app/route.js`).
   planet in from zero, feed shows planet formation. An answer is drawn only while the app still
   shows the view in the stream it was asked in (`ctx.shown`). A fetch that fails is not tried
   again, unless a planet started while it was out, which is a new reason to ask once more. Until
-  an answer comes back while the app shows the view in the stream it was asked in, or the view is
-  built again, the view stays behind: its system is not handed to a planet, which fetches its
+  the answer to a request made after the last planet started comes back while
+  the app shows the view in the stream it was asked in, or the view is built
+  again, the view stays behind: its system is not handed to a planet, which fetches its
   own. A planet that cannot be built, when the view opens or later, leaves no ring, globe,
   shell, material or label behind and gives its maps back to the map service (a world's own
   `dispose()`, `worlds/material.js`, which never disposes the blank texture its scene shares); it

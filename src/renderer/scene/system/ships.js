@@ -171,8 +171,9 @@
     // A build started a planet this view does not draw: the system is fetched again, one request at
     // a time, and once more for a planet that started meanwhile. A fetch that fails is not tried
     // again: the loop ends there, unless a planet started while it was out, which is a new reason to
-    // ask. Either way the view stays behind (view.sysBehind) until an answer comes back while it is
-    // shown in the stream it was asked in, or the view is rebuilt.
+    // ask. Either way the view stays behind (view.sysBehind) until the answer to a request made after
+    // the last planet started comes back while it is shown in the stream it was asked in, or the view
+    // is rebuilt.
     async function refetchPlanets() {
       view.sysBehind = refetchAgain = true;
       if (refetching) return;
