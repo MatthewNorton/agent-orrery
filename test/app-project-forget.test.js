@@ -10,15 +10,13 @@ const { deferred } = require('./support/main-wiring');
 
 const COULD_NOT = 'The project could not be forgotten.';
 
-// The card's forget with main's answer from `answerWith`, by default `forgets`: main forgets a
-// project once and finds it no more after. `asked` lists the projects main was asked to forget;
-// `logged` holds what AUR.log was given.
+// The card's forget with main's answer from `answerWith`, by default that it forgot the project;
+// `asked` lists the projects main was asked to forget; `logged` holds what AUR.log was given.
 function setup() {
   const state = { projectForget: { projectId: null, pending: false, note: '' } };
-  const asked = [], logged = [], forgotten = new Set();
-  const forgets = async (id) => (forgotten.has(id) ? { ok: false, code: 'NOT_FOUND' } : (forgotten.add(id), { ok: true, canceled: false }));
-  let answer = forgets;
-  const AU = { projectForget: (id) => { asked.push(id); return answer(id); } };
+  const asked = [], logged = [];
+  let answer = async () => ({ ok: true, canceled: false });
+  const AU = { projectForget: (id) => { asked.push(id); return answer(); } };
   const app = { state, const: { CHROME: { PROJECT: 1 } }, renderChromeNow() {}, adoptLiveRestart() {} };
   runApp(['app/project/forget.js'], app, { window: { AU }, document: fakeDocument(), aur: { log: (...args) => logged.push(args.join(' ')) } });
   return { app, state, asked, logged, answerWith: (next) => { answer = next; } };
@@ -55,13 +53,13 @@ test('forget from the card: a render or a call that throws leaves the card free 
 });
 
 test('forget from the card: a reseed that fails after main forgot the project is logged, and the card says what main did', async () => {
-  const { app, state, asked, logged } = setup();
+  const { app, state, asked, logged, answerWith } = setup();
   app.adoptLiveRestart = () => { throw new Error('no snapshot'); };
   await app.forgetFromCard('p');
   assert.deepEqual(state.projectForget, { projectId: 'p', pending: false, note: '' }, 'forgotten, as main says');
   assert.deepEqual(logged.map((line) => line.includes('no snapshot')), [true]);
   // Asked again, main has it no more.
-  app.adoptLiveRestart = () => {};
+  answerWith(async () => ({ ok: false, code: 'NOT_FOUND' }));
   await app.forgetFromCard('p');
   assert.deepEqual([state.projectForget.note, asked], ['This project is already gone.', ['p', 'p']]);
 });
