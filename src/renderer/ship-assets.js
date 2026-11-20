@@ -37,7 +37,7 @@
  * @property {(hull: HullEntry, lod: 'far' | 'near') => HullFile[]} hullFiles
  * @property {(scene: any, state: SceneState, file: HullFile) => Promise<HullRecord | null>} ensureContainer
  * @property {(scene: any, state: SceneState, record: HullRecord, released: number) => boolean} fitsBudget
- * @property {(scene: any, state: SceneState, hull: HullEntry, released: number) => Promise<HullAsset | null>} resolveAsset
+ * @property {(scene: any, state: SceneState, hull: HullEntry, released: number, live: () => boolean) => Promise<HullAsset | null>} resolveAsset
  */
 
 (function () {
@@ -238,13 +238,16 @@
   }
 
   /**
-   * Loads the first of the hull's files that fits the scene's triangle budget.
+   * Loads the first of the hull's files that fits the scene's triangle budget, while the request
+   * is live: one that has since ended (its ship gone, its swap superseded) starts no further load.
    * @param {number} released triangles the ship gives back if this replaces its hull
+   * @param {() => boolean} live
    * @returns {Promise<HullAsset | null>}
    */
-  function resolveAsset(scene, state, hull, released) {
+  function resolveAsset(scene, state, hull, released, live) {
     const files = hullFiles(hull, viewLod(scene) || 'far');
     const tryFile = (index) => {
+      if (!live()) return Promise.resolve(null);
       if (index >= files.length) {
         logBudget(scene);
         return Promise.resolve(null);

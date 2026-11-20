@@ -367,7 +367,8 @@ Design tokens (put in `:root`):
   that every other blended mesh keeps: a faded fleet draws after them all,
   over the sun's corona and glow and the planets' shells. A view steps down to the dart past its hull triangle budget (checked again
   in the step that builds a hull, so ships waiting on one container keep to
-  it): 900k in a
+  it; a request that ends while it waits, its dart gone or its swap
+  superseded, loads and builds nothing more): 900k in a
   system or planet view, which holds fifty-one ships of the first rank, and
   1.24M on the universe map, which holds seventy. Ship size is one policy (`AUR.SHIP_SIZE` per
   view, `AUR.fitShip` with a pixel floor so a hull sized to its planets still

@@ -39,12 +39,13 @@
 
   // Every ship waiting on a container is checked against the budget when it arrives, before any of
   // them is built, so the check is made again in the step that builds the hull; a ship that no
-  // longer fits looks again (a lighter file, or none). `released()` is what its swap gives back.
-  function whenFits(scene, state, hull, released, build) {
-    return resolveAsset(scene, state, hull, released()).then((asset) => {
-      if (!asset) return null;
+  // longer fits looks again (a lighter file, or none). `released()` is what its swap gives back,
+  // and `live()` whether the request still stands: one that has ended loads and builds nothing.
+  function whenFits(scene, state, hull, live, released, build) {
+    return resolveAsset(scene, state, hull, released(), live).then((asset) => {
+      if (!asset || !live()) return null;
       return fitsBudget(scene, state, asset.record, released())
-        ? build(asset) : whenFits(scene, state, hull, released, build);
+        ? build(asset) : whenFits(scene, state, hull, live, released, build);
     });
   }
 
@@ -54,8 +55,8 @@
       if (!manifest || isSceneDisposed(scene, state)) return null;
       const hull = selectHull(manifest, ship);
       if (!hull) return null;
-      return whenFits(scene, state, hull, () => 0, (asset) => {
-        if (AUR.isNodeDisposed(fallback) || isSceneDisposed(scene, state)) return null;
+      const live = () => !AUR.isNodeDisposed(fallback) && !isSceneDisposed(scene, state);
+      return whenFits(scene, state, hull, live, () => 0, (asset) => {
         const entry = createShipEntry(scene, state, hull, asset, ship);
         if (!entry) return null;
         const assetRoot = entry.root;
@@ -107,10 +108,9 @@
     const look = lookOf(hull, ship);
     entry.wanted = look; // also cancels a pending swap when the rank falls back
     if (look === entry.look) return Promise.resolve(null);
-    return whenFits(scene, state, hull, () => entry.triangles, (asset) => {
-      if (entry.wanted !== look || AUR.isNodeDisposed(entry.root) || isSceneDisposed(scene, state)) return null;
-      return swapHull(scene, state, entry, hull, asset, ship) ? entry.root : null;
-    }).catch(() => null);
+    const live = () => entry.wanted === look && !AUR.isNodeDisposed(entry.root) && !isSceneDisposed(scene, state);
+    return whenFits(scene, state, hull, live, () => entry.triangles,
+      (asset) => (swapHull(scene, state, entry, hull, asset, ship) ? entry.root : null)).catch(() => null);
   }
 
   function dispose(scene) {

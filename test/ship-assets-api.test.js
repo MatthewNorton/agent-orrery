@@ -147,6 +147,46 @@ test('ships that open together, waiting on one container, keep to the budget as 
   assert.equal(assets.triangles(scene), 800000);
 });
 
+test('a hull request whose dart is gone or that is superseded while it waits on the budget loads no further file', async () => {
+  const assets = loadShipAssets(LADDER_MANIFEST, {
+    'small-near.glb': 500000, 'small-far.glb': 100000, 'mid-near.glb': 500000, 'mid-far.glb': 100000, // a 900k budget
+  });
+  const scene = assets.scene('system');
+  // Two ships wait on one container that only the first fits: the second would step down.
+  let held = assets.hold();
+  const dart = assets.fallback('b');
+  const first = assets.ships.upgrade(scene, ship('a', 0), assets.fallback('a'));
+  const second = assets.ships.upgrade(scene, ship('b', 0), dart);
+  await held.waiting();
+  dart.dispose(); // the ship leaves while its hull loads
+  held.release();
+  assert.ok(await first);
+  assert.equal(await second, null);
+  assert.deepEqual(assets.loads.splice(0), ['small-near.glb'], 'no far file for a ship that is gone');
+  const stepped = await assets.ships.upgrade(scene, ship('c', 0), assets.fallback('c'));
+  assert.equal(stepped.metadata.assetLod, 'far', 'the file a ship still waiting steps down to');
+  assets.loads.length = 0;
+
+  // 600k in use: the next rank's near file does not fit in place of c's 100k, so c would step down.
+  const promoted = assets.ships.refresh(scene, ship('c', 3));
+  assert.equal(await assets.ships.refresh(scene, ship('c', 0)), null, 'back to its rank before the file arrives');
+  assert.equal(await promoted, null);
+  assert.deepEqual(assets.loads.splice(0), ['mid-near.glb'], 'no far file for a promotion that was taken back');
+  assert.equal(await assets.ships.refresh(scene, ship('c', 3)), stepped);
+  assert.deepEqual(assets.loads.splice(0), ['mid-far.glb'], 'the file a promotion still wanted steps down to');
+
+  // Nor is a hull built for a ship that leaves while a file it fits loads.
+  held = assets.hold();
+  const left = assets.fallback('e');
+  const leaving = assets.ships.upgrade(scene, ship('e', 10), left);
+  await held.waiting();
+  left.dispose();
+  held.release();
+  assert.equal(await leaving, null, 'no hull under a dart that is gone');
+  assert.deepEqual(assets.loads, ['big-near.glb']);
+  assert.equal(assets.triangles(scene), 600000, 'its triangles never taken');
+});
+
 // The counts the budget comment and kit/SPEC.md state, at the size Petrel was imported at.
 test('a near view holds fifty-one ships of the first rank and the universe map, with a budget of its own, seventy', async () => {
   const petrel = JSON.parse(fs.readFileSync(path.join(RENDERER, 'ships', 'petrel', 'source', 'source.json'), 'utf8'));

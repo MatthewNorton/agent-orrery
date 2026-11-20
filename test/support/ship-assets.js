@@ -87,6 +87,7 @@ const onLayer = (mesh, layer) => mesh.layerMask === (CAMERA_LAYERS | layer);
 // `materials`: a material name, or { name, textured, albedo } for an authored one.
 function loadShipAssets(manifest, trianglesByFile, materials = ['hull_primary', 'accent_energy']) {
   const loads = [];
+  let held = null; // while a test holds the loads (hold()), each waits on this
   class Vector {
     constructor() { this.x = 0; this.y = 0; this.z = 0; }
     setAll(value) { this.x = value; this.y = value; this.z = value; }
@@ -207,6 +208,7 @@ function loadShipAssets(manifest, trianglesByFile, materials = ['hull_primary', 
       SceneLoader: {
         LoadAssetContainerAsync: async (_root, file) => {
           loads.push(file);
+          if (held) await held;
           return containerFor(file);
         },
       },
@@ -227,6 +229,13 @@ function loadShipAssets(manifest, trianglesByFile, materials = ['hull_primary', 
     fallback: (id) => Object.assign(new Mesh('fallback-' + id), {
       material: { alpha: 1 }, metadata: { isShip: true, shipId: id },
     }),
+    // Holds the hull files that start loading until `release()`; `waiting()` settles once every
+    // request made so far is waiting on one.
+    hold() {
+      let release = () => {};
+      held = new Promise((resolve) => { release = resolve; });
+      return { waiting: () => new Promise((resolve) => setImmediate(resolve)), release: () => { held = null; release(); } };
+    },
   };
 }
 
