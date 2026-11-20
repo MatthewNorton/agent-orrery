@@ -236,10 +236,10 @@
       mesh.visibility = visibility;
       mesh.layerMask |= layer;
       // Babylon sorts a template's ships as one, at the template's place: the scene origin, where
-      // the sun's glow is too, so the glow and the planets' shells fell between a faded ship's
-      // parts. Past the default (Number.MAX_VALUE), which every other mesh keeps, a faded fleet
-      // draws after every other blended mesh, wherever its ships are. Only a faded hull blends:
-      // no flown hull has a blended material in full.
+      // the sun's glow is too. Past the default (Number.MAX_VALUE), which every other mesh keeps,
+      // a faded fleet draws after every other blended mesh, wherever its ships are, and never
+      // with the glow or a planet's shell between its parts. Only a faded hull blends: no flown
+      // hull has a blended material in full.
       mesh.alphaIndex = Number.POSITIVE_INFINITY;
     }
     return { roots: entries.rootNodes, meshes };
