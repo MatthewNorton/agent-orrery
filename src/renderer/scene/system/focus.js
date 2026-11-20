@@ -160,19 +160,15 @@
 
     // The hull's diagonal this frame: measured per unit of the ship's scaling once per hull (the
     // ship's mesh and its hull id, which a promotion changes in place), then scaled by the size the
-    // pixel floor gives the ship right now. A hull swapped in under a dart is noted on the dart
-    // (ship-assets-api.js) and sits under it beside the plume anchors; a hull built in place, or
-    // the bare dart, is the mesh itself.
+    // pixel floor gives the ship right now.
     function hullSpan(rec) {
       const { shipFocus } = view;
-      const key = rec.mesh.uniqueId + ':' + AUR.shipHullId(rec.mesh);
-      if (shipFocus.measured !== key) {
-        const swapped = rec.mesh.metadata && rec.mesh.metadata.upgradedHullId;
-        const hull = swapped && rec.mesh.getChildren((child) => Boolean(child.metadata && child.metadata.assetHullId), true)[0];
-        const node = hull || rec.mesh;
-        const bounds = node.getHierarchyBoundingVectors();
+      const hull = AUR.shipHullId(rec.mesh);
+      if (shipFocus.measuredMesh !== rec.mesh || shipFocus.measuredHull !== hull) {
+        const bounds = AUR.shipHullNode(rec.mesh).getHierarchyBoundingVectors();
         const diagonal = bounds.max.subtract(bounds.min).length() / (rec.mesh.scaling.x || 1);
-        shipFocus.measured = key;
+        shipFocus.measuredMesh = rec.mesh;
+        shipFocus.measuredHull = hull;
         shipFocus.unitSpan = Number.isFinite(diagonal) && diagonal > 0 ? diagonal : 1.2;
       }
       return shipFocus.unitSpan * rec.mesh.scaling.x;
@@ -214,7 +210,7 @@
       const rec = ships.get(id);
       if (!rec) return false;
       clearShipFocus();
-      view.shipFocus = { shipId: id, saved: new Map(), measured: null, unitSpan: 0 };
+      view.shipFocus = { shipId: id, saved: new Map(), measuredMesh: null, measuredHull: null, unitSpan: 0 };
       setShipFocus(settings);
       camera.detachControl(canvas);
       scene.skipPointerMovePicking = true; // the pointer orbits; nothing under it is picked

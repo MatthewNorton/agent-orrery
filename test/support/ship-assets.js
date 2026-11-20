@@ -14,6 +14,8 @@ const SHIP_ASSET_FILES = scriptTags().filter((file) => /^ship-assets[a-z-]*\.js$
 const SHIP_LAYER = 0x10000000;
 const CAMERA_LAYERS = 0x0FFFFFFF;
 const onLayer = (mesh, layer) => mesh.layerMask === (CAMERA_LAYERS | layer);
+// An instance keeps the default mask (Babylon lights it as its template, which carries the layer).
+const instanceOnLayer = (mesh, layer) => mesh.layerMask === CAMERA_LAYERS && onLayer(mesh.sourceMesh, layer);
 
 // Enough of BABYLON.Color3 for the livery: hex in, channels, scale, linearization, hex out.
 class Color {
@@ -248,6 +250,6 @@ function hullOf(root) {
 }
 
 module.exports = {
-  SHIP_ASSET_FILES, SHIP_LAYER, onLayer, Color, loadShipAssets, LADDER_MANIFEST, ship, hullId, partMaterial,
+  SHIP_ASSET_FILES, SHIP_LAYER, onLayer, instanceOnLayer, Color, loadShipAssets, LADDER_MANIFEST, ship, hullId, partMaterial,
   instancesOf, templatesOf, sameItems, hullOf,
 };

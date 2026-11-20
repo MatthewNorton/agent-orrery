@@ -113,9 +113,9 @@
     if (!hull) return Promise.resolve(null);
     const look = lookOf(hull, ship);
     entry.wanted = look; // also cancels a pending swap when the rank falls back
-    if (look === entry.look) return Promise.resolve(null);
+    if (look === lookOf(entry.hull, entry.ship)) return Promise.resolve(null);
     const live = () => entry.wanted === look && !AUR.isNodeDisposed(entry.root);
-    return resolveAsset(scene, state, hull, () => entry.triangles, live,
+    return resolveAsset(scene, state, hull, () => entry.asset.record.triangles, live,
       (asset) => (swapHull(scene, state, entry, hull, asset, ship) ? entry.root : null)).catch(() => null);
   }
 

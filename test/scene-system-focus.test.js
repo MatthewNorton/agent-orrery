@@ -156,4 +156,10 @@ test('the chase camera measures a hull again when a promotion swaps it in place,
     view.clearShipFocus();
     view.focusShip('c', { exterior: true });
     near(back(arrived), unit, 'the hull, not the anchor before it');
+
+    // Measured per mesh too: another mesh of the same hull id is measured again.
+    const bigger = addShip(scene, view, hiddenTemplate(scene, 2), 'bigger', { dart: true });
+    arrived.mesh = bigger.mesh;
+    view.updateShipFocusCamera(true, 0);
+    near(back(arrived), unit * 2, 'a mesh of its own');
   }));

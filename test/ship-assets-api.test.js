@@ -203,6 +203,8 @@ test('the triangle budget steps near hulls down to far before falling back to th
   assert.equal(await assets.ships.refresh(scene, ship('b', 3)), roots[1]);
   assert.equal(hullId(roots[1]), 'mid');
   assert.equal(roots[1].metadata.assetLod, 'far');
+  roots[1].dispose();
+  assert.equal(assets.triangles(scene), 360000 + 135000, 'a promoted ship gives back the triangles of the hull it flies');
 });
 
 test('ships that open together, waiting on one container, keep to the budget as ships that come one by one do', async () => {

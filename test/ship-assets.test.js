@@ -8,7 +8,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const {
-  SHIP_ASSET_FILES, SHIP_LAYER, onLayer, Color, loadShipAssets, LADDER_MANIFEST, ship, hullId, partMaterial,
+  SHIP_ASSET_FILES, SHIP_LAYER, instanceOnLayer, Color, loadShipAssets, LADDER_MANIFEST, ship, hullId, partMaterial,
   instancesOf, templatesOf, sameItems,
 } = require('./support/ship-assets');
 
@@ -92,7 +92,7 @@ test('a rank a ship model has taken flies the model, built in code, until the sh
   assert.deepEqual(instancesOf(drone).map((mesh) => mesh.material.worn), ['coded codex #f2f0ea hull_primary', 'coded codex #f2f0ea accent_energy']);
   for (const mesh of [...instancesOf(root), ...instancesOf(drone)]) {
     assert.ok(mesh.isVisible && !mesh.sourceMesh.isVisible, 'an instance of a hidden template');
-    assert.ok(onLayer(mesh, assets.models.LAYER) && onLayer(mesh.sourceMesh, assets.models.LAYER), 'seen by the camera, lit by the model lights only');
+    assert.ok(instanceOnLayer(mesh, assets.models.LAYER), 'seen by the camera, lit by the model lights only');
   }
   const twin = await assets.ships.upgrade(system, ship('twin', 0), assets.fallback('twin'));
   assert.ok(sameItems(templatesOf(twin), templatesOf(root)), 'one template per palette');
@@ -100,14 +100,14 @@ test('a rank a ship model has taken flies the model, built in code, until the sh
   assert.equal(await assets.ships.refresh(system, ship('a', 3)), root, 'promoted in place');
   assert.equal(hullId(root), 'mid');
   assert.deepEqual(assets.loads, ['mid-near.glb']);
-  assert.ok(instancesOf(root).every((mesh) => onLayer(mesh, SHIP_LAYER) && onLayer(mesh.sourceMesh, SHIP_LAYER) && !mesh.material.worn),
+  assert.ok(instancesOf(root).every((mesh) => instanceOnLayer(mesh, SHIP_LAYER) && !mesh.material.worn),
     'a manifest hull wears the fleet livery and is lit by the fleet lights, not the model ones');
 
   const universe = assets.scene('universe');
   const far = [];
   for (const id of ['x', 'y']) far.push(await assets.ships.upgrade(universe, ship(id, 0), assets.fallback(id)));
   assert.deepEqual(built, ['coded', 'coded'], 'one built container per scene');
-  assert.ok(far.every((root) => instancesOf(root).every((mesh) => mesh.isVisible && onLayer(mesh, assets.models.LAYER))));
+  assert.ok(far.every((root) => instancesOf(root).every((mesh) => mesh.isVisible && instanceOnLayer(mesh, assets.models.LAYER))));
   assert.ok(sameItems(templatesOf(far[0]), templatesOf(far[1])), 'on the map the ships of a palette are instances of one template');
 });
 
@@ -122,7 +122,9 @@ test('every view instances its hulls from one template per provider: far hulls o
   const parts = (root) => root.getChildMeshes(false).filter((mesh) => mesh.material);
   for (const root of [first, second, codex]) {
     assert.equal(parts(root).length, 2);
-    assert.ok(sameItems(parts(root), instancesOf(root)) && parts(root).every((mesh) => mesh.isVisible));
+    assert.ok(sameItems(parts(root), instancesOf(root)) && parts(root).every((mesh) => mesh.isVisible && !mesh.isPickable));
+    const tagged = root.getChildMeshes(false).filter((mesh) => mesh.metadata && mesh.metadata.assetHullId === 'small');
+    assert.ok(sameItems(tagged, parts(root)), 'each part, and only a part, carries its hull id');
     assert.ok(templatesOf(root).every((mesh) => mesh.isVisible === false), 'templates stay hidden');
     assert.equal(root.metadata.assetLod, 'far');
   }
@@ -138,7 +140,7 @@ test('every view instances its hulls from one template per provider: far hulls o
   assert.equal(assets.loads.at(-1), 'small-near.glb');
   assert.ok(sameItems(parts(near), instancesOf(near)) && templatesOf(near).every((mesh) => mesh.isVisible === false));
   assert.ok(sameItems(templatesOf(nearTwin), templatesOf(near)), 'one template per provider');
-  assert.ok(instancesOf(near).every((mesh) => onLayer(mesh, SHIP_LAYER) && onLayer(mesh.sourceMesh, SHIP_LAYER)),
+  assert.ok(instancesOf(near).every((mesh) => instanceOnLayer(mesh, SHIP_LAYER)),
     'the template carries the fleet light layer, and both keep the camera\'s');
   assert.equal(partMaterial(near, 'hull_primary').emissiveColor.toHexString(), '#000000', 'a near hull is lit, not self-lit');
 });

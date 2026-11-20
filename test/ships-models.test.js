@@ -100,8 +100,9 @@ test('in a system every Petrel of a provider is an instance of one template, lit
     assert.equal(a.metadata.assetHullId, 'petrel');
     const template = hullOf(a).sourceMesh;
     assert.equal(hullOf(b).sourceMesh, template, 'one template for the provider');
-    assert.equal(template.isVisible, false);
+    assert.deepEqual([template.isVisible, hullOf(a).isVisible], [false, true], 'a hidden template, drawn as its instances');
     const lights = (mesh) => mesh.lightSources.map((light) => light.name).sort();
+    assert.ok((template.layerMask & AUR.shipModels.LAYER) && hullOf(a).layerMask === 0x0FFFFFFF, 'the layer is the template\'s');
     assert.deepEqual(lights(hullOf(a)), ['model-fill', 'model-rim', 'model-sun'], 'an instance is lit as its template is');
     const blends = (mesh) => mesh.material.subMaterials.map((finish) => finish.needAlphaBlendingForMesh(mesh));
     assert.ok(!blends(hullOf(a)).some(Boolean), 'no finish blends in full');

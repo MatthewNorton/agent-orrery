@@ -193,6 +193,13 @@
     return (metadata && (metadata.upgradedHullId || metadata.assetHullId)) || null;
   };
 
+  // The node a ship mesh's hull hangs from: the asset root swapped in under a dart (beside the
+  // dart's plume anchors), or the mesh itself (an asset root, or a bare dart).
+  AUR.shipHullNode = function (mesh) {
+    const swapped = mesh.metadata && mesh.metadata.upgradedHullId;
+    return (swapped && mesh.getChildren((child) => Boolean(child.metadata && child.metadata.assetHullId), true)[0]) || mesh;
+  };
+
   // The connected pieces of a mesh (triangles sharing a vertex position), each as its centre and
   // the radius of its vertices about it: a hull's glow discs, joined into one mesh but never welded.
   AUR.meshIslands = function (positions, indices) {

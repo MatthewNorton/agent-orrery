@@ -90,6 +90,24 @@ test('shipHullId names the hull under a dart, the asset root itself, or nothing 
   assert.equal(AUR.shipHullId(null), null);
 });
 
+test('shipHullNode finds the hull swapped in under a dart, past its plume anchors, or gives the mesh itself', () => {
+  const AUR = loadUtilLayer();
+  const anchor = { metadata: null };
+  const hull = { metadata: { assetHullId: 'scout' } };
+  const under = (children) => (predicate, directOnly) => {
+    assert.equal(directOnly, true, 'only the dart\'s own children: a hull holds parts tagged with its id too');
+    return children.filter(predicate);
+  };
+  const dart = { metadata: { upgradedHullId: 'scout' }, getChildren: under([anchor, hull]) };
+  assert.equal(AUR.shipHullNode(dart), hull);
+  const root = { metadata: { assetHullId: 'capital' }, getChildren: under([]) };
+  assert.equal(AUR.shipHullNode(root), root, 'a hull built in place');
+  const bare = { metadata: { isShip: true }, getChildren: under([anchor]) };
+  assert.equal(AUR.shipHullNode(bare), bare, 'a dart that flies no hull');
+  const arriving = { metadata: { upgradedHullId: 'scout' }, getChildren: under([anchor]) };
+  assert.equal(AUR.shipHullNode(arriving), arriving, 'a dart noted before its hull is under it');
+});
+
 test('memo builds an entry once and hands the same one back after', () => {
   const AUR = loadUtilLayer();
   const map = new Map();

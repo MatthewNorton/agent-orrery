@@ -213,12 +213,12 @@
   /**
    * A tinted, hidden copy of a hull: every ship of that look draws as its instances, in one draw
    * per part. An instance takes its source's material, visibility and lights, so the template
-   * carries the layer of the lights that reach the hull, and the visibility its ships show: the
-   * fleet's, which focus mode fades by writing it on every template (AUR.ships.fade), or one of its own
-   * for the ship it shows apart.
+   * carries the layer of the ship-only lights that reach the hull (the models' own, or the fleet's
+   * key and rim), and the visibility its ships show: the fleet's, which focus mode fades by
+   * writing it on every template (AUR.ships.fade), or one of its own for the ship it shows apart.
    * @returns {HullTemplate}
    */
-  function makeTemplate(scene, state, asset, ship, name, visibility, layer) {
+  function makeTemplate(scene, state, asset, ship, name, visibility) {
     const entries = asset.record.container.instantiateModelsToScene(
       (sourceName) => name + '_' + sourceName,
       false,
@@ -226,6 +226,7 @@
     );
     // The lightless map's hulls light themselves, and so does a far file stepped down to up close.
     const selfLight = viewLod(scene) === 'far' || asset.lod === 'far';
+    const layer = asset.model ? AUR.shipModels.LAYER : AUR.SHIP_LAYER;
     const meshes = childMeshes(entries.rootNodes);
     for (const mesh of meshes) {
       mesh.material = hullMaterial(scene, state, asset, selfLight, ship, mesh.material);
@@ -245,23 +246,10 @@
 
   // The template a ship's hull is built on: its look's, one per hull file and palette at the
   // fleet's visibility, or one of its own while focus mode shows it apart (`own`).
-  function templateFor(scene, state, asset, ship, own, layer) {
+  function templateFor(scene, state, asset, ship, own) {
     const key = asset.file + '|' + paletteKey(ship);
-    if (own !== null) return makeTemplate(scene, state, asset, ship, 'ship_template_' + key + '|' + ship.id, own, layer);
-    return AUR.memo(state.templates, key, () => makeTemplate(scene, state, asset, ship, 'ship_template_' + key, state.visibility, layer));
-  }
-
-  function placeInstances(template, ship, pivot) {
-    const created = [];
-    for (const node of template.roots) {
-      node.instantiateHierarchy(pivot, undefined, (source, copy) => {
-        copy.name = 'ship_' + String(ship.id) + '_' + source.name;
-        created.push(copy);
-      });
-    }
-    const meshes = childMeshes(created);
-    for (const mesh of meshes) mesh.isVisible = true;
-    return meshes;
+    if (own !== null) return makeTemplate(scene, state, asset, ship, 'ship_template_' + key + '|' + ship.id, own);
+    return AUR.memo(state.templates, key, () => makeTemplate(scene, state, asset, ship, 'ship_template_' + key, state.visibility));
   }
 
   /**
@@ -280,29 +268,26 @@
     const offset = Array.isArray(data.offset) ? data.offset : [0, 0, 0];
     pivot.position.set(Number(offset[0]) || 0, Number(offset[1]) || 0, Number(offset[2]) || 0);
     correction.setEnabled(apartVisibility(state, ship) !== 0);
-    // Which ship-only lights reach the hull: the models' own, or the fleet's key and rim.
-    const layer = asset.model ? AUR.shipModels.LAYER : AUR.SHIP_LAYER;
     const own = ownVisibility(state, ship);
+    const tags = { providerPalette: true, providerKey: AUR.providerKey(ship && ship.provider), assetHullId: hull.id };
     let template = null;
-    let meshes;
     try {
-      template = templateFor(scene, state, asset, ship, own, layer);
-      meshes = placeInstances(template, ship, pivot);
+      template = templateFor(scene, state, asset, ship, own);
+      for (const node of template.roots) {
+        // An instance for each part (shown, unlike its template, and lit as it is), a copy for
+        // each node without geometry.
+        node.instantiateHierarchy(pivot, undefined, (source, copy) => {
+          copy.name = 'ship_' + String(ship.id) + '_' + source.name;
+          if (!copy.material) return;
+          copy.isPickable = false;
+          copy.metadata = { ...(copy.metadata || {}), ...tags };
+        });
+      }
     } catch (error) {
       correction.dispose();
       if (template && own !== null) disposeTemplate(template);
       logOnce('instance:' + hull.id, 'Hull ' + hull.id + ' could not be instantiated; using procedural hulls.');
       return null;
-    }
-    for (const mesh of meshes) {
-      mesh.isPickable = false;
-      mesh.layerMask |= layer;
-      mesh.metadata = {
-        ...(mesh.metadata || {}),
-        providerPalette: true,
-        providerKey: AUR.providerKey(ship && ship.provider),
-        assetHullId: hull.id,
-      };
     }
     return { correction, own: own === null ? null : template, evidence: evidenceMaterial(scene, state, ship) };
   }
@@ -327,15 +312,12 @@
     root.metadata = hullMetadata(hull, asset, ship);
     root.isPickable = false;
     /** @type {ShipEntry} */
-    const entry = {
-      root, correction: built.correction, own: built.own, hull, asset, ship, triangles: asset.record.triangles,
-      look: lookOf(hull, ship), wanted: lookOf(hull, ship), fallback: null,
-    };
+    const entry = { root, correction: built.correction, own: built.own, hull, asset, ship, wanted: lookOf(hull, ship), fallback: null };
     const shipId = String(ship.id);
-    state.triangles += entry.triangles;
+    state.triangles += asset.record.triangles;
     state.ships.set(shipId, entry);
     root.onDisposeObservable.addOnce(() => {
-      state.triangles = Math.max(0, state.triangles - entry.triangles);
+      state.triangles = Math.max(0, state.triangles - entry.asset.record.triangles);
       if (entry.own) disposeTemplate(entry.own); // a template of its own leaves with its ship
       if (state.ships.get(shipId) === entry) state.ships.delete(shipId);
     });
@@ -353,11 +335,8 @@
     built.correction.parent = entry.root;
     entry.correction.dispose(false, false);
     if (entry.own) disposeTemplate(entry.own); // its instances went with the old hull
-    state.triangles += asset.record.triangles - entry.triangles;
-    Object.assign(entry, {
-      correction: built.correction, own: built.own, hull, asset, ship,
-      triangles: asset.record.triangles, look: lookOf(hull, ship),
-    });
+    state.triangles += asset.record.triangles - entry.asset.record.triangles;
+    Object.assign(entry, { correction: built.correction, own: built.own, hull, asset, ship });
     entry.root.material = built.evidence;
     entry.root.metadata = { ...(entry.root.metadata || {}), ...hullMetadata(hull, asset, ship) };
     if (entry.fallback && entry.fallback.metadata) {
