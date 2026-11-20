@@ -28,7 +28,9 @@ function validArchive() {
 }
 
 // The codes Windows gives for a file that another process (a virus scanner, the search indexer)
-// holds for a moment after it was written.
+// holds for a moment after it was written. On macOS and Linux they mean a refusal that lasts (a
+// permission, a mount point); trying again there costs four waits of HELD_WAIT_MS before the same
+// error is reported, so the tries need not be kept to Windows.
 const HELD = new Set(['EPERM', 'EBUSY', 'EACCES']);
 const HELD_TRIES = 5, HELD_WAIT_MS = 100;
 
