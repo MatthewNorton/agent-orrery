@@ -519,9 +519,10 @@ contract), `AUR`, `AUR_POLISH` and `AUR_GALAXY` (all `any` for now).
   `AUR.app.const.CHROME` bits, and one `requestAnimationFrame` re-renders only those panels.
 - **View switch** (`A.setView`, `app/boot.js`): build the new scene first, swap, then dispose the old one —
   after polling up to 4 s for Babylon's BRDF texture, because disposing too early throws.
-- **Routes** (`app/route.js`): `showUniverse`, `openSystem` and `openPlanet` ask main, then
-  build their view through `A.setView`, unless another route or stream came first; a system read
-  goes through `AUR.fetchSystem`, and with none `openSystem` shows the universe.
+- **Routes** (`app/route.js`): `openSystem` and `openPlanet` ask main, then build their view
+  through `A.setView`, unless a route (`showUniverse` included) or a new stream came before the
+  answer; `showUniverse` builds the universe at once. A system read goes through
+  `AUR.fetchSystem`, and with none `openSystem` shows the universe.
 - **Views** are `AUR.views.<name>(engine, data, ctx) → {scene, update, dispose, …}`. The app
   layer fills in no-op defaults for the optional methods (`VIEW_DEFAULTS` in `app/boot.js`:
   `resize`, `setQuality`, `setSearchMatches`, `setShipFocusVantage`, `focusShip`,
