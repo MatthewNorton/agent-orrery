@@ -369,11 +369,13 @@ Design tokens (put in `:root`):
     and 0 from inside, then restores 1: entering or leaving focus rebuilds at
     most one hull, following another ship at most two, and switching between
     inside and outside none, except the first time out of a focus that began
-    inside (one). An opaque hull material gives its transparency
-    mode up, because Babylon ignores a mesh's visibility while its material is
-    set opaque or cut-out. No flown hull has a blended material in full, its
-    glass included; a cut-out would keep its mode and not fade, and no hull
-    has one.
+    inside (one). A ship whose rebuild fails keeps the hull it has, drawn
+    exactly when the fade shows it and at the fade's visibility as far as that
+    hull allows, and is rebuilt at a later fade. An opaque hull material gives
+    its transparency mode up, because Babylon ignores a mesh's visibility while
+    its material is set opaque or cut-out. No flown hull has a blended material
+    in full, its glass included; a cut-out would keep its mode and not fade,
+    and no hull has one.
   - **Triangle budget.** Past its budget a view flies the dart, a near view
     first trying the hull's far file: 900k in a system or planet view, which
     holds fifty-one ships of the first rank, and 1.24M on the universe map,

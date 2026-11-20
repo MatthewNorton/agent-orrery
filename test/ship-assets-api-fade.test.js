@@ -116,3 +116,45 @@ test('a followed ship whose hull cannot be instantiated keeps the hull it has, a
   assert.ok(sameItems(assets.templates(), templates), 'the template made for it is gone');
   assert.ok(shows(a, 0.16) && a.children.length === 1, 'and it flies faded on the hull it had');
 });
+
+test('a ship whose rebuild fails is drawn exactly when the fade shows it, as faded as the hull it keeps allows, and moves at a later fade', async () => {
+  const assets = loadShipAssets(LADDER_MANIFEST, {});
+  const throwing = () => { throw new Error('no instances'); };
+
+  // Out, in, and focus ends while the fleet template makes no instance: it keeps its own template.
+  let scene = assets.scene('system');
+  const a = await assets.ships.upgrade(scene, ship('a', 0), assets.fallback('a'));
+  const b = await assets.ships.upgrade(scene, ship('b', 0), assets.fallback('b'));
+  const fleet = templatesOf(b);
+  assets.ships.fade(scene, 0.16, { shipId: 'a', visibility: 1 });
+  assets.ships.fade(scene, 0.16, { shipId: 'a', visibility: 0 });
+  const roots = [...assets.AUR.shipAssets.sceneStates.get(scene).templates.values()].flatMap((template) => template.roots);
+  for (const root of roots) root.instantiateHierarchy = throwing;
+  assets.ships.fade(scene, 1);
+  assert.ok(shows(a, 1) && !templatesOf(a).some((mesh) => fleet.includes(mesh)), 'drawn in full, on the template it kept');
+  assets.ships.fade(scene, 0.16, { shipId: 'b', visibility: 1 });
+  assert.ok(shows(a, 0.16) && shows(b, 1), 'and faded with the fleet while focus follows another ship');
+  for (const root of roots) delete root.instantiateHierarchy;
+  assets.built();
+  assets.ships.fade(scene, 1);
+  assert.deepEqual(assets.built(), ['b', 'a'], 'the next fade moves it');
+  assert.ok([a, b].every((root) => sameItems(templatesOf(root), fleet) && shows(root, 1)) && assets.templates().length === fleet.length);
+
+  // A focus that began inside, and the way out makes no template of its own: drawn on the fleet's.
+  scene = assets.scene('system');
+  const c = await assets.ships.upgrade(scene, ship('c', 0), assets.fallback('c'));
+  const { container } = assets.AUR.shipAssets.sceneStates.get(scene).containers.get('small-near.glb');
+  const make = container.instantiateModelsToScene;
+  container.instantiateModelsToScene = (...args) => {
+    const made = make(...args);
+    for (const root of made.rootNodes) root.instantiateHierarchy = throwing;
+    return made;
+  };
+  assets.ships.fade(scene, 0.16, { shipId: 'c', visibility: 0 });
+  assets.ships.fade(scene, 0.16, { shipId: 'c', visibility: 1 });
+  assert.ok(shows(c, 0.16), 'drawn, faded with the fleet');
+  container.instantiateModelsToScene = make;
+  assets.built();
+  assets.ships.fade(scene, 0.16, { shipId: 'c', visibility: 1 });
+  assert.ok(sameItems(assets.built(), ['c']) && shows(c, 1), 'the next fade moves it onto a template of its own');
+});

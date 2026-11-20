@@ -70,8 +70,10 @@
    * built later too (a ship that arrives, a promotion). The fleet fades on its templates, so only
    * a ship moving apart or back is rebuilt, onto or off a template of its own. A hidden one is
    * disabled on the template it has, which rebuilds nothing; shown again, it is rebuilt only if it
-   * has no template of its own yet (focus began inside it). A dart or a signal has meshes of its
-   * own, which focus mode fades itself.
+   * has no template of its own yet (focus began inside it). A ship that cannot be rebuilt keeps
+   * the hull it has, drawn exactly when the fade shows it and at the fade's visibility as far as
+   * that hull's template allows, and is rebuilt at a later fade. A dart or a signal has meshes of
+   * its own, which focus mode fades itself.
    * @param {number} visibility
    * @param {{ shipId: string, visibility: number }} [apart]
    */
@@ -83,16 +85,18 @@
     state.apart = apart ? { shipId: String(apart.shipId), visibility: apart.visibility } : null;
     const show = (template, value) => { for (const mesh of template.meshes) mesh.visibility = value; };
     for (const template of state.templates.values()) show(template, visibility);
-    for (const id of new Set([before && before.shipId, state.apart && state.apart.shipId])) {
+    // The ships apart before and now, and any that a failed rebuild left on a template of its own.
+    const ids = new Set([before && before.shipId, state.apart && state.apart.shipId]);
+    for (const [id, entry] of state.ships) if (entry.own) ids.add(id);
+    for (const id of ids) {
       const entry = id ? state.ships.get(id) : null;
       if (!entry) continue;
       const shown = apartVisibility(state, entry.ship);
       const own = ownVisibility(state, entry.ship);
-      if (shown !== 0 && (own !== null) !== Boolean(entry.own)) {
-        swapHull(scene, state, entry, entry.hull, entry.asset, entry.ship); // lands as the fade says
-        continue;
-      }
-      if (entry.own && own !== null) show(entry.own, own);
+      const moves = shown !== 0 && (own !== null) !== Boolean(entry.own);
+      if (moves && swapHull(scene, state, entry, entry.hull, entry.asset, entry.ship)) continue; // lands as the fade says
+      // On the hull it has: shown as the fade shows it, as far as that hull's template allows.
+      if (entry.own && shown !== 0) show(entry.own, own === null ? visibility : own);
       entry.correction.setEnabled(shown !== 0);
     }
   }
