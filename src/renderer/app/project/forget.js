@@ -20,13 +20,17 @@
   ]);
 
   /**
+   * Main's answer, also when the reseed after a forget fails: main has forgotten the project then,
+   * and the failure is logged.
    * @param {string} projectId
    * @returns {Promise<ProjectForgetResult>}
    */
   A.forgetProject = async function forgetProject(projectId) {
     /** @type {ProjectForgetResult} */
     const result = await AUR.settle(() => AU.projectForget(projectId));
-    if (result.ok === true && !result.canceled) A.adoptLiveRestart(result);
+    if (result.ok === true && !result.canceled) {
+      try { A.adoptLiveRestart(result); } catch (error) { AUR.log('forget: the live state was not reseeded', error && error.message); }
+    }
     return result;
   };
 

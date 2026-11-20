@@ -10,16 +10,18 @@ const { deferred } = require('./support/main-wiring');
 
 const COULD_NOT = 'The project could not be forgotten.';
 
-// The card's forget with main's answer from `answerWith`; `asked` lists the projects main was asked
-// to forget.
+// The card's forget with main's answer from `answerWith`, by default `forgets`: main forgets a
+// project once and finds it no more after. `asked` lists the projects main was asked to forget;
+// `logged` holds what AUR.log was given.
 function setup() {
   const state = { projectForget: { projectId: null, pending: false, note: '' } };
-  const asked = [];
-  let answer = async () => ({ ok: true, canceled: false });
-  const AU = { projectForget: (id) => { asked.push(id); return answer(); } };
+  const asked = [], logged = [], forgotten = new Set();
+  const forgets = async (id) => (forgotten.has(id) ? { ok: false, code: 'NOT_FOUND' } : (forgotten.add(id), { ok: true, canceled: false }));
+  let answer = forgets;
+  const AU = { projectForget: (id) => { asked.push(id); return answer(id); } };
   const app = { state, const: { CHROME: { PROJECT: 1 } }, renderChromeNow() {}, adoptLiveRestart() {} };
-  runApp(['app/project/forget.js'], app, { window: { AU }, document: fakeDocument() });
-  return { app, state, asked, answerWith: (next) => { answer = next; } };
+  runApp(['app/project/forget.js'], app, { window: { AU }, document: fakeDocument(), aur: { log: (...args) => logged.push(args.join(' ')) } });
+  return { app, state, asked, logged, answerWith: (next) => { answer = next; } };
 }
 
 test('forget from the card: pending while main is asked, then a note for a refusal', async () => {
@@ -36,7 +38,7 @@ test('forget from the card: pending while main is asked, then a note for a refus
   }], 'one at a time: q was refused while p was out');
 });
 
-test('forget from the card: a render, a call or a reseed that throws leaves the card free to forget again', async () => {
+test('forget from the card: a render or a call that throws leaves the card free to forget again', async () => {
   const { app, state, asked, answerWith } = setup();
   let renders = 0;
   app.renderChromeNow = () => { if (renders++ === 0) throw new Error('render failed'); };
@@ -48,11 +50,18 @@ test('forget from the card: a render, a call or a reseed that throws leaves the 
   assert.deepEqual(state.projectForget, { projectId: 'p', pending: false, note: COULD_NOT });
 
   answerWith(async () => ({ ok: true, canceled: false }));
+  await app.forgetFromCard('p');
+  assert.deepEqual([state.projectForget, asked], [{ projectId: 'p', pending: false, note: '' }, ['p', 'p']]);
+});
+
+test('forget from the card: a reseed that fails after main forgot the project is logged, and the card says what main did', async () => {
+  const { app, state, asked, logged } = setup();
   app.adoptLiveRestart = () => { throw new Error('no snapshot'); };
   await app.forgetFromCard('p');
-  assert.deepEqual(state.projectForget, { projectId: 'p', pending: false, note: COULD_NOT });
-
+  assert.deepEqual(state.projectForget, { projectId: 'p', pending: false, note: '' }, 'forgotten, as main says');
+  assert.deepEqual(logged.map((line) => line.includes('no snapshot')), [true]);
+  // Asked again, main has it no more.
   app.adoptLiveRestart = () => {};
   await app.forgetFromCard('p');
-  assert.deepEqual([state.projectForget, asked], [{ projectId: 'p', pending: false, note: '' }, ['p', 'p', 'p']]);
+  assert.deepEqual([state.projectForget.note, asked], ['This project is already gone.', ['p', 'p']]);
 });
