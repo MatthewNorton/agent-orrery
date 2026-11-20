@@ -9,7 +9,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const {
-  SEC, MIN, T0, SLUG, SHIP_ID, fnv1a, appendJsonl, createWorld, ofType, pick, claude,
+  SEC, MIN, T0, SLUG, SHIP_ID, fnv1a, appendJsonl, createWorld, ofType, pick, claude, readState,
 } = require('./support/transcripts');
 const { PROJECT_KEYS, SHIP_KEYS, startClaude, appendAndPoll } = require('./support/live-session');
 
@@ -247,4 +247,18 @@ test('claude: a lower-cased saved bucket and new builds share the folder\'s on-d
     [{ name: 'Docs', key: 'docs', files: 0, builds: 3 }]);
   // Asked for by the saved key, as the Go to palette's Folder row does: the planet the system draws.
   assert.deepEqual(pick(['name', 'key', 'builds'])(await session.tracker.getPlanet(SLUG, 'docs')), { name: 'Docs', key: 'docs', builds: 3 });
+});
+
+test('claude: a build adds nothing to a total the state file holds at the largest count', (t) => {
+  const MAX = Number.MAX_SAFE_INTEGER;
+  const session = startClaude(t, { saved: { [SLUG]: { buckets: { src: MAX }, totalBuilds: MAX, firstSeen: T0 - MIN } } });
+  appendAndPoll(session, [
+    claude.tool(session.dir, T0 + 1 * SEC, 'toolu_e', 'Edit', { file_path: path.join(session.dir, 'src', 'a.js') }),
+  ], T0 + 1 * SEC);
+  const { projects, ships } = session.tracker.snapshot();
+  assert.deepEqual([projects[0].totalBuilds, ships[0].builds], [MAX, 1]);
+  assert.equal(session.tracker.getSystem(SLUG).planets.find((planet) => planet.name === 'src').builds, MAX);
+  session.tracker.saveState();
+  const saved = readState(session.world.statePath).projects[SLUG];
+  assert.deepEqual([saved.totalBuilds, saved.buckets.src], [MAX, MAX], 'and the file it writes holds whole counts still');
 });

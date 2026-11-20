@@ -8,6 +8,7 @@ const { relativeInside } = require('../path-safety');
 const { bucketOf, countBuild, planetKey } = require('../build-buckets');
 const { queue, pushFeed } = require('./events');
 const { countBuild: countHistogramBuild } = require('../shared/build-histogram');
+const { wholeCount } = require('../shared/values');
 
 /** @import { LiveModel, LiveProject, LiveShip } from '../../types/live-model' */
 
@@ -25,8 +26,8 @@ const BUILD_FILES_LIMIT = 64;
 function addBuild(model, project, ship, rel, ts, catchup) {
   const bucket = bucketOf(rel, path.sep);
   const isNew = countBuild(project, bucket);
-  project.totalBuilds += 1;
-  ship.builds += 1;
+  project.totalBuilds = wholeCount(project.totalBuilds + 1);
+  ship.builds = wholeCount(ship.builds + 1);
   model.systemCache.delete(project.id);
   countHistogramBuild(model.buildHistogram, ts);
   if (catchup) return;

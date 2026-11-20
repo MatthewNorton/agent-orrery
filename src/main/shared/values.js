@@ -8,7 +8,8 @@ function boundedInteger(value, fallback, minimum, maximum) {
 /**
  * A count as the app keeps one: a whole number from 0 to Number.MAX_SAFE_INTEGER. A fraction
  * keeps its whole part, a larger number is the largest kept, and anything else (a string, NaN, a
- * negative, Infinity) is 0: the one rule for a count from a file and for every sum of counts.
+ * negative, Infinity) is 0: the one rule for a build count from a file (a folder's, a project's
+ * total), for every sum of such counts and for the count a build adds one to (a ship's too).
  * @param {unknown} value
  * @returns {number}
  */

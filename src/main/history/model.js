@@ -8,6 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const { canonicalProjectPath, isLocalProjectPath } = require('../provider-adapters');
 const { fnv1a, hex8, mulberry32 } = require('../shared/hash');
+const { wholeCount } = require('../shared/values');
 const { relativeInside } = require('../path-safety');
 const { bucketOf, bucketFor, countBuild, planetKey } = require('../build-buckets');
 const { safeId, safePath } = require('../transcripts/fields');
@@ -181,8 +182,8 @@ function createHistoryModel({ batchSize, onBatch, preferredProjectId }) {
       seen.add(relative);
       const bucket = bucketOf(relative, '/');
       const isNew = countBuild(project, bucket);
-      project.totalBuilds++;
-      ship.builds++;
+      project.totalBuilds = wholeCount(project.totalBuilds + 1);
+      ship.builds = wholeCount(ship.builds + 1);
       queue({
         type: 'build', project: project.id, bucket, key: planetKey(project, bucket), file: relative,
         shipId: ship.id, isNew, ts,

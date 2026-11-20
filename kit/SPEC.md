@@ -151,8 +151,9 @@ AU.universeImport()                    -> Promise<{ok, canceled, added, merged, 
    // is a project id. A folder keeps one bucket, by the rule of the path the project ends with
    // (its own, else the one the file gives it): under a Windows path each side's counts for
    // `docs` and `Docs` are added up, and the larger of the two sums is kept.
-   // Every count, here and in the state file, is a whole number up to Number.MAX_SAFE_INTEGER;
-   // anything else counts as none.
+   // Every build count (a folder's, a project's total, a ship's), here, in the state file and
+   // as builds add to it, is a whole number up to Number.MAX_SAFE_INTEGER: anything else in a
+   // file counts as none, and a build adds nothing to a count that is already the largest.
 ```
 
 ```js

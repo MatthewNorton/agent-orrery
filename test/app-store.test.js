@@ -44,3 +44,16 @@ test('store: every build that starts a planet is passed on with its project, for
   build('web', { isNew: true });
   assert.deepEqual(refreshed, ['p', 'other', 'p']);
 });
+
+test('store: a build adds nothing to a count that is already the largest main keeps', () => {
+  const MAX = Number.MAX_SAFE_INTEGER;
+  const { state, planet, build } = setup('docs');
+  Object.assign(state.store.projects.get('p'), { totalBuilds: MAX });
+  state.store.ships.set('s', { id: 's', builds: MAX });
+  planet.builds = MAX;
+  build('docs');
+  assert.deepEqual([state.store.projects.get('p').totalBuilds, state.store.ships.get('s').builds, planet.builds], [MAX, MAX, MAX]);
+  state.store.ships.set('s', { id: 's' });
+  build('docs');
+  assert.equal(state.store.ships.get('s').builds, 1, 'a ship with no count yet has its first');
+});
