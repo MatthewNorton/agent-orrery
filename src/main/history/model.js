@@ -8,10 +8,11 @@ const fs = require('fs');
 const path = require('path');
 const { canonicalProjectPath, isLocalProjectPath } = require('../provider-adapters');
 const { fnv1a, hex8, mulberry32 } = require('../shared/hash');
+const { bareCopy, wholeCount } = require('../shared/values');
 const { relativeInside } = require('../path-safety');
-const { bucketOf, bucketKey, countBuild, bucketBuilds } = require('../build-buckets');
-const { safeId, safePath } = require('../transcripts/fields');
-const { proceduralSystem } = require('../universe/planets');
+const { bucketOf, bucketFor, countBuild, planetKey } = require('../build-buckets');
+const { safeId } = require('../transcripts/fields');
+const { proceduralSystem, systemData } = require('../universe/planets');
 const { historyProject, historyShip } = require('../universe/public-shape');
 const { createShipRecord } = require('../universe/ships');
 const { applyRecord } = require('./apply-record');
@@ -114,7 +115,8 @@ function createHistoryModel({ batchSize, onBatch, preferredProjectId }) {
         lastActivity: ts,
         totalBytes: 0,
         totalBuilds: 0,
-        buckets: Object.create(null),
+        buckets: bareCopy(),
+        bucketsCounted: true,
       };
       state.projects.set(id, project);
       state.projectIdByPath.set(key, id);
@@ -175,18 +177,14 @@ function createHistoryModel({ batchSize, onBatch, preferredProjectId }) {
     for (const value of files.slice(0, 256)) {
       const filePath = typeof value === 'string' ? value
         : value && typeof value === 'object' ? value.movePath || value.path : null;
-      const relative = safePath(project.path) && safePath(filePath)
-        ? relativeInside(project.path, filePath, { separator: '/', requireAbsolute: true }) : null;
+      const relative = relativeInside(project.path, filePath, { separator: '/' });
       if (!relative || seen.has(relative)) continue;
       seen.add(relative);
       const bucket = bucketOf(relative, '/');
-      const isNew = countBuild(project, bucket);
-      project.totalBuilds++;
-      ship.builds++;
-      queue({
-        type: 'build', project: project.id, bucket, file: relative,
-        shipId: ship.id, isNew, ts,
-      }, emit);
+      const { key, isNew } = countBuild(project, bucket);
+      project.totalBuilds = wholeCount(project.totalBuilds + 1);
+      ship.builds = wholeCount(ship.builds + 1);
+      queue({ type: 'build', project: project.id, bucket, key, file: relative, shipId: ship.id, isNew, ts }, emit);
       if (isNew) pushFeed('form',
         `Planet formation started: ${bucket} in ${project.name}`, project.id, ts, emit);
       pushFeed('build', `${ship.name} building ${relative} in ${project.name}`,
@@ -252,10 +250,9 @@ function createHistoryModel({ batchSize, onBatch, preferredProjectId }) {
     if (!project) return null;
     let planets = Object.entries(project.buckets)
       .map(([name, builds]) => ({ name, files: 0, builds }))
-      .sort((a, b) => b.builds - a.builds || a.name.localeCompare(b.name))
-      .slice(0, 8);
+      .sort((a, b) => b.builds - a.builds || a.name.localeCompare(b.name));
     if (planets.length === 0) planets = proceduralSystem(projectId).planets;
-    return { project: historyProject(project), planets, beltDensity: 0 };
+    return systemData(historyProject(project), planets, 0);
   }
 
   /**
@@ -266,13 +263,15 @@ function createHistoryModel({ batchSize, onBatch, preferredProjectId }) {
   function getPlanet(projectId, planetName) {
     const project = state.projects.get(projectId);
     if (!project || typeof planetName !== 'string') return null;
-    const builds = bucketBuilds(project, planetName);
-    const procedural = bucketKey(project, planetName) === null;
+    const bucket = bucketFor(project, planetName);
+    const procedural = bucket.key === null;
     const rand = mulberry32(fnv1a(`${projectId}:${planetName}`));
     return {
-      name: planetName,
+      // By its bucket's key, the name the system view draws it under, whatever casing asked for it.
+      name: bucket.name,
+      key: planetKey(project, bucket.name),
       project: historyProject(project),
-      builds,
+      builds: bucket.builds,
       files: procedural ? Math.floor(rand() * 160) : 0,
       sizeKb: procedural ? Math.floor(rand() * 3200) : 0,
       subdirs: procedural ? Math.floor(rand() * 8) : 0,

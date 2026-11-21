@@ -8,6 +8,7 @@ const { relativeInside } = require('../path-safety');
 const { bucketOf, countBuild } = require('../build-buckets');
 const { queue, pushFeed } = require('./events');
 const { countBuild: countHistogramBuild } = require('../shared/build-histogram');
+const { wholeCount } = require('../shared/values');
 
 /** @import { LiveModel, LiveProject, LiveShip } from '../../types/live-model' */
 
@@ -24,16 +25,13 @@ const BUILD_FILES_LIMIT = 64;
  */
 function addBuild(model, project, ship, rel, ts, catchup) {
   const bucket = bucketOf(rel, path.sep);
-  const isNew = countBuild(project, bucket);
-  project.totalBuilds += 1;
-  ship.builds += 1;
+  const { key, isNew } = countBuild(project, bucket);
+  project.totalBuilds = wholeCount(project.totalBuilds + 1);
+  ship.builds = wholeCount(ship.builds + 1);
   model.systemCache.delete(project.id);
   countHistogramBuild(model.buildHistogram, ts);
   if (catchup) return;
-  queue(model, {
-    type: 'build', project: project.id, bucket, file: rel,
-    shipId: ship.id, isNew, ts,
-  });
+  queue(model, { type: 'build', project: project.id, bucket, key, file: rel, shipId: ship.id, isNew, ts });
   if (isNew) pushFeed(model, 'form', `Planet formation started: ${bucket} in ${project.name}`, project.id);
   pushFeed(model, 'build', `${ship.name} building ${rel} in ${project.name}`, project.id);
 }

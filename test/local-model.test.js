@@ -8,11 +8,10 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const { codexProviderIsLocal, claudeModel, modelName } = require('../src/main/transcripts/model');
 const {
-  SEC, MIN, T0, SLUG, CLAUDE_SESSION, CODEX_SESSION, appendJsonl, createWorld, ofType, claude, codex,
+  SEC, MIN, T0, CODEX_SESSION, SHIP_ID, CODEX_SHIP_ID, appendJsonl, createWorld, ofType, claude,
+  codex,
 } = require('./support/transcripts');
 
-const SHIP_ID = `ship:${SLUG}:${CLAUDE_SESSION}`;
-const CODEX_SHIP_ID = `ship:codex:${CODEX_SESSION}`;
 const withModel = (record, model) => ({ ...record, message: { ...record.message, model } });
 const shipLocal = (snapshot, id) => snapshot.ships.find((ship) => ship.id === id).local;
 const shipModel = (snapshot, id) => snapshot.ships.find((ship) => ship.id === id).model;

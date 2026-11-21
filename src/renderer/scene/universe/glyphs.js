@@ -76,7 +76,10 @@
     }
 
     function setSearchMatches(ids) {
-      view.searchMatchIds = ids == null ? null : new Set(ids);
+      const next = ids == null ? null : new Set(ids), was = view.searchMatchIds;
+      // Every store refresh sends the matches again; the same ones change nothing to draw or lay out.
+      if (next === was || (next && was && next.size === was.size && [...next].every((id) => was.has(id)))) return;
+      view.searchMatchIds = next;
       for (const g of glyphs.values()) applyGlyphSearchState(g);
       view.markLabelLayoutDirty();
     }

@@ -20,13 +20,31 @@
   ]);
 
   /**
+   * Main's answer. When the reseed after a forget throws synchronously, main has forgotten the
+   * project all the same: the throw is logged, the project search is refreshed from the store, and
+   * one redraw of the panels is asked for in a frame.
    * @param {string} projectId
    * @returns {Promise<ProjectForgetResult>}
    */
   A.forgetProject = async function forgetProject(projectId) {
     /** @type {ProjectForgetResult} */
     const result = await AUR.settle(() => AU.projectForget(projectId));
-    if (result.ok === true && !result.canceled) A.adoptLiveRestart(result);
+    if (result.ok === true && !result.canceled) {
+      try {
+        A.adoptLiveRestart(result);
+      } catch (error) {
+        AUR.log('forget: the live state was not reseeded', AUR.errorText(error));
+        // The reseed threw part way, perhaps before the search and the panels showed the store it
+        // had reseeded. The search is refreshed here (a throw from that is logged), and the panels
+        // are drawn once in a frame, where nothing catches a throw: a test run's error check sees it.
+        try {
+          A.refreshProjectSearchFromStore();
+        } catch (refreshError) {
+          AUR.log('forget: the search was not refreshed', AUR.errorText(refreshError));
+        }
+        requestAnimationFrame(() => A.renderChrome());
+      }
+    }
     return result;
   };
 
@@ -46,11 +64,18 @@
 
   A.forgetFromCard = async function forgetFromCard(projectId) {
     if (S.projectForget.pending) return;
-    S.projectForget = { projectId, pending: true, note: '' };
-    A.renderChromeNow(C.CHROME.PROJECT);
-    const result = await A.forgetProject(projectId);
-    const note = result.ok === true ? '' : forgetFailureText(result.code);
-    S.projectForget = { projectId, pending: false, note };
+    /** @type {ProjectForgetResult} */
+    const result = await AUR.settleBusy({
+      raise() {
+        S.projectForget = { projectId, pending: true, note: '' };
+        A.renderChromeNow(C.CHROME.PROJECT);
+      },
+      lower(raised) {
+        S.projectForget.pending = false;
+        if (!raised) A.scheduleChrome(C.CHROME.PROJECT);
+      },
+    }, () => A.forgetProject(projectId));
+    S.projectForget.note = result.ok === true ? '' : forgetFailureText(result.code);
     A.renderChromeNow(C.CHROME.PROJECT);
   };
 })();

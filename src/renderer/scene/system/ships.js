@@ -4,7 +4,6 @@
 
 (function () {
   const AUR = window.AUR;
-  const AU = window.AU;
   const { disposeMeshAndMaterial } = AUR;
 
   AUR.sceneParts.system.ships = function (view) {
@@ -14,7 +13,7 @@
     const BELT_CLEARANCE = 0.9;  // and between the belt's outer edge and the patrol ring
     const shipLookTarget = new BABYLON.Vector3();
     const standoff = new BABYLON.Vector3();
-    let refetching = false;
+    let refetching = false, refetchAgain = false;
 
     function attentionSuffix(attention) {
       if (AUR.needsYou(attention)) return '· needs you';
@@ -149,9 +148,9 @@
         } else if (ev.type === 'ship-departed') {
           removeShip(ev.shipId);
         } else if (ev.type === 'build' && ev.project === projectId) {
-          const pr = planets.get(ev.bucket);
+          const pr = AUR.planetOfBuild(planets.values(), ev);
           const sh = ships.get(ev.shipId);
-          if (ev.isNew && !pr) { refetchPlanets(); }
+          if (ev.isNew && !pr) refetchPlanets().catch((e) => AUR.log('planets not fetched again', e && e.message));
           if (pr) {
             pr.pulseUntil = performance.now() + 600;
             if (sh && sh.mode === 'patrol') {
@@ -169,19 +168,48 @@
       }
     }
 
-    function refetchPlanets() {
+    // A build started a planet this view does not draw: the system is fetched again, one request at
+    // a time, and once more for a planet that started meanwhile. A fetch that fails is not tried
+    // again: the loop ends there, unless a planet started while it was out, which is a new reason to
+    // ask. Either way the view stays behind (view.sysBehind) until the answer to a request made after
+    // the last planet started comes back while it is shown in the stream it was asked in, or the view
+    // is rebuilt.
+    async function refetchPlanets() {
+      view.sysBehind = refetchAgain = true;
       if (refetching) return;
       refetching = true;
-      AU.getSystem(projectId).then((ns) => {
+      try {
+        // An answer is drawn only while the app still shows this view, in the stream it was asked in.
+        const stream = view.shown();
+        const shown = () => stream !== null && view.shown() === stream;
+        while (refetchAgain && shown()) {
+          refetchAgain = false;
+          const ns = await AUR.fetchSystem(projectId);
+          if (!shown()) break;
+          if (!ns) continue;
+          view.sys = ns;
+          view.sysBehind = refetchAgain;
+          drawNewPlanets(ns.planets);
+        }
+      } finally {
         refetching = false;
-        if (!ns) return;
-        ns.planets.forEach((pd, i) => {
-          if (!planets.has(pd.name)) {
-            const rec = view.buildPlanet(pd, i);
-            rec.appear = 0.01;
-          }
-        });
-      }).catch(() => { refetching = false; });
+      }
+    }
+
+    // Draws the planets of `listed` the view lacks. A folder renamed in case only is the globe already
+    // drawn (one key); a key listed more often than it is drawn (case-twin folders) gets another globe.
+    function drawNewPlanets(listed) {
+      const count = (counts, key) => counts.set(key, (counts.get(key) || 0) + 1);
+      const drawn = new Map(), wanted = new Map();
+      for (const planet of planets.values()) count(drawn, planet.key);
+      for (const pd of listed) count(wanted, pd.key);
+      listed.forEach((pd, i) => {
+        if (planets.has(pd.name) || (drawn.get(pd.key) || 0) >= wanted.get(pd.key)) return;
+        const built = view.buildPlanet(pd, i);
+        if (!built) return; // it could not be built, which does not stop the others
+        built.appear = 0.01;
+        count(drawn, pd.key);
+      });
     }
 
     return { buildShip, animateShips, update };

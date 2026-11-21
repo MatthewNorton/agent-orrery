@@ -1,4 +1,14 @@
-// Shapes that cross the `window.AU` bridge; kit/SPEC.md §3 is the prose version.
+// Shapes that cross the `window.AU` bridge; kit/SPEC.md §3 is the prose version. What its calls
+// that act take and answer (results, tasks, the IDEAS queue, recovery, backup) is in calls.d.ts.
+
+import type {
+  OpenExternalResult, OpenTerminalResult, ProjectForgetResult, ProjectPathRecoveryResult,
+  ProjectPathsScanResult, ReplayCommand, ReplayResult, ReplayStatePush, RootTaskResult,
+  RootTasksChangedPush, RootTasksSnapshot, TaskMutationResult, TaskRemoveRequest,
+  TaskSetDoneRequest, TasksChangedPush, TasksSnapshot, UniverseExportResult, UniverseImportResult,
+} from './calls';
+
+export type * from './calls';
 
 export type Provider = 'claude' | 'codex' | 'generic' | 'local';
 export type ShipKind = 'main' | 'drone';
@@ -65,8 +75,17 @@ export interface FeedEntry {
   ts: number;
 }
 
+/**
+ * What main compares a planet by (build-buckets.js planetKey): the same for a folder, its bucket
+ * and every build the bucket holds, in whatever casing each was written. A build no bucket holds
+ * (a name a bucket cannot have, or a project at the 10,000 cap) carries null and is on no planet,
+ * not even the one its folder names. Match on it with `===`; it is not a name to show.
+ */
+export type PlanetKey = string;
+
 export interface Planet {
   name: string;
+  key: PlanetKey;
   files: number;
   builds: number;
   procedural?: boolean;
@@ -74,12 +93,21 @@ export interface Planet {
 
 export interface SystemData {
   project: Project;
+  /** The planets the system view draws: the biggest, at most 8 (universe/planets.js). */
   planets: Planet[];
   beltDensity: number;
+  /** How many planets the project has, when that is more than `planets` holds. */
+  planetTotal?: number;
 }
 
 export interface PlanetData {
+  /**
+   * The planet's name as the system view draws it, which seeds its globe: live, the folder's name
+   * as the disk spells it; in history, its bucket's key. Under a Windows path it can differ in
+   * case from the name asked for.
+   */
   name: string;
+  key: PlanetKey;
   project: Project;
   builds: number;
   files: number;
@@ -87,7 +115,19 @@ export interface PlanetData {
   subdirs: number;
   /** Top file extensions, upper case. */
   resources: string[];
+  /**
+   * A stand-in whose folder numbers are invented. Live: the project has no folder on disk, or the
+   * planet is a stand-in of a project without folders. History: no builds at the cursor.
+   */
   procedural?: boolean;
+  /**
+   * Live only, how far main read the folder (live/system-view.js): 'partial' when a read limit left
+   * a folder holding a file unread, or a folder below it or a file's size could not be read, so files
+   * and size are floors; 'gone' when the folder itself is not there; 'none' when it is there and
+   * could not be read (locked, or a passing error). Absent when there was no folder to read: a
+   * procedural planet's numbers are invented, and history never reads the disk.
+   */
+  folderRead?: 'full' | 'partial' | 'none' | 'gone';
 }
 
 /** Bounded by main (replay-control.js): unknown times are null; in LIVE, playing is false and cursorTs is maxTs once known. */
@@ -176,8 +216,13 @@ export interface BuildEvent extends Sequenced {
   type: 'build';
   /** Project id. */
   project: string;
-  /** Planet name. */
+  /**
+   * The edit's top-level folder as the edit wrote it, or '(root)': a name to show. Under a Windows
+   * path it can differ in case from its planet's name, so the planet is found by `key`.
+   */
   bucket: string;
+  /** The key of the planet this build is in; null when no bucket holds it (isBucketName, the cap). */
+  key: PlanetKey | null;
   file: string;
   shipId: string;
   /** True when this build forms a new planet. */
@@ -237,191 +282,6 @@ export interface ProjectVcsStatus {
   git: GitStatus | null;
   github: GithubStatus | null;
   errorCode: string | null;
-}
-
-// ---- results ----
-
-/**
- * A failure carries only `code`; a success carries the other fields. Flat rather than a
- * discriminated union because, without strictNullChecks, the renderer's
- * `result && result.code` reads would not narrow.
- */
-export interface Outcome<Code extends string> {
-  ok: boolean;
-  code?: Code;
-}
-
-export interface Failure<Code extends string> extends Outcome<Code> {
-  ok: false;
-  code: Code;
-}
-
-export type OpenExternalResult = Outcome<'INVALID_URL' | 'OPEN_FAILED'>;
-
-export type TerminalFailureCode = 'INVALID' | 'REPLAY' | 'NOT_FOUND' | 'UNAVAILABLE' | 'BUSY' | 'FAILED'
-  | 'TERMINAL_NOT_FOUND' | 'TERMINAL_BLOCKED' | 'AMBIGUOUS';
-export type OpenTerminalResult = Outcome<TerminalFailureCode>;
-
-export type ReplayCommand =
-  | { action: 'index' | 'play' | 'pause' | 'live' }
-  | { action: 'seek'; ts: number }
-  | { action: 'speed'; speed: ReplaySpeed };
-
-export interface ReplayResult {
-  playback: PlaybackStatus;
-  streamEpoch: number;
-  /** Present after `seek` and `live`. */
-  snapshot?: Snapshot;
-}
-
-export interface ReplayStatePush extends PlaybackStatus {
-  streamEpoch: number;
-}
-
-// ---- GOALS.md tasks ----
-
-export interface GoalItem {
-  text: string;
-  done: boolean;
-  /** Zero-based source line in GOALS.md. */
-  line: number;
-  /** Lower-case UUID marker on goals assigned from the IDEAS queue. */
-  id?: string;
-  agentStatus?: 'ready-for-review' | 'agent-working';
-}
-
-export interface TasksSnapshot {
-  exists: boolean;
-  path: string;
-  items: GoalItem[];
-}
-
-export interface TaskMutationResult {
-  ok: boolean;
-  items: GoalItem[];
-}
-
-export interface TaskSetDoneRequest {
-  text: string;
-  done: boolean;
-  id?: string;
-  line?: number;
-}
-
-export interface TaskRemoveRequest {
-  line: number;
-  text: string;
-}
-
-export type TaskRunPhase =
-  | 'waiting-for-agent' | 'running' | 'completing' | 'ready-for-review' | 'launch-failed'
-  | 'completion-failed' | 'reopened' | 'agent-aborted' | 'agent-departed' | 'agent-not-found';
-
-export interface TasksChangedPush {
-  projectId: string;
-  taskId: string;
-  phase: TaskRunPhase;
-}
-
-// ---- IDEAS queue ----
-
-export type RootTaskPhase =
-  | 'idea' | 'prepared' | 'goal-written' | 'launch-requested' | 'launch-failed'
-  | 'ready-for-review' | 'completion-failed' | 'reopened'
-  | 'agent-aborted' | 'agent-departed' | 'agent-not-found'
-  /** Overlaid while a launched run is active. */
-  | 'agent-working';
-
-export interface RootTaskItem {
-  id: string;
-  text: string;
-  projectId: string | null;
-  phase: RootTaskPhase;
-  createdAt: number;
-  updatedAt: number;
-}
-
-export interface RootTasksSnapshot {
-  items: RootTaskItem[];
-}
-
-export type RootTaskFailureCode =
-  | 'INVALID' | 'REPLAY' | 'NOT_FOUND' | 'LIMIT_REACHED' | 'PROJECT_IMMUTABLE'
-  | 'INVALID_TRANSITION' | 'PROJECT_NOT_FOUND' | 'PROJECT_BUSY' | 'BUSY'
-  | 'WRITE_FAILED' | 'UNAVAILABLE' | 'LAUNCH_FAILED' | 'FAILED';
-
-export interface RootTaskResult extends Outcome<RootTaskFailureCode> {
-  item?: RootTaskItem;
-}
-
-export interface RootTasksChangedPush {
-  taskId: string;
-  /** Null once the idea is removed. */
-  phase: RootTaskPhase | TaskRunPhase | null;
-}
-
-// ---- moved-project recovery ----
-
-export type ProjectPathFailureCode =
-  | 'INVALID' | 'REPLAY' | 'BUSY' | 'NOT_FOUND' | 'NOT_MISSING' | 'IN_USE' | 'EXPIRED'
-  /** Forget only: an agent is working in the project. */
-  | 'ACTIVE'
-  | 'FAILED';
-
-export interface ProjectPathCandidate {
-  /** One-time token for `projectPathApply`. */
-  token: string;
-  path: string;
-}
-
-export interface ProjectPathMatch {
-  projectId: string;
-  candidates: ProjectPathCandidate[];
-}
-
-export interface ProjectPathsScanResult extends Outcome<ProjectPathFailureCode> {
-  /** True when the folder dialog was dismissed; nothing else is set then. */
-  canceled?: boolean;
-  /** Absent when no project is missing. */
-  scanId?: string;
-  root?: string | null;
-  directoriesVisited?: number;
-  truncated?: boolean;
-  matches?: ProjectPathMatch[];
-}
-
-export interface ProjectPathRecoveryResult extends Outcome<ProjectPathFailureCode> {
-  /** Locate only: the folder dialog was dismissed. */
-  canceled?: boolean;
-  project?: Project;
-}
-
-/**
- * A forgotten project leaves the stream: success starts a new LIVE epoch and carries its
- * snapshot, as `replay({ action: 'live' })` does.
- */
-export interface ProjectForgetResult extends Outcome<ProjectPathFailureCode>, Partial<ReplayResult> {
-  /** The confirmation was dismissed; nothing changed. */
-  canceled?: boolean;
-}
-
-// ---- universe backup ----
-
-export type BackupFailureCode = 'INVALID' | 'REPLAY' | 'BUSY' | 'FAILED';
-
-export interface UniverseExportResult extends Outcome<BackupFailureCode> {
-  canceled?: boolean;
-  path?: string;
-  projects?: number;
-  ideas?: number;
-}
-
-/** Import merges and never removes; new projects arrive as `project-added` events. */
-export interface UniverseImportResult extends Outcome<BackupFailureCode> {
-  canceled?: boolean;
-  added?: number;
-  merged?: number;
-  ideas?: number;
 }
 
 // ---- the bridge ----

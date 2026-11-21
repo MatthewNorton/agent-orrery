@@ -84,6 +84,12 @@ try {
   if (rail.unfolded !== true) failures.push('M6: left-rail modules did not unfold again');
   if (rail.allFolded !== true) failures.push('M6: the panels button did not fold both rails');
   if (rail.allOpen !== true) failures.push('M6: the panels button did not open both rails again');
+  // Security: with asar handling on, Electron's fs opens and parses any file named *.asar in a project folder.
+  if (ux.mainProcess?.noAsar !== true) failures.push('M7: the main process runs with asar handling on (process.noAsar is not true)');
+  const asar = ux.mainProcess?.asar || {};
+  if (asar.lstatFile !== true || asar.direntFile !== true || asar.deleted !== true) {
+    failures.push(`M7: the main process's fs does not read a file named *.asar as a plain file it can delete (${JSON.stringify(asar)})`);
+  }
 } catch (e) {
   failures.push(`M6: ux-state.json unreadable: ${e.message}`);
 }

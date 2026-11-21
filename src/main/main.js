@@ -1,6 +1,12 @@
 // @ts-check
 'use strict';
 
+// Security: Electron's fs treats a file named *.asar as an archive: stat and lstat open it, parse
+// it and keep it open. Every read the main process makes of a user's folder must see plain files,
+// so asar handling is off before any module is loaded. The app runs from source and never loads
+// from an asar; packaging it into one would need this changed.
+process.noAsar = true;
+
 const { app } = require('electron');
 const { readFlags } = require('./flags');
 const fixtures = require('./harness/fixtures');

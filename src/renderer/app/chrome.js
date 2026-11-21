@@ -1,7 +1,9 @@
 // @ts-check
-// Compact command rail, project-name helpers, agents/summary renderers, tab bar. The feed is
+// Compact command rail, project-name helpers, agents/summary renderers, back button. The feed is
 // app/panels/feed.js.
 'use strict';
+
+/** @import { PlanetData } from '../../types/contract' */
 
 (function () {
   const AUR = window.AUR;
@@ -77,6 +79,31 @@
 
   A.activePlanetData = function activePlanetData() {
     return S.activeView && S.activeView.planetData ? S.activeView.planetData : null;
+  };
+
+  /**
+   * @param {number} kb @param {number} files
+   * @param {boolean} floor the least it can be (a read that stopped short): rounded down, never "< 1 KB"
+   */
+  function sizeText(kb, files, floor) {
+    if (kb === 0) return files > 0 && !floor ? '< 1 KB' : '0 KB';
+    if (kb < 1024) return kb + ' KB';
+    const tenth = (/** @type {number} */ n) => (floor ? Math.floor(n * 10) : Math.round(n * 10)) / 10;
+    const mb = tenth(kb / 1024);
+    return mb < 1024 ? mb.toFixed(1) + ' MB' : tenth(kb / 1048576).toFixed(1) + ' GB';
+  }
+
+  /**
+   * A planet's folder counts as the cards show them, or null where main read no folder (a
+   * procedural planet, a folder that could not be read, or history). Where the read stopped short,
+   * files and size end in `+`.
+   * @param {PlanetData | null} pd
+   * @returns {{ files: string, size: string, subdirs: string } | null}
+   */
+  A.planetFolderCounts = function planetFolderCounts(pd) {
+    if (!pd || (pd.folderRead !== 'full' && pd.folderRead !== 'partial')) return null;
+    const floor = pd.folderRead === 'partial', more = floor ? '+' : '';
+    return { files: pd.files + more, size: sizeText(pd.sizeKb || 0, pd.files, floor) + more, subdirs: String(pd.subdirs) };
   };
 
   A.onlineProjectCount = function onlineProjectCount() {
@@ -190,7 +217,7 @@
   };
 
   function universeSummaryStats() {
-    return [[S.store.projects.size, 'Projects'], [S.store.ships.size, 'Agents'],
+    return [[S.store.projects.size, 'Systems'], [S.store.ships.size, 'Agents'],
       [A.onlineProjectCount(), 'Online']];
   }
 
@@ -215,33 +242,10 @@
   function planetSummaryStats() {
     const ships = A.shipsInProject(S.current.projectId);
     const pd = A.activePlanetData();
-    const structures = pd ? pd.subdirs : 0;
-    const resources = pd && pd.resources ? pd.resources.length : 0;
-    const builds = pd ? pd.builds : 0;
-    return [[ships.length, 'Agents'], [structures, 'Structures'],
-      [resources, 'Resources'], [builds, 'Builds']];
+    const counts = A.planetFolderCounts(pd);
+    return [[ships.length, 'Agents'], [counts ? counts.files : '—', 'Files'],
+      [counts ? counts.subdirs : '—', 'Subfolders'], [pd ? pd.builds : 0, 'Builds']];
   }
-
-  // ---------- tab bar ----------
-  const TABS = ['Overview', 'Surface', 'Orbit', 'Resources', 'Structures', 'Scans'];
-  function tabIco() {
-    return '<svg class="tab-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
-      'stroke-width="1.6" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="8"/>' +
-      '<circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none"/></svg>';
-  }
-  A.renderTabbar = function renderTabbar() {
-    const bar = document.getElementById('tabbar');
-    const planet = S.current.view === 'planet';
-    bar.classList.toggle('hidden', !planet);
-    if (!planet || bar.childElementCount) return;
-    TABS.forEach((t, i) => {
-      const tab = AUR.el('div', 'tab' + (i === 0 ? ' active' : ' disabled'));
-      const ico = document.createElement('span');
-      ico.innerHTML = tabIco();
-      tab.append(ico.firstChild, AUR.el('span', null, t));
-      bar.appendChild(tab);
-    });
-  };
 
   A.renderBackButton = function renderBackButton() {
     const btn = document.getElementById('back-btn');

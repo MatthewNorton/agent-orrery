@@ -7,29 +7,28 @@
 
 const { canonicalProjectPath } = require('../provider-adapters');
 const { localAbsolutePath } = require('../path-safety');
-const { hasControlChars, validProjectId } = require('../shared/ids');
+const { mergeBuckets } = require('../build-buckets');
+const { validProjectId } = require('../shared/ids');
 const { ownString } = require('../shared/values');
 const { plainObject } = require('../transcripts/fields');
 const { liftForgotten } = require('./forgotten');
 const {
-  adoptProjectPath, announceProjectUpdated, preferredProjectPath, projectIdAtPath, restoreProject,
+  announceProjectUpdated, preferredProjectPath, projectIdAtPath, restoreProject, takeProjectPath,
 } = require('./projects');
+const { savedProject, validKey } = require('./saved-project');
 const { serializeState } = require('./state-file');
 
 /**
  * @import { RootTaskItem } from '../../types/contract'
- * @import { LiveModel, PersistedProject } from '../../types/live-model'
+ * @import { LiveModel, SavedProject } from '../../types/live-model'
  * @typedef {{ projects: [string, ImportedProject][], pathIds: [string, string][], ideas: string[] }} ParsedBackup
- * @typedef {PersistedProject & { path: string | null, override: string | null }} ImportedProject
+ * @typedef {SavedProject & { override: string | null }} ImportedProject
  */
 
 const BACKUP_FORMAT = 'agent-orrery-backup';
 const BACKUP_VERSION = 1;
 const MAX_BACKUP_BYTES = 8 * 1024 * 1024;
 const MAX_ENTRIES = 10_000;
-const MAX_KEY_LENGTH = 4096;
-// Security: keys that would reach an object's prototype instead of an own property.
-const RESERVED_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
 /**
  * @param {LiveModel} model
@@ -59,17 +58,16 @@ function parseBackup(text) {
   const overrides = plainObject(raw.universe.pathOverrides) ? raw.universe.pathOverrides : {};
   /** @type {[string, ImportedProject][]} */
   const projects = [];
-  for (const [id, saved] of Object.entries(raw.universe.projects).slice(0, MAX_ENTRIES)) {
-    if (!validKey(id) || !validProjectId(id) || !plainObject(saved)) continue;
+  for (const [id, entry] of Object.entries(raw.universe.projects).slice(0, MAX_ENTRIES)) {
+    // The fields are read as the state file's are (saved-project.js).
+    const saved = savedProject(entry);
+    // Security: an id may be '__proto__' (a folder of transcripts); every map it keys has no prototype.
+    if (!validProjectId(id) || !saved) continue;
     // Security: a backup's path is later stat'd and opened; only a local absolute one may be.
     projects.push([id, {
+      ...saved,
       path: localAbsolutePath(saved.path),
       override: localAbsolutePath(Object.hasOwn(overrides, id) ? overrides[id] : null),
-      name: validKey(saved.name) ? saved.name : undefined,
-      lastActivity: count(saved.lastActivity),
-      firstSeen: count(saved.firstSeen),
-      totalBuilds: count(saved.totalBuilds),
-      buckets: buckets(saved.buckets),
     }]);
   }
   const pathIds = Object.entries(plainObject(raw.universe.pathIds) ? raw.universe.pathIds : {})
@@ -105,46 +103,21 @@ function importProjects(model, backup) {
       added++;
       continue;
     }
-    for (const [bucket, builds] of Object.entries(saved.buckets)) {
-      existing.buckets[bucket] = Math.max(existing.buckets[bucket] || 0, builds);
-    }
+    // The project takes its folder first: both sides are then counted by that folder's rule
+    // (mergeBuckets), and the larger count of each folder is kept.
+    const adopted = existing.path ? null : preferredProjectPath(model, target, saved.path);
+    if (adopted) takeProjectPath(model, existing, adopted);
+    mergeBuckets(existing, saved);
     existing.totalBuilds = Math.max(existing.totalBuilds, saved.totalBuilds);
     if (saved.firstSeen && saved.firstSeen < existing.firstSeen) existing.firstSeen = saved.firstSeen;
     existing.lastActivity = Math.max(existing.lastActivity, saved.lastActivity);
-    const adopted = existing.path ? null : preferredProjectPath(model, target, saved.path);
-    if (adopted) adoptProjectPath(model, existing, adopted);
-    else announceProjectUpdated(model, existing);
+    announceProjectUpdated(model, existing);
   }
   for (const [key, id] of backup.pathIds) {
     // A key that leads to a forgotten project is free to take.
     if (targets.has(id) && !model.projects.has(model.pathIds[key])) model.pathIds[key] = targets.get(id);
   }
   return { added, merged: targets.size - added };
-}
-
-/**
- * Security: a key or name from the file becomes an object key and reaches the screen.
- * @param {unknown} value
- * @returns {value is string}
- */
-function validKey(value) {
-  return typeof value === 'string' && value.length > 0 && value.length <= MAX_KEY_LENGTH &&
-    !RESERVED_KEYS.has(value) && !hasControlChars(value);
-}
-
-function count(value) {
-  return Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
-}
-
-function buckets(value) {
-  /** @type {Record<string, number>} */
-  const out = {};
-  if (!plainObject(value)) return out;
-  for (const [name, saved] of Object.entries(value).slice(0, MAX_ENTRIES)) {
-    const builds = count(saved);
-    if (validKey(name) && builds > 0) out[name] = builds;
-  }
-  return out;
 }
 
 module.exports = { MAX_BACKUP_BYTES, createBackup, parseBackup, importProjects };

@@ -60,15 +60,26 @@ loaders), then:
 | Shared libraries | `util.js` (creates `window.AUR`; `fnv1a`/`mulberry32` copied from `src/main/shared/hash.js` so seeds agree), `util-scene.js` (Babylon helpers), `procedural-worlds.js` (world profiles: class, palette, hue, seed; asteroids), `worlds/` (kit 15: the pure map generator `noise.js` + `classes.js` + `maps.js`, run by `worker.js`, a worker file and not a page script; `textures.js`, the map service on `AUR.app.state.worldMaps`; `shaders.js`; `material.js`, a world's globe and shells; `sun.js`, the system sun's photosphere plugin and billboards), `ship-assets.js` + `ship-assets-hulls.js` + `ship-assets-api.js` (`AUR.ships`), `ships/` (ship models built in code: `modules.js`, the registry the converted modules load into; `models.js`, `AUR.shipModels`; one folder per model, `ships/petrel/` with its generated `source/` and the hand-written `model.js`), `polish-math.js`, `galaxy-layout.js` and `galaxy-field.js` (pure UMD; the field is a galaxy's emission/dust atlas and the stars drawn from it), `search-core.js`, `components/project-vcs-status.js` |
 | Views | `scene/common.js` (`AUR.sceneParts`), `scene/sky.js` (`AUR.addSky`, the system and planet views' baked sky), then for each view in `scene/<view>/` (universe, system, planet) its parts before its `view.js` |
 | App state | `app/state.js` — the only file that assigns `AUR.app` (`state`, `const`) |
-| App modules | every other file in `app/`, `app/project/` and `app/panels/`, in `index.html` order |
-| Boot | `app/boot.js` — boot, event routing, view switching, debug hooks |
+| App modules | every other file in `app/`, `app/project/` and `app/panels/`, in `index.html` order; the last of them is `app/route.js`, the routes (universe, system, planet, the back button, the debug views of §8) |
+| Boot | `app/boot.js` — boot, event routing, view switching (`A.setView`) |
 
 View contract: each `scene/<view>/view.js` registers
 `AUR.views.<name> = (engine, data, ctx) => ({ scene, update(eventBatch), dispose() })`
-where `ctx` provides `openSystem(projectId)`, `openPlanet(projectId, name)`, the
+where `ctx` provides `openSystem(projectId)`, `openPlanet(projectId, name, system?)`,
+`shown(scene)` (the stream the app shows that scene in, `null` once another view has its place:
+a view compares it around a call of its own that it awaits, and drops an answer that comes after
+a change), the
 shared `store`, the graphics `quality` tier, the `galaxyFields` cache and `worldMaps`, the generated
 planet maps (`worlds/textures.js`: a view opens an epoch on its scene and requests maps in it; disposing the scene closes the epoch),
-and the Settings `skyLook` and `orbitRings` (§4).
+and the Settings `skyLook` and `orbitRings` (§4). The app builds every view through
+`AUR.buildView` (`scene/common.js`): a factory that throws leaves no scene behind, since any scene it
+had made is disposed before the error is passed on. What a view keeps outside its scene (an element
+on the page, a timer) it ties to the scene's `onDisposeObservable`, so it goes with the scene
+whether the build failed or the view was disposed; `AUR.disposeView` disposes the scene even when a
+step before it throws. `A.setView` makes the route (`AUR.app.state.current`: the view, and the
+project and planet its data names, `A.viewRoute` in `app/route.js`) the new view's only once the
+view is built. A system or planet view that cannot be built falls back to the universe; a universe
+that cannot be built leaves the view shown, and its route, as they were.
 Views may also implement `resize`,
 `setQuality`, `setSkyLook`, `setOrbitRings`, `setSearchMatches`, `setShipFocus`, `focusShip` and `shipFocusState`;
 the app fills in a no-op default for any they leave out (`VIEW_DEFAULTS` in `app/boot.js`).
@@ -80,11 +91,13 @@ environment re-seats it) or one of the first-person rooms, each a `camera: 'room
 the scene gets it, and the view spends it on the chase camera's orbit or, in a room, ignores it.
 Three more members are optional and have no default: the `planetData` field, read through
 `A.activePlanetData()`, and the `systemData` field and `clearShipFocus()` method, which
-`app/agent-focus.js` checks for before using them.
+`app/agent-focus.js` checks for before using them. The system view carries `systemData`, its
+system as it stands, and hands it to a planet it opens.
 
 ## 3. The `window.AU` bridge (matches `src/preload.js`)
 
-`src/types/contract.d.ts` is the type-checked version of this section; where they differ, it wins.
+`src/types/contract.d.ts` (with `calls.d.ts`, which it exports again) is the type-checked version of
+this section; where they differ, it wins.
 
 ```js
 AU.snapshot()  -> Promise<{ projects: Project[], ships: Ship[], feed: FeedEntry[],
@@ -140,6 +153,26 @@ AU.universeImport()                    -> Promise<{ok, canceled, added, merged, 
    // One JSON file: universe-state.json as the model stands plus the IDEAS queue's texts.
    // Import merges (larger build counts, earlier firstSeen, later lastActivity) and never
    // removes; new projects arrive as project-added events, imported ideas as new items.
+   // A project is kept under its id when the id is plain text, not blank and 256 characters at
+   // most (`validProjectId`), `__proto__` and `constructor` included. A folder keeps one
+   // bucket, by the rule of the path the project ends with (its own, else the one the file gives
+   // it): under a Windows path each side's counts for `docs` and `Docs` are made one, and the
+   // larger of the two sides is kept. How one side's casings are made one follows whether its
+   // builds were counted under a path, which a project keeps with its buckets (`bucketsCounted`,
+   // saved in the state file and the backup) through any change of path; `setProjectPath` and
+   // `mergeBuckets` in `src/main/build-buckets.js` say how. A folder never has more builds than
+   // its project.
+   // Every build count (a folder's, a project's total, a ship's), here, in the state file and
+   // as builds add to it, is a whole number up to Number.MAX_SAFE_INTEGER: anything else in a
+   // file counts as none, and a build adds nothing to a count that is already the largest.
+   // A saved project's name, path, buckets and counts have one reader (`live/saved-project.js`)
+   // for both files: an entry that is not a record is passed over; a name is kept only as plain
+   // text (no control character, 4,096 characters at most, and not `__proto__`, `constructor`
+   // or `prototype`) and otherwise the project goes by its folder or its id; a bucket is a name
+   // a build can start one under (`isBucketName`, below), `__proto__` and `constructor` too,
+   // with a whole count above none, and a project's total is at least its largest bucket. The
+   // path alone has a rule per file: the state file's is used when it is local, a backup's only
+   // when it is also absolute, and normalized.
 ```
 
 ```js
@@ -191,11 +224,63 @@ Ship = { id, name, provider, project, kind, status, detail, lastEvent,
 FeedEntry = { kind, text, project, ts }
 // kind: 'discover'|'form'|'build'|'info'|'spawn'|'depart'|'attention'|'done'|'warning'
 
-SystemData = { project: Project, planets: Planet[], beltDensity: number }
-Planet     = { name, files, builds, procedural? }   // name '(root)' possible
+SystemData = { project: Project, planets: Planet[], beltDensity: number, planetTotal? }
+// planets: the project's biggest, at most 8, which the system view draws; planetTotal: how many
+//   it has, present only when that is more
+Planet     = { name, key, files, builds, procedural? }   // name '(root)' possible
+// key: which planet this is, decided by main (`planetKey` in `src/main/build-buckets.js`): one
+//   key for every casing main counts as the folder. A Planet, a PlanetData and a `build` event
+//   are of one planet when their keys are equal; the renderer compares them and never reads them.
+//   Names are unique in a system and keys almost always are: a case-sensitive folder under a
+//   Windows path (WSL) can hold `Docs` and `docs`, two planets with one key and one build count.
+//   A build then goes to the one it spelled (`bucket`), else the first (`AUR.planetOfBuild`).
+// A planet folder, live: an entry the project folder's listing types as a folder (`planetFolders`
+//   in `src/main/live/system-view.js`); a link or junction is typed a link, so it is never one. A
+//   planet's file is every other entry, a link or junction too, and is never followed: one rule
+//   (`isPlanetFile`) says what a file is wherever an entry's type is read, so a link or junction
+//   is one file. The counts reach differently. In the system view a planet's `files` is a rough
+//   size (`shallowCount`): its folder's files, and every entry, of any type, in each of its
+//   folders that is not ignored, stopping past 400; `beltDensity` and `(root)`'s `files` are
+//   the project folder's own files. The planet card's `files` counts files down the folder's
+//   tree (`readFolder`: five levels, 600 files and 300 folders at most, ignored folders passed
+//   over), and for `(root)` the top-level files alone.
+//   getSystem draws the planet folders that are not ignored (a name starting with `.`, or one of
+//   `IGNORE_DIRS` such as `node_modules`), and `(root)` from the top-level files' own bucket, by
+//   that exact key, when it has builds. getPlanet reads any planet folder. So a folder with builds
+//   that the system view does not draw (`.github`) stays in `Project.planets` (every bucket's
+//   key), which Go to lists, and opens as a planet that reads its folder. Every bucket opens: a
+//   bucket's name is one a planet can have (one plain path segment) with no control character
+//   (`isBucketName` in `src/main/build-buckets.js`), and a project keeps 10,000 at most. One rule
+//   for both models' counting and both files' reader, so a bucket reads back after a restart as
+//   it was.
 
-PlanetData = { name, project: Project, builds, files, sizeKb, subdirs,
-               resources: string[], procedural? }   // resources = top file exts
+PlanetData = { name, key, project: Project, builds, files, sizeKb, subdirs,
+               resources: string[], procedural?, folderRead? }   // resources = top file exts;
+// name: the planet as the system view draws it, which seeds its globe: live, the folder as the
+//   disk spells it; in history, its bucket's key. Under a Windows path it can differ in case from
+//   the name asked for, and the renderer takes it as the planet's name.
+// procedural: a stand-in with invented folder numbers. Live: the project has no folder on disk,
+//   or the planet has a stand-in's name (`Sector-N`), no builds, and by the project folder's
+//   listing nothing or a file at that name, or the listing could not be had (the rule is
+//   `planetFolders`'; getSystem draws stand-ins when it has no planet to draw). A folder the
+//   listing had that is gone by its read is 'gone', not a stand-in. History: no builds at the cursor.
+// folderRead: live only. 'full'; 'partial' (the read stopped short, so files and size are
+//   floors); 'gone' (the folder is not there); 'none' (it is there and could not be read: locked,
+//   a passing error, a link, or a project folder that cannot be listed). A planet read never
+//   descends into a link: the planet's folder is a planet folder (above) and every folder below is
+//   typed by its parent's listing, which types every link and junction as a link, never as a
+//   folder. A link inside a planet counts as a file of the link's own size, and a file named
+//   `*.asar` as the plain file it is: main turns Electron's asar handling off before anything
+//   else loads (`process.noAsar` in `main.js`), which would otherwise open and parse it. A folder swapped
+//   for a link between its parent's listing and its own read can still be followed (that needs a
+//   process already writing inside the project).
+//   Absent when there was no folder to read (procedural, or history).
+// builds, project: as they stand when the answer is made, after the folder was read. A project
+//   forgotten meanwhile answers null. A project whose folder changed during the read is read once
+//   more; if it changed again the answer is null, so counts and project are never of two folders.
+// A name that is not one plain path segment (a separator, `.`, `..`, a NUL, over 255 characters;
+//   `(root)` is one) answers null, LIVE and replay alike, whatever folder the project has: main
+//   checks it before either is asked (`au:planet`), so nothing is read for it and no stand-in made.
 ```
 
 Event batch entries (from `AU.onEvents`):
@@ -206,8 +291,19 @@ Event batch entries (from `AU.onEvents`):
 { type: 'ship-spawned',   ship }
 { type: 'ship-updated',   ship }           // status/detail changed
 { type: 'ship-departed',  shipId, ts }
-{ type: 'build', project, bucket, file, shipId, isNew, ts }
-   // project is the ID string; bucket = planet name; isNew => planet formation
+{ type: 'build', project, bucket, key, file, shipId, isNew, ts }
+   // project is the ID string; bucket = the edit's top-level folder as the edit wrote it, or
+   // '(root)'; isNew => planet formation. A folder whose name can be no bucket (`isBucketName`),
+   // or a new one in a project that has 10,000, starts none: the build counts in the project's
+   // and the ship's builds only, with isNew false and key null, so it is on no planet and no
+   // planet card counts it. Under a Windows path main keeps one bucket for a folder's casings, so
+   // the planet is found by `key` (the Planet's and PlanetData's), not by the bucket's spelling.
+   // An edit's path is checked once, trimmed, where its transcript is read (`safePath`): one that
+   // is blank, holds a NUL, CR or LF, or is over 4096 characters, names no file. Where builds are
+   // counted (`relativeInside`), one that is relative, or not in its project path's syntax (a
+   // Windows path with no drive, a share), is in no project; under a POSIX path its leading
+   // slashes are one, as the system opens it (`//home/u/a` is `/home/u/a`). Either is no build,
+   // live and in history alike; its tool shows all the same.
 { type: 'activity', project, shipId, tool, status, detail, ts }
 { type: 'feed', entry: FeedEntry }
 ```
@@ -234,17 +330,55 @@ Design tokens (put in `:root`):
 --accent: #6c8cff;        --radius: 10px;
 ```
 
-- **Top bar** (full width, ~56px): purple glowing dot logo, `AGENT ORRERY`
-  (letter-spaced, semibold), pill badge `MULTI-PROVIDER` (purple-tinted
-  border). Window controls are native — do not draw min/max/close.
-  Universe view only: a `RECENT` strip after the badge — up to 5 pills, the
-  most recently active projects sorted by `lastActivity`, each showing the
-  project name (ellipsized), a green dot when the project has live ships, and
-  jumping to that project's system view on click.
-  A `SEARCH` glass field follows the strip: case-insensitive ranked project
-  matches appear in a keyboard-accessible dropdown and Enter/click opens the
-  existing guarded system route. It is present in every view; a view switch clears the
-  query, and the GitHub filter also narrows the PROJECTS directory.
+- **Top bar** (full width, `--bar-h`): ring-and-star logo, `AGENT ORRERY`
+  (letter-spaced, semibold), mono badge `MULTI-PROVIDER`. Window controls are
+  native — do not draw min/max/close.
+  The controls sit on the right, led by a square search button and the GitHub filter. The button
+  (or `/`, or Ctrl K) opens the Go to palette (`app/project/search.js`, rows by
+  `app/project/search-rows.js`, `styles/search.css`): a modal dialog near the top centre, up to
+  800 px wide, with its field first and the results below. The query ranks up to 6 projects, 4
+  agents and 4 folders (`search-core.js`): prefix, then substring, then a project's path,
+  repository or branch (an agent's status) holding the query, then fuzzy matches, the query's
+  characters in order (3 or more), scored by how close they sit and whether they start words; a
+  word counts the same wherever it sits in the name (`dsb` finds `web-dashboard` as it finds
+  `dashboard`), and how far along the match starts only orders the matches.
+  PROJECTS ranks its query the same way, whole matches only (`rankProjects` with `fuzzy: false`
+  runs no fuzzy pass). Both rank and mark the name they show (`A.projectLabel`, so a project
+  without a name is found by its id) and match real values only:
+  the `Unnamed project`, `Branch unavailable` and `Detached HEAD` labels match nothing, and case
+  folds letter by letter (`İ` as `i`, `ς` as `σ`; the VCS component's own search folds the same
+  way). Each row shows the live dot (an agent's is its
+  provider colour), the name with the characters its match found marked (none when the path,
+  repository, branch or status found it), the full path, the repository and branch (an agent's
+  status) and its kind. Short of room the repository gives way first, then the start of the
+  path; the path's last two folders stay, or as many as tell it from a result of the same name (a
+  folder of a project at a drive or filesystem root reads `D:\src`, with one separator).
+  Arrows, Enter and click pick a result through the existing guarded routes. The arrows move the
+  selection on the rows as they stand, and a refresh from the store keeps the elements of every
+  row whose entry is still listed, also when a row comes in or goes above it (`A.renderListbox`),
+  and the list stays scrolled where it was. A row is its entry's key, and every entry has one of
+  its own: a project `p:<id>`, an agent `a:<id>`, a folder `f:` + the JSON of
+  `[<project id>, <folder>]`. The kinds differ in the first letter, and no two id and folder pairs
+  are written as the same JSON, whatever they hold (an id and a folder name may each hold a
+  quote). `A.renderListbox` logs, once for a key, two entries that share one: a click on either
+  row would open the first. A click opens the entry that was pressed (`A.wireListbox`): when the
+  rows moved under a pointer that stayed put, the release lands on another row and the pressed
+  entry, found by its key, still opens while it is listed.
+  PROJECTS shares all of it (its key is the project id). While an input method
+  composes text (`AUR.composing`), Enter, Escape and the arrows are its own. Escape, a click
+  outside (pressed and released outside the dialog's own box with the main button, so a drag out
+  of the field selecting text keeps it; Settings follows the same rule, `AUR.closeOnBackdrop`), a
+  pick or a view switch closes the palette and clears the query; focus goes back where it was,
+  except after a pick, which leaves it on the page (a field the palette was opened from would
+  take the next keys as text), and stays in the dialog while it is open. The
+  backdrop is a light shade, so the universe's matching systems show behind. The GitHub filter
+  narrows the results (and their agents and folders), the map and the PROJECTS directory, and is
+  wired apart from the palette; the
+  palette's footer says so while it is on. A bar under 1100 layout px (text size counts) keeps
+  PROJECTS to its mark and count; a bar still short of room takes it from the brand (the badge
+  gives way to an ellipsis, then the name), so the controls on the right stay on screen. The
+  chrome's other width rules count the text size too: PROJECTS opens at the window's edge, not
+  beside the right rail, once the chrome has 1040 layout px or fewer across.
   A persistent gear opens Settings, one tab at a time: Graphics · Panels · Shortcuts · Projects · Backup
   (`app/settings-tabs.js`; arrow keys, Home and End move between the tabs, the last tab chosen
   stays chosen while the app runs, and Settings opens on Projects while a project folder is
@@ -258,8 +392,8 @@ Design tokens (put in `:root`):
   kept per viewer), Panel opacity sets the fill of the rail modules, the compact rail buttons and
   the timeline from 20% to solid through one token, `--panel-fill`; 86%, the alpha of `--paper`, is
   the default, text and controls stay, and at 100% the panels drop their blur. Text size zooms the
-  chrome around the star chart (top bar, rails, view title and hint, timeline, planet tab bar,
-  directory, panels menu, toast and Settings) by 100 · 110 · 125 · 150%
+  chrome around the star chart (top bar, rails, view title and hint, timeline,
+  directory, Go to palette, panels menu, toast and Settings) by 100 · 110 · 125 · 150%
   with CSS `zoom`; the star chart keeps its size. The zoom stops where the window would leave the
   chrome less than 1024 × 576 CSS px, the least room it was checked to lay out in without its parts
   overlapping (`C.TEXT_SIZE_ROOM`), and Settings says so under the sizes when it does. While a
@@ -308,16 +442,18 @@ Design tokens (put in `:root`):
     - **Keys and reset.** Arrow keys step 16 px, Shift 64; Home and End go to the least and greatest size; Enter or a double-click puts one size back; the panels menu's *Reset panel sizes* puts them all back. A hairline shows on hover and turns orange with a size badge while dragged or focused.
   - **Each run.** Every run starts from the At launch layout in Settings › Panels (`app/panels/launch.js`, stored in localStorage). By default Summary and Galaxies are hidden, Tasks and Ideas folded, and the rest open. The menu, the chevrons and the keys change only the run in progress. The first run with launch layouts carries over the panels folded before.
 - **Keyboard shortcuts** (`shortcuts.js`, a UMD table the Node tests share, run by `app/keys.js`). Settings › Shortcuts lists them and turns single keys on or off (`agent-universe.single-keys.v1`, on by default).
-  - **Go to and views.** `/` or Ctrl K focuses the search; Backspace goes back one level; N opens the first agent that needs you; Ctrl , opens Settings and ? opens it on Shortcuts. On macOS ⌘ stands in for Ctrl.
+  - **Go to and views.** `/` or Ctrl K opens the Go to palette (or returns to its field); Backspace goes back one level; N opens the first agent that needs you; Ctrl , opens Settings and ? opens it on Shortcuts. On macOS ⌘ stands in for Ctrl.
   - **Timeline.** Space plays or pauses history; L returns to live.
   - **Panels.** `[` and `]` fold or open the left and the right rail, `\` every panel, and Shift E expands the event feed or puts it back. A panel's `letter` in `panel-layout.js` hides or shows it: F Fleet, G Galaxies, E Event feed, I Ideas, S Summary, P Project, T Tasks. In a view without that panel, a toast says where it shows.
-  - **When a key is not a shortcut.** Single keys wait while a text field has focus, while Settings is open, with Alt held, and while they are off; Space on a focused button presses the button. Ctrl shortcuts always work. Escape closes the panels menu, then Settings, then the expanded feed, then the toast, unless the agent view, the directory or the search took it first, or a text field with text has focus.
-  - **Hints.** The panels menu and the At launch rows show each panel's key, the menu's actions theirs, the hiding toast says which key shows the panel again, the search shows `/`, the view hint ends with `? shortcuts`, and the panels button and the feed's expand button give theirs in their titles and `aria-keyshortcuts`. Single-key hints go while single keys are off.
+  - **When a key is not a shortcut.** Single keys wait while a text field has focus, while Settings is open, with Alt held, and while they are off; Space on a focused button presses the button. Ctrl shortcuts always work, except behind the Go to palette: while it is open only `/` and Ctrl K act, putting the caret back in its field. Escape closes the panels menu, then Settings, then the expanded feed, then the toast, unless the Go to palette, the agent view or the directory took it first (the palette closes and nothing else does), or a text field with text has focus. While Settings is open, or agent focus has made the top bar inert, `/` and Ctrl K leave the palette shut.
+  - **Hints.** The panels menu and the At launch rows show each panel's key, the menu's actions theirs, the hiding toast says which key shows the panel again, the view hint ends with `? shortcuts`, and the search button, the panels button and the feed's expand button give theirs in their titles and `aria-keyshortcuts` (the title names the first key that works, `aria-keyshortcuts` every one: the search button says `/` and Ctrl K, or Ctrl K alone). Single-key hints go while single keys are off.
 - **Back control** (system + planet views, top-left under the project card or
   above it): `← Universe` / `← Orion System` style button.
 - **History bar** (all views, fixed bottom): Play/Pause, `1x`/`10x`/`100x`/
   `1000x`, historical clock, scrubber, and exact `LIVE`. Existing sidebar,
-  summaries, and planet tabs remain above it at 1200×720. Seeking atomically
+  summaries, and planet tabs remain above it at 1200×720. The bar of a window 1280 px wide or
+  less at 100% text, or as narrow in layout px at a larger text size (a container query on its own
+  width), closes up: less room between its parts, narrower buttons, no `PROJECT STARTS` caption. Seeking atomically
   reseeds the store; returning LIVE installs a fresh tracker snapshot.
 - Status dot colors: Building `#4da3ff`, Exploring `#a78bfa`,
   Gathering Resources `#ffb454`, Scanning `#34d399`, Delegating `#f472b6`,
@@ -461,9 +597,15 @@ Design tokens (put in `:root`):
 - States: system with ≥1 ship = "online" (brighter, sun pulse, label full
   opacity). Idle = normal dim. `exists: false` = derelict (very dim, ~40%
   opacity, no pulse).
-- While project search is active, matching system glyphs and labels brighten
-  through those same state materials and nonmatches dim; clearing or leaving
-  the universe restores the ordinary online/idle/derelict appearance.
+- While the Go to palette has a query (or the directory has one, or the GitHub
+  filter is on), matching system glyphs and labels brighten through those same
+  state materials and nonmatches dim, in view behind the palette's light
+  backdrop; closing the palette, clearing or leaving the universe restores the
+  ordinary online/idle/derelict appearance. Behind the backdrop a label still
+  keeps clear of the chrome, as it does with the palette shut, and of the
+  palette's own box: a hit test skips the page a modal dialog makes inert, so
+  `scene/universe/labels.js` tests the boxes of the elements that take the pointer (measured
+  when the dialog opens or closes or the window changes size, and again every 300 ms it stays open).
 - Ships: every live ship = its hull (a dart until it loads) cruising outside
   its project's glyph rings (slow orbit, gentle bob), instanced per provider.
   Drones smaller. On `ship-spawned`: warp-in grow; `ship-departed`: removed.
@@ -471,12 +613,15 @@ Design tokens (put in `:root`):
   `project-added` → glyph grows in from zero.
 - Interaction: hover glyph → highlight + pointer cursor; click → zoom/fade
   transition into system view.
-- Summary card: `UNIVERSE SUMMARY` — Projects / Active Agents / Systems Online
-  (systems online = distinct projects with ≥1 ship).
+- Summary card: `UNIVERSE SUMMARY` — Systems / Agents / Online
+  (online = distinct projects with ≥1 ship). The view title's line reads
+  `<n> solar systems · <m> online`.
 
 ## 6. Solar system view (`2.solar-system-view.png`)
 
-Data: `AU.getSystem(projectId)`.
+Data: `AU.getSystem(projectId)`, through `AUR.fetchSystem` (`util.js`): `null` when main has no
+such system, its answer has no `planets` list, or the call throws, which it logs. For `null` the
+route logs that and shows the universe instead (`app/route.js`).
 
 - Backdrop: `AUR.addSky` (`scene/sky.js`), a cube baked offline by `scripts/bake-sky.js` from the
   author's Sidereal Deep Field shader (region The Veil): nebula gas, dust and stars in one
@@ -520,8 +665,23 @@ Data: `AU.getSystem(projectId)`.
   belt; on `build` → `flyto` (`AUR.MOTION.flyToSeconds`, arcing over the belt
   and the largest planet) to a standoff beside the `bucket` planet → `hold`
   (~2.4s, a thin emissive beam, planet pulses 1 → 1.15 → 1) → `return` to the
-  ring (`AUR.MOTION.returnSeconds`). On `build` with `isNew: true`: re-fetch
-  `AU.getSystem`, grow the new planet in from zero, feed shows planet formation.
+  ring (`AUR.MOTION.returnSeconds`). The `bucket` planet is the one whose `key` the build
+  carries (`AUR.planetOfBuild`; the view keeps its planets by name). On `build` with
+  `isNew: true` and no such planet: re-fetch `AU.getSystem` (the view's `systemData` follows),
+  one request at a time and once more for a planet that started while one was out, grow the new
+  planet in from zero, feed shows planet formation. An answer is drawn only while the app still
+  shows the view in the stream it was asked in (`ctx.shown`). A fetch that fails is not tried
+  again, unless a planet started while it was out, which is a new reason to ask once more. Until
+  the answer to a request made after the last planet started comes back while
+  the app shows the view in the stream it was asked in, or the view is built
+  again, the view stays behind: its system is not handed to a planet, which fetches its
+  own. A planet that cannot be built, when the view opens or later, leaves no ring, globe,
+  shell, material or label behind and gives its maps back to the map service (a world's own
+  `dispose()`, `worlds/material.js`, which never disposes the blank texture its scene shares); it
+  is logged once and does not stop the others, and the next re-fetch builds it again. A folder is
+  one planet whatever its casing: one renamed in case only keeps the globe it has, under the name
+  it was drawn with, until the view is built again; a key gets a second globe only when the
+  answer lists it twice.
   On `activity`: brief thruster flash.
 - Project card (top-left, panel): `PROJECT: <NAME>`; rows: `STATE` (any ship
   Building → `Building` in accent blue; else the busiest ship status; no ships →
@@ -545,7 +705,9 @@ Data: `AU.getSystem(projectId)`.
   source line endings in the file are preserved.
 - IDEAS panel (global command rail): captures root-level to-do ideas before a
   project is selected. In LIVE mode the user can assign one to an existing
-  project, which idempotently adds an internally tagged `GOALS.md` item and
+  project (the picker's lines are `A.projectSubtitles`: name, then galaxy, repository,
+  branch and path; projects that share a name lead with the end of the path that tells
+  them apart), which idempotently adds an internally tagged `GOALS.md` item and
   starts Codex. Any idea that is not mid-start or mid-run can be removed after
   confirmation; removing an assigned one also drops its unfinished tagged
   `GOALS.md` line when the project is reachable. The task shows Agent working while correlated work
@@ -559,7 +721,20 @@ Data: `AU.getSystem(projectId)`.
 
 ## 7. Planet view (`1.planet-view.png`)
 
-Data: `AU.getPlanet(projectId, name)`.
+Data: `AU.getPlanet(projectId, name)`, and the project's system alongside it for the planet
+card's solar-system totals: the system view hands over its own when the planet is clicked there
+(`ctx.openPlanet(projectId, name, system)`), and any other way in fetches it
+(`AUR.fetchSystem`, which the system view's refetch uses too: `AU.getSystem`, or `null`). The system view hands over none while its own is
+behind a planet that has just started. The app holds it in `S.planetSystem`; when there is
+none, those rows show `—`; a `build` with `isNew: true` in the open planet's project fetches it
+again, one request at a time (`A.refreshPlanetSystem`), and one that arrives while the planet
+is still opening does so as soon as it has opened (`A.requestPlanetSystem`,
+`A.planetSystemOpened`). An answer is drawn only if no route was asked for and no stream adopted
+since it was asked for (`S.routeRequestGeneration` counts both, so a seek into history never
+shows the live system on the planet it reopens) and the card still shows that project. A fetch
+that fails follows the system view's rule: not tried again, unless a planet started while it was
+out. The view and the route take the planet's name from the answer
+(`PlanetData.name`), not from the name asked for.
 
 - Large generated world (same class rule) filling ~60% of view height, slow
   rotation about a tilted axis, the atmosphere shell, clouds on oceanic worlds on
@@ -568,21 +743,32 @@ Data: `AU.getPlanet(projectId, name)`.
   6 s pass. 1–2 small rocky moons with their own maps. The system view's baked sky (`AUR.addSky`)
   as backdrop.
 - This project's ships orbit the planet with name labels.
-- Left panels (stacked, like the mockup):
+- Left panels (stacked):
   1. `PROJECT: <NAME>` mini-card (state + builds and the same folder/terminal
      actions as in system view).
-  2. `PLANET: <NAME uppercased>` card — status dot `Active` (ships present) or
-     `Dormant`; rows: `TYPE` `Terrestrial` (or `Unknown` when `procedural`),
-     `RESOURCES` top file extensions joined (`TS, JSON, PNG`), `MASS`
-     `<files> files`, `DIAMETER` `<sizeKb> KB`, `STRUCTURES` `<subdirs>`.
-  3. `PLANET STATUS` card with labeled progress bars (clamped 0–100%):
-     Infrastructure `subdirs/10`, Resources `files/500`, Build Energy
-     `builds/50`.
-- Bottom-center tab bar like the mockup: `Overview · Surface · Orbit ·
-  Resources · Structures · Scans` — `Overview` active; all others rendered but
-  disabled (muted, no-op). This is deliberate visual parity without scope creep.
-- Summary card: `PLANET SUMMARY` — Active Agents / Structures / Resources /
-  Builds.
+  2. `PLANET: <NAME uppercased>` card, in plain words — status dot `Active` (ships present) or
+     `Dormant`; a line saying what the globe is drawn as (its class from `AUR.worldProfile`:
+     Rocky world, Gas giant, Ice world, Volcanic world, Oceanic world) and what the planet stands
+     for (`a folder in <project>`, `the top-level files of <project>` for `(root)`, or, when
+     `procedural`, `no folder on disk` for a project without one and `no builds here yet` for a
+     stand-in of a project whose folder is there); rows `FILES`, `SIZE` (KB, MB or GB),
+     `SUBFOLDERS`, `FILE TYPES` (top extensions, `MISC` shown as `other`), each `—` where main read
+     no folder (`A.planetFolderCounts`), and the line says why from the planet's own data: the
+     `procedural` lines above (its numbers invented), `· no longer on disk` (`folderRead: 'gone'`:
+     a build bucket outlives its folder), `· could not be read` (`folderRead: 'none'`: there, and
+     locked or failing just now), or `· history keeps no file counts` (`folderRead` absent: REPLAY
+     never reads the disk); `FILES` and `SIZE` end in `+` when the read stopped short
+     (`folderRead: 'partial'`: past 600 files, 300 folders or five levels, where a folder left
+     unread counts only if it or a folder below it holds a file, at most 100 of them looked into;
+     or a folder below the planet's, or a file's size, that could not be read), and a floor is
+     rounded down (`0 KB+`, never `< 1 KB+`); then `BUILDS (FILE EDITS)`:
+     `THIS PLANET`, `WHOLE SOLAR SYSTEM` (the project's `totalBuilds`) and a bar of the planet's
+     share, a whole percent that is never `0%` of a planet with builds (`< 1%`) nor `100%` of one
+     without them all (`> 99%`); then `SOLAR SYSTEM`: `PLANETS` (the planets the system view
+     draws, `8 of <planetTotal>` when the project has more, from `S.planetSystem`) and `AGENTS`. A
+     `build` event with the open planet's `key` raises its count in place.
+- No tab bar: the mockup's `Overview … Scans` row was dropped because its tabs did nothing.
+- Summary card: `PLANET SUMMARY` — Agents / Files / Subfolders / Builds.
 - Back button → system view.
 
 ## 8. Debug / shots contract (grading depends on this — get it exact)

@@ -7,6 +7,8 @@ const os = require('node:os');
 const path = require('node:path');
 const { isLocalProjectPath, canonicalProjectPath } = require('../src/main/provider-adapters');
 const { Tracker } = require('../src/main/tracker');
+const { SEC, T0, ofType, claude } = require('./support/transcripts');
+const { runBoth } = require('./support/both-models');
 
 test('isLocalProjectPath accepts drive-rooted and POSIX-rooted paths only', () => {
   for (const ok of ['C:\\Work\\proj', 'c:/work/proj', '/Users/coder/proj', '/']) {
@@ -40,11 +42,17 @@ test('canonicalProjectPath refuses network and device paths from transcripts', (
 
 function withTempRoot(run) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'au-path-safety-'));
+  const done = () => fs.rmSync(root, { recursive: true, force: true });
+  let result;
   try {
-    return run(root);
-  } finally {
-    fs.rmSync(root, { recursive: true, force: true });
+    result = run(root);
+  } catch (error) {
+    done();
+    throw error;
   }
+  if (result instanceof Promise) return result.finally(done);
+  done();
+  return result;
 }
 
 test('tracker readCwd drops a UNC cwd and never marks the project as existing', () => {
@@ -66,7 +74,7 @@ test('tracker readCwd drops a UNC cwd and never marks the project as existing', 
 });
 
 test('getPlanet refuses traversal segments and only walks inside the project', () => {
-  withTempRoot((root) => {
+  return withTempRoot(async (root) => {
     const project = path.join(root, 'project');
     fs.mkdirSync(path.join(project, 'src'), { recursive: true });
     fs.mkdirSync(path.join(root, 'secret'), { recursive: true });
@@ -80,10 +88,10 @@ test('getPlanet refuses traversal segments and only walks inside the project', (
       id: 'p1', path: project, name: 'project', exists: true, buckets: {}, lastActivity: 0,
       totalBytes: 0, totalBuilds: 0, firstSeen: 0,
     });
-    const inside = tracker.getPlanet('p1', 'src');
+    const inside = await tracker.getPlanet('p1', 'src');
     assert.equal(inside.files, 1);
     for (const evil of ['..', '../secret', '..\\secret', 'src/../../secret', '/secret', 'C:\\Windows']) {
-      assert.equal(tracker.getPlanet('p1', evil), null, evil);
+      assert.equal(await tracker.getPlanet('p1', evil), null, evil);
     }
   });
 });
@@ -142,18 +150,18 @@ test('ensureProjectForPath trims a leading-space cwd instead of throwing', () =>
 });
 
 test('getPlanet ignores inherited property names and returns a cloneable result', () => {
-  withTempRoot((root) => {
+  return withTempRoot(async (root) => {
     const tracker = isolatedTracker(root);
     tracker.projects.set('p1', {
       id: 'p1', path: null, name: 'project', exists: false, buckets: { src: 3 }, lastActivity: 0,
       totalBytes: 0, totalBuilds: 3, firstSeen: 0,
     });
     for (const name of ['constructor', '__proto__', 'toString']) {
-      const planet = tracker.getPlanet('p1', name);
+      const planet = await tracker.getPlanet('p1', name);
       assert.equal(planet.builds, 0, name);
       assert.equal(structuredClone(planet).builds, 0, name);
     }
-    assert.equal(tracker.getPlanet('p1', 'src').builds, 3);
+    assert.equal((await tracker.getPlanet('p1', 'src')).builds, 3);
   });
 });
 
@@ -180,16 +188,53 @@ test('localAbsolutePath normalizes a local absolute path and refuses UNC, device
   assert.equal(localAbsolutePath(local), path.normalize(local));
 });
 
-test('relativeInside ignores case only under a Windows-style root and keeps the file\'s casing', () => {
-  const { relativeInside, ignoresCase } = pathSafety;
+test('relativeInside ignores case only under a Windows-style root and keeps the file\'s casing', (t) => {
+  const { relativeInside } = pathSafety;
   assert.equal(relativeInside('C:\\Work\\Demo', 'c:/work/demo/Docs/Guide.md', { separator: '/' }), 'Docs/Guide.md');
   assert.equal(relativeInside('c:\\work\\demo', 'C:\\WORK\\DEMO\\Src\\A.js', { separator: '\\' }), 'Src\\A.js');
   assert.equal(relativeInside('C:\\Work\\Demo', 'C:\\WORK\\Other\\x.js'), null);
   assert.equal(relativeInside('C:\\Work\\Demo', 'c:\\work\\demo'), null);
   assert.equal(relativeInside('/Work/Demo', '/Work/Demo/Docs/Guide.md', { separator: '/' }), 'Docs/Guide.md');
   assert.equal(relativeInside('/Work/Demo', '/work/demo/Docs/Guide.md'), null);
-  assert.deepEqual(['C:\\Work', 'c:/work', 'relative\\dir', '/Work', null].map(ignoresCase),
-    [true, true, true, false, false]);
+  // A relative path says nothing about where a file is: it would resolve against the app's own folder.
+  for (const [root, file] of [[process.cwd(), path.join('Docs', 'x.md')], ['Demo', 'Demo/Docs/x.md'], [process.cwd(), 7], [null, '/x'],
+    ['Demo', path.posix.resolve('Demo', 'Docs', 'x.md')], ['Demo\\x', path.win32.resolve('Demo\\x', 'Docs', 'x.md')]]) {
+    assert.equal(relativeInside(root, file), null, JSON.stringify([root, file]));
+  }
+  // Nor does a Windows path with no drive, which would resolve against the working folder's drive:
+  // C: here, on every host, the root's own drive.
+  t.mock.method(process, 'cwd', () => 'C:\\Work');
+  for (const file of ['\\Demo\\src\\a.js', '/Demo/src/a.js']) assert.equal(relativeInside('C:\\Demo', file), null, file);
+});
+
+test('relativeInside takes a POSIX file\'s leading slashes as one, as the system opens it, and no share under any root', () => {
+  const { relativeInside } = pathSafety;
+  for (const file of ['//Work/Demo/src/a.js', '///Work/Demo/src/a.js']) {
+    assert.equal(relativeInside('/Work/Demo', file, { separator: '/' }), 'src/a.js', file);
+    assert.equal(relativeInside('C:\\Work\\Demo', file), null, `${file} under a Windows root`);
+  }
+  for (const file of ['\\\\server\\share\\Demo\\a.js', '//server/share/Demo/a.js']) {
+    assert.equal(relativeInside('C:\\server\\share\\Demo', file), null, file);
+  }
+  assert.equal(relativeInside('/server/share/Demo', '\\\\server\\share\\Demo\\a.js'), null);
+});
+
+test('under a POSIX root an edit path whose leading slashes are doubled builds in both models', async (t) => {
+  // Linux and macOS open '//home/u/a' as '/home/u/a'; the root is missing on disk, so any host works.
+  const { live, replay } = await runBoth(t, {
+    cwd: '/orrery-fixture-missing/demo',
+    records: (dir) => [
+      claude.prompt(dir, T0),
+      claude.tool(dir, T0 + 1 * SEC, 'toolu_one', 'Edit', { file_path: `${dir}/src/a.js` }),
+      claude.tool(dir, T0 + 2 * SEC, 'toolu_two', 'Edit', { file_path: `/${dir}/src/b.js` }),
+      claude.tool(dir, T0 + 3 * SEC, 'toolu_three', 'Edit', { file_path: `//${dir}/lib/c.js` }),
+    ],
+  });
+  for (const side of [live, replay]) {
+    assert.deepEqual(ofType(side.events, 'build').map((event) => [event.bucket, event.file.replaceAll('\\', '/')]),
+      [['src', 'src/a.js'], ['src', 'src/b.js'], ['lib', 'lib/c.js']]);
+  }
+  assert.equal(live.snapshot.projects[0].totalBuilds, 3);
 });
 
 test('pathFlavor names drive-rooted and POSIX paths and rejects UNC and //host/share', () => {

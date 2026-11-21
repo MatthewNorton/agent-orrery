@@ -51,6 +51,51 @@
       return true;
     }
 
+    // The chrome over the map, as boxes, behind `overlay`. A modal dialog makes the page behind it
+    // inert, and a hit test skips what is inert, so behind one the chrome is found the way a hit
+    // test would find it: every element that takes the pointer, by its box. The walk is kept until
+    // the overlay opens or closes or the window changes size, and CHROME_BOXES_MS at most, since a
+    // panel behind the overlay can still grow.
+    const CHROME_BOXES_MS = 300;
+    const NO_CHROME = { overlay: null, width: 0, height: 0, at: 0, boxes: [] };
+    let chromeUnder = NO_CHROME;
+    function chromeBoxes(overlay) {
+      const { innerWidth: width, innerHeight: height } = window;
+      const at = performance.now();
+      if (chromeUnder.overlay === overlay && chromeUnder.width === width && chromeUnder.height === height &&
+        at - chromeUnder.at < CHROME_BOXES_MS) return chromeUnder.boxes;
+      const boxes = [];
+      const collect = (el) => {
+        if (el === canvas || el === overlay) return;
+        const style = getComputedStyle(el);
+        if (style.display === 'none') return;
+        const box = style.pointerEvents !== 'none' && style.visibility === 'visible' && el.getBoundingClientRect();
+        if (box && box.width > 0 && box.height > 0) boxes.push(box);
+        else for (const child of el.children) collect(child);
+      };
+      for (const child of document.body.children) collect(child);
+      chromeUnder = { overlay, width, height, at, boxes };
+      return boxes;
+    }
+    // A dialog that opens or closes changes where a label may sit, see-through or not.
+    const dialogs = [...document.querySelectorAll('dialog')];
+    const dialogToggled = () => { chromeUnder = NO_CHROME; markLabelLayoutDirty(); };
+    for (const dialog of dialogs) dialog.addEventListener('toggle', dialogToggled);
+    // Both go with the scene, also when the view's build fails (AUR.buildView).
+    scene.onDisposeObservable.add(() => {
+      cancelLabelLayout();
+      for (const dialog of dialogs) dialog.removeEventListener('toggle', dialogToggled);
+    });
+
+    // An overlay marked data-see-through (the Go to palette's light backdrop) hides none of the map;
+    // the chrome behind it still does.
+    function mapShowsAt(x, y) {
+      const hit = document.elementFromPoint(x, y);
+      if (hit === canvas) return true;
+      if (!hit || !hit.hasAttribute('data-see-through')) return false;
+      return !chromeBoxes(hit).some((box) => x >= box.left && x <= box.right && y >= box.top && y <= box.bottom);
+    }
+
     function labelPointIsClear(rect) {
       if (![rect.x, rect.y, rect.width, rect.height].every(Number.isFinite)) return false;
       const inset = 2;
@@ -61,7 +106,7 @@
         [rect.x + inset, rect.y + rect.height - inset],
         [rect.x + rect.width - inset, rect.y + rect.height - inset],
       ];
-      return points.every(([x, y]) => document.elementFromPoint(x, y) === canvas);
+      return points.every(([x, y]) => mapShowsAt(x, y));
     }
 
     function updateLabelLayout() {
@@ -217,7 +262,7 @@
 
     return {
       markLabelLayoutDirty, cameraLayoutChanged, labelPointIsClear, ensureLabelLayout,
-      cancelLabelLayout, lastLabelMetrics: () => lastLabelMetrics,
+      lastLabelMetrics: () => lastLabelMetrics,
     };
   };
 })();

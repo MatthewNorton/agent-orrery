@@ -84,31 +84,28 @@ function isInsidePath(root, candidate) {
 }
 
 /**
- * Whether names under root compare case-insensitively: a Windows-style root (a drive letter
- * or a backslash), on every host.
- * @param {string | null | undefined} root
- */
-function ignoresCase(root) {
-  return typeof root === 'string' && (/^[a-z]:[\\/]/i.test(root) || root.includes('\\'));
-}
-
-/**
  * file relative to root, joined with `separator`, or null unless it lies strictly beneath
- * root. The flavor, and Windows case folding, come from root's syntax, so every host agrees.
- * Case folding only decides containment: the result keeps the file's own casing.
- * Without `requireAbsolute` a relative file resolves against the process cwd.
- * @param {string | null | undefined} root
- * @param {string | null | undefined} file
- * @param {{ separator?: string, requireAbsolute?: boolean }} [options]
+ * root. Both must be absolute in one path syntax (pathFlavor), a POSIX file's leading slashes
+ * taken as one. The syntax, and with it Windows case folding, comes from root's own text, so
+ * every host agrees. Case folding only decides containment: the result keeps the file's own casing.
+ * @param {unknown} root
+ * @param {unknown} file
+ * @param {{ separator?: string }} [options]
  * @returns {string | null}
  */
-function relativeInside(root, file, { separator = path.sep, requireAbsolute = false } = {}) {
-  if (!root || !file) return null;
-  const windows = ignoresCase(root);
-  const flavor = windows ? path.win32 : path.posix;
-  if (requireAbsolute && (!flavor.isAbsolute(root) || !flavor.isAbsolute(file))) return null;
+function relativeInside(root, file, { separator = path.sep } = {}) {
+  if (typeof root !== 'string' || typeof file !== 'string') return null;
+  const flavorName = pathFlavor(root);
+  if (!flavorName) return null;
+  const windows = flavorName === 'win32';
+  const flavor = path[flavorName];
   const normalizedRoot = flavor.normalize(root);
   const normalizedFile = flavor.normalize(file);
+  // Security: a relative path, or a Windows path with no drive, would resolve against the process's
+  // working folder or its drive, which says nothing about where a transcript's file is. A POSIX
+  // file is judged as the system opens it, its leading slashes one ('//home/u/a' is '/home/u/a');
+  // under a Windows root, '//host/share' names a share, in no project.
+  if (pathFlavor(windows ? file : normalizedFile) !== flavorName) return null;
   const comparableRoot = windows ? normalizedRoot.toLowerCase() : normalizedRoot;
   const comparableFile = windows ? normalizedFile.toLowerCase() : normalizedFile;
   const rel = flavor.relative(comparableRoot, comparableFile);
@@ -126,7 +123,6 @@ module.exports = {
   isAbsolutePosixPath,
   localAbsolutePath,
   isInsidePath,
-  ignoresCase,
   relativeInside,
   // Re-exported unchanged from provider-adapters.js, which owns them.
   isLocalProjectPath,

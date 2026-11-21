@@ -1,9 +1,9 @@
 'use strict';
 
-// Feeds the same transcript to the live Tracker and to the history
-// ReplaySource. "agree:" tests pin what both models already share;
-// "differs:" tests name a divergence that exists today, so the parser merge
-// can change each one deliberately rather than by accident.
+// Feeds the same transcript to the live Tracker (src/main/tracker.js) and to the history
+// ReplaySource. "agree:" tests pin what both models already share; "differs:" tests name a
+// divergence that exists today, so the parser merge can change each one deliberately rather than
+// by accident.
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -11,84 +11,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { canonicalProjectPath } = require('../src/main/provider-adapters');
 const {
-  SEC, T0, SLUG, CLAUDE_SESSION, CODEX_SESSION, TASK_ID,
-  hex8, appendJsonl, createWorld, ofType, countTypes, claude, codex,
+  SEC, T0, SLUG, CLAUDE_SESSION, CODEX_SESSION, TASK_ID, SHIP_ID, CODEX_SHIP_ID, hex8, appendJsonl, createWorld, ofType, countTypes,
+  pick, claude, codex,
 } = require('./support/transcripts');
-
-const SHIP_ID = `ship:${SLUG}:${CLAUDE_SESSION}`;
-const CODEX_SHIP_ID = `ship:codex:${CODEX_SESSION}`;
-const pick = (keys) => (item) => Object.fromEntries(keys.map((key) => [key, item[key]]));
-
-function claudeSession(dir, root) {
-  return [
-    claude.prompt(dir, T0),
-    claude.tool(dir, T0 + 1 * SEC, 'toolu_read', 'Read', { file_path: path.join(dir, 'src', 'a.js') }),
-    claude.result(dir, T0 + 2 * SEC, 'toolu_read'),
-    claude.tool(dir, T0 + 3 * SEC, 'toolu_edit', 'Edit', { file_path: path.join(dir, 'src', 'a.js') }),
-    claude.result(dir, T0 + 4 * SEC, 'toolu_edit'),
-    claude.tool(dir, T0 + 5 * SEC, 'toolu_write', 'Write', { file_path: path.join(dir, 'notes.md') }),
-    claude.result(dir, T0 + 6 * SEC, 'toolu_write'),
-    claude.tool(dir, T0 + 7 * SEC, 'toolu_out', 'Edit', { file_path: path.join(root, 'elsewhere', 'x.js') }),
-    claude.result(dir, T0 + 8 * SEC, 'toolu_out'),
-    claude.tool(dir, T0 + 9 * SEC, 'toolu_mcp', 'mcp__probe__lookup', {}),
-    claude.result(dir, T0 + 10 * SEC, 'toolu_mcp'),
-    claude.tool(dir, T0 + 11 * SEC, 'toolu_task', 'Task', { description: 'Survey' }),
-    claude.result(dir, T0 + 12 * SEC, 'toolu_task'),
-    claude.turnDone(dir, T0 + 13 * SEC),
-    claude.prompt(dir, T0 + 14 * SEC, 'next'),
-  ];
-}
-
-function codexSession(dir) {
-  return [
-    codex.meta(T0, CODEX_SESSION, dir),
-    codex.event(T0 + 1 * SEC, 'task_started'),
-    codex.userText(T0 + 2 * SEC, `agent-universe:${TASK_ID}`),
-    codex.call(T0 + 3 * SEC, 'call-exec', 'exec_command'),
-    codex.output(T0 + 4 * SEC, 'call-exec'),
-    codex.patchCall(T0 + 5 * SEC, 'call-patch'),
-    codex.patched(T0 + 6 * SEC, 'call-patch', [path.join(dir, 'src', 'x.js')]),
-    codex.patchOutput(T0 + 7 * SEC, 'call-patch'),
-    codex.event(T0 + 8 * SEC, 'task_complete'),
-  ];
-}
-
-// Live sees the first record at startup (tailed from EOF) and the rest in one
-// poll at the last record's time; replay seeks to the first record and
-// advances to the same time.
-async function runBoth(t, { provider = 'claude', records, cwd } = {}) {
-  const world = createWorld(t);
-  const build = records || (provider === 'claude' ? claudeSession : codexSession);
-  const lines = build(cwd || world.projectDir, world.root);
-  const end = Date.parse(lines.at(-1).timestamp);
-  const file = provider === 'claude' ? world.claudeFile() : world.codexFile();
-
-  appendJsonl(file, lines.slice(0, 1), T0);
-  const startupBytes = fs.statSync(file).size;
-  const live = world.live();
-  live.tracker.scan(true);
-  live.take();
-  world.clock.set(end);
-  appendJsonl(file, lines.slice(1), end);
-  live.tracker.pollFiles();
-  const liveEvents = live.take();
-
-  const replay = world.replay();
-  await replay.source.index();
-  await replay.source.seek(T0);
-  replay.take();
-  await replay.source.advanceTo(end);
-  const replayEvents = replay.take();
-
-  return {
-    world,
-    startupBytes,
-    live: { tracker: live.tracker, events: liveEvents, snapshot: live.tracker.snapshot() },
-    replay: { source: replay.source, events: replayEvents, snapshot: replay.source.snapshot() },
-  };
-}
-
-// ---------- Claude: where the models agree ----------
+const { runBoth } = require('./support/both-models');
 
 test('agree: claude project id, path, seed and ship identity', async (t) => {
   const { live, replay } = await runBoth(t);
@@ -171,12 +97,80 @@ test('agree: one folder written in two casings under a Windows-style root keeps 
     assert.deepEqual(ofType(side.events, 'build').map(pick(['bucket', 'isNew'])),
       [{ bucket: 'Docs', isNew: true }, { bucket: 'docs', isNew: false }]);
   }
-  assert.equal(live.tracker.getPlanet(SLUG, 'DOCS').builds, 2);
+  assert.deepEqual(pick(['name', 'builds'])(await live.tracker.getPlanet(SLUG, 'DOCS')), { name: 'Docs', builds: 2 });
   assert.deepEqual(replay.snapshot.projects[0].buckets, { Docs: 2 });
-  assert.equal(replay.source.getPlanet(SLUG, 'DOCS').builds, 2);
+  assert.deepEqual(pick(['name', 'builds'])(replay.source.getPlanet(SLUG, 'DOCS')), { name: 'Docs', builds: 2 },
+    'by the bucket key, which the replay system view draws it under');
 });
 
-// ---------- Claude: where the models differ today ----------
+test('agree: a system of more than eight planets keeps the biggest eight and says of how many', async (t) => {
+  const { live, replay } = await runBoth(t, {
+    records: (dir) => {
+      for (let index = 0; index < 10; index++) fs.mkdirSync(path.join(dir, `dir${index}`));
+      return [claude.prompt(dir, T0), ...Array.from({ length: 10 }, (_, index) => (
+        claude.tool(dir, T0 + (index + 1) * SEC, `toolu_${index}`, 'Write', { file_path: path.join(dir, `dir${index}`, 'a.js') })))];
+    },
+  });
+  // Live counts the folders on disk, the fixture's own src among them; history, the folders built in.
+  const live8 = live.tracker.getSystem(SLUG), replay8 = replay.source.getSystem(SLUG);
+  assert.deepEqual([live8.planets.length, live8.planetTotal], [8, 11]);
+  assert.deepEqual([replay8.planets.length, replay8.planetTotal], [8, 10]);
+  assert.equal(live8.planets.some((planet) => planet.name === 'src'), false, 'the one without builds is past the eighth');
+});
+
+// ---------- Codex ----------
+
+test('agree: codex project id, ship identity, classified activity and builds', async (t) => {
+  const { world, live, replay } = await runBoth(t, { provider: 'codex' });
+  const projectId = `project:${hex8(canonicalProjectPath(world.projectDir))}`;
+  assert.deepEqual(replay.snapshot.projects.map((project) => project.id), [projectId]);
+  assert.deepEqual(live.snapshot.projects.map((project) => project.id), [projectId]);
+
+  const ship = pick(['id', 'name', 'project', 'kind', 'provider', 'status', 'lastEvent', 'builds']);
+  assert.deepEqual(replay.snapshot.ships.map(ship), live.snapshot.ships.map(ship));
+  assert.equal(live.snapshot.ships[0].id, CODEX_SHIP_ID);
+  assert.equal(live.snapshot.ships[0].builds, 1);
+
+  const activity = pick(['shipId', 'tool', 'status', 'detail', 'ts']);
+  assert.deepEqual(ofType(replay.events, 'activity').map(activity), ofType(live.events, 'activity').map(activity));
+  assert.deepEqual(ofType(live.events, 'activity').map((event) => event.tool), ['Bash', 'Edit']);
+
+  const build = pick(['project', 'bucket', 'isNew', 'shipId', 'ts']);
+  assert.deepEqual(ofType(replay.events, 'build').map(build), ofType(live.events, 'build').map(build));
+  assert.equal(ofType(live.events, 'build').length, 1);
+});
+
+test('agree: a relative or drive-less edit path builds nothing in either model, Claude or Codex, wherever the app runs', async (t) => {
+  // A relative path would resolve against the app's working folder, which here is the project, and a
+  // Windows path with no drive against that folder's drive.
+  const cwd = process.cwd();
+  const inProject = (lines) => (dir) => { process.chdir(dir); return lines(dir); };
+  const driveless = (dir) => path.win32.join(dir.replace(/^[A-Za-z]:/, ''), 'src', 'c.js');
+  const sides = {
+    claude: inProject((dir) => [
+      claude.prompt(dir, T0),
+      claude.tool(dir, T0 + 1 * SEC, 'toolu_rel', 'Edit', { file_path: path.join('src', 'a.js') }),
+      claude.tool(dir, T0 + 2 * SEC, 'toolu_abs', 'Edit', { file_path: path.join(dir, 'src', 'b.js') }),
+      claude.tool(dir, T0 + 3 * SEC, 'toolu_nodrive', 'Edit', { file_path: driveless(dir) }),
+    ]),
+    codex: inProject((dir) => [
+      codex.meta(T0, CODEX_SESSION, dir), codex.event(T0 + 1 * SEC, 'task_started'), codex.patchCall(T0 + 2 * SEC, 'call-patch'),
+      codex.patched(T0 + 3 * SEC, 'call-patch', [path.join('src', 'a.js'), path.join(dir, 'src', 'b.js'), driveless(dir)]),
+    ]),
+  };
+  for (const [provider, records] of Object.entries(sides)) {
+    await t.test(provider, async (st) => {
+      try {
+        const { live, replay } = await runBoth(st, { provider, records });
+        for (const side of [live, replay]) {
+          assert.deepEqual(ofType(side.events, 'build').map((event) => event.file.replaceAll('\\', '/')), ['src/b.js']);
+        }
+      } finally {
+        process.chdir(cwd);
+      }
+    });
+  }
+});
 
 test('differs: event volume — replay adds project-updated per record and ship-updated per turn/tool boundary', async (t) => {
   const { live, replay } = await runBoth(t);
@@ -282,12 +276,12 @@ test('differs: getSystem — live lists folders on disk, replay lists build buck
   const { world, live, replay } = await runBoth(t);
   fs.writeFileSync(path.join(world.projectDir, 'src', 'a.js'), 'a');
   assert.deepEqual(live.tracker.getSystem(SLUG).planets, [
-    { name: 'src', files: 1, builds: 1 },
-    { name: '(root)', files: 0, builds: 1 },
+    { name: 'src', key: 'src', files: 1, builds: 1 },
+    { name: '(root)', key: '(root)', files: 0, builds: 1 },
   ]);
   assert.deepEqual(replay.source.getSystem(SLUG), {
     project: replay.snapshot.projects[0],
-    planets: [{ name: '(root)', files: 0, builds: 1 }, { name: 'src', files: 0, builds: 1 }],
+    planets: [{ name: '(root)', key: '(root)', files: 0, builds: 1 }, { name: 'src', key: 'src', files: 0, builds: 1 }],
     beltDensity: 0,
   });
 });
@@ -364,26 +358,6 @@ test('differs: project-id collision suffix — live "<id>:<hash8>", replay "<id>
 });
 
 // ---------- Codex and Signal ----------
-
-test('agree: codex project id, ship identity, classified activity and builds', async (t) => {
-  const { world, live, replay } = await runBoth(t, { provider: 'codex' });
-  const projectId = `project:${hex8(canonicalProjectPath(world.projectDir))}`;
-  assert.deepEqual(replay.snapshot.projects.map((project) => project.id), [projectId]);
-  assert.deepEqual(live.snapshot.projects.map((project) => project.id), [projectId]);
-
-  const ship = pick(['id', 'name', 'project', 'kind', 'provider', 'status', 'lastEvent', 'builds']);
-  assert.deepEqual(replay.snapshot.ships.map(ship), live.snapshot.ships.map(ship));
-  assert.equal(live.snapshot.ships[0].id, CODEX_SHIP_ID);
-  assert.equal(live.snapshot.ships[0].builds, 1);
-
-  const activity = pick(['shipId', 'tool', 'status', 'detail', 'ts']);
-  assert.deepEqual(ofType(replay.events, 'activity').map(activity), ofType(live.events, 'activity').map(activity));
-  assert.deepEqual(ofType(live.events, 'activity').map((event) => event.tool), ['Bash', 'Edit']);
-
-  const build = pick(['project', 'bucket', 'isNew', 'shipId', 'ts']);
-  assert.deepEqual(ofType(replay.events, 'build').map(build), ofType(live.events, 'build').map(build));
-  assert.equal(ofType(live.events, 'build').length, 1);
-});
 
 test('differs: codex task marker and turn outcome reach ships in live only', async (t) => {
   const { live, replay } = await runBoth(t, { provider: 'codex' });
