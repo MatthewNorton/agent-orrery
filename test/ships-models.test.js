@@ -32,8 +32,8 @@ test('Petrel flies the Scout rank: the first rank of the family both providers f
     { id: 'petrel', file: 'model:petrel', family: SCOUT.family, role: SCOUT.role, minBuilds: 0 });
   assert.deepEqual([hull.model.id, hull.model.replaces, hull.correction], ['petrel', SCOUT.id, hull.model.correction]);
   assert.equal(models.inPlaceOf(SCOUT), hull, 'one hull entry, so a refresh compares like with like');
-  const workhorse = manifest.hulls.find((entry) => entry.family === SCOUT.family && entry.minBuilds === 5);
-  assert.equal(models.inPlaceOf(workhorse), workhorse, 'a rank no model has taken keeps its manifest hull');
+  const flagship = manifest.hulls.find((entry) => entry.family === SCOUT.family && entry.minBuilds === 60);
+  assert.equal(models.inPlaceOf(flagship), flagship, 'a rank no model has taken keeps its manifest hull');
 });
 
 test('a model container holds the dressed ship out of the scene, as one mesh with a sub-mesh per finish', () => {
@@ -183,7 +183,7 @@ test('a model container owns the materials and textures it was built with: dispo
 });
 
 test('a ship wears the model finishes, with its trim copied once per palette in the ship color', () => {
-  onScene((scene, models, petrel) => {
+  onScene((scene, models, petrel, AUR) => {
     const whole = models.container(scene, petrel).meshes[0].material;
     const base = (name) => whole.subMaterials.find((finish) => finish.name === name);
     const materials = new Map();
@@ -220,7 +220,6 @@ test('a ship wears the model finishes, with its trim copied once per palette in 
     }
     assert.equal(hull.imageProcessingConfiguration, base('pearl pressure hull').imageProcessingConfiguration);
     assert.equal(base('pearl pressure hull').emissiveColor.r, 2.5, 'the model material is untouched');
-    for (const name of Object.keys(petrel.trim)) assert.ok(base(name), name + ' is a material Petrel builds');
 
     // The whole hull's material for a palette: each finish in its place, the trim swapped for its copy.
     const worn = models.material(materials, petrel, 'claude', '#d97757', whole);
@@ -228,6 +227,24 @@ test('a ship wears the model finishes, with its trim copied once per palette in 
     assert.ok(sameItems(worn.subMaterials, whole.subMaterials.map((finish) => wear(finish.name, 'claude', '#d97757'))));
     assert.equal(worn.subMaterials.filter((finish, i) => finish !== whole.subMaterials[i]).length, Object.keys(petrel.trim).length);
     assert.equal(scene.textures.length, textures, 'a copy makes no texture of its own');
+
+    // Both Petrels, bare and ringed, wear the hull's guide lamps in the ship color on the lamp map
+    // the art painted, each from its own container, and each trim name of each names a material
+    // that model builds.
+    const ringed = models.inPlaceOf(manifest.hulls.find((entry) => entry.family === SCOUT.family && entry.minBuilds === 5)).model;
+    assert.notEqual(ringed, petrel);
+    for (const model of [petrel, ringed]) {
+      const finishes = models.container(scene, model).meshes[0].material.subMaterials;
+      const own = (name) => finishes.find((finish) => finish.name === name);
+      for (const name of Object.keys(model.trim)) assert.ok(own(name), `${name} is a material ${model.id} builds`);
+      assert.deepEqual(model.trim['pearl pressure hull'], { lamps }, model.id);
+      const copies = new Map();
+      for (const [palette, hex] of [['claude', '#d97757'], ['codex', '#f2f0ea'], ['local', AUR.LOCAL_MODEL.color]]) {
+        const guide = models.material(copies, model, palette, hex, own('pearl pressure hull'));
+        assert.ok(shown(guide).equalsWithEpsilon(BABYLON.Color3.FromHexString(hex).toLinearSpace().scale(2.5), 1e-6), `${model.id}: ${palette} guide lamps`);
+        assert.ok(guide.emissiveTexture === own('pearl pressure hull').emissiveTexture, `${model.id}: ${palette} guide lamps on the art's map`);
+      }
+    }
   });
 });
 
@@ -253,8 +270,8 @@ test('a model hull is lit by the three model lights and nothing else; they light
 
 test('the nozzles sit at the stern in the fleet frame', () => {
   const models = load().shipModels;
-  assert.equal(models.nozzles('aur-bastion-corvette-v3'), null, 'a manifest hull finds its own');
-  const [port, starboard] = models.nozzles('petrel');
+  assert.equal(models.nozzles('aur-ark-carrier-v3'), null, 'a manifest hull finds its own');
+  const [port, starboard] = models.nozzles(models.inPlaceOf(SCOUT).id);
   assert.ok(Math.abs(port.position.x + starboard.position.x) < 1e-9 && starboard.position.x > 0, 'mirrored');
   assert.ok(port.position.z < -0.4 && port.position.z > -0.5, 'at the stern of a hull one unit long, centred');
   assert.ok(port.radius > 0.02 && port.radius < 0.05);

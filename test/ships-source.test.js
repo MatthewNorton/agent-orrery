@@ -8,7 +8,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const BABYLON = require('babylonjs');
-const { lf, sha256, fingerprintOf, loadShipModules } = require('../scripts/lib/ship-fingerprint.js');
+const { lf, sha256, fingerprintOf, loadShipModules, rootOf } = require('../scripts/lib/ship-fingerprint.js');
 const { scriptTags } = require('./support/renderer-source');
 
 const SHIPS = path.join(__dirname, '..', 'src', 'renderer', 'ships');
@@ -17,8 +17,10 @@ const ships = fs.readdirSync(SHIPS, { withFileTypes: true })
   .filter((entry) => entry.isDirectory() && fs.existsSync(path.join(SHIPS, entry.name, 'source', 'source.json')))
   .map((entry) => entry.name);
 
-test('at least one ship model is converted', () => {
+test('at least one ship model is converted, Petrel with its survey ring as a variant', () => {
   assert.ok(ships.includes('petrel'));
+  const petrel = JSON.parse(fs.readFileSync(path.join(SHIPS, 'petrel', 'source', 'source.json'), 'utf8'));
+  assert.deepEqual(petrel.variants.ring.call, ['setRing', true]);
 });
 
 test('every folder under ships/ is a converted model with its adapter', () => {
@@ -68,5 +70,8 @@ for (const ship of ships) {
     }
     const [module, build] = record.build;
     assert.deepEqual(fingerprintOf(BABYLON, (scene) => use(`${ship}/${module}`)[build](scene).root), record.geometry);
+    for (const [name, { call, geometry }] of Object.entries(record.variants)) {
+      assert.deepEqual(fingerprintOf(BABYLON, (scene) => rootOf(use(`${ship}/${module}`)[build](scene), call)), geometry, name);
+    }
   });
 }

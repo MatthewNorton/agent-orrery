@@ -11,12 +11,13 @@ const { buildHull } = use('petrel/hull');
 const { buildDeck } = use('petrel/deck');
 const { buildDrive } = use('petrel/drives');
 const { buildWing } = use('petrel/wings');
+const { createSurveyRing } = use('petrel/survey-ring');
 const { STOW_ANGLE } = use('petrel/airframe');
 
 function createPetrel(scene) {
   const root=new TransformNode('Petrel',scene), m=createSurfaces(scene);
   const body=new Assembly(scene,root);
-  buildHull(body,m);
+  const sockets=buildHull(body,m);
   buildDeck(body,m);
   const wings=[-1,1].map(sign=>{
     buildDrive(body,sign,m);
@@ -28,7 +29,13 @@ function createPetrel(scene) {
     for (const {sign,pivot} of wings) pivot.rotation.z=sign*STOW_ANGLE*fold;
   }
   setDeployment(1);
-  return {root,setDeployment};
+  let ring;
+  function setRing(equipped) {
+    if (equipped && !ring) ring=createSurveyRing(scene,root,sockets,{...m,...m.ringFinishes()});
+    ring?.setEnabled(equipped);
+    return ring;
+  }
+  return {root,setDeployment,setRing};
 }
 return { createPetrel };
 });

@@ -27,7 +27,8 @@ function loadShipModels() {
 }
 
 // Runs `work(scene, AUR, fly)` on a system view's scene, with AUR.ships on the real Babylon build
-// and Petrel flying the Scout rank of the manifest on disk; `fly(id)` resolves to a ship's hull.
+// and Petrel in the ranks it takes from the manifest on disk (bare the Scout, ringed the
+// Workhorse and the Capital); `fly(id)` resolves to a Scout's hull.
 function onSystem(work) {
   return withCanvas(() => onNullScene(BABYLON, async (scene) => {
     const AUR = loadShipModels();
