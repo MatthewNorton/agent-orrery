@@ -32,8 +32,8 @@ test('Petrel flies the Scout rank: the first rank of the family both providers f
     { id: 'petrel', file: 'model:petrel', family: SCOUT.family, role: SCOUT.role, minBuilds: 0 });
   assert.deepEqual([hull.model.id, hull.model.replaces, hull.correction], ['petrel', SCOUT.id, hull.model.correction]);
   assert.equal(models.inPlaceOf(SCOUT), hull, 'one hull entry, so a refresh compares like with like');
-  const workhorse = manifest.hulls.find((entry) => entry.family === SCOUT.family && entry.minBuilds === 5);
-  assert.equal(models.inPlaceOf(workhorse), workhorse, 'a rank no model has taken keeps its manifest hull');
+  const flagship = manifest.hulls.find((entry) => entry.family === SCOUT.family && entry.minBuilds === 60);
+  assert.equal(models.inPlaceOf(flagship), flagship, 'a rank no model has taken keeps its manifest hull');
 });
 
 test('a model container holds the dressed ship out of the scene, as one mesh with a sub-mesh per finish', () => {
@@ -253,8 +253,8 @@ test('a model hull is lit by the three model lights and nothing else; they light
 
 test('the nozzles sit at the stern in the fleet frame', () => {
   const models = load().shipModels;
-  assert.equal(models.nozzles('aur-bastion-corvette-v3'), null, 'a manifest hull finds its own');
-  const [port, starboard] = models.nozzles('petrel');
+  assert.equal(models.nozzles('aur-ark-carrier-v3'), null, 'a manifest hull finds its own');
+  const [port, starboard] = models.nozzles(models.inPlaceOf(SCOUT).id);
   assert.ok(Math.abs(port.position.x + starboard.position.x) < 1e-9 && starboard.position.x > 0, 'mirrored');
   assert.ok(port.position.z < -0.4 && port.position.z > -0.5, 'at the stern of a hull one unit long, centred');
   assert.ok(port.radius > 0.02 && port.radius < 0.05);

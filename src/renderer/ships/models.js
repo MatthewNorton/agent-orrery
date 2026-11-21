@@ -1,18 +1,22 @@
 // @ts-check
-// Ship models built in code. A model flies the rank of one manifest hull: ship-assets.js asks here
-// for the hull to fly and for its container (the ship built once per scene, as one mesh that every
-// ship of the model instances), ships/livery.js for what a ship's hull wears, the
-// views for the lights and the nozzles. A model keeps the finishes it was authored with, so it
+// Ship models built in code. A model flies the rank of a manifest hull, or the ranks of several:
+// ship-assets.js asks here for the hull to fly and for its container (the ship built once per
+// scene, as one mesh that every ship of the model instances), ships/livery.js for what a ship's
+// hull wears, the views for the lights and the nozzles. A model keeps the finishes it was authored with, so it
 // brings its own reflections, tone curve and lights, and no other light of the view reaches it.
 'use strict';
 
 /**
  * @import { HullEntry } from '../ship-assets.js'
  * @typedef {object} ShipModel one ship, built by its converted modules under ships/<id>/source/
- * @property {string} id also the id of the hull it flies as
- * @property {string} replaces the manifest hull whose rank it takes
- * @property {{ scale: number, offset: number[] }} correction to the fleet's frame: one unit long,
- *   centred, nose on +Z (the offset is in the model's own units)
+ * @property {string} id also the id of the hull it flies as (in a later rank, `<id>-<rank>`)
+ * @property {string | string[]} replaces the manifest hull whose rank it takes, or the hulls whose
+ *   ranks it takes, lowest first
+ * @property {number[]} [sizes] its longest side in each of those ranks, in the fleet's units (the
+ *   Scout is one unit long); one unit when not given
+ * @property {{ scale: number, offset: number[] }} correction to the fleet's frame: its longest
+ *   side one unit, centred along its length and across its span, nose on +Z (the offset is in the
+ *   model's own units)
  * @property {(scene: BABYLON.Scene) => BABYLON.TransformNode} build one ship with its materials
  * @property {(scene: BABYLON.Scene) => BABYLON.BaseTexture} probe the reflections its finishes were tuned under
  * @property {Record<string, number | { lamps: string }>} trim by material name: a surface that
@@ -52,17 +56,25 @@
     models.set(model.id, model);
   }
 
+  /** @param {ShipModel} model @returns {string[]} */
+  const ranksOf = (model) => [model.replaces].flat();
+
   /**
-   * The hull to fly for a manifest hull: the model that replaces it, in its rank, else itself.
+   * The hull to fly for a manifest hull: the model that replaces it, in its rank and at its size
+   * there, else itself.
    * @param {HullEntry} hull @returns {HullEntry}
    */
   function inPlaceOf(hull) {
-    const model = [...models.values()].find((candidate) => candidate.replaces === hull.id);
+    const model = [...models.values()].find((candidate) => ranksOf(candidate).includes(hull.id));
     if (!model) return hull;
-    // The file names no file: it keys the model's container, templates and materials in a scene.
+    const rank = ranksOf(model).indexOf(hull.id);
+    const scale = model.correction.scale * (model.sizes ? model.sizes[rank] : 1);
+    // The file names no file: it keys the model's container, templates and materials in a scene,
+    // one for every rank it flies. The id names the rank, so a promotion between two of them
+    // rebuilds the hull at its new size.
     return AUR.memo(hulls, hull.id, () => ({
-      id: model.id, file: 'model:' + model.id, family: hull.family, role: hull.role,
-      minBuilds: hull.minBuilds, correction: model.correction, model,
+      id: rank ? model.id + '-' + (rank + 1) : model.id, file: 'model:' + model.id, family: hull.family,
+      role: hull.role, minBuilds: hull.minBuilds, correction: { ...model.correction, scale }, model,
     }));
   }
 
@@ -219,16 +231,16 @@
   }
 
   /**
-   * A model hull's stern nozzles in the ship root's frame (the root carries the display scale),
-   * or null when the hull is not a model.
+   * A model hull's stern nozzles in the ship root's frame (the root carries the display scale,
+   * the hull's correction its rank's size), or null when the hull is not a model's.
    * @param {string} hullId
    */
   function nozzles(hullId) {
-    const model = models.get(hullId);
-    if (!model) return null;
-    const { scale, offset } = model.correction;
+    const hull = [...hulls.values()].find((entry) => entry.id === hullId);
+    if (!hull) return null;
+    const { scale, offset } = hull.correction;
     const shift = BABYLON.Vector3.FromArray(offset);
-    return model.nozzles().map(({ position, radius }) => ({
+    return hull.model.nozzles().map(({ position, radius }) => ({
       position: BABYLON.Vector3.FromArray(position).addInPlace(shift).scaleInPlace(scale),
       radius: radius * scale,
     }));
