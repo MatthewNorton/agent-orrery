@@ -60,19 +60,22 @@
     mesh._updateInstancedBuffers = function (subMesh, batch, ...rest) {
       const instances = batch.visibleInstances[subMesh._id] || [];
       const storage = mesh._instanceDataStorage;
-      const self = batch.renderSelf[subMesh._id]; // the template drawn too: another layout, never reused
+      const self = batch.renderSelf[subMesh._id]; // the template drawn too: another layout
       const frame = mesh.getScene().getFrameId();
-      if (!self && frame === written.frame && instances.length === written.ids.length &&
+      if (!self && !storage.isFrozen && frame === written.frame && instances.length === written.ids.length &&
         instances.every((instance, i) => instance.uniqueId === written.ids[i])) {
         storage.isFrozen = true; // Babylon then draws from the buffer as it is
         try {
           return update.call(this, subMesh, batch, ...rest);
         } finally {
-          storage.isFrozen = false; // as it was: a frozen mesh's write is never one to reuse
+          storage.isFrozen = false;
         }
       }
       const result = update.call(this, subMesh, batch, ...rest);
-      if (!self && !storage.isFrozen) written = { frame, ids: instances.map((instance) => instance.uniqueId) };
+      // Only a write of ships alone is one to reuse: any other call forgets the last one.
+      written = !self && !storage.isFrozen
+        ? { frame, ids: instances.map((instance) => instance.uniqueId) }
+        : { frame: -1, ids: [] };
       return result;
     };
   }

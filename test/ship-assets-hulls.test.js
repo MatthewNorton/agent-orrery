@@ -121,7 +121,8 @@ test('a template that draws itself writes for each of its draws, and the next pa
     wide.setTarget(new BABYLON.Vector3(200, 0, 0));
     wide.maxZ = 4000;
     const narrow = scene.activeCamera;
-    for (const cameras of [[wide, narrow], [narrow, wide]]) {
+    // The third order draws the ships alone, then the template too, then the ships alone again.
+    for (const cameras of [[wide, narrow], [narrow, wide], [narrow, wide, narrow]]) {
       scene.activeCameras = cameras;
       await settle();
       const { writes, draws } = frame();
