@@ -71,7 +71,12 @@ async function asarCheck(files = fs.promises, options = {}) {
     }
   };
   const dir = await run('mkdtemp', () => files.mkdtemp(path.join(os.tmpdir(), 'agent-orrery-asar-')));
-  if (dir === false) return { lstatFile: false, direntFile: false, deleted: false, errors };
+  // Only a folder mkdtemp made goes on, since the end removes it recursively: an answer that is no
+  // absolute path ends the check (when mkdtemp threw, its error is recorded already).
+  if (typeof dir !== 'string' || !path.isAbsolute(dir)) {
+    if (errors.length === 0) errors.push('mkdtemp: it answered no absolute folder path');
+    return { lstatFile: false, direntFile: false, deleted: false, errors };
+  }
   const archives = { 'malformed.asar': Buffer.from('not an archive'), 'valid.asar': validArchive() };
   const names = Object.keys(archives);
   const at = (name) => path.join(dir, name);
@@ -95,7 +100,7 @@ async function asarCheck(files = fs.promises, options = {}) {
     return (await files.readdir(dir)).length === 0;
   });
   const removal = { recursive: true, force: true, maxRetries: HELD_TRIES - 1, retryDelay: HELD_WAIT_MS };
-  await run(`cleanup: ${String(dir)} stays`, () => files.rm(dir, removal));
+  await run(`cleanup: ${dir} stays`, () => files.rm(dir, removal));
   return { lstatFile, direntFile, deleted, errors };
 }
 

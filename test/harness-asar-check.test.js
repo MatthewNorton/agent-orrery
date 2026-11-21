@@ -128,6 +128,26 @@ test('asar check: the valid archive is one Electron could open: its header pickl
   assert.equal(bytes.subarray(8 + headerSize).toString(), 'hello');
 });
 
+// An fs whose mkdtemp answers `made`; every other call is recorded, and none touches the disk.
+function madeAs(made) {
+  const calls = [];
+  const files = { mkdtemp: async () => made };
+  for (const name of ['writeFile', 'rename', 'lstat', 'readdir', 'unlink', 'rm']) {
+    files[name] = async () => { calls.push(name); throw new Error(`${name} was called`); };
+  }
+  return { calls, files };
+}
+
+test('asar check: an mkdtemp that answers no absolute folder path ends the check, with nothing written or removed', async () => {
+  for (const made of [Object.create(null), '', 'agent-orrery-asar-relative']) {
+    const { calls, files } = madeAs(made);
+    assert.deepEqual(await asarCheck(files, { wait: async () => {} }), {
+      lstatFile: false, direntFile: false, deleted: false, errors: ['mkdtemp: it answered no absolute folder path'],
+    }, typeof made === 'string' ? JSON.stringify(made) : 'an object with no prototype');
+    assert.deepEqual(calls, [], 'no other fs call, rm among them');
+  }
+});
+
 test('asar check: it never rejects: options given as null, an rm that throws as it is called, an error with no string', async () => {
   assert.deepEqual(await asarCheck(fs.promises, null), { lstatFile: true, direntFile: true, deleted: true, errors: [] });
   let kept = null;
