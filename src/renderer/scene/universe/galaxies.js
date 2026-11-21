@@ -106,6 +106,7 @@
     }
 
     const framed = { radius: NaN, x: NaN, z: NaN };
+    const SKY_REACH = 0.9; // the share of the sky dome's radius the camera may be from its centre
     const CORNERS = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
 
     // The world-space box of every galaxy's disc, tilt and lift included.
@@ -132,16 +133,18 @@
       const extentX = (max.x - min.x) / 2;
       // Lift shows on screen much like depth does at this pitch, so it widens the depth extent.
       const extentZ = (max.z - min.z) / 2 + Math.max(Math.abs(min.y), Math.abs(max.y));
-      // Fit the world into the part of the canvas the chrome leaves clear. The near edge of the
-      // tilted ground sits closest to the camera, so it decides the radius; the target then
-      // shifts so the world's centre lands in the middle of the clear area, not of the canvas.
-      const bounds = AUR.chromeBounds(canvas);
+      // Fit the world into the canvas below the top bar. The side rails and the timeline float over
+      // the map and never move or scale it. The near edge of the tilted ground sits closest to the
+      // camera, so it decides the radius; the target then shifts so the world's centre lands in
+      // the middle of the area below the bar.
       const width = canvas.clientWidth;
       const height = canvas.clientHeight;
+      const top = AUR.chromeBounds(canvas).y;
+      const bounds = { x: 0, y: top, width, height: height - top };
       if (height < 10 || bounds.width < 10 || bounds.height < 10) {
         const desiredRadius = Math.max(90, Math.max(extentX, extentZ) * 2.55 + 44);
         camera.upperRadiusLimit = Math.max(320, desiredRadius * 1.25);
-        camera.setTarget(new BABYLON.Vector3(cx, 0, cz));
+        camera.setTarget(new BABYLON.Vector3(cx, 0, cz), false, false, true);
         camera.radius = Math.min(desiredRadius, camera.upperRadiusLimit);
         limitPanning(box);
         return;
@@ -160,15 +163,17 @@
       const right = camera.getDirection(BABYLON.Axis.X);
       const forward = camera.getDirection(BABYLON.Axis.Z);
       const ground = new BABYLON.Vector3(forward.x, 0, forward.z).normalize();
+      // The last argument keeps the angles and the radius just fitted; without it Babylon derives
+      // them again from where the camera was, and each fit would turn and move the map.
       camera.setTarget(new BABYLON.Vector3(
-        cx - right.x * dx + ground.x * dy, 0, cz - right.z * dx + ground.z * dy));
+        cx - right.x * dx + ground.x * dy, 0, cz - right.z * dx + ground.z * dy), false, false, true);
       framed.radius = camera.radius;
       framed.x = camera.target.x;
       framed.z = camera.target.z;
       limitPanning(box);
     }
 
-    // Re-fit after the layout, the chrome or the window changes, unless the viewer moved the camera.
+    // Re-fit after the layout, the top bar or the window changes, unless the viewer moved the camera.
     function reframeCamera(box) {
       const untouched = Number.isNaN(framed.radius) || (Math.abs(camera.radius - framed.radius) < 0.5 &&
         Math.abs(camera.target.x - framed.x) < 0.5 && Math.abs(camera.target.z - framed.z) < 0.5);
@@ -177,13 +182,16 @@
 
     // Panning stays over the galaxies: the target roams their footprint, and always reaches where
     // it already is (framing shifts it to clear the chrome), since Babylon refuses any pan step
-    // that would end outside the limit.
+    // that would end outside the limit. The sky dome grows to hold the camera zoomed all the way
+    // out wherever the target roams, so its edge never shows.
     function limitPanning({ min, max }) {
       const cx = (min.x + max.x) / 2;
       const cz = (min.z + max.z) / 2;
       camera.panningOriginTarget.set(cx, 0, cz);
       camera.panningDistanceLimit = Math.max((max.x - min.x) / 2, (max.z - min.z) / 2,
         Math.hypot(camera.target.x - cx, camera.target.z - cz));
+      const reach = Math.hypot(cx, cz) + camera.panningDistanceLimit + camera.upperRadiusLimit;
+      view.sky.scaling.setAll(Math.max(1, reach / (view.skyRadius * SKY_REACH)));
     }
 
     // A drag moves the ground about as far as the pointer at any zoom: Babylon divides the

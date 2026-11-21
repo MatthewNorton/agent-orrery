@@ -437,7 +437,7 @@ Design tokens (put in `:root`):
     - Needs you never hides and the timeline never folds.
     - A rail with no panel on screen takes no room, and the view's name or hint moves into it (CSS `:has()` in `hud.css`). With the timeline hidden, `--dock-h` is 0, so the chrome above it reaches down.
   - **Resizing** (`app/panels/resize.js`). Sizes are CSS px, so they grow with the text size, and are stored per viewer (`agent-universe.panel-sizes.v1`).
-    - **Rail width.** A rail's inner edge is a `role=separator` grip. It drags the rail's width (`--rail-l`, `--rail-r`), down to 240 px, with no other limit than stopping 24 px short of the other rail (`fitRails` in `panel-layout.js`). When the two do not fit, the side being dragged or put back gives way, otherwise the left rail. The view title and hint, the directory and the camera's clear area follow.
+    - **Rail width.** A rail's inner edge is a `role=separator` grip. It drags the rail's width (`--rail-l`, `--rail-r`), down to 240 px, with no other limit than stopping 24 px short of the other rail (`fitRails` in `panel-layout.js`). When the two do not fit, the side being dragged or put back gives way, otherwise the left rail. The view title and hint, the directory and the universe labels' clear area follow; the universe map itself does not move or scale.
     - **Panel height.** The gap under Needs you, Summary, Fleet, Galaxies, the Event feed or Ideas drags that panel's height (`--panel-h` with `.is-sized`). A sized panel keeps its height and gives it up last when its rail runs short, so it never pushes the rail past its end. It folds as usual.
     - **Keys and reset.** Arrow keys step 16 px, Shift 64; Home and End go to the least and greatest size; Enter or a double-click puts one size back; the panels menu's *Reset panel sizes* puts them all back. A hairline shows on hover and turns orange with a size badge while dragged or focused.
   - **Each run.** Every run starts from the At launch layout in Settings › Panels (`app/panels/launch.js`, stored in localStorage). By default Summary and Galaxies are hidden, Tasks and Ideas folded, and the rest open. The menu, the chevrons and the keys change only the run in progress. The first run with launch layouts carries over the panels folded before.
@@ -549,8 +549,13 @@ Design tokens (put in `:root`):
   ceiling it clears. Graveyard is muted and peripheral.
   Galaxy and project labels share the 6px screen-space
   declutter pass. Camera framing uses the world-space bounds of every outline, lift
-  and tilt included. ArcRotateCamera keeps
-  wheel zoom + drag rotation and a dynamically sufficient radius clamp. Right-drag pans
+  and tilt included, and fits them into the canvas below the top bar: the rails and the
+  timeline float over the map, so opening, folding, hiding or resizing a panel never moves
+  or scales it, while a window resize re-fits. A fit keeps the camera's angles, so it gives
+  the same camera however often it runs. ArcRotateCamera keeps
+  wheel zoom + drag rotation and a dynamically sufficient radius clamp; the sky dome
+  (1600 across) grows with a big world, so the camera zoomed all the way out stays inside it
+  wherever the target is panned. Right-drag pans
   along the ground (`mapPanning`), the ground following the pointer at any zoom, and the
   target stays within the galaxies' footprint; only a left-click opens a system, and a
   double-click on open space re-fits every galaxy. A layout change re-fits only while

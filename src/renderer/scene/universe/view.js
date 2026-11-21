@@ -7,6 +7,7 @@
   const AUR = window.AUR;
   const GALAXY = window.AUR_GALAXY;
   const UNIVERSE_SKY_LEVEL = 0.028;
+  const UNIVERSE_SKY_SIZE = 1600; // the dome's diameter before scene/universe/galaxies.js grows it
 
   AUR.views.universe = function (engine, data, ctx) {
     const store = ctx.store;
@@ -26,7 +27,7 @@
 
     // SPEC §5: skybox-001.png (seed 0), dimmed to a near-black subtle backdrop
     // so the nebula reads as a faint band — not a washed-out bright field.
-    AUR.addSkybox(scene, 0, 1600, UNIVERSE_SKY_LEVEL);
+    const sky = AUR.addSkybox(scene, 0, UNIVERSE_SKY_SIZE, UNIVERSE_SKY_LEVEL);
     AUR.addStarfield(scene, 3200, 760);
 
     const gui = AUR.guiLayer(scene);
@@ -46,7 +47,7 @@
       fields: ctx.galaxyFields || new Map(),
       softDisc: AUR.softDiscTexture(scene), coronaMaterials: new Map(),
       searchMatchIds: null, hoveredProjectId: null,
-      quality: ctx.quality,
+      quality: ctx.quality, sky, skyRadius: UNIVERSE_SKY_SIZE / 2,
     };
     const parts = AUR.sceneParts.universe;
     Object.assign(view, parts.labels(view), parts.glyphs(view), parts.stars(view),
