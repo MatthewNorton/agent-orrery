@@ -8,12 +8,10 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const { canonicalProjectPath } = require('../src/main/provider-adapters');
 const {
-  SEC, MIN, T0, SLUG, CLAUDE_SESSION, CODEX_SESSION,
-  fnv1a, hex8, appendJsonl, createWorld, ofType, claude, codex,
+  SEC, MIN, T0, SLUG, CLAUDE_SESSION, CODEX_SESSION, SHIP_ID, CODEX_SHIP_ID, fnv1a, hex8,
+  appendJsonl, createWorld, ofType, pick, claude, codex,
 } = require('./support/transcripts');
 
-const SHIP_ID = `ship:${SLUG}:${CLAUDE_SESSION}`;
-const CODEX_SHIP_ID = `ship:codex:${CODEX_SESSION}`;
 const DRONE_ID = `drone:claude:${CLAUDE_SESSION}:toolu_task`;
 const END = T0 + 10 * MIN;
 
@@ -56,7 +54,6 @@ function historyGalaxy(projectDir) {
   return { key: `history:${hex8(flavor.dirname(raw))}`, label: 'Workspace' };
 }
 
-const pick = (keys) => (event) => Object.fromEntries(keys.map((key) => [key, event[key]]));
 
 test('replay: index() reports the history range and leaves the model empty', async (t) => {
   const { source, states } = await historyAt(t);
@@ -204,17 +201,17 @@ test('replay: getSystem() and getPlanet() derive planets from build buckets only
   const { source } = await historyAt(t);
   await source.seek(T0 + 31 * SEC);
   const early = source.getSystem(SLUG);
-  assert.deepEqual(early.planets, [{ name: 'src', files: 0, builds: 1 }]);
+  assert.deepEqual(early.planets, [{ name: 'src', key: 'src', files: 0, builds: 1 }]);
 
   await source.seek(END);
   const system = source.getSystem(SLUG);
   assert.deepEqual(system, {
     project: source.snapshot().projects[0],
-    planets: [{ name: 'docs', files: 0, builds: 1 }, { name: 'src', files: 0, builds: 1 }],
+    planets: [{ name: 'docs', key: 'docs', files: 0, builds: 1 }, { name: 'src', key: 'src', files: 0, builds: 1 }],
     beltDensity: 0,
   });
   assert.deepEqual(source.getPlanet(SLUG, 'src'), {
-    name: 'src', project: system.project, builds: 1, files: 0, sizeKb: 0, subdirs: 0, resources: [], procedural: false,
+    name: 'src', key: 'src', project: system.project, builds: 1, files: 0, sizeKb: 0, subdirs: 0, resources: [], procedural: false,
   });
   const unknown = source.getPlanet(SLUG, 'Sector-1');
   assert.equal(unknown.procedural, true);

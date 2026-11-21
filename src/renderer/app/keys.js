@@ -24,8 +24,10 @@
   /** @type {Map<HTMLElement, { label: string, id: string }>} controls whose title names their key */
   const titled = new Map();
 
+  /** Every key a shortcut has. @param {string} id @returns {string[][]} */
+  const allKeysOf = (id) => ROWS.find((r) => r.id === id)?.keys || [];
   /** @param {string} id */
-  const keysOf = (id) => ROWS.find((r) => r.id === id)?.keys[0] || null;
+  const keysOf = (id) => allKeysOf(id)[0] || null;
   /** @param {string[]} names */
   const kbds = (names, cls = 'kbd') => K.display(names, MAC).map((/** @type {string} */ n) => AUR.el('kbd', cls, n));
 
@@ -44,12 +46,13 @@
     return span;
   };
 
-  /** @param {HTMLElement} el @param {{ label: string, id: string }} t */
+  /** The title names the first key that works now; aria-keyshortcuts lists every one. @param {HTMLElement} el @param {{ label: string, id: string }} t */
   function applyTitle(el, { label, id }) {
-    const names = keysOf(id);
-    if (names && (singleKeys || !K.singleKey(names))) {
-      el.title = `${label} (${K.display(names, MAC).join(' ')})`;
-      el.setAttribute('aria-keyshortcuts', names.map((n) => (n === 'Mod' ? (MAC ? 'Meta' : 'Control') : n)).join('+'));
+    const working = allKeysOf(id).filter((names) => singleKeys || !K.singleKey(names));
+    if (working.length) {
+      el.title = `${label} (${K.display(working[0], MAC).join(' ')})`;
+      el.setAttribute('aria-keyshortcuts', working
+        .map((names) => names.map((n) => (n === 'Mod' ? (MAC ? 'Meta' : 'Control') : n)).join('+')).join(' '));
     } else {
       el.title = label;
       el.removeAttribute('aria-keyshortcuts');
@@ -82,11 +85,7 @@
 
   /** @type {Record<string, () => unknown>} what each shortcut does; false: nothing to do, so the key goes on */
   const ACTIONS = {
-    search: () => {
-      const input = /** @type {HTMLInputElement | null} */ (document.getElementById('search-input'));
-      input?.focus();
-      input?.select();
-    },
+    search: () => A.openProjectSearch(),
     back: () => clickShown('back-btn'),
     'needs-you': () => clickShown('needs-you') || A.showToast('No agent needs you right now'),
     settings: () => A.openProjectSettings(),
@@ -127,6 +126,8 @@
       singleKeys: singleKeys && !S.projectSettings.open,
     }, SHORTCUTS, MAC);
     if (!row) return;
+    // The Go to palette is modal: behind it only its own key works, putting the caret back in its field.
+    if (S.projectSearch.els?.dialog?.open && row.id !== 'search') return;
     if ((row.panel ? togglePanel(row.panel) : ACTIONS[row.id]()) !== false) event.preventDefault();
   }
 
@@ -152,10 +153,7 @@
     document.addEventListener('keydown', onKey);
     const list = document.getElementById('key-list');
     if (list) renderList(list);
-    // The search shows its key until it has focus; the view hint ends with how to find this list.
-    const searchKey = A.keyChips('search');
-    searchKey?.classList.add('search-kbd');
-    if (searchKey) document.querySelector('#project-search .search-control')?.appendChild(searchKey);
+    // The view hint ends with how to find this list.
     const help = AUR.el('span', 'key-single');
     help.append(' · ', ...kbds(['?'], 'kbd kbd--sm'), ' shortcuts');
     document.getElementById('view-hint')?.appendChild(help);

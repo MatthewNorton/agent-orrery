@@ -36,12 +36,11 @@
     const els = S.taskPanel.els;
     if (!els.panel || !els.count || !els.list || !els.form || !els.input || !els.add ||
         !els.status) return;
-    els.form.addEventListener('submit', (event) => {
+    AUR.listen(els.form, 'submit', (event) => {
       event.preventDefault();
-      if (!S.taskPanel.trusted || S.taskPanel.saving) return;
+      if (!S.taskPanel.trusted || S.taskPanel.saving) return null;
       const text = els.input.value.trim();
-      if (!text) return;
-      addTask(text);
+      return text ? addTask(text) : null;
     });
   };
 
@@ -139,16 +138,23 @@
     const owner = S.taskPanel.owner;
     const projectId = S.taskPanel.projectId;
     if (!taskOwnerIsActive(owner, projectId) || !S.taskPanel.trusted || S.taskPanel.saving) return;
-    S.taskPanel.saving = true;
-    S.taskPanel.refreshAfterSave = false;
-    S.taskPanel.status = '';
-    S.taskPanel.error = false;
     const request = ++S.taskPanel.request;
-    renderTasksPanel();
+    // Once the panel has moved on (another project or view), the flag is the next session's.
+    const isCurrent = () => taskOwnerIsActive(owner, projectId) && request === S.taskPanel.request;
     /** @type {TaskMutationResult} */
-    const result = await AUR.settle(operation);
-    if (!taskOwnerIsActive(owner, projectId) || request !== S.taskPanel.request) return;
-    S.taskPanel.saving = false;
+    const result = await AUR.settleBusy({
+      raise() {
+        Object.assign(S.taskPanel, { saving: true, refreshAfterSave: false, status: '', error: false });
+        renderTasksPanel();
+      },
+      // The panel is not on the chrome queue: its own frame draws it.
+      lower(raised) {
+        S.taskPanel.saving = false;
+        if (!raised) requestAnimationFrame(renderTasksPanel);
+      },
+      isCurrent,
+    }, operation);
+    if (!isCurrent()) return;
     const refreshAfterSave = S.taskPanel.refreshAfterSave;
     S.taskPanel.refreshAfterSave = false;
     if (result.ok === true && Array.isArray(result.items)) {
@@ -210,9 +216,7 @@
       S.taskPanel.items.forEach((item, index) => {
         const row = AUR.el('div', 'task-row' + (item.done ? ' done' : ''));
         row.dataset.taskIndex = String(index);
-        const toggle = AUR.button('task-toggle', null, () => {
-          setTaskDone(item, !item.done);
-        });
+        const toggle = AUR.button('task-toggle', null, () => setTaskDone(item, !item.done));
         toggle.disabled = S.taskPanel.saving;
         toggle.setAttribute('role', 'checkbox');
         toggle.setAttribute('aria-checked', String(item.done));

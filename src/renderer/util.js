@@ -217,6 +217,9 @@
     return Math.floor(h / 24) + 'd ago';
   };
 
+  // `n` and its noun, plural unless one: "1 agent", "3 agents".
+  AUR.counted = (n, noun) => `${n || 0} ${noun}${n === 1 ? '' : 's'}`;
+
   // ---- per-viewer preferences in localStorage; a missing or broken value is the fallback ----
   AUR.storedJson = function storedJson(key, fallback) {
     try {
@@ -236,10 +239,33 @@
   };
 
   // ---- main-process calls ----
-  // A call's result, or a shared FAILED one when the call throws or resolves empty.
+  // A call's result, or a shared FAILED one when the call throws or resolves empty. `onError`, when
+  // given, hears what the call threw.
   const FAILED = Object.freeze({ ok: false, code: 'FAILED' });
-  AUR.settle = async function settle(call) {
-    try { return (await call()) || FAILED; } catch (error) { return FAILED; }
+  AUR.settle = async function settle(call, onError) {
+    try { return (await call()) || FAILED; } catch (error) { if (onError) onError(error); return FAILED; }
+  };
+  // `call` settled as above with a busy flag up meanwhile. `busy.raise()` puts the flag up and shows
+  // it; `busy.lower(raised)` takes it down once the call has settled, and also when raise() throws
+  // (that error is then passed on), unless `busy.isCurrent()` says the flag is no longer this call's:
+  // a newer request, or the panel opened again, holds it now. `raised` is false when raise() threw:
+  // what it drew may show the flag up, so lower() has it drawn again.
+  AUR.settleBusy = async function settleBusy(busy, call, onError) {
+    let raised = false;
+    try {
+      busy.raise();
+      raised = true;
+      return await AUR.settle(call, onError);
+    } finally {
+      if (!busy.isCurrent || busy.isCurrent()) busy.lower(raised);
+    }
+  };
+  // A project's system as main has it now; null when it has none, its answer lists no planets, or
+  // the call fails, which is logged.
+  AUR.fetchSystem = async function fetchSystem(projectId) {
+    const system = await AUR.settle(() => window.AU.getSystem(projectId),
+      (error) => AUR.log('getSystem err', error && error.message));
+    return Array.isArray(system.planets) ? system : null;
   };
 
   // ---- tiny DOM helpers ----
@@ -251,13 +277,51 @@
   };
   // On screen: there, without the .hidden class a view sets, and not display: none.
   AUR.isShown = (n) => Boolean(n) && !n.classList.contains('hidden') && getComputedStyle(n).display !== 'none';
+  // An error as its name and message; any other thrown value as String() gives it, or a fixed
+  // text when even that throws (an object with no prototype, a getter that throws).
+  AUR.errorText = function errorText(error) {
+    try {
+      return error instanceof Error ? error.name + ': ' + error.message : String(error);
+    } catch (_) {
+      return 'an error with no readable text';
+    }
+  };
+  // Listens for `type` on `node`. What the listener throws, or the promise it returns rejects with,
+  // is logged: nothing awaits a listener, so it would go uncaught. The line says "handler failed",
+  // which a test run's renderer error check (src/main/window.js) fails on. A listener that starts
+  // a busy action (AUR.settleBusy) returns its promise.
+  AUR.listen = function listen(node, type, listener) {
+    const failed = (error) => AUR.log(type + ' handler failed:', AUR.errorText(error));
+    node.addEventListener(type, function (event) {
+      try {
+        const result = listener.call(this, event);
+        if (result && typeof result.then === 'function') result.then(undefined, failed);
+      } catch (error) {
+        failed(error);
+      }
+    });
+  };
   AUR.button = function button(cls, text, onClick) {
     const n = AUR.el('button', cls, text);
     n.type = 'button';
-    if (onClick) n.addEventListener('click', onClick);
+    if (onClick) AUR.listen(n, 'click', onClick);
     return n;
   };
   AUR.clear = (node) => { while (node.firstChild) node.removeChild(node.firstChild); };
+  // The planet a build belongs to: the one with the build's key, which main gives a folder in any
+  // casing. A case-sensitive folder under a Windows path (WSL) can hold two that differ only in
+  // case and so share a key: then the one the build spelled, else the first.
+  AUR.planetOfBuild = (planets, ev) => {
+    let first = null;
+    for (const planet of planets) {
+      if (planet.key !== ev.key) continue;
+      if (planet.name === ev.bucket) return planet;
+      first = first || planet;
+    }
+    return first;
+  };
+  // A key press an input method takes to compose text (229 where it hides the key): not the app's.
+  AUR.composing = (event) => event.isComposing || event.keyCode === 229;
   // A group of choice buttons, each paired with its value: a click picks that value, and the
   // returned press(value) marks the chosen one with aria-pressed.
   AUR.choiceButtons = function choiceButtons(pairs, onPick) {
@@ -265,6 +329,23 @@
     return (current) => {
       for (const [button, value] of pairs) button.setAttribute('aria-pressed', String(value === current));
     };
+  };
+  // A modal dialog closes on a click on its backdrop, outside the dialog's own box (its padding or
+  // scrollbar is inside). The press must land there too, or a drag from inside (selecting text)
+  // would close it on release.
+  AUR.closeOnBackdrop = function closeOnBackdrop(dialog, close) {
+    const outside = (event) => {
+      if (event.target !== dialog) return false;
+      const r = dialog.getBoundingClientRect();
+      return event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom;
+    };
+    let pressed = false;
+    dialog.addEventListener('pointerdown', (event) => { pressed = event.button === 0 && outside(event); });
+    dialog.addEventListener('click', (event) => {
+      const wasPressed = pressed;
+      pressed = false; // one press, one click
+      if (wasPressed && outside(event)) close();
+    });
   };
 
   // Inline fleet/signal glyph used in the sidebar rows.

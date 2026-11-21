@@ -7,7 +7,7 @@
 const { classifyTool, createAdapterState, normalizeProvider } = require('../provider-adapters');
 const { claudeRecordToSignals } = require('../transcripts/claude');
 const { adaptCodexRecord } = require('../transcripts/codex');
-const { plainObject, safeId, safePath } = require('../transcripts/fields');
+const { plainObject, safeId } = require('../transcripts/fields');
 const { parseJsonLine } = require('./jsonl');
 
 /**
@@ -105,9 +105,8 @@ function historicalClaudeSignals(entry, record, lineOffset, ts, sessionEmitted) 
       const callId = safeId(fact.callId) || `line-${lineOffset.toString(16)}`;
       const classified = classifyTool(fact.tool);
       signals.push(signal('tool-start', { callId, tool: classified.tool, status: classified.status }));
-      const filePath = safePath(fact.filePath);
-      if (classified.build && filePath) {
-        signals.push(signal('build', { callId, files: [filePath], success: true }));
+      if (classified.build && fact.filePath) {
+        signals.push(signal('build', { callId, files: [fact.filePath], success: true }));
       }
     } else if (fact.type === 'tool-end' && message.user) {
       const callId = safeId(fact.callId);

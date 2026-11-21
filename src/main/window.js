@@ -7,6 +7,13 @@ const { rendererUrl, hardenWebContents } = require('./window-security');
 const RENDERER_ENTRY_PATH = path.join(__dirname, '..', 'renderer', 'index.html');
 const RENDERER_ENTRY_URL = rendererUrl(RENDERER_ENTRY_PATH);
 
+// A renderer console line that fails a test run: an uncaught error, a resource that did not load,
+// a boot failure, or the error of a page handler that AUR.listen caught and logged.
+const RENDERER_ERRORS = new RegExp([
+  'Uncaught', 'ReferenceError', 'TypeError', 'SyntaxError', 'is not defined',
+  'Failed to load resource', 'boot-failure', 'handler failed',
+].join('|'), 'i');
+
 // Electron is resolved at call time: ipc/guards.js imports RENDERER_ENTRY_URL, and
 // unit tests load the ipc modules under plain Node, where the electron package throws.
 /** @param {Pick<typeof import('electron'), 'app' | 'BrowserWindow'>} [electron] */
@@ -48,9 +55,7 @@ function createWindow(ctx, electron = require('electron')) {
       );
       const msg = d ? `${d.level ?? ''} ${d.message}` : `${args[1] ?? ''} ${args[2] ?? ''}`;
       console.log(`[renderer] ${msg}`);
-      if (/Uncaught|ReferenceError|TypeError|SyntaxError|is not defined|Failed to load resource|boot-failure/i.test(msg)) {
-        ctx.harness.rendererTestErrors.push(msg);
-      }
+      if (RENDERER_ERRORS.test(msg)) ctx.harness.rendererTestErrors.push(msg);
     });
     win.webContents.once('did-finish-load', () => ctx.harness.runTestMode());
     win.webContents.on('did-fail-load', (e, code, desc) => {

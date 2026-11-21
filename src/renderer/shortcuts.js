@@ -17,7 +17,7 @@
    * @typedef {{ title: string, rows: Shortcut[] }} Group
    * @typedef {Map<string, { row: Shortcut, keys: string[] }>} Index each combination's shortcut
    * @typedef {{ key: string, ctrlKey: boolean, metaKey: boolean, shiftKey: boolean, altKey: boolean,
-   *   repeat?: boolean, isComposing?: boolean }} Press
+   *   repeat?: boolean, isComposing?: boolean, keyCode?: number }} Press
    */
   /** @type {Group[]} */
   const FIXED = [
@@ -92,7 +92,7 @@
    * @returns {Shortcut | null}
    */
   function route(press, where, shortcuts, mac) {
-    if (press.altKey || press.repeat || press.isComposing) return null;
+    if (press.altKey || press.repeat || press.isComposing || press.keyCode === 229) return null;
     const hit = shortcuts.get(pressed(press, mac));
     if (!hit) return null;
     if (hit.keys[0] === 'Esc') return where.field ? null : hit.row;

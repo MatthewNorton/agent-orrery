@@ -128,10 +128,30 @@ function fakeCtx(overrides = {}) {
   };
 }
 
+// Removes a temp folder a test may have put links in. Every link goes first, by itself, and a
+// folder that still holds one is left where it is: a recursive remove goes into what lstat calls
+// a folder, and lstat calls some junctions folders (one to a volume), so a link left in place
+// could take the remove out of the temp folder. A folder's listing marks every link as one.
+function removeTree(dir) {
+  let linksLeft = false;
+  const unlinkIn = (folder) => {
+    let entries = [];
+    try { entries = fs.readdirSync(folder, { withFileTypes: true }); } catch { return; }
+    for (const entry of entries) {
+      const full = path.join(folder, entry.name);
+      if (entry.isDirectory()) { unlinkIn(full); continue; }
+      if (!entry.isSymbolicLink()) continue;
+      try { fs.rmdirSync(full); } catch { try { fs.unlinkSync(full); } catch { linksLeft = true; } }
+    }
+  };
+  unlinkIn(dir);
+  if (!linksLeft) fs.rmSync(dir, { recursive: true, force: true });
+}
+
 // Native realpath: Windows CI temp dirs are 8.3 short names the app expands.
 function tempDir(t, prefix) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  t.after(() => removeTree(dir));
   return path.normalize(fs.realpathSync.native(dir));
 }
 

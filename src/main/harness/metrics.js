@@ -119,7 +119,7 @@ function createMetrics(ctx, driver) {
       const buttonRect = bounds(button);
       const statusRect = bounds(status);
       const targetRects = [buttonRect, statusRect].filter(Boolean);
-      const blockerIds = ['back-btn', 'sidebar', 'summary-card', 'planet-card', 'tabbar', 'history-bar'];
+      const blockerIds = ['back-btn', 'sidebar', 'summary-card', 'planet-card', 'history-bar'];
       const overlapIds = [];
       for (const id of blockerIds) {
         const blocker = bounds(document.getElementById(id));

@@ -65,6 +65,7 @@ test('Space on a button presses the button; Alt, held keys and composing text ar
   assert.equal(id(press('k', { ctrlKey: true, altKey: true })), null);
   assert.equal(id(press('f', { repeat: true })), null);
   assert.equal(id(press('f', { isComposing: true })), null);
+  assert.equal(id(press('f', { keyCode: 229 })), null, 'a key an input method hides is composing too');
 });
 
 test('on macOS Cmd stands in for Ctrl, and Ctrl alone is not it', () => {

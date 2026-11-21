@@ -43,13 +43,13 @@
     'prepared', 'goal-written', 'reopened',
   ]);
 
-  function ideaRenderKey(items, projects) {
+  // `lines` is each project's line in the picker (A.projectSubtitles), so a repository or branch
+  // that arrives later renders too.
+  function ideaRenderKey(items, projects, lines) {
     const itemState = items.map((item) => [
       item.id, item.projectId, item.phase, item.createdAt, item.updatedAt,
     ]);
-    const projectState = projects.map((project) => [
-      project.id, project.name, project.path, A.projectGalaxyLabel(project), project.exists,
-    ]);
+    const projectState = projects.map((project) => [project.id, project.name, lines.get(project.id), project.exists]);
     return JSON.stringify([S.ideaPanel.visibleLimit, itemState, projectState]);
   }
 
@@ -135,7 +135,7 @@
     return button;
   }
 
-  function ideaRow(item, projects) {
+  function ideaRow(item, projects, lines) {
     const row = AUR.el('article', 'idea-row');
     row.dataset.ideaId = item.id;
     const heading = AUR.el('div', 'idea-heading');
@@ -150,8 +150,8 @@
         : 'Remove this unassigned idea?';
       // removeIdea refuses on its own; this check only spares the confirm dialog.
       const remove = ideaButton('idea-remove', '×', 'remove', () => {
-        if (A.ideaMutationsDisabled() || !A.confirmRemoval(prompt, item.text)) return;
-        A.removeIdea(item);
+        if (A.ideaMutationsDisabled() || !A.confirmRemoval(prompt, item.text)) return null;
+        return A.removeIdea(item);
       }, taskText.id);
       remove.setAttribute('aria-label', 'Remove idea');
       remove.title = 'Remove idea';
@@ -167,13 +167,13 @@
           ? assigned.name : 'Assigned project unavailable'
       ));
     }
-    const controls = ideaControls(item, taskText.id, assignedAvailable, projects);
+    const controls = ideaControls(item, taskText.id, assignedAvailable, projects, lines);
     if (controls) row.appendChild(controls);
     return row;
   }
 
   // Assign while an idea, retry after a failed start, view once the project has the task.
-  function ideaControls(item, describedBy, assignedAvailable, projects) {
+  function ideaControls(item, describedBy, assignedAvailable, projects, lines) {
     const controls = AUR.el('div', 'idea-controls');
     if (item.phase === 'idea') {
       const select = document.createElement('select');
@@ -184,7 +184,7 @@
       select.appendChild(new Option('Choose project…', ''));
       for (const project of projects) {
         const name = A.projectLabel(project);
-        const detail = A.projectSearchSubtitle(project);
+        const detail = lines.get(project.id);
         select.appendChild(new Option(detail ? `${name} — ${detail}` : name, project.id));
       }
       const selected = S.ideaPanel.selections.get(item.id) || '';
@@ -234,8 +234,9 @@
     const count = S.ideaPanel.items.length;
     A.setRailCount('ideas', count, count === 0);
     els.panel.setAttribute('aria-busy', String(S.ideaPanel.busy));
-    els.count.textContent = `${count} idea${count === 1 ? '' : 's'}`;
-    const nextRenderKey = ideaRenderKey(S.ideaPanel.items, projects);
+    els.count.textContent = AUR.counted(count, 'idea');
+    const lines = A.projectSubtitles(projects);
+    const nextRenderKey = ideaRenderKey(S.ideaPanel.items, projects, lines);
     if (nextRenderKey !== S.ideaPanel.renderKey) {
       const previousFocus = ideaFocusedControl(els.list);
       S.ideaPanel.renderKey = nextRenderKey;
@@ -246,7 +247,7 @@
         ));
       } else {
         const visibleItems = S.ideaPanel.items.slice(0, S.ideaPanel.visibleLimit);
-        for (const item of visibleItems) els.list.appendChild(ideaRow(item, projects));
+        for (const item of visibleItems) els.list.appendChild(ideaRow(item, projects, lines));
         if (visibleItems.length < count) els.list.appendChild(showMoreButton(count - visibleItems.length));
       }
       restoreIdeaFocus(els.list, previousFocus);

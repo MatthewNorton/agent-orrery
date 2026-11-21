@@ -213,6 +213,19 @@ test('au:planet checks its arguments and reads the visible source', async (t) =>
   assert.equal((await invoke('au:planet', event, 'alpha', 'src')).source, 'replay');
 });
 
+test('au:planet asks neither LIVE nor history for a name that is no plain path segment', async (t) => {
+  const { ctx, invoke } = wired(t);
+  const event = trustedEvent(ctx.win);
+  for (const active of [null, ctx.replaySource]) {
+    ctx.activeSource = active;
+    const mode = active ? 'replay' : 'live';
+    for (const name of ['a/b', '..', 'a\\b', '.', '', 'a\0b']) {
+      assert.equal(await invoke('au:planet', event, 'alpha', name), null, `${mode}: ${JSON.stringify(name)}`);
+    }
+    assert.equal((await invoke('au:planet', event, 'alpha', '(root)')).source, mode);
+  }
+});
+
 test('au:snapshot and au:system serve what replay control makes visible', async (t) => {
   const { ctx, invoke } = wired(t);
   const event = trustedEvent(ctx.win);

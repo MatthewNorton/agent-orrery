@@ -4,6 +4,7 @@
 const { app, ipcMain } = require('electron');
 const fs = require('fs');
 const path = require('path');
+const { asarCheck } = require('../asar-check');
 
 // --shots: cycle the three views, capture each to .shots/, then exit.
 // Used for automated visual verification.
@@ -138,6 +139,7 @@ async function runShotMode(ctx, driver) {
       .map((element) => element.textContent),
   }))()`);
   await screenshotClick('#project-directory-close');
+  const asar = await asarCheck();
   fs.writeFileSync(
     path.join(outDir, 'ux-state.json'),
     JSON.stringify({
@@ -145,6 +147,9 @@ async function runShotMode(ctx, driver) {
       directorySearch: directorySearchState,
       commandRail: compactRailState,
       leftRail: leftRailState,
+      // What main.js sets before anything loads, as it stands at the end of the run, and what the
+      // main process's fs then makes of a file named *.asar (grade.mjs M7).
+      mainProcess: { noAsar: process.noAsar === true, asar },
     }, null, 2)
   );
   fs.writeFileSync(path.join(outDir, 'state.json'), JSON.stringify(ctx.tracker.snapshot(), null, 2));

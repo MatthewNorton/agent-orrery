@@ -21,7 +21,6 @@
       button: document.getElementById('settings-button'),
       count: document.getElementById('settings-count'),
       dialog: document.getElementById('settings-dialog'),
-      shell: document.querySelector('#settings-dialog .settings-shell'),
       close: document.getElementById('settings-close'),
       summary: document.getElementById('settings-summary'),
       scan: document.getElementById('settings-scan'),
@@ -33,15 +32,9 @@
 
     els.button.addEventListener('click', A.openProjectSettings);
     els.close.addEventListener('click', closeProjectSettings);
-    els.scan.addEventListener('click', scanForProjectPaths);
+    AUR.listen(els.scan, 'click', scanForProjectPaths);
     els.dialog.addEventListener('close', finishProjectSettingsClose);
-    els.dialog.addEventListener('click', (event) => {
-      if (event.target !== els.dialog || !els.shell) return;
-      const rect = els.shell.getBoundingClientRect();
-      const inside = event.clientX >= rect.left && event.clientX <= rect.right &&
-        event.clientY >= rect.top && event.clientY <= rect.bottom;
-      if (!inside) closeProjectSettings();
-    });
+    AUR.closeOnBackdrop(els.dialog, closeProjectSettings);
     A.wireUniverseBackup();
     A.wireSettingsTabs();
     A.renderProjectSettings();
@@ -110,9 +103,12 @@
     return PATH_ERRORS.get(code) || 'The project path could not be updated.';
   }
 
+  // Sets the Projects tab's status line and answers the one it replaced.
   function setProjectSettingsStatus(message, error = false) {
+    const replaced = { message: S.projectSettings.status, error: S.projectSettings.error };
     S.projectSettings.status = message || '';
     S.projectSettings.error = Boolean(error);
+    return replaced;
   }
 
   function settingsRequestIsCurrent(owner, request) {
@@ -149,21 +145,35 @@
    * @template T
    * @param {string} statusText
    * @param {() => Promise<T>} call
-   * @param {(message: string) => void} [setStatus] where statusText shows
+   * @param {(message: string, error?: boolean) => { message: string, error: boolean }} [setStatus]
+   *   where statusText shows; it answers the status it replaced
    * @returns {Promise<T | Failure<ProjectPathFailureCode> | null>}
    */
   async function runSettingsRequest(statusText, call, setStatus = setProjectSettingsStatus) {
     if (S.projectSettings.busy || S.playback.mode !== 'live' || S.replayTransitionPending) return null;
     const owner = S.projectSettings.owner;
     const request = ++S.projectSettings.request;
-    S.projectSettings.busy = true;
-    setStatus(statusText);
-    A.renderProjectSettings();
-    S.projectSettings.els.close.focus();
-    const result = await AUR.settle(call);
-    if (!settingsRequestIsCurrent(owner, request)) return null;
-    S.projectSettings.busy = false;
-    return result;
+    // Once superseded, the flag is the session's that followed (resetSettingsSession cleared it,
+    // and a request there may hold it).
+    const isCurrent = () => settingsRequestIsCurrent(owner, request);
+    let replaced = null;
+    const result = await AUR.settleBusy({
+      raise() {
+        S.projectSettings.busy = true;
+        replaced = setStatus(statusText);
+        A.renderProjectSettings();
+        S.projectSettings.els.close.focus();
+      },
+      // After a raise() that threw, the request never went to main: the status it set goes too.
+      lower(raised) {
+        S.projectSettings.busy = false;
+        if (raised) return;
+        if (replaced) setStatus(replaced.message, replaced.error);
+        A.scheduleChrome(A.const.CHROME.SETTINGS);
+      },
+      isCurrent,
+    }, call);
+    return isCurrent() ? result : null;
   }
   A.runSettingsRequest = runSettingsRequest;
 
@@ -199,7 +209,7 @@
     const suffix = result.truncated ? ' The bounded scan stopped early.' : '';
     const root = S.projectSettings.scanRoot ? ` under ${S.projectSettings.scanRoot}` : '';
     setProjectSettingsStatus(
-      `Scanned ${visited.toLocaleString()} folders${root}; found matches for ${found} project${found === 1 ? '' : 's'}.${suffix}`
+      `Scanned ${visited.toLocaleString()} folders${root}; found matches for ${AUR.counted(found, 'project')}.${suffix}`
     );
     A.renderProjectSettings();
     focusProjectSettingsControl('first-candidate');

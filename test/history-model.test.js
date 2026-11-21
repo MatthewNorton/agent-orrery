@@ -107,3 +107,27 @@ test('history model: idle ships depart at their deadline; reset empties everythi
   model.reset();
   assert.deepEqual(model.snapshot(), { projects: [], ships: [], feed: [], eventSequence: 0 });
 });
+
+test('history model: a build adds nothing to a total that is already the largest count', () => {
+  const MAX = Number.MAX_SAFE_INTEGER;
+  const { model } = createModel(256);
+  model.applyRecord(record(T0, { type: 'session', cwd: PROJECT_DIR }), true);
+  const build = (name, ts) => model.applyRecord(record(ts, { type: 'build', files: [path.join(PROJECT_DIR, 'src', name)] }), true);
+  build('a.js', T0 + 1);
+  const totals = () => [model.snapshot().projects[0].totalBuilds, model.snapshot().ships[0].builds];
+  assert.deepEqual(totals(), [1, 1]);
+  // No transcript holds that many edits; the totals are set as a restored one would be.
+  Object.assign(model.state.projects.get('demo'), { totalBuilds: MAX });
+  Object.assign(model.state.ships.get('ship:demo:s1'), { builds: MAX });
+  build('b.js', T0 + 2);
+  assert.deepEqual(totals(), [MAX, MAX]);
+});
+
+test('history model: a folder named __proto__ is a bucket like any other, in a map with no prototype', () => {
+  const { model } = createModel(256);
+  model.applyRecord(record(T0, { type: 'session', cwd: PROJECT_DIR }), true);
+  model.applyRecord(record(T0 + 1, { type: 'build', files: [path.join(PROJECT_DIR, '__proto__', 'a.js')] }), true);
+  const { buckets } = model.state.projects.get('demo');
+  assert.deepEqual([Object.getPrototypeOf(buckets), Object.keys(buckets), buckets.__proto__], [null, ['__proto__'], 1]);
+  assert.deepEqual(model.snapshot().projects[0].planets, ['__proto__']);
+});

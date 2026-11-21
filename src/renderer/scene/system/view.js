@@ -1,6 +1,7 @@
 // One project's solar system: central sun, orbit rings and generated planets. The asteroid belt,
-// the ships, their engine plumes, agent focus (its camera and the fade of the other ships) and
-// the planets' worlds are the belt, ships, exhaust, focus and worlds parts in this folder.
+// the ships, their engine plumes, agent focus (its camera and the fade of the other ships), the
+// planets' worlds and the planets themselves are the belt, ships, exhaust, focus, worlds and
+// planets parts in this folder.
 'use strict';
 
 (function () {
@@ -66,18 +67,22 @@
     let lastPulseFactor = 1;
 
     // State shared with the parts in scene/system/.
-    const planets = new Map(); // name -> record
+    const planets = new Map(); // name -> record; a build finds its planet by key (AUR.planetOfBuild)
     const ships = new Map();
     // The asteroid belt sits between the middle orbits (past the last one in a small system),
     // `beltWidth` across; ships patrol outside it.
     const beltR = planetList.length >= 2 ? (orbitR(Math.floor(planetList.length / 2) - 1) + orbitR(Math.floor(planetList.length / 2))) / 2 : outer + 4;
+    const ringRoot = new BABYLON.TransformNode('orbitRings', scene); // every orbit ring; Settings turns it off
+    ringRoot.setEnabled(ctx.orbitRings);
     const view = {
-      scene, gui, sys, projectId, orbitR, outer, beltR, beltWidth: 3.4, planets, ships,
-      camera, canvas, glow, shipFocus: null, buildPlanet,
+      scene, gui, sys, projectId, orbitR, outer, beltR, beltWidth: 3.4, planets, ships, ringRoot,
+      camera, canvas, glow, shipFocus: null, sysBehind: false,
+      // The stream the app shows this view in; null once it is closed or another view has its place.
+      shown: () => (scene.isDisposed ? null : ctx.shown(scene)),
       sun, sunHex, sunDia, worldMaps: ctx.worldMaps, quality: ctx.quality,
     };
     const parts = AUR.sceneParts.system;
-    Object.assign(view, parts.exhaust(view), parts.ships(view), parts.focus(view), parts.worlds(view));
+    Object.assign(view, parts.exhaust(view), parts.ships(view), parts.focus(view), parts.worlds(view), parts.planets(view));
 
     scene.metadata = {
       view: 'system',
@@ -95,46 +100,7 @@
       },
     };
 
-    // ---- planets ----
-    const topNames = planetList.slice()
-      .sort((a, b) => AUR.planetWeight(b) - AUR.planetWeight(a))
-      .slice(0, 3).map((p) => p.name);
-    const ringRoot = new BABYLON.TransformNode('orbitRings', scene); // every orbit ring; Settings turns it off
-    ringRoot.setEnabled(ctx.orbitRings);
-
-    function buildPlanet(pd, i) {
-      const rand = AUR.mulberry32(AUR.fnv1a(projectId + ':' + pd.name));
-      const r = orbitR(i);
-      const ring = AUR.orbitRing(scene, r, '#9fb0e0', 0.16, 0);
-      ring.parent = ringRoot;
-      const dia = AUR.clamp(AUR.PLANET_DIA.min + Math.sqrt(AUR.planetWeight(pd)) * 0.18, AUR.PLANET_DIA.min, AUR.PLANET_DIA.max);
-      const persistent = topNames.indexOf(pd.name) >= 0;
-      const world = view.makeWorld(pd.name, dia, persistent);
-      const mesh = world.globe;
-      mesh.metadata = { planetName: pd.name, isPlanet: true, worldType: world.spec.cls };
-      const a0 = rand() * Math.PI * 2;
-      AUR.orbitPoint(a0, r, 0, mesh.position);
-
-      const label = AUR.label(gui, pd.name, {
-        fontSize: 12.5, weight: '600', mesh, offsetY: -(18 + dia * 5),
-      });
-      // Hidden, not transparent: Babylon GUI still projects and draws a linked label at alpha 0.
-      label.alpha = 0.95;
-      label.isVisible = persistent;
-
-      const rec = {
-        name: pd.name, mesh, ring, world, r, a: a0,
-        speed: AUR.MOTION.systemPlanetOrbitMin +
-          rand() * AUR.MOTION.systemPlanetOrbitRange,
-        axialSpeed: AUR.MOTION.systemPlanetAxialMin +
-          rand() * AUR.MOTION.systemPlanetAxialRange,
-        dia, baseScale: 1,
-        label, persistent, pulseUntil: 0, appear: 1,
-      };
-      planets.set(pd.name, rec);
-      return rec;
-    }
-    planetList.forEach(buildPlanet);
+    planetList.forEach(view.buildPlanet); // one that cannot be built is left out, and its orbit stays empty
 
     const belt = parts.belt(view);
 
@@ -158,7 +124,8 @@
         view.orbitShipFocus(pi);
       } else if (pi.type === BABYLON.PointerEventTypes.POINTERPICK) {
         const m = pi.pickInfo && pi.pickInfo.pickedMesh;
-        if (m && m.metadata && m.metadata.isPlanet) ctx.openPlanet(projectId, m.metadata.planetName);
+        // The system rides along for the planet card, unless a planet has started since it was read.
+        if (m && m.metadata && m.metadata.isPlanet) ctx.openPlanet(projectId, m.metadata.planetName, view.sysBehind ? undefined : view.sys);
       } else if (pi.type === BABYLON.PointerEventTypes.POINTERMOVE) {
         const pick = scene.pick(scene.pointerX, scene.pointerY, (mm) => mm.metadata && mm.metadata.isPlanet);
         const hit = pick && pick.hit ? pick.pickedMesh.metadata.planetName : null;
@@ -205,7 +172,8 @@
 
     return {
       scene,
-      systemData: sys,
+      // The system as last fetched: the ships part fetches it again when a build starts a planet.
+      get systemData() { return view.sys; },
       update: view.update,
       focusShip: view.focusShip,
       setShipFocus: view.setShipFocus,
