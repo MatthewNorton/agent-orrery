@@ -549,13 +549,11 @@ Design tokens (put in `:root`):
   ceiling it clears. Graveyard is muted and peripheral.
   Galaxy and project labels share the 6px screen-space
   declutter pass. Camera framing uses the world-space bounds of every outline, lift
-  and tilt included, and fits them below the top bar into the area the default layout leaves
-  clear: the right rail and the timeline at their default sizes (`AUR.app.defaultPanelRoom` in
-  `app/panels/resize.js`: `--rail-r` and `--dock-h` with their margins, at the current text
-  size) and no left rail, so the left keeps only a gap. The fit deliberately ignores what the
-  panels are doing now and the viewer's At launch choices: opening, folding, hiding or resizing
-  a panel never moves or scales the map, and a left-rail panel open at launch can cover part of
-  it. A fit keeps the camera's angles, so it gives the same camera however often it runs.
+  and tilt included, and fits them below the top bar, between both side rails and above the
+  timeline as they sit at their default sizes (`AUR.app.defaultPanelRoom` in
+  `app/panels/resize.js`: `--rail-l`, `--rail-r` and `--dock-h` with their margins, at the
+  current text size), whatever is showing now and whatever the viewer's At launch choices are.
+  Opening, folding, hiding or resizing a panel never moves or scales the map. A fit keeps the camera's angles, so it gives the same camera however often it runs.
   ArcRotateCamera keeps
   wheel zoom + drag rotation and a dynamically sufficient radius clamp; the sky dome
   (1600 across) grows with a big world, so the camera zoomed all the way out stays inside it

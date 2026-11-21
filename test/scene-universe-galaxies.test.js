@@ -16,8 +16,8 @@ BABYLON.Logger.LogLevels = BABYLON.Logger.NoneLogLevel;
 
 const SKY_RADIUS = 800; // scene/universe/view.js: a dome 1600 across
 // AUR.app.defaultPanelRoom at text size 100% (app/panels/resize.js): the tokens' --space-3 12px
-// margin, plus --rail-r 312px and --dock-h 52px.
-const ROOM = { right: 12 + 312, bottom: 12 + 52 };
+// margin, plus --rail-l 296px, --rail-r 312px and --dock-h 52px.
+const ROOM = { left: 12 + 296, right: 12 + 312, bottom: 12 + 52 };
 const GAP = 8; // what AUR.chromeBounds keeps clear of the chrome
 
 // The page's chrome as boxes: the top bar, the two rails and the timeline, on a canvas of the
@@ -86,7 +86,7 @@ function universe({ document, canvas }, specs = small()) {
 // The clear area the panels leave at their default sizes, as the fit should take it.
 function defaultClearArea({ clientWidth: w, clientHeight: h }) {
   const top = 48 + GAP;
-  return { left: GAP, right: w - ROOM.right - GAP, top, bottom: h - ROOM.bottom - GAP };
+  return { left: ROOM.left + GAP, right: w - ROOM.right - GAP, top, bottom: h - ROOM.bottom - GAP };
 }
 
 test('galaxies: resizing, folding, hiding or opening a panel never moves or scales the map', () => {
@@ -136,7 +136,7 @@ test('galaxies: a canvas with no room yet, once it has its size, frames as a fir
 test('galaxies: the map centres on the area the default panels leave clear', () => {
   for (const [w, h] of [[1666, 944], [1186, 684]]) {
     const chrome = page(w, h);
-    chrome.layout({ right: 819, timeline: false }); // what the panels do now does not count
+    chrome.layout({ left: 560, right: 819, timeline: false }); // what the panels do now does not count
     const map = universe(chrome);
     map.part.frameCamera();
     const box = { min: new BABYLON.Vector3(Infinity, Infinity, Infinity), max: new BABYLON.Vector3(-Infinity, -Infinity, -Infinity) };
@@ -156,7 +156,7 @@ test('galaxies: the map centres on the area the default panels leave clear', () 
   }
 });
 
-test('galaxies: at the smallest canvas no sun starts under a default rail or the timeline', () => {
+test('galaxies: at the smallest canvas no sun starts under either default rail or the timeline', () => {
   for (const count of [10, 30, 60]) {
     const projects = Array.from({ length: count }, (_, i) => ({ id: 'p' + i, galaxy: { key: 'g' + i, label: 'G' + i } }));
     const layout = LAYOUT.layoutGalaxyProjects(projects);

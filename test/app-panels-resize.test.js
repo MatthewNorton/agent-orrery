@@ -1,6 +1,6 @@
 'use strict';
 
-// src/renderer/app/panels/resize.js: the room the right rail and the timeline take at their default
+// src/renderer/app/panels/resize.js: the room the side rails and the timeline take at their default
 // sizes, which the universe map frames to clear.
 
 const assert = require('node:assert/strict');
@@ -22,11 +22,12 @@ function page() {
   return { app, vars, document };
 }
 
-test('defaultPanelRoom: the default right rail and timeline with their margins, at the text size', () => {
+test('defaultPanelRoom: both default rails and the timeline with their margins, at the text size', () => {
   const { app, vars, document } = page();
-  assert.deepEqual(app.defaultPanelRoom(), { right: 405, bottom: 80 }, '(12 + 312) and (12 + 52) at 125%');
-  // A rail sized by its grip and a hidden timeline change the live tokens, not the defaults.
-  vars.get(document.documentElement)['--rail-r'] = '819px';
+  const room = { left: 385, right: 405, bottom: 80 };
+  assert.deepEqual(app.defaultPanelRoom(), room, '(12 + 296), (12 + 312) and (12 + 52) at 125%');
+  // Rails sized by their grips and a hidden timeline change the live tokens, not the defaults.
+  Object.assign(vars.get(document.documentElement), { '--rail-l': '560px', '--rail-r': '819px' });
   vars.get(document.body)['--dock-h'] = '0px';
-  assert.deepEqual(app.defaultPanelRoom(), { right: 405, bottom: 80 });
+  assert.deepEqual(app.defaultPanelRoom(), room);
 });

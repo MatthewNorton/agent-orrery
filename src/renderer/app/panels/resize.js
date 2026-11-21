@@ -62,12 +62,13 @@
   }
 
   /**
-   * How far the right rail and the timeline reach in from the window's edges at their default sizes,
+   * How far the side rails and the timeline reach in from the window's edges at their default sizes,
    * in screen px at the current text size, whatever they are doing now. The universe map frames to
-   * clear them (scene/universe/galaxies.js). @returns {{ right: number, bottom: number }}
+   * clear them (scene/universe/galaxies.js). @returns {{ left: number, right: number, bottom: number }}
    */
   A.defaultPanelRoom = function defaultPanelRoom() {
-    return { right: (MARGIN + DEFAULT_WIDTH.right) * zoom(), bottom: (MARGIN + DOCK_H) * zoom() };
+    const scale = zoom();
+    return { left: (MARGIN + DEFAULT_WIDTH.left) * scale, right: (MARGIN + DEFAULT_WIDTH.right) * scale, bottom: (MARGIN + DOCK_H) * scale };
   };
 
   /** Sets both rails to widths that fit the window. @param {string} [yields] */
