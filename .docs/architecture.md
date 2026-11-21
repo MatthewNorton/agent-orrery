@@ -473,9 +473,9 @@ contract), `AUR`, `AUR_POLISH` and `AUR_GALAXY` (all `any` for now).
 | `polish-math.js` | 67 | Pure: label overlap, sun pulse |
 | `search-core.js` | 225 | Pure: ranks projects, agents and folders (prefix, substring, path or other text, then fuzzy) |
 | `components/project-vcs-status.js` | 277 | Pure presentation for git / GitHub markers and details |
-| `scene/common.js` | 137 | Creates `AUR.sceneParts`; the shared camera, ship mesh, teardown and mesh disposal |
-| `scene/universe/view.js` | 276 | Galaxy map: builds the `view` object and merges its parts |
-| `scene/universe/galaxies.js` | 208 | Galaxy discs, outlines, labels, glyph placement, camera framing |
+| `scene/common.js` | 142 | Creates `AUR.sceneParts`; the shared camera, ship mesh, teardown and mesh disposal |
+| `scene/universe/view.js` | 277 | Galaxy map: builds the `view` object and merges its parts |
+| `scene/universe/galaxies.js` | 214 | Galaxy discs, outlines, labels, glyph placement, camera framing |
 | `scene/universe/glyphs.js` | 144 | A project glyph's live state: dimming, search focus, attention halo, VCS markers, sun pulse |
 | `scene/universe/labels.js` | 268 | Dirty-driven label layout (`updateLabelLayout`) |
 | `scene/universe/ships.js` | 54 | Ships orbiting their project's glyph |

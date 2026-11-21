@@ -101,8 +101,7 @@
       view.markLabelLayoutDirty();
       if (galaxies.size === 0) return;
       const box = galaxyBounds();
-      reframeCamera(box);
-      limitPanning(box);
+      if (!reframeCamera(box)) limitPanning(box);
     }
 
     const framed = { radius: NaN, x: NaN, z: NaN, alpha: NaN, beta: NaN };
@@ -133,18 +132,11 @@
       const extentX = (max.x - min.x) / 2;
       // Lift shows on screen much like depth does at this pitch, so it widens the depth extent.
       const extentZ = (max.z - min.z) / 2 + Math.max(Math.abs(min.y), Math.abs(max.y));
-      // Fit the world below the top bar, between both side rails and above the timeline as they
-      // sit at their default sizes, whatever is showing now and whatever the viewer's At launch
-      // choices are, so no panel ever moves or scales the map. The near edge of the tilted ground
-      // sits closest to the camera, so it decides the radius; the target then shifts so the
-      // world's centre lands in the middle of that area.
+      // Fit into what the panels leave clear at their default sizes, whatever they do now; the near
+      // edge of the tilted ground decides the radius, and the target centres the world in that area.
       const width = canvas.clientWidth;
       const height = canvas.clientHeight;
-      const room = view.defaultPanelRoom();
-      const top = AUR.chromeBounds(canvas).y;
-      const gap = AUR.CHROME_GAP;
-      const bounds = { x: room.left + gap, y: top, width: width - room.left - room.right - 2 * gap,
-        height: height - room.bottom - gap - top };
+      const bounds = AUR.chromeBounds(canvas, view.defaultPanelRoom());
       if (bounds.width < 10 || bounds.height < 10) {
         const desiredRadius = Math.max(90, Math.max(extentX, extentZ) * 2.55 + 44);
         camera.upperRadiusLimit = Math.max(320, desiredRadius * 1.25);
@@ -183,6 +175,7 @@
         Math.abs(camera.target.x - framed.x) < 0.5 && Math.abs(camera.target.z - framed.z) < 0.5 &&
         Math.abs(camera.alpha - framed.alpha) < 1e-3 && Math.abs(camera.beta - framed.beta) < 1e-3);
       if (untouched) frameCamera(box);
+      return untouched;
     }
 
     // Panning stays over the galaxies: the target roams their footprint, and always reaches where

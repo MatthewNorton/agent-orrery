@@ -8,20 +8,22 @@
   AUR.sceneParts = { universe: {}, system: {} };
 
   // The px the scene keeps clear of the chrome's edges.
-  const GAP = AUR.CHROME_GAP = 8;
+  const GAP = 8;
 
   // The part of the canvas not covered by the fixed chrome: below the top bar, between the rails,
-  // above the timeline. Labels and the chrome-occlusion stats both lay out inside it.
-  AUR.chromeBounds = function (canvas) {
+  // above the timeline. Labels and the chrome-occlusion stats both lay out inside it. Given `room`
+  // ({ left, right, bottom } px in from those edges, as AUR.app.defaultPanelRoom gives), it stands
+  // in for the rails and the timeline, and only the top bar is measured.
+  AUR.chromeBounds = function (canvas, room) {
     const edge = (id, side, fallback) => {
       const el = document.getElementById(id);
       return AUR.isShown(el) ? el.getBoundingClientRect()[side] : fallback;
     };
     const width = canvas.clientWidth, height = canvas.clientHeight;
     const top = edge('topbar', 'bottom', 0) + GAP;
-    const left = edge('rail-left', 'right', 0) + GAP;
-    const right = edge('sidebar', 'left', width) - GAP;
-    const bottom = edge('history-bar', 'top', height) - GAP;
+    const left = (room ? room.left : edge('rail-left', 'right', 0)) + GAP;
+    const right = (room ? width - room.right : edge('sidebar', 'left', width)) - GAP;
+    const bottom = (room ? height - room.bottom : edge('history-bar', 'top', height)) - GAP;
     return { x: left, y: top, width: Math.max(1, right - left), height: Math.max(1, bottom - top) };
   };
 

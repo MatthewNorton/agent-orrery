@@ -191,3 +191,20 @@ test('disposeView: the scene goes, and what was tied to it, also when a step bef
     assert.deepEqual([engine.scenes, tied], [[], 1], stuck);
   }
 });
+
+test('chromeBounds: given the room the panels take, it measures only the top bar and keeps the gap from each edge', () => {
+  const document = fakeDocument(['topbar', 'rail-left', 'sidebar', 'history-bar']);
+  const box = (left, top, right, bottom) => ({ left, top, right, bottom, width: right - left, height: bottom - top });
+  document.getElementById('topbar').getBoundingClientRect = () => box(0, 0, 1186, 48);
+  // Live rails and a timeline elsewhere than the room says; only the live form may see them.
+  document.getElementById('rail-left').getBoundingClientRect = () => box(12, 60, 572, 608);
+  document.getElementById('sidebar').getBoundingClientRect = () => box(355, 60, 1174, 608);
+  document.getElementById('history-bar').getBoundingClientRect = () => box(12, 560, 1174, 612);
+  const window = {};
+  runRenderer('util.js', { window, document, getComputedStyle: () => ({ display: 'block' }) });
+  runRenderer('scene/common.js', { window, document });
+  const canvas = { clientWidth: 1186, clientHeight: 684 };
+  assert.deepEqual(window.AUR.chromeBounds(canvas, { left: 308, right: 324, bottom: 64 }),
+    { x: 316, y: 56, width: 1186 - 324 - 8 - 316, height: 684 - 64 - 8 - 56 });
+  assert.deepEqual(window.AUR.chromeBounds(canvas), { x: 580, y: 56, width: 1, height: 552 - 56 }, 'the live form');
+});

@@ -73,6 +73,8 @@ function universe({ document, canvas }, specs = small()) {
   const part = window.AUR.sceneParts.universe.galaxies(view);
   // The view's resize hook, then a frame: the camera's position follows its angles and radius.
   const resize = () => { part.reframeCamera(); scene.render(); };
+  // A first fit, then a frame.
+  const frame = () => { part.frameCamera(); scene.render(); };
   const state = () => ({ alpha: camera.alpha, beta: camera.beta, radius: camera.radius, target: camera.target.asArray() });
   // Where a world point lands on the canvas, in CSS px.
   const onScreen = (point) => {
@@ -80,7 +82,7 @@ function universe({ document, canvas }, specs = small()) {
     const { clientWidth: w, clientHeight: h } = canvas;
     return BABYLON.Vector3.Project(point, BABYLON.Matrix.Identity(), scene.getTransformMatrix(), new BABYLON.Viewport(0, 0, w, h));
   };
-  return { camera, part, resize, state, scene, sky, galaxies, onScreen };
+  return { camera, part, frame, resize, state, scene, sky, galaxies, onScreen };
 }
 
 // The clear area the panels leave at their default sizes, as the fit should take it.
@@ -92,8 +94,7 @@ function defaultClearArea({ clientWidth: w, clientHeight: h }) {
 test('galaxies: resizing, folding, hiding or opening a panel never moves or scales the map', () => {
   const chrome = page();
   const map = universe(chrome);
-  map.part.frameCamera();
-  map.scene.render();
+  map.frame();
   const framed = map.state();
   for (const layout of [{ right: 819 }, { left: 560, right: 819 }, { right: 0 }, { left: 300, right: 56 }, { timeline: false }, {}]) {
     chrome.layout(layout);
@@ -106,8 +107,7 @@ test('galaxies: a map the viewer only turned or tilted stays put when the panels
   for (const turn of [{ alpha: -Math.PI / 2 + 0.6 }, { beta: 1.1 }, { alpha: -2.4, beta: 0.4 }]) {
     const chrome = page();
     const map = universe(chrome);
-    map.part.frameCamera();
-    map.scene.render();
+    map.frame();
     Object.assign(map.camera, turn); // an orbit or a tilt, no zoom and no pan
     map.scene.render();
     const turned = map.state();
@@ -120,28 +120,17 @@ test('galaxies: a map the viewer only turned or tilted stays put when the panels
     map.resize();
     assert.deepEqual(map.state(), turned, `${JSON.stringify(turn)}, then a window resize`);
   }
-  // Left as framed, the camera still follows the window.
-  const chrome = page();
-  const map = universe(chrome);
-  map.part.frameCamera();
-  map.scene.render();
-  const framed = map.state();
-  Object.assign(chrome.canvas, { clientWidth: 900, clientHeight: 700 });
-  map.resize();
-  assert.notDeepEqual(map.state(), framed, 'an untouched camera re-fits on a window resize');
 });
 
 test('galaxies: a view built while other panels show frames as the first one did', () => {
   const first = universe(page());
-  first.part.frameCamera();
-  first.scene.render();
+  first.frame();
   // Back from a system: the universe builds while that view's left rail still shows, then the
   // chrome swaps and the observer re-fits.
   const chrome = page();
   chrome.layout({ left: 420, right: 819 });
   const again = universe(chrome);
-  again.part.frameCamera();
-  again.scene.render();
+  again.frame();
   chrome.layout();
   again.resize();
   assert.deepEqual(again.state(), first.state());
@@ -149,12 +138,10 @@ test('galaxies: a view built while other panels show frames as the first one did
 
 test('galaxies: a canvas with no room yet, once it has its size, frames as a first load does', () => {
   const first = universe(page());
-  first.part.frameCamera();
-  first.scene.render();
+  first.frame();
   const chrome = page(1666, 0); // the window still opening
   const map = universe(chrome);
-  map.part.frameCamera();
-  map.scene.render();
+  map.frame();
   assert.deepEqual([map.camera.alpha, map.camera.beta], [-Math.PI / 2, 0.82], 'the early fit keeps the angles');
   Object.assign(chrome.canvas, { clientHeight: 944 });
   chrome.layout();
@@ -205,8 +192,7 @@ test('galaxies: at the smallest canvas no sun starts under either default rail o
 test('galaxies: a window resize re-fits, and the first size frames as before', () => {
   const chrome = page();
   const map = universe(chrome);
-  map.part.frameCamera();
-  map.scene.render();
+  map.frame();
   const framed = map.state();
   Object.assign(chrome.canvas, { clientWidth: 900, clientHeight: 700 });
   chrome.layout();
