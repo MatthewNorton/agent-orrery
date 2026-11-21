@@ -111,6 +111,10 @@
     activeView: null,   // what the view factory returned (kit/SPEC.md view contract)
     activeScene: null,
     current: { view: 'universe', projectId: null, planetName: null },
+    // The open planet's system, for its card's solar-system rows: set as the planet opens, fetched
+    // again (one request at a time) when a build starts a planet, also one that came while the
+    // planet of project `awaited` was opening (`missed`) (app/project/control.js).
+    planetSystem: { data: null, loading: false, stale: false, awaited: null, missed: false },
     routeRequestGeneration: 0,
     booting: true,
     bootEventQueue: [],
@@ -175,7 +179,10 @@
       filter: VCS.FILTERS.ALL,
       results: [],
       selected: 0,
+      sharedKey: null, // a row key two results had at the last render (listbox.js); none is expected
       els: null,
+      filterEls: null, // the top bar's GitHub filter, wired with or without the palette
+      opener: null,    // what had focus before the palette opened; a pick clears it
     },
     projectDirectory: {
       open: false,
@@ -183,6 +190,7 @@
       query: '',
       results: [],
       selected: 0,
+      sharedKey: null,
       els: null,
     },
     modules: { collapsed: new Set() }, // data-module keys of the modules folded to their header

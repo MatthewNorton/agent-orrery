@@ -17,7 +17,7 @@
   // ---------- agent focus ----------
   // The chrome roots focus mode makes inert; focus-rooms.css fades whatever is [inert].
   const AGENT_FOCUS_INERT_IDS = [
-    'topbar', 'sidebar', 'rail-left', 'view-title', 'view-hint', 'tabbar', 'history-bar',
+    'topbar', 'sidebar', 'rail-left', 'view-title', 'view-hint', 'history-bar',
   ];
 
   A.wireAgentFocus = function wireAgentFocus() {
@@ -62,9 +62,9 @@
       const ship = S.store.ships.get(S.agentFocus.shipId);
       if (ship) AU.openProject(ship.project);
     });
-    els.terminal.addEventListener('click', () => {
+    AUR.listen(els.terminal, 'click', () => {
       const ship = S.store.ships.get(S.agentFocus.shipId);
-      if (ship) A.requestProjectTerminal(ship.project, ship.id);
+      return ship ? A.requestProjectTerminal(ship.project, ship.id) : null;
     });
     document.addEventListener('keydown', (event) => {
       if (event.key !== 'Escape' || !S.agentFocus.shipId) return;

@@ -66,10 +66,12 @@ const iCore = html.indexOf('search-core.js');
 const iApp = html.indexOf('app/boot.js');
 if (iCore === -1) fail('P3: search-core.js script tag missing from index.html');
 if (!(iCore < iApp)) fail('P3: search-core.js must load before app/boot.js');
+// The UI calls the core from outside it: search-core.js itself defines every name it would match.
 const rendererDir = path.join(ROOT, 'src', 'renderer');
-const rendererSrc = fs.readdirSync(rendererDir, { recursive: true }).filter((f) => f.endsWith('.js') || f.endsWith('.html'))
+const uiSrc = fs.readdirSync(rendererDir, { recursive: true })
+  .filter((f) => (f.endsWith('.js') || f.endsWith('.html')) && path.basename(f) !== 'search-core.js')
   .map((f) => fs.readFileSync(path.join(rendererDir, f), 'utf8')).join('\n');
-if (!/[Ss]earch/.test(rendererSrc) || !/searchProjects/.test(rendererSrc)) fail('P3: search UI not wired in renderer');
+if (!/AUR\.(rankProjects|searchProjects)\(/.test(uiSrc)) fail('P3: search UI not wired in renderer');
 console.log('P3 PASS  script order + UI wiring present');
 
 // ---- P4 regression ----

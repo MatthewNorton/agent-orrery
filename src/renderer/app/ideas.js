@@ -25,11 +25,10 @@
     const els = S.ideaPanel.els;
     if (!els.panel || !els.count || !els.list || !els.form || !els.input ||
         !els.create || !els.status) return;
-    els.form.addEventListener('submit', (event) => {
+    AUR.listen(els.form, 'submit', (event) => {
       event.preventDefault();
       const text = els.input.value.trim();
-      if (!text) return;
-      mutateIdea(() => AU.rootTaskCreate(text), 'Idea created', true);
+      return text ? mutateIdea(() => AU.rootTaskCreate(text), 'Idea created', true) : null;
     });
   };
 
@@ -74,16 +73,16 @@
     if (!projectId) return;
     const project = S.store.projects.get(projectId);
     const label = project ? project.name : 'project';
-    mutateIdea(() => AU.rootTaskAssign(id, projectId), `Assigned to ${label}; agent start requested`);
+    return mutateIdea(() => AU.rootTaskAssign(id, projectId), `Assigned to ${label}; agent start requested`);
   };
 
   A.retryIdea = function retryIdea(id) {
-    mutateIdea(() => AU.rootTaskRetry(id), 'Agent start requested again');
+    return mutateIdea(() => AU.rootTaskRetry(id), 'Agent start requested again');
   };
 
   A.removeIdea = function removeIdea(item) {
     const index = S.ideaPanel.items.findIndex((entry) => entry.id === item.id);
-    mutateIdea(() => AU.rootTaskRemove(item.id), 'Idea removed', false, () => {
+    return mutateIdea(() => AU.rootTaskRemove(item.id), 'Idea removed', false, () => {
       S.ideaPanel.selections.delete(item.id);
       S.ideaPanel.items = S.ideaPanel.items.filter((entry) => entry.id !== item.id);
       const next = S.ideaPanel.items[Math.min(index, S.ideaPanel.items.length - 1)] || null;
@@ -102,14 +101,17 @@
   /** @param {() => Promise<RootTaskResult>} operation */
   async function mutateIdea(operation, successText, clearInput = false, onSuccess = null) {
     if (A.ideaMutationsDisabled()) return;
-    S.ideaPanel.busy = true;
-    S.ideaPanel.refreshAfterBusy = false;
-    S.ideaPanel.status = '';
-    S.ideaPanel.error = false;
-    A.renderIdeas();
     /** @type {RootTaskResult} */
-    const result = await AUR.settle(operation);
-    S.ideaPanel.busy = false;
+    const result = await AUR.settleBusy({
+      raise() {
+        Object.assign(S.ideaPanel, { busy: true, refreshAfterBusy: false, status: '', error: false });
+        A.renderIdeas();
+      },
+      lower(raised) {
+        S.ideaPanel.busy = false;
+        if (!raised) A.scheduleChrome(A.const.CHROME.IDEAS);
+      },
+    }, operation);
     if (result.ok === true) {
       S.ideaPanel.status = successText;
       S.ideaPanel.error = false;

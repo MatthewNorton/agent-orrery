@@ -164,8 +164,9 @@ function onToolUse(model, project, ship, signal, ts, catchup) {
   const tool = signal.tool || '?';
   const { status, build, spawn } = claudeTool(tool);
   ship.status = status;
-  const rel = signal.filePath === null ? null : relativeInside(project.path, signal.filePath);
-  ship.detail = signal.filePath === null ? signal.detail : rel || path.basename(signal.filePath);
+  const { filePath } = signal;
+  const rel = filePath && relativeInside(project.path, filePath);
+  ship.detail = filePath === null ? signal.detail : rel || path.basename(filePath);
   queue(model, { type: 'ship-updated', ship: liveShip(ship) });
 
   if (build && rel) {

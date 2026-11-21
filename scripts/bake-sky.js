@@ -7,6 +7,9 @@
 // window; everything takes about 40 seconds on integrated graphics.
 //   npx electron scripts/bake-sky.js
 
+// Security: asar handling is off before any module is loaded, as in src/main/main.js (SECURITY.md).
+process.noAsar = true;
+
 const { app, BrowserWindow } = require('electron');
 const crypto = require('node:crypto');
 const fs = require('node:fs');

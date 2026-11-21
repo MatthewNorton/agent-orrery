@@ -6,8 +6,9 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 const { runRenderer } = require('./support/renderer-source');
+const { assertNoDisposeErrors, fakeScene, fakeTimers } = require('./support/scene-fakes');
 
-function loadPart() {
+function loadPart(timers = {}) {
   const requests = [], closed = [], foreground = [];
   let nextEpoch = 1;
   const service = {
@@ -27,8 +28,8 @@ function loadPart() {
     },
   };
   const BABYLON = { Vector3: { Zero: () => ({ x: 0, y: 0, z: 0 }) } };
-  runRenderer('scene/system/worlds.js', { window: { AUR }, BABYLON });
-  const scene = { isDisposed: false };
+  runRenderer('scene/system/worlds.js', { window: { AUR }, BABYLON, ...timers });
+  const scene = fakeScene({ scenes: [] });
   const part = AUR.sceneParts.system.worlds({
     scene, projectId: 'p', planets: new Map(), glow: {}, sun: { material: {} }, sunHex: '#ffffff', sunDia: 6,
     worldMaps: service, quality: { key: 'high' },
@@ -66,4 +67,14 @@ test('no prefetch once the scene is gone', (t) => {
   scene.isDisposed = true;
   t.mock.timers.tick(1000);
   assert.deepEqual(requests, []);
+});
+
+test('a prefetch still waiting goes with the scene', () => {
+  const timers = fakeTimers();
+  const { part, scene, planet } = loadPart(timers);
+  part.prefetchDetail(planet('a'));
+  assert.deepEqual(timers.delays(), [250]);
+  scene.dispose();
+  assert.deepEqual(timers.delays(), []);
+  assertNoDisposeErrors(scene.getEngine());
 });

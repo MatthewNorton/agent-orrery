@@ -23,7 +23,7 @@
     const overlaps = (a, b) => Boolean(a && b && a.left < b.right && a.right > b.left &&
       a.top < b.bottom && a.bottom > b.top);
     const barRect = bar ? edges(bar) : null;
-    const overlapIds = ['sidebar', 'summary-card', 'tabbar', 'project-card', 'planet-card']
+    const overlapIds = ['sidebar', 'summary-card', 'project-card', 'planet-card']
       .filter((id) => overlaps(barRect, visibleRect(id)));
     const scene = S.activeScene && !S.activeScene.isDisposed ? S.activeScene : null;
     let providerStats = null;

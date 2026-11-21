@@ -4,6 +4,18 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const statusUi = require('../src/renderer/components/project-vcs-status');
 
+test('in a page, the component says which script it needs when search-core.js has not loaded', () => {
+  const { runRenderer } = require('./support/renderer-source');
+  for (const window of [{}, { AUR: {} }]) {
+    assert.throws(() => runRenderer('components/project-vcs-status.js', { window, module: undefined }),
+      /search-core\.js must load before components\/project-vcs-status\.js/);
+  }
+  const window = {};
+  runRenderer('search-core.js', { window, module: undefined });
+  runRenderer('components/project-vcs-status.js', { window, module: undefined });
+  assert.equal(typeof window.AUR.ProjectVcsStatus.matchesSearch, 'function');
+});
+
 test('normalizes GitHub HTTPS and SSH remotes without mutating source data', () => {
   const httpsInput = {
     id: 'one', name: 'One',
@@ -85,6 +97,38 @@ test('filters by GitHub presence and searches project, branch, path, or reposito
     statusUi.filterProjects(projects, { filter: statusUi.FILTERS.ALL, query: 'example/agent' }).map((p) => p.id),
     ['github']
   );
+});
+
+test('search matches a real name and branch, never the placeholder label of a project without one', () => {
+  const none = { id: 'none', name: 'Plain', path: 'C:\\work\\plain' };
+  const detached = { id: 'detached', name: 'Pinned', path: 'C:\\work\\pinned', git: { detached: true } };
+  assert.equal(statusUi.normalize(none).branchLabel, 'Branch unavailable');
+  for (const query of ['branch', 'unavailable', 'detached', 'head']) {
+    assert.equal(statusUi.matchesSearch(none, query), false, query);
+    assert.equal(statusUi.matchesSearch(detached, query), false, query);
+  }
+  assert.equal(statusUi.matchesSearch({ ...detached, git: { detached: true, branch: 'fix/head' } }, 'fix/head'), true);
+  const nameless = { id: 'nameless', path: 'C:\\work\\x' };
+  assert.equal(statusUi.normalize(nameless).projectName, 'Unnamed project');
+  assert.equal(statusUi.matchesSearch(nameless, 'unnamed'), false);
+  assert.equal(statusUi.matchesSearch(none, 'plain'), true);
+  assert.deepEqual(statusUi.searchTexts(detached), ['Pinned', 'C:\\work\\pinned', '', '']);
+  const full = { ...nameless, git: { branch: 'main' }, github: { nameWithOwner: 'acme/pin' } };
+  assert.deepEqual(statusUi.searchTexts(full), ['', 'C:\\work\\x', 'main', 'acme/pin']);
+  assert.deepEqual(statusUi.otherSearchTexts(full), ['C:\\work\\x', 'main', 'acme/pin'],
+    'Go to and PROJECTS rank the name themselves and read these after it');
+  assert.deepEqual(statusUi.otherSearchTexts(detached), ['C:\\work\\pinned', '', '']);
+  assert.deepEqual(statusUi.otherSearchTexts(null), ['', '', '']);
+});
+
+test('search folds case letter by letter, as the app\'s own search does (search-core.js lowerOf)', () => {
+  const izmir = { id: 'i', name: 'İzmir-tools', path: 'C:\\work\\izmir' };
+  const greek = { id: 'g', name: 'Οδυσσέας', path: 'C:\\work\\greek' };
+  assert.equal(statusUi.matchesSearch(izmir, 'izmir-t'), true, 'a plain i finds İ');
+  assert.equal(statusUi.matchesSearch(izmir, 'İZMİR'), true);
+  assert.equal(statusUi.matchesSearch(greek, 'ΟΔΥΣ'), true, 'capitals find the final sigma');
+  assert.equal(statusUi.matchesSearch(greek, 'οδυσσέασ'), true);
+  assert.deepEqual(statusUi.filterProjects([izmir, greek], { query: 'IZMIR' }).map((p) => p.id), ['i']);
 });
 
 test('reads the live renderer project shape with status nested under vcs', () => {

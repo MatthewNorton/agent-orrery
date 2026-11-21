@@ -23,10 +23,11 @@ test('planet motion remains independent from comfort-tuned ship motion', () => {
 test('planet scenes consume the dedicated planet motion settings', () => {
   const universe = readRenderer('scene/universe/view.js');
   const system = readRenderer('scene/system/view.js');
+  const systemPlanets = readRenderer('scene/system/planets.js');
   const planet = readRenderer('scene/planet/view.js');
 
   assert.match(universe, /AUR\.MOTION\.universePlanetOrbitMin/);
-  assert.match(system, /AUR\.MOTION\.systemPlanetOrbitMin/);
+  assert.match(systemPlanets, /AUR\.MOTION\.systemPlanetOrbitMin/);
   assert.match(system, /p\.mesh\.rotation\.y \+= dt \* p\.axialSpeed/);
   assert.match(planet, /AUR\.MOTION\.planetDetailAxialRotation/);
 });

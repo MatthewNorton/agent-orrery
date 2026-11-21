@@ -2,29 +2,20 @@
 'use strict';
 
 // The live project registry: which id a project path maps to, which path a project shows, and
-// whether that folder still exists.
+// whether that folder still exists. What the owner does to a project by hand is project-edits.js.
 
 const fs = require('fs');
 const path = require('path');
+const { setProjectPath } = require('../build-buckets');
 const { canonicalProjectPath, isLocalProjectPath } = require('../provider-adapters');
 const { localAbsolutePath } = require('../path-safety');
 const { hex8 } = require('../shared/hash');
 const { liveProject } = require('../universe/public-shape');
-const { queue, pushFeed, flush } = require('./events');
-const { saveState, serializeState, writeState } = require('./state-file');
+const { queue } = require('./events');
 const { stillForgotten } = require('./forgotten');
-const { projectHasShips } = require('./ships');
+const { savedProject } = require('./saved-project');
 
-/**
- * @import { Project } from '../../types/contract'
- * @import { LiveModel, LiveProject, PersistedProject } from '../../types/live-model'
- */
-
-function trackerPathError(code, message) {
-  const error = /** @type {NodeJS.ErrnoException} */ (new Error(message));
-  error.code = code;
-  return error;
-}
+/** @import { LiveModel, LiveProject, SavedProject } from '../../types/live-model' */
 
 function isProjectDirectory(projectPath) {
   // Security: transcript-derived paths reach the filesystem here on every scan.
@@ -39,7 +30,9 @@ function isProjectDirectory(projectPath) {
 
 /**
  * A new project record, announced. Build counts and first sight come from `fields` when an
- * earlier run saved them.
+ * earlier run saved them, and whether those were counted under a path (build-buckets.js
+ * foldBuckets); a project the app makes counts under its own. `fields.name` is its name only
+ * while it has no folder to be named for.
  * @param {LiveModel} model
  * @param {string} id
  * @param {string | null} projPath
@@ -47,37 +40,69 @@ function isProjectDirectory(projectPath) {
  * @returns {LiveProject}
  */
 function createProject(model, id, projPath, fields) {
+  /** @type {LiveProject} */
   const project = {
     id,
-    path: projPath,
-    name: fields.name || (projPath && path.basename(projPath)) || id,
-    exists: isProjectDirectory(projPath),
+    path: null,
+    name: fields.name || id,
+    exists: false,
     lastActivity: fields.lastActivity || 0,
     totalBytes: fields.totalBytes || 0,
     claudeBytes: fields.claudeBytes || 0,
     codexBytes: fields.codexBytes || 0,
     buckets: fields.buckets || {},
+    bucketsCounted: fields.bucketsCounted ?? true,
     totalBuilds: fields.totalBuilds || 0,
     firstSeen: fields.firstSeen || Date.now(),
   };
+  takeProjectPath(model, project, projPath);
   model.projects.set(id, project);
-  indexProjectPath(model, project);
   queue(model, { type: 'project-added', project: liveProject(project) });
   return project;
 }
 
 /**
- * A project that had no folder learns one.
+ * A project that had no folder learns one, and the change is announced.
  * @param {LiveModel} model
  * @param {LiveProject} project
  * @param {string} projPath
  */
 function adoptProjectPath(model, project, projPath) {
-  project.path = projPath;
-  project.name = path.basename(projPath) || project.name;
+  takeProjectPath(model, project, projPath);
+  announceProjectUpdated(model, project);
+}
+
+/**
+ * The one way a project takes a path (or none, at its creation), with what follows from it: one
+ * bucket per folder by the rule of that path, every count a whole one (setProjectPath), the
+ * folder's name, whether the folder is there, and the path index. The caller announces it.
+ * @param {LiveModel} model
+ * @param {LiveProject} project
+ * @param {string | null} projPath
+ * @returns {() => void} gives the path back: each of those as it was before
+ */
+function takeProjectPath(model, project, projPath) {
+  const key = canonicalProjectPath(projPath);
+  const was = {
+    path: project.path, buckets: project.buckets, bucketsCounted: project.bucketsCounted, name: project.name, exists: project.exists,
+  };
+  const index = key && { had: model.projectPathIndex.has(key), id: model.projectPathIndex.get(key) };
+  const pathId = key && { had: Object.hasOwn(model.pathIds, key), id: model.pathIds[key] };
+  setProjectPath(project, projPath);
+  project.name = (projPath && path.basename(projPath)) || project.name;
   project.exists = isProjectDirectory(projPath);
   indexProjectPath(model, project);
-  announceProjectUpdated(model, project);
+  return () => {
+    setProjectPath(project, was.path);
+    // The buckets as the very object they were: once joined by the new path's rule they cannot
+    // be told apart again, and a fold of them would be a copy.
+    Object.assign(project, { buckets: was.buckets, bucketsCounted: was.bucketsCounted, name: was.name, exists: was.exists });
+    if (!key) return;
+    if (index.had) model.projectPathIndex.set(key, index.id);
+    else model.projectPathIndex.delete(key);
+    if (pathId.had) model.pathIds[key] = pathId.id;
+    else delete model.pathIds[key];
+  };
 }
 
 /**
@@ -96,24 +121,25 @@ function announceProjectUpdated(model, project) {
  * @param {LiveModel} model
  */
 function restoreRememberedProjects(model) {
-  for (const [id, saved] of Object.entries(model.persisted.projects)) {
-    if (!model.projects.has(id)) restoreProject(model, id, saved);
+  for (const [id, entry] of Object.entries(model.persisted.projects)) {
+    // A state file is read as it is: an entry that is not a project record is passed over.
+    const saved = savedProject(entry);
+    if (saved && !model.projects.has(id)) restoreProject(model, id, saved);
   }
 }
 
 /**
- * A project as the state file, or a backup, keeps it.
+ * A project as the state file, or a backup, keeps it: `saved` is from the one reader
+ * (saved-project.js), so its fields are taken as they are.
  * @param {LiveModel} model
  * @param {string} id
- * @param {PersistedProject} saved
+ * @param {SavedProject} saved
  * @returns {LiveProject}
  */
 function restoreProject(model, id, saved) {
-  const projPath = preferredProjectPath(model, id, saved.path || null);
-  return createProject(model, id, projPath, {
-    name: projPath ? undefined : saved.name,
-    lastActivity: saved.lastActivity || saved.firstSeen,
-    buckets: saved.buckets, totalBuilds: saved.totalBuilds, firstSeen: saved.firstSeen,
+  return createProject(model, id, preferredProjectPath(model, id, saved.path), {
+    name: saved.name, lastActivity: saved.lastActivity || saved.firstSeen,
+    buckets: saved.buckets, bucketsCounted: saved.bucketsCounted, totalBuilds: saved.totalBuilds, firstSeen: saved.firstSeen,
   });
 }
 
@@ -167,124 +193,6 @@ function preferredProjectPath(model, projectId, discoveredPath) {
 }
 
 /**
- * Points a missing project at the folder it moved to, and saves that choice.
- * @param {LiveModel} model
- * @param {string} projectId
- * @param {unknown} nextPath
- * @returns {Project}
- */
-function remapProjectPath(model, projectId, nextPath) {
-  const project = model.projects.get(projectId);
-  if (!project) throw trackerPathError('NOT_FOUND', 'project was not found');
-  if (project.exists === true) {
-    throw trackerPathError('NOT_MISSING', 'only missing project paths can be recovered');
-  }
-  if (typeof nextPath !== 'string' || !path.isAbsolute(nextPath)) {
-    throw trackerPathError('INVALID', 'project path must be absolute');
-  }
-
-  let real;
-  try {
-    real = path.normalize(fs.realpathSync.native(nextPath));
-    if (!fs.statSync(real).isDirectory()) {
-      throw trackerPathError('INVALID', 'project path must be a directory');
-    }
-  } catch (error) {
-    if (error && error.code === 'INVALID') throw error;
-    throw trackerPathError('NOT_FOUND', 'project directory is unavailable');
-  }
-
-  const key = canonicalProjectPath(real);
-  if (!key) throw trackerPathError('INVALID', 'project path is invalid');
-  const owner = projectIdAtPath(model, key);
-  if (owner && owner !== projectId && model.projects.has(owner)) {
-    throw trackerPathError('IN_USE', 'project path is already assigned');
-  }
-  for (const other of model.projects.values()) {
-    if (!other || other.id === projectId || !isProjectDirectory(other.path)) continue;
-    try {
-      if (canonicalProjectPath(fs.realpathSync.native(other.path)) === key) {
-        throw trackerPathError('IN_USE', 'project path is already assigned');
-      }
-    } catch (error) {
-      if (error && error.code === 'IN_USE') throw error;
-    }
-  }
-
-  const previous = {
-    path: project.path,
-    name: project.name,
-    exists: project.exists,
-    hadOverride: Object.prototype.hasOwnProperty.call(model.pathOverrides, projectId),
-    override: model.pathOverrides[projectId],
-    hadIndex: model.projectPathIndex.has(key),
-    indexOwner: model.projectPathIndex.get(key),
-    hadPathId: Object.prototype.hasOwnProperty.call(model.pathIds, key),
-    pathIdOwner: model.pathIds[key],
-  };
-  project.path = real;
-  project.name = path.basename(real) || project.name;
-  project.exists = true;
-  model.pathOverrides[projectId] = real;
-  model.projectPathIndex.set(key, projectId);
-  model.pathIds[key] = projectId;
-  model.systemCache.delete(projectId);
-  try {
-    saveState(model, true);
-  } catch {
-    project.path = previous.path;
-    project.name = previous.name;
-    project.exists = previous.exists;
-    if (previous.hadOverride) model.pathOverrides[projectId] = previous.override;
-    else delete model.pathOverrides[projectId];
-    if (previous.hadIndex) model.projectPathIndex.set(key, previous.indexOwner);
-    else model.projectPathIndex.delete(key);
-    if (previous.hadPathId) model.pathIds[key] = previous.pathIdOwner;
-    else delete model.pathIds[key];
-    throw trackerPathError('FAILED', 'project path could not be saved');
-  }
-  const visible = liveProject(project);
-  queue(model, { type: 'project-updated', project: visible });
-  pushFeed(model, 'discover', `Project path recovered: ${project.name}`, projectId);
-  flush(model);
-  return visible;
-}
-
-/**
- * Drops a project and its build history from the map and the state file, and records it as
- * forgotten so its old transcripts don't bring it back. Refused while an agent works there.
- * @param {LiveModel} model
- * @param {string} projectId
- * @param {number} [now]
- */
-function forgetProject(model, projectId, now = Date.now()) {
-  const project = model.projects.get(projectId);
-  if (!project) throw trackerPathError('NOT_FOUND', 'project was not found');
-  if (projectHasShips(model.ships, projectId)) {
-    throw trackerPathError('ACTIVE', 'an agent is working in this project');
-  }
-  // The file is written first; memory changes only once the forgetting is saved. Path keys
-  // stay, now leading to the record.
-  const record = { at: now, path: project.path };
-  const out = serializeState(model);
-  delete out.projects[projectId];
-  delete out.pathOverrides[projectId];
-  out.forgotten[projectId] = record;
-  try {
-    writeState(model.statePath, out);
-  } catch {
-    throw trackerPathError('FAILED', 'the forgotten project could not be saved');
-  }
-  model.projects.delete(projectId);
-  delete model.pathOverrides[projectId];
-  model.forgotten[projectId] = record;
-  // Tails stop here but keep their offsets: a project that returns reads on from them.
-  for (const [fp, tail] of model.files) if (tail.project === projectId) model.files.delete(fp);
-  model.feed = model.feed.filter((entry) => entry.project !== projectId);
-  model.systemCache.delete(projectId);
-}
-
-/**
  * The project a Codex or Signal path belongs to, created on first sight.
  * @param {LiveModel} model
  * @param {string} projectPath
@@ -330,6 +238,7 @@ module.exports = {
   isProjectDirectory,
   createProject,
   adoptProjectPath,
+  takeProjectPath,
   announceProjectUpdated,
   restoreRememberedProjects,
   restoreProject,
@@ -338,7 +247,5 @@ module.exports = {
   indexProjectPath,
   projectIdAtPath,
   preferredProjectPath,
-  remapProjectPath,
-  forgetProject,
   ensureProjectForPath,
 };

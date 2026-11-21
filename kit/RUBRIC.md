@@ -14,6 +14,8 @@ hard-fail items.
 | M3 | `.shots/state.json` parses; `projects.length ≥ 1`; on the synthetic profile every project path is inside it and the app saved its state into it | tracker snapshot empty or unwritten, or the real profile was read |
 | M4 | Combined stdout/stderr has no `Uncaught`, `ReferenceError`, `TypeError`, `SyntaxError`, `is not defined`, `Failed to load resource` | any match (Electron GPU/`Autofill` noise is already filtered by the script) |
 | M5 (soft) | `state.json` ships length ≥ 1 | warn only — the synthetic profile always has live sessions, so a warning there means ship detection regressed; with `--real` it depends on a supported provider session being live |
+| M6 | `.shots/ux-state.json` parses; the left-rail modules folded and unfolded, and the panels button folded and opened both rails | any of the four did not happen, or the file is unreadable |
+| M7 | `ux-state.json` reports `mainProcess.noAsar: true`, and `mainProcess.asar` (`src/main/harness/asar-check.js`, run in the main process at the end of the shots): a malformed and a valid `*.asar` in a temporary folder read as plain files by `fs.promises.lstat` and by `readdir` with file types, and are deleted straight after | the main process ran with Electron asar handling on (`process.noAsar`, set first thing in `src/main/main.js`; see `SECURITY.md`), or its fs opened, parsed or held open a file named `*.asar` |
 
 ## Visual — universe shot vs `3.universe-map-view.png`
 
@@ -45,8 +47,7 @@ Soft: asteroid belt visible; ship(s) with name labels; planet name labels on lar
 Hard fail if any of:
 
 - [ ] No single dominant textured planet (should fill roughly half the view height)
-- [ ] Left panel stack missing (need at least PLANET card + PLANET STATUS bars)
-- [ ] No bottom tab bar (`Overview … Scans`)
+- [ ] Left panel stack missing (need at least the PLANET card with its rows and its builds bar)
 - [ ] Right rail chrome (Fleet, Event feed) missing
 
 Soft: the planet is a generated world of its class with relief and a soft terminator, an atmosphere rim where it has air, no visible seam, and no neon: oceanic shows glint, and on high clouds and city lights on the night side; volcanic lava glows on the night side; ice shows long arcs, not loops.
@@ -63,8 +64,8 @@ Soft: moons; atmosphere rim; orbiting labeled ships.
 3. Click into that system: a ship is present; trigger a file edit (ask the
    agent to touch a file) → ship moves toward the matching planet and the feed
    logs a build.
-4. Click a planet → planet view shows non-zero MASS/DIAMETER and real file
-   extensions under RESOURCES. Back navigation works both levels. `Open Folder`
+4. Click a planet → planet view shows non-zero FILES/SIZE and real file
+   extensions under FILE TYPES. Back navigation works both levels. `Open Folder`
    opens Explorer.
 5. Close the app window → process exits (no orphaned Electron in Task Manager).
 

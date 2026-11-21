@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
+const { readState } = require('./support/transcripts');
 
 const load = () => import(pathToFileURL(path.join(__dirname, '..', 'scripts', 'lib', 'synthetic-profile.mjs')).href);
 const NOW = Date.UTC(2026, 9, 7, 12, 0, 0);
@@ -79,7 +80,7 @@ test('codexPatchLines reports a successful patch inside the project', async () =
 test('createSyntheticProfile builds the fictional universe with history and live sessions', async (t) => {
   const lib = await load();
   const profile = profileFor(t, lib);
-  const state = JSON.parse(fs.readFileSync(profile.statePath, 'utf8'));
+  const state = readState(profile.statePath);
   const projects = Object.values(lib.GALAXIES).flat();
   assert.equal(profile.statePath, path.join(lib.userDataDir(profile.root), 'universe-state.json'));
   assert.equal(Object.keys(state.projects).length, projects.length);

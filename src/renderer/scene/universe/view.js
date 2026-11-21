@@ -34,6 +34,8 @@
     vcsLayer.className = 'universe-vcs-layer';
     vcsLayer.setAttribute('aria-label', 'Project repository status');
     document.body.appendChild(vcsLayer);
+    // The page's part of the view goes with its scene, also when the build fails (AUR.buildView).
+    scene.onDisposeObservable.addOnce(() => vcsLayer.remove());
 
     // State shared with the parts in scene/universe/.
     const glyphs = new Map(); // projectId -> glyph record
@@ -267,8 +269,6 @@
       setQuality: view.setStarsQuality,
       resize: view.reframeCamera,
       dispose() {
-        view.cancelLabelLayout();
-        vcsLayer.remove();
         AUR.disposeView(scene, gui);
       },
     };
