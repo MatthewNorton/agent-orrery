@@ -60,7 +60,8 @@
   // that has one). Hulls carry their detail as geometry (10k to 58k triangles each), and
   // a template's ships draw in one draw per part, so what grows with the fleet is the triangles
   // drawn, which is what this counts. A system or planet view holds fifty-one ships of the first
-  // rank (Petrel, 17,544), the universe map seventy.
+  // rank (Petrel, 17,544) or twenty-two of the two above it (Petrel with its survey ring, 40,840),
+  // the universe map seventy or thirty.
   const TRIANGLE_BUDGET = { near: 900000, far: 1240000 };
   /** @type {WeakMap<object, SceneState>} */
   const sceneStates = new WeakMap();

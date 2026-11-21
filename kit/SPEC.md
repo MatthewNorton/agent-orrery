@@ -386,8 +386,10 @@ Design tokens (put in `:root`):
   - **Triangle budget.** Past its budget a ship keeps its dart, or its current
     hull when a promotion does not fit, a near view first trying the hull's far
     file when it has one: 900k in a system or planet view, which
-    holds fifty-one ships of the first rank, and 1.24M on the universe map,
-    which holds seventy. A hull is checked in the step that builds it, so ships
+    holds fifty-one ships of the first rank (Petrel, 17,544 triangles) or
+    twenty-two of the two above it (Petrel with its survey ring, 40,840), and
+    1.24M on the universe map, which holds seventy or thirty. A hull is
+    checked in the step that builds it, so ships
     waiting on one container keep to the budget, and a request that ends while
     it waits (its dart gone, its swap superseded) loads and builds nothing more.
   - **Promotion.** `AUR.ships.refresh(scene, ship)` swaps the hull inside the
