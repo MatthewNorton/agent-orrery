@@ -431,7 +431,9 @@ Design tokens (put in `:root`):
     its emissive map is painted in> }`, keeps its surface and has that map show
     the ship color, at the level of the emissive color's brightest channel, so
     lamps the art lights in a tint of their own show it too (Petrel lights its
-    guide lamps in grey and its ring's inspection rail in amber).
+    guide lamps in grey and its ring's inspection rail in amber). One color is
+    divided out, so what a map paints in another keeps some of its hue: the
+    halos around the rail's lamps stay faintly warm on a Codex ship.
     `AUR.shipModels.trimLight` is that light, and the fleet's livery stripes
     and nozzles are made by it too.
 - A model's `source/` folder is generated: `node scripts/import-ship.mjs <ship>
