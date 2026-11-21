@@ -67,6 +67,8 @@
       clearTimeout(holdTimer);
     };
     const holdTimer = setTimeout(release, 6000);
+    // Released with the scene too, also when the build fails after this (AUR.buildView).
+    scene.onDisposeObservable.addOnce(release);
     let latest = null;
     const showDetail = () => {
       const shown = latest = world.show(SIZES[tier.key].detail, 3, PLACEHOLDER.planet);
@@ -186,7 +188,6 @@
       },
       setSkyLook: sky.setLook,
       dispose() {
-        release();
         AUR.disposeView(scene, gui);
       },
     };

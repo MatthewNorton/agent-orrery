@@ -144,26 +144,31 @@
   /** @param {ReplayCommand} command */
   A.issueReplay = async function issueReplay(command) {
     const request = ++S.replayRequest;
+    const isCurrent = () => request === S.replayRequest;
     const modeBoundary = command.action === 'seek' || command.action === 'live';
-    if (modeBoundary) S.replayTransitionPending = true;
-    S.replayBusy = true;
-    A.renderChromeNow(REPLAY_BUSY_CHROME);
-    try {
-      const result = await AU.replay(command);
-      if (request !== S.replayRequest) return;
-      adoptReplayResult(result, modeBoundary);
-    } catch (error) {
-      if (request === S.replayRequest) AUR.log('replay command failed', error && error.message);
-    } finally {
-      if (request === S.replayRequest) {
+    await AUR.settleBusy({
+      raise() {
+        if (modeBoundary) S.replayTransitionPending = true;
+        S.replayBusy = true;
+        A.renderChromeNow(REPLAY_BUSY_CHROME);
+      },
+      // The events that waited for the answer go after it, into the stream it brought. After a
+      // raise() that threw, the bar is drawn in a frame: a second throw here would replace its error.
+      lower(raised) {
         S.replayTransitionPending = false;
         S.replayBusy = false;
         S.historyPreviewTs = null;
         const queued = S.transitionEventQueue;
         S.transitionEventQueue = [];
         for (const packet of queued) A.handleSequencedEvents(packet.batch, packet.meta);
-        A.renderChromeNow(REPLAY_BUSY_CHROME);
-      }
-    }
+        if (raised) A.renderChromeNow(REPLAY_BUSY_CHROME);
+        else A.scheduleChrome(REPLAY_BUSY_CHROME);
+      },
+      isCurrent,
+    }, async () => {
+      const result = await AU.replay(command);
+      if (isCurrent()) adoptReplayResult(result, modeBoundary);
+      return result;
+    }, (error) => { if (isCurrent()) AUR.log('replay command failed', error && error.message); });
   };
 })();

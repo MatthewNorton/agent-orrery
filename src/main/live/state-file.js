@@ -11,6 +11,8 @@ const fs = require('fs');
 const path = require('path');
 const { writeFileAtomic } = require('../shared/atomic-write');
 const { pathFromKey } = require('../provider-adapters');
+const { bareCopy } = require('../shared/values');
+const { plainObject } = require('../transcripts/fields');
 
 /** @import { LiveModel, PersistedState } from '../../types/live-model' */
 
@@ -39,7 +41,8 @@ function migrate(state) {
     if (!pathsById.has(id)) pathsById.set(id, pathFromKey(key));
   }
   for (const [id, saved] of Object.entries(state.projects)) {
-    if (saved.path || !pathsById.get(id)) continue;
+    // An entry that is not a project record has no path to bring back; the restore passes it over.
+    if (!plainObject(saved) || (saved.path && typeof saved.path === 'string') || !pathsById.get(id)) continue;
     const p = pathsById.get(id);
     try { saved.path = path.normalize(fs.realpathSync.native(p)); } catch { saved.path = p; }
   }
@@ -69,18 +72,19 @@ function loadState(statePath) {
  * @returns {PersistedState}
  */
 function serializeState(model) {
+  // Security: keyed by project ids and path keys, which come from folder names on disk (bareCopy).
   /** @type {PersistedState} */
   const out = {
     version: STATE_VERSION,
-    projects: {},
-    pathIds: { ...model.pathIds },
-    pathOverrides: { ...model.pathOverrides },
-    forgotten: { ...model.forgotten },
+    projects: bareCopy(),
+    pathIds: bareCopy(model.pathIds),
+    pathOverrides: bareCopy(model.pathOverrides),
+    forgotten: bareCopy(model.forgotten),
   };
   for (const [id, p] of model.projects) {
     out.projects[id] = {
       path: p.path, name: p.name, lastActivity: p.lastActivity,
-      buckets: p.buckets, totalBuilds: p.totalBuilds, firstSeen: p.firstSeen,
+      buckets: p.buckets, bucketsCounted: p.bucketsCounted, totalBuilds: p.totalBuilds, firstSeen: p.firstSeen,
     };
   }
   return out;

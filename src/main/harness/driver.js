@@ -34,9 +34,9 @@ function createDriver(ctx) {
         summary: document.querySelector('#summary-card .mod-title')?.textContent || '',
         projectCard: document.getElementById('project-card')?.textContent || '',
         planetCard: document.getElementById('planet-card')?.textContent || '',
+        planetCardVisible: shown('planet-card'),
         backText: document.getElementById('back-btn')?.textContent || '',
         backVisible: shown('back-btn'),
-        tabbarVisible: shown('tabbar'),
         liveScenes,
       };
     })()`);

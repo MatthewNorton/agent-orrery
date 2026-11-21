@@ -64,7 +64,6 @@
     A.renderSummary();
     A.renderProjectCard();
     A.renderPlanetCard();
-    A.renderTabbar();
     A.renderBackButton();
     A.renderGalaxies();
     A.renderProjectDirectory();

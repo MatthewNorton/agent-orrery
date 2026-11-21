@@ -3,6 +3,7 @@
 
 const { isLocalProjectPath } = require('../provider-adapters');
 const { githubIdentity } = require('../vcs-status/collector');
+const { isPlanetSegment } = require('../build-buckets');
 const guards = require('./guards');
 
 /** @import { OpenExternalResult } from '../../types/contract' */
@@ -36,8 +37,8 @@ function registerIpc(ctx, handlers, electron = require('electron')) {
   });
   ipcMain.handle('au:system', (event, id) => (trustedMainFrame(event) ? visibleSystem(id) : null));
   ipcMain.handle('au:planet', (event, id, name) => {
-    if (!trustedMainFrame(event) || typeof id !== 'string' || typeof name !== 'string' ||
-        name.length > 255) return null;
+    // Security: a planet is named by one plain path segment, so LIVE and history get no other.
+    if (!trustedMainFrame(event) || typeof id !== 'string' || !isPlanetSegment(name)) return null;
     return (ctx.activeSource || ctx.tracker).getPlanet(id, name);
   });
   ipcMain.handle('au:replay', (event, command) => (

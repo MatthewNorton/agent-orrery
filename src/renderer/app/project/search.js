@@ -1,5 +1,7 @@
 // @ts-check
-// Project search in every view: topbar query, GitHub filter, universe match highlighting, shared ranking.
+// Go to: the search palette, a dialog from the top bar's search button, / or Ctrl K. Its query ranks
+// projects, agents and folders (search-core.js) under the GitHub filter and brightens the matching
+// systems on the universe map; rows are filled by app/project/search-rows.js.
 'use strict';
 
 (function () {
@@ -8,24 +10,27 @@
   const A = AUR.app;
   if (!A) throw new Error('app/state.js must load before app/project/search.js');
   const S = A.state;
+  const LABEL = 'Go to a project, agent or folder';
+  const ROW_ID = 'search-result-';
+  const entryKey = (entry) => entry.key;
 
-  /** `ranked` first, then the rest of `matches`, sorted by `compareRest` when given. */
-  A.rankedFirst = function rankedFirst(matches, ranked, compareRest) {
-    const rankedIds = new Set(ranked.map((project) => project.id));
-    const rest = matches.filter((project) => !rankedIds.has(project.id));
-    return [...ranked, ...(compareRest ? rest.sort(compareRest) : rest)];
-  };
-
-  // ---------- project search ----------
   A.wireProjectSearch = function wireProjectSearch() {
-    S.projectSearch.els = {
-      input: document.getElementById('search-input'),
+    wireVcsFilter();
+    const els = {
+      button: document.getElementById('search-button'),
+      dialog: /** @type {HTMLDialogElement | null} */ (document.getElementById('search-dialog')),
+      input: /** @type {HTMLInputElement | null} */ (document.getElementById('search-input')),
       results: document.getElementById('search-results'),
-      filter: document.getElementById('project-vcs-filter'),
-      filterCount: document.getElementById('project-vcs-filter-count'),
+      scope: document.getElementById('search-scope'),
     };
-    const els = S.projectSearch.els;
-    if (!els.input || !els.results) return;
+    // Wired whole or not at all: everything below takes a missing els for a palette that is not there.
+    if (!els.button || !els.dialog || !els.input || !els.results) return;
+    S.projectSearch.els = els;
+
+    A.titleWithKey(els.button, LABEL, 'search');
+    els.button.addEventListener('click', A.openProjectSearch);
+    AUR.closeOnBackdrop(els.dialog, A.clearProjectSearch);
+    els.dialog.addEventListener('close', finishClose);
 
     els.input.addEventListener('input', () => {
       if (els.input.value.trim()) {
@@ -36,77 +41,117 @@
       updateProjectSearch();
     });
 
-    els.input.addEventListener('focus', () => A.closeProjectDirectory(false));
-
-    if (els.filter) {
-      els.filter.addEventListener('click', () => {
-        S.projectSearch.filter = S.projectSearch.filter === VCS.FILTERS.GITHUB
-          ? VCS.FILTERS.ALL : VCS.FILTERS.GITHUB;
-        updateProjectSearch();
-        A.refreshProjectDirectoryFromStore();
-      });
-    }
-
-    A.wireListboxKeys(els.input, S.projectSearch, {
+    A.wireListbox(els.results, els.input, S.projectSearch, {
       escape: A.clearProjectSearch,
       update: updateProjectSearch,
       activate: activateProjectSearchResult,
-      render: renderProjectSearchResults,
+      select: () => A.selectListboxRow(els.results, els.input, S.projectSearch, ROW_ID),
+      keyOf: entryKey,
     });
   };
 
+  // The GitHub filter narrows the palette, PROJECTS and the map, so it is wired on its own.
+  function wireVcsFilter() {
+    const filter = document.getElementById('project-vcs-filter');
+    if (!filter) return;
+    S.projectSearch.filterEls = { filter, count: document.getElementById('project-vcs-filter-count') };
+    filter.addEventListener('click', () => {
+      S.projectSearch.filter = S.projectSearch.filter === VCS.FILTERS.GITHUB
+        ? VCS.FILTERS.ALL : VCS.FILTERS.GITHUB;
+      A.refreshProjectSearchFromStore();
+      A.refreshProjectDirectoryFromStore();
+    });
+  }
+
+  /**
+   * Opens the palette, or puts the caret back in its field when it is open; false when it cannot:
+   * over Settings, or while agent focus has made the top bar, and so the search button, inert.
+   * @returns {boolean}
+   */
+  A.openProjectSearch = function openProjectSearch() {
+    const els = S.projectSearch.els;
+    if (!els || !els.dialog || S.projectSettings.open || els.button.closest('[inert]')) return false;
+    if (!els.dialog.open) {
+      A.closeProjectDirectory(false);
+      const active = document.activeElement;
+      S.projectSearch.opener = active instanceof HTMLElement && active !== document.body ? active : null;
+      els.dialog.showModal();
+      els.button.setAttribute('aria-expanded', 'true');
+      renderProjectVcsFilter();
+    }
+    els.input.focus();
+    els.input.select();
+    return true;
+  };
+
+  /** Clears the query and closes the palette: Escape, a click outside, a pick, a view switch. */
   A.clearProjectSearch = function clearProjectSearch() {
+    // At once, not on the close event: a view switch reads the field straight after.
+    resetQuery();
+    const dialog = S.projectSearch.els && S.projectSearch.els.dialog;
+    if (dialog && dialog.open) dialog.close();
+  };
+
+  function resetQuery() {
     A.cancelListboxTimer(S.projectSearch);
     S.projectSearch.query = '';
     S.projectSearch.results = [];
     S.projectSearch.selected = 0;
     const els = S.projectSearch.els;
-    if (els) {
+    if (els && els.input) {
       els.input.value = '';
-      els.input.setAttribute('aria-expanded', 'false');
-      els.input.removeAttribute('aria-activedescendant');
-      els.results.classList.add('hidden');
-      AUR.clear(els.results);
+      renderProjectSearchResults();
     }
     A.syncProjectMatches();
-  };
+  }
+
+  // However it closed (Escape on a clicked row closes it natively), the query goes and focus goes
+  // back where it was, unless a pick has moved on.
+  function finishClose() {
+    const els = S.projectSearch.els;
+    if (els.input.value || S.projectSearch.query) resetQuery();
+    els.button.setAttribute('aria-expanded', 'false');
+    const back = S.projectSearch.opener;
+    S.projectSearch.opener = null;
+    if (back && back.isConnected && back.getClientRects().length > 0) back.focus();
+  }
 
   function renderProjectVcsFilter() {
-    const els = S.projectSearch.els;
-    if (!els || !els.filter) return;
+    const fe = S.projectSearch.filterEls;
+    if (!fe) return;
     const githubCount = VCS.filterProjects([...S.store.projects.values()], {
       filter: VCS.FILTERS.GITHUB,
     }).length;
     const active = S.projectSearch.filter === VCS.FILTERS.GITHUB;
-    els.filter.setAttribute('aria-pressed', String(active));
-    els.filter.setAttribute('aria-label', active
+    fe.filter.setAttribute('aria-pressed', String(active));
+    fe.filter.setAttribute('aria-label', active
       ? `Show all projects; ${githubCount} have GitHub repositories`
       : `Focus on the ${githubCount} projects with GitHub repositories`);
-    els.filter.title = active ? 'Show all projects' : 'Focus on GitHub projects';
-    if (els.filterCount) els.filterCount.textContent = String(githubCount);
+    fe.filter.title = active ? 'Show all projects' : 'Focus on GitHub projects';
+    if (fe.count) fe.count.textContent = String(githubCount);
+    const scope = S.projectSearch.els && S.projectSearch.els.scope;
+    if (scope) scope.textContent = active ? 'GitHub projects only' : '';
   }
 
   A.refreshProjectSearchFromStore = function refreshProjectSearchFromStore() {
     const els = S.projectSearch.els;
-    if (!els) return;
-    if (els.input.value.trim()) updateProjectSearch();
-    else { A.syncProjectMatches(); renderProjectVcsFilter(); }
+    if (els && els.input.value.trim()) { updateProjectSearch(); return; }
+    A.syncProjectMatches();
+    renderProjectVcsFilter();
   };
 
-  function matchingProjects(projects, query) {
-    return VCS.filterProjects(projects, { filter: S.projectSearch.filter, query });
-  }
+  const underFilter = (projects) => VCS.filterProjects(projects, { filter: S.projectSearch.filter });
 
-  A.syncProjectMatches = function syncProjectMatches(projects, query) {
+  /**
+   * Brightens `found`'s systems on the view's map; with none given, the projects under the GitHub
+   * filter, or no system singled out while it shows all.
+   * @param {any[]} [found]
+   */
+  A.syncProjectMatches = function syncProjectMatches(found) {
     if (!S.activeView) return;
-    const needle = query == null && S.projectSearch.els
-      ? S.projectSearch.els.input.value.trim() : String(query || '').trim();
-    if (!needle && S.projectSearch.filter === VCS.FILTERS.ALL) {
-      S.activeView.setSearchMatches(null);
-      return;
-    }
-    const source = projects || [...S.store.projects.values()];
-    S.activeView.setSearchMatches(new Set(matchingProjects(source, needle).map((project) => project.id)));
+    const projects = found ||
+      (S.projectSearch.filter === VCS.FILTERS.ALL ? null : underFilter([...S.store.projects.values()]));
+    S.activeView.setSearchMatches(projects && new Set(projects.map((project) => project.id)));
   };
 
   function updateProjectSearch() {
@@ -125,32 +170,27 @@
       return;
     }
 
-    const projects = [...S.store.projects.values()];
-    const matches = matchingProjects(projects, query);
-    const projectEntries = A.rankedFirst(matches, AUR.searchProjects(matches, query), A.byProjectName)
-      .slice(0, 6)
-      .map((project) => ({ kind: 'project', key: 'p:' + project.id, project }));
-    const agentEntries = AUR.searchAgents([...S.store.ships.values()], query, 4)
-      .map((ship) => ({ kind: 'agent', key: 'a:' + ship.id, ship }));
-    const planetEntries = AUR.searchPlanets(projects, query, 4)
-      .map((hit) => ({ kind: 'planet', key: 'f:' + hit.project.id + '/' + hit.planet, project: hit.project, planet: hit.planet }));
-    S.projectSearch.results = [...projectEntries, ...agentEntries, ...planetEntries].slice(0, 10);
-    A.keepSelection(S.projectSearch, previous, queryChanged, (entry) => entry.key);
+    const visible = underFilter([...S.store.projects.values()]);
+    const shown = new Set(visible.map((project) => project.id));
+    // By the name its row shows, then its path, branch and repository together.
+    const found = AUR.rankProjects(visible, query, { nameOf: A.projectLabel, othersOf: VCS.otherSearchTexts });
+    // Security: a row is told from the others by its key, so each entry has its own. The kinds differ
+    // in their first letter. A folder's key is its project's id and its name as JSON, which no other
+    // pair writes the same, whatever the two hold: an id and a folder name may each hold a quote.
+    const rows = [
+      ...found.slice(0, 6).map((hit) => ({ kind: 'project', key: 'p:' + hit.project.id, ...hit })),
+      ...AUR.searchAgents([...S.store.ships.values()].filter((ship) => shown.has(ship.project)), query, 4)
+        .map((hit) => ({ kind: 'agent', key: 'a:' + hit.ship.id, ...hit })),
+      ...AUR.searchPlanets(visible, query, 4)
+        .map((hit) => ({ kind: 'planet', key: 'f:' + JSON.stringify([hit.project.id, hit.planet]), ...hit })),
+    ];
+    // Rows found only fuzzily go after every row found otherwise, each part in the kinds' order.
+    S.projectSearch.results = [...rows.filter((row) => !row.fuzzy), ...rows.filter((row) => row.fuzzy)].slice(0, 10);
+    A.keepSelection(S.projectSearch, previous, queryChanged, entryKey);
     renderProjectSearchResults();
-    A.syncProjectMatches(projects, query);
+    A.syncProjectMatches(found.map((hit) => hit.project));
     renderProjectVcsFilter();
   }
-
-  A.projectSearchSubtitle = function projectSearchSubtitle(project) {
-    const galaxy = A.projectGalaxyLabel(project);
-    const detail = [];
-    if (galaxy) detail.push(String(galaxy));
-    const vcs = VCS.normalize(project);
-    if (vcs.nameWithOwner) detail.push(vcs.nameWithOwner);
-    if (vcs.branch) detail.push(vcs.branch);
-    if (project.path) detail.push(String(project.path));
-    return detail.join(' · ');
-  };
 
   function renderProjectSearchResults() {
     const els = S.projectSearch.els;
@@ -164,36 +204,24 @@
       return;
     }
     A.renderListbox(els.results, els.input, S.projectSearch, {
-      idPrefix: 'search-result-',
+      idPrefix: ROW_ID,
       rowClass: 'search-result',
       emptyClass: 'search-empty',
       emptyText: 'Nothing found',
-      fill: fillSearchRow,
-      activate: activateProjectSearchResult,
+      keyOf: entryKey,
+      fill: A.searchRowFiller(S.projectSearch.results),
     });
-  }
-
-  function fillSearchRow(row, entry) {
-    const live = entry.kind === 'project' && A.shipsInProject(entry.project.id).length > 0;
-    const dot = AUR.el('span', 'search-result-dot' + (live ? ' live' : ''));
-    if (entry.kind === 'agent') dot.style.background = AUR.providerMeta(entry.ship.provider).color;
-    const copy = AUR.el('span', 'search-result-copy');
-    let name, meta, kind;
-    if (entry.kind === 'agent') {
-      name = entry.ship.name; meta = entry.ship.status + ' · ' + A.projectName(entry.ship.project); kind = 'Agent';
-    } else if (entry.kind === 'planet') {
-      name = entry.planet; meta = A.projectLabel(entry.project); kind = 'Folder';
-    } else {
-      name = A.projectLabel(entry.project); meta = A.projectSearchSubtitle(entry.project); kind = 'Project';
-    }
-    copy.append(AUR.el('span', 'search-result-name', name), AUR.el('span', 'search-result-meta', meta));
-    row.append(dot, copy, AUR.el('span', 'search-result-kind', kind));
   }
 
   function activateProjectSearchResult(index) {
     const entry = S.projectSearch.results[index] || S.projectSearch.results[0];
     if (!entry) return;
+    S.projectSearch.opener = null; // the pick moves on, and focus with it
     A.clearProjectSearch();
+    // The dialog's own close hands focus back to what had it before the palette. A pick leaves that
+    // behind too: a field there would take the next keys as text.
+    const restored = document.activeElement;
+    if (restored instanceof HTMLElement && restored !== document.body) restored.blur();
     if (entry.kind === 'agent') A.enterAgentFocus(entry.ship.id);
     else if (entry.kind === 'planet') A.openPlanet(entry.project.id, entry.planet);
     else A.openSystem(entry.project.id);

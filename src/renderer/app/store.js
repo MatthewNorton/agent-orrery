@@ -9,6 +9,9 @@
   const A = AUR.app;
   if (!A) throw new Error('app/state.js must load before app/store.js');
   const S = A.state, C = A.const;
+  // One more build on a count, which stops where main's does (src/main/shared/values.js).
+  /** @param {number} [count] */
+  const oneMore = (count) => Math.min((count || 0) + 1, Number.MAX_SAFE_INTEGER);
 
   /** @param {Snapshot} snap */
   A.seedStore = function seedStore(snap) {
@@ -58,11 +61,16 @@
         break;
       case 'build': {
         const p = S.store.projects.get(ev.project);
-        if (p) p.totalBuilds = (p.totalBuilds || 0) + 1;
+        if (p) p.totalBuilds = oneMore(p.totalBuilds);
+        // The open planet's count keeps pace with main's, which is one count per key: two folders that
+        // share a key share it, whichever of them the build flies to (AUR.planetOfBuild).
+        const pd = A.activePlanetData();
+        if (pd && ev.project === S.current.projectId && AUR.planetOfBuild([pd], ev)) pd.builds = oneMore(pd.builds);
+        if (ev.isNew) A.refreshPlanetSystem(ev.project);
         // A ship-updated can precede the build it reports (and Codex patches
         // send none), so the stored count follows build events too.
         const ship = S.store.ships.get(ev.shipId);
-        if (ship) S.store.ships.set(ship.id, { ...ship, builds: (ship.builds || 0) + 1 });
+        if (ship) S.store.ships.set(ship.id, { ...ship, builds: oneMore(ship.builds) });
         // Same binning as src/main/shared/build-histogram.js: half hours of the snapshot's day.
         const h = S.store.buildHistogram;
         if (h && Number.isFinite(ev.ts) && ev.ts >= h.day && ev.ts < h.day + 86400000) {

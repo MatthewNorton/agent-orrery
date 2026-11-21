@@ -1,7 +1,8 @@
 'use strict';
 
 // Renderer source for the source-text tests, listed by folder under src/renderer, and
-// runRenderer() and loadUtilLayer() for the tests that run renderer scripts.
+// runRenderer() and loadUtilLayer() for the tests that run renderer scripts; settled() for what
+// their events start.
 
 const fs = require('node:fs');
 const path = require('node:path');
@@ -35,6 +36,18 @@ function loadUtilLayer(window = {}, BABYLON = undefined) {
   return window.AUR;
 }
 
+/**
+ * Runs util.js and then `files` in a page whose AUR.app is `app`, and returns the page's AUR. `aur`
+ * is what else AUR holds before the files run; `window` and `document` are the page's own, and
+ * `globals` the other names the files see (requestAnimationFrame, say).
+ */
+function runApp(files, app, { document = {}, window = {}, aur = {}, globals = {} } = {}) {
+  runRenderer('util.js', { window, document });
+  Object.assign(window.AUR, aur, { app });
+  for (const file of files) runRenderer(file, { window, document, ...globals });
+  return window.AUR;
+}
+
 /** Sorted `<dir>/...` paths of every file under src/renderer/<dir> that passes `keep`. */
 function rendererFiles(dir, keep = (file) => file.endsWith('.js')) {
   return fs.readdirSync(path.join(RENDERER, dir), { recursive: true })
@@ -50,4 +63,20 @@ function logsOf({ AUR }) {
   return logs;
 }
 
-module.exports = { loadUtilLayer, logsOf, readRenderer, rendererFiles, rendererSource, runRenderer, scriptTags };
+/** Runs `act` (a click, say), lets what it started settle, and returns what rejected unhandled. */
+async function settled(act) {
+  const unhandled = [];
+  const record = (reason) => unhandled.push(reason && reason.message);
+  process.on('unhandledRejection', record);
+  try {
+    act();
+    for (let turn = 0; turn < 3; turn++) await new Promise((resolve) => setImmediate(resolve));
+  } finally {
+    process.off('unhandledRejection', record);
+  }
+  return unhandled;
+}
+
+module.exports = {
+  loadUtilLayer, logsOf, readRenderer, rendererFiles, rendererSource, runApp, runRenderer, scriptTags, settled,
+};

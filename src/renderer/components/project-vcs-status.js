@@ -7,13 +7,14 @@
 'use strict';
 
 (function exposeProjectVcsStatus(root, factory) {
-  const api = factory();
-  if (typeof module === 'object' && module.exports) module.exports = api;
-  if (root) {
-    const AUR = (root.AUR = root.AUR || {});
-    AUR.ProjectVcsStatus = api;
-  }
-})(typeof window !== 'undefined' ? window : null, function createProjectVcsStatusApi() {
+  const node = typeof module === 'object' && module.exports;
+  // Search folds case as the app's own search does: search-core.js, loaded first in a page.
+  const lowerOf = node ? require('../search-core').lowerOf : root && root.AUR && root.AUR.lowerOf;
+  if (!lowerOf) throw new Error('search-core.js must load before components/project-vcs-status.js');
+  const api = factory(lowerOf);
+  if (node) module.exports = api;
+  else root.AUR.ProjectVcsStatus = api;
+})(typeof window !== 'undefined' ? window : null, function createProjectVcsStatusApi(lowerOf) {
   const FILTERS = Object.freeze({
     ALL: 'all',
     GITHUB: 'github',
@@ -86,16 +87,22 @@
     return true;
   }
 
-  function matchesSearch(input, query) {
+  // What search reads of a project besides its name: path, branch and repository, real values only.
+  // The "Branch unavailable" and "Detached HEAD" labels would match every project without a branch.
+  function otherSearchTexts(input) {
     const status = normalize(input);
-    const needle = text(query).toLowerCase();
-    if (!needle) return true;
-    return [
-      status.projectName,
-      status.projectPath,
-      status.branchLabel,
-      status.nameWithOwner || '',
-    ].join('\n').toLowerCase().includes(needle);
+    return [status.projectPath, status.branch || '', status.nameWithOwner || ''];
+  }
+
+  // The name first; "Unnamed project" would match every project without one.
+  function searchTexts(input) {
+    const source = input && typeof input === 'object' ? input : {};
+    return [text(source.projectName || source.name), ...otherSearchTexts(source)];
+  }
+
+  function matchesSearch(input, query) {
+    const needle = lowerOf(text(query));
+    return !needle || lowerOf(searchTexts(input).join('\n')).includes(needle);
   }
 
   function filterProjects(projects, options) {
@@ -254,6 +261,8 @@
     githubIdentity,
     matchesFilter,
     matchesSearch,
+    searchTexts,
+    otherSearchTexts,
     filterProjects,
     pullRequestLabel,
     createMarkers,

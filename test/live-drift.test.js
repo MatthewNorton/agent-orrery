@@ -12,6 +12,7 @@ const { codexRecordFacts } = require('../src/main/transcripts/codex');
 const {
   SEC, MIN, T0, CODEX_SESSION, iso, appendJsonl, createWorld, ofType, claude, codex,
 } = require('./support/transcripts');
+const { startClaude } = require('./support/live-session');
 
 const CLAUDE_UNKNOWN = 'Claude Code writes records this version does not recognise (Claude Code 9.9.9); ' +
   'its sessions will not show until Agent Orrery is updated.';
@@ -144,12 +145,8 @@ test('drift: through the Tracker, a startup transcript whose head is all unknown
 
 test('drift: through the Tracker, a transcript this version reads says nothing however it grows', (t) => {
   t.mock.method(console, 'warn', () => {});
-  const world = createWorld(t);
-  const file = world.claudeFile();
-  appendJsonl(file, [claude.prompt(world.projectDir, T0)], T0);
-  const live = world.live();
-  live.tracker.scan(true);
-  live.take();
+  const live = startClaude(t);
+  const { world, file } = live;
 
   const records = [];
   for (let index = 0; index < DRIFT_LINES + 5; index++) {

@@ -147,3 +147,30 @@ test('AUR.disposeLogged logs a dispose that throws once per message', () => {
   AUR.disposeLogged(stuck, 'A copy');
   assert.deepEqual(logs, ['A copy could not be disposed (no dispose).', 'A copy could not be disposed (context lost).']);
 });
+
+test('label: a label joins the layer before it links to its mesh, and a layer that cannot take it throws', () => {
+  // Babylon GUI's own rules: a control links to a mesh only at the layer's root, and logs and
+  // returns otherwise; a disposed layer throws from addControl before it adds anything.
+  const logged = [];
+  class TextBlock {
+    linkWithMesh(mesh) {
+      if (!this.inLayer) { logged.push('Cannot link a control to a mesh if the control is not at root level'); return; }
+      this.linked = mesh;
+    }
+  }
+  const layer = (disposed = false) => ({
+    controls: [],
+    addControl(control) {
+      if (disposed) throw new TypeError("Cannot read properties of null (reading 'getUniqueId')");
+      control.inLayer = true;
+      this.controls.push(control);
+    },
+  });
+  const AUR = loadUtilLayer({}, { GUI: { TextBlock } });
+  const gui = layer(), mesh = {};
+  const label = AUR.label(gui, 'src', { mesh, offsetY: -20 });
+  assert.deepEqual([gui.controls, label.text, label.linked, label.linkOffsetY, logged], [[label], 'src', mesh, -20, []]);
+  const gone = layer(true);
+  assert.throws(() => AUR.label(gone, 'docs', { mesh }), /getUniqueId/);
+  assert.deepEqual(gone.controls, [], 'a disposed layer holds nothing for the label that failed');
+});

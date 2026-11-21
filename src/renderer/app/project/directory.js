@@ -8,6 +8,8 @@
   const A = AUR.app;
   if (!A) throw new Error('app/state.js must load before app/project/directory.js');
   const S = A.state;
+  const ROW_ID = 'project-directory-result-';
+  const projectKey = (project) => project.id;
 
   // ---------- searchable all-projects directory ----------
   A.wireProjectDirectory = function wireProjectDirectory() {
@@ -34,14 +36,16 @@
     els.input.addEventListener('input', () => {
       A.debounceListbox(S.projectDirectory, updateProjectDirectory);
     });
-    A.wireListboxKeys(els.input, S.projectDirectory, {
+    A.wireListbox(els.list, els.input, S.projectDirectory, {
       escape: () => A.closeProjectDirectory(),
       update: updateProjectDirectory,
       activate: activateProjectDirectoryResult,
-      render: renderProjectDirectoryResults,
+      select: () => A.selectListboxRow(els.list, els.input, S.projectDirectory, ROW_ID),
+      keyOf: projectKey,
     });
     document.addEventListener('keydown', (event) => {
-      if (event.key !== 'Escape' || !S.projectDirectory.open) return;
+      // While an input method composes, Escape cancels its text.
+      if (event.key !== 'Escape' || AUR.composing(event) || !S.projectDirectory.open) return;
       event.preventDefault();
       A.closeProjectDirectory();
     });
@@ -100,16 +104,16 @@
     const projects = VCS.filterProjects(allProjects, { filter: S.projectSearch.filter });
     S.projectDirectory.query = query;
     if (query) {
-      const matches = VCS.filterProjects(projects, { query });
-      S.projectDirectory.results = A.rankedFirst(
-        matches, AUR.searchProjects(matches, query, Math.max(matches.length, 8))
-      );
+      // Ranked as the palette ranks them, by name, then path, branch or repository (search-core.js),
+      // but only the projects that hold the query whole: the list filters, it does not guess.
+      S.projectDirectory.results = AUR.rankProjects(projects, query,
+        { nameOf: A.projectLabel, othersOf: VCS.otherSearchTexts, fuzzy: false }).map((hit) => hit.project);
     } else {
       S.projectDirectory.results = projects;
     }
-    A.keepSelection(S.projectDirectory, previous, queryChanged, (project) => project.id);
+    A.keepSelection(S.projectDirectory, previous, queryChanged, projectKey);
     A.renderProjectDirectory();
-    A.syncProjectMatches(allProjects, query);
+    A.syncProjectMatches(query ? S.projectDirectory.results : undefined);
   }
 
   A.refreshProjectDirectoryFromStore = function refreshProjectDirectoryFromStore() {
@@ -143,12 +147,12 @@
     const els = S.projectDirectory.els;
     if (!els || !S.projectDirectory.open) return;
     A.renderListbox(els.list, els.input, S.projectDirectory, {
-      idPrefix: 'project-directory-result-',
+      idPrefix: ROW_ID,
+      keyOf: projectKey,
       rowClass: 'project-directory-row',
       emptyClass: 'project-directory-empty',
       emptyText: 'No projects found',
       fill: fillDirectoryRow,
-      activate: activateProjectDirectoryResult,
     });
   }
 
