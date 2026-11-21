@@ -133,15 +133,19 @@
       const extentX = (max.x - min.x) / 2;
       // Lift shows on screen much like depth does at this pitch, so it widens the depth extent.
       const extentZ = (max.z - min.z) / 2 + Math.max(Math.abs(min.y), Math.abs(max.y));
-      // Fit the world into the canvas below the top bar. The side rails and the timeline float over
-      // the map and never move or scale it. The near edge of the tilted ground sits closest to the
-      // camera, so it decides the radius; the target then shifts so the world's centre lands in
-      // the middle of the area below the bar.
+      // Fit the world into the area the panels leave clear at their default sizes, below the top
+      // bar: what the panels do now never moves or scales the map. The universe shows no left-rail
+      // panel at launch (Summary starts hidden, Needs you waits for an agent), so only the gap is
+      // kept on the left. The near edge of the tilted ground sits closest to the camera, so it
+      // decides the radius; the target then shifts so the world's centre lands in the middle of
+      // the clear area, not of the canvas.
       const width = canvas.clientWidth;
       const height = canvas.clientHeight;
+      const room = view.defaultPanelRoom();
       const top = AUR.chromeBounds(canvas).y;
-      const bounds = { x: 0, y: top, width, height: height - top };
-      if (height < 10 || bounds.width < 10 || bounds.height < 10) {
+      const gap = AUR.CHROME_GAP;
+      const bounds = { x: gap, y: top, width: width - room.right - 2 * gap, height: height - room.bottom - gap - top };
+      if (bounds.width < 10 || bounds.height < 10) {
         const desiredRadius = Math.max(90, Math.max(extentX, extentZ) * 2.55 + 44);
         camera.upperRadiusLimit = Math.max(320, desiredRadius * 1.25);
         camera.setTarget(new BABYLON.Vector3(cx, 0, cz), false, false, true);
@@ -181,9 +185,9 @@
     }
 
     // Panning stays over the galaxies: the target roams their footprint, and always reaches where
-    // it already is (framing shifts it to clear the chrome), since Babylon refuses any pan step
-    // that would end outside the limit. The sky dome grows to hold the camera zoomed all the way
-    // out wherever the target roams, so its edge never shows.
+    // it already is (framing shifts it to clear the top bar and the default panels), since Babylon
+    // refuses any pan step that would end outside the limit. The sky dome grows to hold the camera
+    // zoomed all the way out wherever the target roams, so its edge never shows.
     function limitPanning({ min, max }) {
       const cx = (min.x + max.x) / 2;
       const cz = (min.z + max.z) / 2;

@@ -47,7 +47,7 @@
       fields: ctx.galaxyFields || new Map(),
       softDisc: AUR.softDiscTexture(scene), coronaMaterials: new Map(),
       searchMatchIds: null, hoveredProjectId: null,
-      quality: ctx.quality, sky, skyRadius: UNIVERSE_SKY_SIZE / 2,
+      quality: ctx.quality, sky, skyRadius: UNIVERSE_SKY_SIZE / 2, defaultPanelRoom: ctx.defaultPanelRoom,
     };
     const parts = AUR.sceneParts.universe;
     Object.assign(view, parts.labels(view), parts.glyphs(view), parts.stars(view),
