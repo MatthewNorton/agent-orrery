@@ -133,12 +133,11 @@
       const extentX = (max.x - min.x) / 2;
       // Lift shows on screen much like depth does at this pitch, so it widens the depth extent.
       const extentZ = (max.z - min.z) / 2 + Math.max(Math.abs(min.y), Math.abs(max.y));
-      // Fit the world into the area the panels leave clear at their default sizes, below the top
-      // bar: what the panels do now never moves or scales the map. The universe shows no left-rail
-      // panel at launch (Summary starts hidden, Needs you waits for an agent), so only the gap is
-      // kept on the left. The near edge of the tilted ground sits closest to the camera, so it
-      // decides the radius; the target then shifts so the world's centre lands in the middle of
-      // the clear area, not of the canvas.
+      // Fit the world below the top bar into the area the default layout leaves clear: the right
+      // rail and the timeline at their default sizes, no left rail. What the panels do now and the
+      // viewer's At launch choices are ignored on purpose, so no panel ever moves or scales the map.
+      // The near edge of the tilted ground sits closest to the camera, so it decides the radius;
+      // the target then shifts so the world's centre lands in the middle of that area.
       const width = canvas.clientWidth;
       const height = canvas.clientHeight;
       const room = view.defaultPanelRoom();
