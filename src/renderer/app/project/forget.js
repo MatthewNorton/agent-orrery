@@ -20,17 +20,9 @@
   ]);
 
   /**
-   * Runs `step`; what it throws is logged, as `what` not done, and not raised.
-   * @param {string} what
-   * @param {() => void} step
-   */
-  function orLog(what, step) {
-    try { step(); } catch (error) { AUR.log(`forget: ${what}`, error && error.message); }
-  }
-
-  /**
-   * Main's answer, also when the reseed after a forget fails: main has forgotten the project then,
-   * the failure is logged, and the search and the panels are drawn again from the store.
+   * Main's answer. When the reseed after a forget throws synchronously, main has forgotten the
+   * project all the same: the throw is logged, the project search is refreshed from the store, and
+   * one redraw of the panels is asked for in a frame.
    * @param {string} projectId
    * @returns {Promise<ProjectForgetResult>}
    */
@@ -41,11 +33,16 @@
       try {
         A.adoptLiveRestart(result);
       } catch (error) {
-        AUR.log('forget: the live state was not reseeded', error && error.message);
-        // The reseed stopped part way, perhaps before the search and the panels were drawn from
-        // the store it had reseeded: they would show the forgotten project.
-        orLog('the search was not refreshed', () => A.refreshProjectSearchFromStore());
-        requestAnimationFrame(() => orLog('the panels were not drawn again', () => A.renderChrome()));
+        AUR.log('forget: the live state was not reseeded', AUR.errorText(error));
+        // The reseed threw part way, perhaps before the search and the panels showed the store it
+        // had reseeded. The search is refreshed here (a throw from that is logged), and the panels
+        // are drawn once in a frame, where nothing catches a throw: a test run's error check sees it.
+        try {
+          A.refreshProjectSearchFromStore();
+        } catch (refreshError) {
+          AUR.log('forget: the search was not refreshed', AUR.errorText(refreshError));
+        }
+        requestAnimationFrame(() => A.renderChrome());
       }
     }
     return result;

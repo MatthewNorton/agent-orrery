@@ -279,7 +279,7 @@
   AUR.isShown = (n) => Boolean(n) && !n.classList.contains('hidden') && getComputedStyle(n).display !== 'none';
   // An error as its name and message; any other thrown value as String() gives it, or a fixed
   // text when even that throws (an object with no prototype, a getter that throws).
-  const errorText = (error) => {
+  AUR.errorText = function errorText(error) {
     try {
       return error instanceof Error ? error.name + ': ' + error.message : String(error);
     } catch (_) {
@@ -291,7 +291,7 @@
   // which a test run's renderer error check (src/main/window.js) fails on. A listener that starts
   // a busy action (AUR.settleBusy) returns its promise.
   AUR.listen = function listen(node, type, listener) {
-    const failed = (error) => AUR.log(type + ' handler failed:', errorText(error));
+    const failed = (error) => AUR.log(type + ' handler failed:', AUR.errorText(error));
     node.addEventListener(type, function (event) {
       try {
         const result = listener.call(this, event);

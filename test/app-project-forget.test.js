@@ -81,23 +81,32 @@ test('forget: a reseed that throws part way leaves the project out of the search
   // As the reseed goes: the store, then the panels, then the search.
   app.adoptLiveRestart = () => { state.store.projects.delete('p'); app.renderChrome(); app.refreshProjectSearchFromStore(); };
   await app.forgetFromCard('p');
-  assert.deepEqual([listed, logged], [['q'], ['forget: the live state was not reseeded render failed']]);
+  assert.deepEqual([listed, logged], [['q'], ['forget: the live state was not reseeded Error: render failed']]);
   assert.equal(frames.length, 1, 'a frame draws the panels again');
   frames.shift()();
   assert.deepEqual([draws, listed, logged.length], [2, ['q'], 1]);
 });
 
-test('forget: after a reseed that throws, a search refresh or a redraw that throws is logged, not raised', async () => {
+test('forget: after a reseed that throws, a failed search refresh is logged; a failed redraw in its frame is not caught', async () => {
   const { app, state, logged, frames } = setup();
   app.adoptLiveRestart = () => { throw new Error('no snapshot'); };
   app.refreshProjectSearchFromStore = () => { throw new Error('search failed'); };
   app.renderChrome = () => { throw new Error('draw failed'); };
   await app.forgetFromCard('p');
   assert.equal(state.projectForget.note, '', 'forgotten, as main says');
-  frames.shift()();
   assert.deepEqual(logged, [
-    'forget: the live state was not reseeded no snapshot',
-    'forget: the search was not refreshed search failed',
-    'forget: the panels were not drawn again draw failed',
+    'forget: the live state was not reseeded Error: no snapshot',
+    'forget: the search was not refreshed Error: search failed',
   ]);
+  assert.equal(frames.length, 1);
+  assert.throws(() => frames.shift()(), /draw failed/, 'left to the page, where a test run\'s error check sees it');
+});
+
+test('forget: a reseed that throws an object whose message cannot be read is logged, and the search refreshed', async () => {
+  const { app, logged, frames } = setup();
+  let refreshed = 0;
+  app.refreshProjectSearchFromStore = () => { refreshed++; };
+  app.adoptLiveRestart = () => { throw { get message() { throw new Error('no message'); } }; };
+  assert.deepEqual(await app.forgetProject('p'), { ok: true, canceled: false }, 'main\'s answer');
+  assert.deepEqual([logged, refreshed, frames.length], [['forget: the live state was not reseeded [object Object]'], 1, 1]);
 });
