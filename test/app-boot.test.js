@@ -9,10 +9,12 @@ const assert = require('node:assert/strict');
 const test = require('node:test');
 const { runRenderer } = require('./support/renderer-source');
 
-// boot.js without its last statement, which boots the page.
+// boot.js without its last statement, which boots the page. Line endings are made LF first: a
+// Windows checkout can have CRLF.
 function withoutBoot(code) {
-  const kept = code.replace(/\n {2}boot\(\)\.catch\([^]*?\n {2}\}\);\n/, '\n');
-  assert.notEqual(kept, code, 'the boot call was found');
+  const lf = code.replace(/\r\n/g, '\n');
+  const kept = lf.replace(/\n {2}boot\(\)\.catch\([^]*?\n {2}\}\);\n/, '\n');
+  assert.notEqual(kept, lf, 'the boot call was found');
   return kept;
 }
 
