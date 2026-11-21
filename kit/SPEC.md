@@ -499,8 +499,10 @@ Design tokens (put in `:root`):
     every other mesh keeps: a faded fleet draws after every other blended mesh
     (the sun's corona and glow, the planets' shells), wherever its ships are.
     A template uploads its ships' matrices only when a pass draws another
-    list of ships than its last upload of the frame, not before each part's
-    draw in each pass; `test/ship-assets-hulls.test.js` guards it.
+    list of ships than its last upload of the frame, or draws the template
+    itself, not before each part's draw in each pass (on WebGPU, where each
+    pass keeps its own buffer, Babylon's own rule stands);
+    `test/ship-assets-hulls.test.js` guards it.
   - **Focus fade.** `AUR.ships.fade(scene, visibility, apart)` shows every
     hull at `visibility`, written on the templates, and a hull built later
     starts at it. The ship `apart` names (`{ shipId, visibility }`) shows its
