@@ -2,14 +2,16 @@
 // Ship models built in code. A model flies the rank of a manifest hull, or the ranks of several:
 // ship-assets.js asks here for the hull to fly and for its container (the ship built once per
 // scene, as one mesh that every ship of the model instances), ships/livery.js for what a ship's
-// hull wears, the views for the lights and the nozzles. A model keeps the finishes it was authored with, so it
-// brings its own reflections, tone curve and lights, and no other light of the view reaches it.
+// hull wears, the views for the lights and the nozzles. A model keeps the finishes it was
+// authored with, so it brings its own reflections, tone curve and lights, and no other light of
+// the view reaches it.
 'use strict';
 
 /**
  * @import { HullEntry } from '../ship-assets.js'
  * @typedef {object} ShipModel one ship, built by its converted modules under ships/<id>/source/
- * @property {string} id also the id of the hull it flies as (in a later rank, `<id>-<rank>`)
+ * @property {string} id also the id of the hull it flies as; in a later one of its own ranks,
+ *   `<id>-<n>`, n counting those ranks from 1 (the ringed Petrel's Capital is `petrel-ring-2`)
  * @property {string | string[]} replaces the manifest hull whose rank it takes, or the hulls whose
  *   ranks it takes, lowest first
  * @property {number[]} [sizes] its longest side in each of those ranks, in the fleet's units (the
@@ -199,8 +201,8 @@
           // The map times the emissive color is what shows: with the painted color divided out,
           // that is the ship color, at the level the model lights its lamps to (the emissive
           // color's brightest channel, so a tinted one loses its tint). (The glow pass reads the
-          // map without linearizing it, so a lamp's halo is a paler tint; on Petrel's hairline
-          // lamps no halo shows, even with the chase camera at its closest.)
+          // map without linearizing it, so a lamp's halo is a paler tint; around Petrel's hairline
+          // guide lamps on its hull no halo shows, even with the chase camera at its closest.)
           const painted = AUR.color3(role.lamps).toLinearSpace();
           const shown = tint.toLinearSpace();
           const { r, g, b } = base.emissiveColor;

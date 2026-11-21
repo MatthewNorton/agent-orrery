@@ -402,8 +402,10 @@ Design tokens (put in `:root`):
   (`selectHull` asks `AUR.shipModels.inPlaceOf`); the frozen manifest is
   unchanged. A model with several ranks gives each a size (`sizes`, its
   longest side in fleet units) and flies the first as its id and a later one
-  as `<id>-<rank>`, so a promotion between two of them rebuilds the hull at
-  its new size, while every rank keys the same container and template. Petrel
+  as `<id>-<n>`, n counting the model's own ranks from 1 (the ringed Petrel's
+  Capital, its second, is `petrel-ring-2`), so a promotion between two of them
+  rebuilds the hull at its new size, while every rank keys the same container
+  and template. Petrel
   (`ships/petrel/model.js`) flies the Scout rank, so it is also every drone;
   the same build with its survey ring fitted (`petrel-ring`) flies the
   Workhorse and Capital ranks, its ring, its longest side, as wide as the
@@ -413,8 +415,8 @@ Design tokens (put in `:root`):
     with a sub-mesh per finish, because every mesh of a hull is placed and
     culled once per ship. From there it goes the way of a hull file's
     container (the hull entry `inPlaceOf` returns carries the `model`, which
-    tells the two apart), so all the Petrels of a palette draw in one draw per
-    finish. Like a file's container it owns the materials and textures it was
+    tells the two apart), so all the ships of one model and palette draw in one
+    draw per finish (the bare and the ringed Petrel are two models). Like a file's container it owns the materials and textures it was
     built with, so disposing it releases them; the BRDF lookup texture a
     scene's first PBR material makes stays the scene's.
   - **Finishes and light.** A model keeps the finishes it was authored with:
@@ -432,8 +434,11 @@ Design tokens (put in `:root`):
     the ship color, at the level of the emissive color's brightest channel, so
     lamps the art lights in a tint of their own show it too (Petrel lights its
     guide lamps in grey and its ring's inspection rail in amber). One color is
-    divided out, so what a map paints in another keeps some of its hue: the
-    halos around the rail's lamps stay faintly warm on a Codex ship.
+    divided out, so what a map paints in another keeps its hue: the rail's map
+    paints a darker amber halo around each lamp, and on a Codex ship each halo
+    stays amber at about a quarter of its pearl lamp's brightness, five lamp
+    widths across and meeting its neighbours, so the rail still reads amber
+    around its lamps.
     `AUR.shipModels.trimLight` is that light, and the fleet's livery stripes
     and nozzles are made by it too.
 - A model's `source/` folder is generated: `node scripts/import-ship.mjs <ship>
