@@ -17,16 +17,19 @@ function setup() {
     transitionEventQueue: [], deferredEpochBatches: [], retiredEpochs: new Set(), streamEpoch: 1, booting: false,
     playback: { mode: 'live' },
   };
-  const handled = [], logged = [];
+  const handled = [], logged = [], scheduled = [];
   let answer = async () => ({ playback: { mode: 'replay' } });
   const AU = { replay: () => answer() };
   const CHROME = { HISTORY: 1, PROJECT: 2, FOCUS: 4, SETTINGS: 8, IDEAS: 16, FEED: 32 };
-  const app = { state, const: { CHROME }, renderChromeNow() {}, handleSequencedEvents: (batch) => handled.push(batch) };
+  const app = {
+    state, const: { CHROME }, renderChromeNow() {}, scheduleChrome: (mask) => scheduled.push(mask),
+    handleSequencedEvents: (batch) => handled.push(batch),
+  };
   runApp(['app/replay.js'], app, { window: { AU }, document: fakeDocument(), aur: { log: (...args) => logged.push(args.join(' ')) } });
   // An event batch that arrives while a command is out waits in the queue (app/boot.js routeEvents).
   const arrive = (batch) => state.transitionEventQueue.push({ batch, meta: {} });
   const flags = () => [state.replayBusy, state.replayTransitionPending];
-  return { app, state, handled, logged, arrive, flags, answerWith: (next) => { answer = next; } };
+  return { app, state, handled, logged, scheduled, arrive, flags, answerWith: (next) => { answer = next; } };
 }
 
 test('replay: busy while main answers, then the events that waited, after the answer', async () => {
@@ -55,6 +58,16 @@ test('replay: a render or a call that throws leaves the bar free and lets the wa
   arrive('meanwhile');
   await live;
   assert.deepEqual([flags(), handled, logged], [[false, false], ['before', 'meanwhile'], ['replay command failed main is away']]);
+});
+
+test('replay: a render that throws as the bar goes busy is the error the command rejects with', async () => {
+  const { app, handled, scheduled, arrive, flags } = setup();
+  let renders = 0;
+  app.renderChromeNow = () => { throw new Error(`render ${++renders}`); };
+  arrive('before');
+  await assert.rejects(app.issueReplay({ action: 'seek', ts: 5 }), /^Error: render 1$/);
+  assert.deepEqual([renders, scheduled, flags(), handled], [1, [1 | 2 | 4 | 8 | 16], [false, false], ['before']],
+    'one render, the redraw in a frame, the bar free and the waiting events through');
 });
 
 test('replay: a command overtaken by another leaves the flags and the waiting events to the newer one', async () => {

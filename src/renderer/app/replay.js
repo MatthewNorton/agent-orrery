@@ -152,15 +152,17 @@
         S.replayBusy = true;
         A.renderChromeNow(REPLAY_BUSY_CHROME);
       },
-      // The events that waited for the answer go after it, into the stream it brought.
-      lower() {
+      // The events that waited for the answer go after it, into the stream it brought. After a
+      // raise() that threw, the bar is drawn in a frame: a second throw here would replace its error.
+      lower(raised) {
         S.replayTransitionPending = false;
         S.replayBusy = false;
         S.historyPreviewTs = null;
         const queued = S.transitionEventQueue;
         S.transitionEventQueue = [];
         for (const packet of queued) A.handleSequencedEvents(packet.batch, packet.meta);
-        A.renderChromeNow(REPLAY_BUSY_CHROME);
+        if (raised) A.renderChromeNow(REPLAY_BUSY_CHROME);
+        else A.scheduleChrome(REPLAY_BUSY_CHROME);
       },
       isCurrent,
     }, async () => {
