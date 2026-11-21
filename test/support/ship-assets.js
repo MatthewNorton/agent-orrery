@@ -3,7 +3,8 @@
 // The ship-assets files (src/renderer/ship-assets*.js and ships/livery.js) on the renderer's own
 // util layer and enough of Babylon to build, fade, swap and dispose hulls, for
 // test/ship-assets.test.js, test/ship-assets-api*.test.js and test/ships-livery.test.js; and the
-// hull pickers those and test/ships-models.test.js share.
+// file list, ships and hull pickers those share with the tests on the real Babylon build
+// (test/support/ships-models.js, test/ships-models.test.js, test/ship-assets-hulls.test.js).
 
 const assert = require('node:assert/strict');
 const { loadUtilLayer, logsOf, runRenderer, scriptTags } = require('./renderer-source');

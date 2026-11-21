@@ -133,8 +133,7 @@ test('AUR.dressed returns a material once dressed, and disposes one that cannot 
   const stuck = { name: 'lamp claude', dispose() { throw new Error('no dispose'); } };
   assert.throws(() => AUR.dressed(stuck, () => { throw fault; }), (error) => error === fault, 'the cause stays the dressing\'s');
   assert.throws(() => AUR.dressed(null, () => { throw fault; }), (error) => error === fault, 'and for a material never made');
-  assert.equal(logs[0], 'Undressed material lamp claude could not be disposed (no dispose).');
-  assert.equal(logs.length, 2);
+  assert.deepEqual(logs, ['Undressed material lamp claude could not be disposed (no dispose).']);
 });
 
 test('AUR.disposeLogged logs a dispose that throws once per message', () => {

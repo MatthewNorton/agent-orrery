@@ -48,27 +48,32 @@
   // Babylon writes a template's instance matrices before each part's draw, in each pass; on ANGLE
   // D3D11 a buffer rewritten after a draw of the same frame has read it stalls the GPU process, so
   // a part drawn with the same ships as the frame's last write reuses it. This wraps Babylon 9.36
-  // internals; test/ship-assets-hulls.test.js fails if they move and it stops applying.
+  // internals; test/ship-assets-hulls.test.js fails if they move and it stops applying. It holds
+  // while ships move only before a frame's passes, as the views move them, and where the passes
+  // share one buffer (not WebGPU, which keeps one a pass).
   function writeInstancesOnce(mesh) {
     const update = mesh._updateInstancedBuffers;
-    if (typeof update !== 'function' || !mesh._instanceDataStorage) return;
-    /** @type {{ frame: number, instances: any[] }} */
-    let written = { frame: -1, instances: [] };
+    const made = mesh._instanceDataStorage;
+    if (typeof update !== 'function' || !made || !made.useMonoDataStorageRenderPass) return;
+    /** @type {{ frame: number, ids: number[] }} the last write to reuse: its frame and its ships */
+    let written = { frame: -1, ids: [] };
     mesh._updateInstancedBuffers = function (subMesh, batch, ...rest) {
       const instances = batch.visibleInstances[subMesh._id] || [];
-      const frame = mesh.getScene().getFrameId();
       const storage = mesh._instanceDataStorage;
-      if (storage.isFrozen || batch.renderSelf[subMesh._id] || frame !== written.frame ||
-        instances.length !== written.instances.length || instances.some((instance, i) => instance !== written.instances[i])) {
-        written = { frame, instances: instances.slice() };
-        return update.call(this, subMesh, batch, ...rest);
+      const self = batch.renderSelf[subMesh._id]; // the template drawn too: another layout, never reused
+      const frame = mesh.getScene().getFrameId();
+      if (!self && frame === written.frame && instances.length === written.ids.length &&
+        instances.every((instance, i) => instance.uniqueId === written.ids[i])) {
+        storage.isFrozen = true; // Babylon then draws from the buffer as it is
+        try {
+          return update.call(this, subMesh, batch, ...rest);
+        } finally {
+          storage.isFrozen = false; // as it was: a frozen mesh's write is never one to reuse
+        }
       }
-      storage.isFrozen = true; // Babylon then draws from the buffer as it is
-      try {
-        return update.call(this, subMesh, batch, ...rest);
-      } finally {
-        storage.isFrozen = false;
-      }
+      const result = update.call(this, subMesh, batch, ...rest);
+      if (!self && !storage.isFrozen) written = { frame, ids: instances.map((instance) => instance.uniqueId) };
+      return result;
     };
   }
 

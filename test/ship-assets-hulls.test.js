@@ -6,8 +6,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const BABYLON = require('babylonjs');
-const { hullOf } = require('./support/ship-assets');
-const { onSystem } = require('./support/ship-models');
+const { hullOf, ship } = require('./support/ship-assets');
+const { onSystem } = require('./support/ships-models');
 
 // Runs `work(fleet)` on a system view with the Claude Petrels `ids` side by side before a camera,
 // and the view's glow layer. A NullEngine says it cannot draw instances and never uploads a
@@ -77,7 +77,7 @@ function onFleet(ids, work) {
       frame(); // the first frame after a change makes the buffer
     };
     await settle();
-    return work({ scene, template, roots, hulls, parts: template.subMeshes.length, add, frame, settle });
+    return work({ scene, AUR, template, roots, hulls, parts: template.subMeshes.length, add, frame, settle });
   });
 }
 
@@ -101,13 +101,50 @@ test('a template writes its ships once a frame, though each of its parts draws i
 
 test('a pass that draws other ships than the frame\'s last write writes its own', () =>
   onFleet(['a', 'b'], async ({ scene, hulls, parts, frame, settle }) => {
-    const pass = new BABYLON.RenderTargetTexture('one ship', 64, scene);
-    pass.renderList = [hulls.get('a')];
-    scene.customRenderTargets.push(pass);
+    for (const id of ['a', 'b']) {
+      const pass = new BABYLON.RenderTargetTexture('only ' + id, 64, scene);
+      pass.renderList = [hulls.get(id)];
+      scene.customRenderTargets.push(pass);
+    }
     await settle();
     const { writes, draws } = frame();
-    assert.deepEqual(writes, [1, 2], 'its one ship first, then both for the glow, which the camera reuses');
-    assert.deepEqual(draws, [...times(parts, 'a'), ...times(parts * 2, 'a b')]);
+    assert.deepEqual(writes, [1, 1, 2], 'one ship, then the other, then both for the glow, which the camera reuses');
+    assert.deepEqual(draws, [...times(parts, 'a'), ...times(parts, 'b'), ...times(parts * 2, 'a b')]);
+  }));
+
+test('a template that draws itself writes for each of its draws, and the next pass does not draw it as a ship', () =>
+  onFleet(['a', 'b'], async ({ scene, template, hulls, frame, settle }) => {
+    // Shown, and far to one side: a wide camera draws it with its ships, a narrow one the ships alone.
+    Object.assign(template, { isVisible: true }).position.x = 400;
+    hulls.set('T', template);
+    const wide = new BABYLON.FreeCamera('wide', new BABYLON.Vector3(200, 0, -2000), scene);
+    wide.setTarget(new BABYLON.Vector3(200, 0, 0));
+    wide.maxZ = 4000;
+    const narrow = scene.activeCamera;
+    for (const cameras of [[wide, narrow], [narrow, wide]]) {
+      scene.activeCameras = cameras;
+      await settle();
+      const { writes, draws } = frame();
+      const withTemplate = draws.filter((ships) => ships === 'T a b').length;
+      assert.ok(withTemplate > 0 && draws.includes('a b'), 'one camera draws the template, the other does not');
+      assert.deepEqual(draws.filter((ships) => ships !== 'T a b' && ships !== 'a b'), [], 'and no draw reads another layout');
+      assert.equal(writes.filter((ships) => ships === 3).length, withTemplate, 'a draw of the template itself always writes');
+    }
+  }));
+
+test('a frozen template stays frozen, and one whose passes each keep a buffer is left to Babylon', () =>
+  onFleet(['a', 'b'], async ({ scene, AUR, template, frame }) => {
+    template._instanceDataStorage.isFrozen = true;
+    assert.deepEqual(frame().writes, [], 'Babylon writes nothing for a frozen mesh');
+    assert.equal(template._instanceDataStorage.isFrozen, true);
+    // WebGPU keeps an instance buffer a pass, where one write a frame would leave the others stale.
+    const engine = scene.getEngine();
+    Object.defineProperty(engine, 'isWebGPU', { value: true, configurable: true });
+    const codex = await AUR.ships.upgrade(scene, ship('c', 0, { provider: 'codex' }), new BABYLON.Mesh('dart c', scene));
+    delete engine.isWebGPU;
+    const other = hullOf(codex).sourceMesh;
+    assert.notEqual(other, template, 'another palette, another template');
+    assert.equal(Object.hasOwn(other, '_updateInstancedBuffers'), false);
   }));
 
 test('a new frame writes again: a ship that moved draws where it is, and a hidden one is gone', () =>

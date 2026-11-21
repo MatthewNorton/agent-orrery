@@ -37,7 +37,7 @@
     try {
       dress(material);
     } catch (error) {
-      AUR.disposeLogged(material, 'Undressed material ' + (material && material.name));
+      if (material) AUR.disposeLogged(material, 'Undressed material ' + material.name);
       throw error;
     }
     return material;

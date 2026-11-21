@@ -7,7 +7,7 @@ const BABYLON = require('babylonjs');
 const { withCanvas, onNullScene } = require('../scripts/lib/ship-fingerprint.js');
 const { logsOf, readRenderer } = require('./support/renderer-source');
 const { hullOf, sameItems } = require('./support/ship-assets');
-const { manifest, loadShipModels: load, onSystem } = require('./support/ship-models');
+const { manifest, loadShipModels: load, onSystem } = require('./support/ships-models');
 
 const SCOUT = manifest.hulls.find((hull) => hull.id === 'aur-lance-interceptor-v3');
 

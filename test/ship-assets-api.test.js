@@ -190,7 +190,7 @@ test('a dart that cannot be read builds no hull, and one that cannot be shown ag
   assert.equal(await assets.ships.upgrade(scene, ship('b', 0), unshown), null);
   assert.deepEqual([unshown.children.length, ...books()], [0, 0, 0], 'its hull is let go and off the books');
   // A hull that cannot be marked, under a dart that cannot be shown again and on a root that
-  // cannot be disposed: the dart's metadata is still put back, before the hull is let go.
+  // cannot be disposed: the dart's metadata is still put back.
   const { AUR, BABYLON: { Mesh } } = assets;
   const { markShipMesh } = AUR;
   const { dispose } = Mesh.prototype;
