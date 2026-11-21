@@ -398,9 +398,17 @@ Design tokens (put in `:root`):
     the ship.
 - A rank can be flown by a ship model built in code instead of a file
   (`AUR.shipModels`, `ships/models.js`). A model names the manifest hull it
-  `replaces` and flies in that hull's rank (`selectHull` asks
-  `AUR.shipModels.inPlaceOf`); the frozen manifest is unchanged. Petrel
-  (`ships/petrel/model.js`) flies the Scout rank, so it is also every drone.
+  `replaces`, or a list of them lowest first, and flies in those hulls' ranks
+  (`selectHull` asks `AUR.shipModels.inPlaceOf`); the frozen manifest is
+  unchanged. A model with several ranks gives each a size (`sizes`, its
+  longest side in fleet units) and flies the first as its id and a later one
+  as `<id>-<rank>`, so a promotion between two of them rebuilds the hull at
+  its new size, while every rank keys the same container and template. Petrel
+  (`ships/petrel/model.js`) flies the Scout rank, so it is also every drone;
+  the same build with its survey ring fitted (`petrel-ring`) flies the
+  Workhorse and Capital ranks, its ring, its longest side, as wide as the
+  fleet shows those hulls long (1.25 and 1.55). The Flagship keeps its
+  manifest hull.
   - **Container.** The ship is built once per scene and merged into one mesh
     with a sub-mesh per finish, because every mesh of a hull is placed and
     culled once per ship. From there it goes the way of a hull file's
@@ -421,19 +429,24 @@ Design tokens (put in `:root`):
     light in the ship color (a number: `TRIM_LIGHT` for a lamp, lower for a
     wide surface that should glow as a lit panel) or, for `{ lamps: <the color
     its emissive map is painted in> }`, keeps its surface and has that map show
-    the ship color. `AUR.shipModels.trimLight` is that light, and the fleet's
-    livery stripes and nozzles are made by it too.
+    the ship color, at the level of the emissive color's brightest channel, so
+    lamps the art lights in a tint of their own show it too (Petrel lights its
+    guide lamps in grey and its ring's inspection rail in amber).
+    `AUR.shipModels.trimLight` is that light, and the fleet's livery stripes
+    and nozzles are made by it too.
 - A model's `source/` folder is generated: `node scripts/import-ship.mjs <ship>
   <source folder>` converts the ship's ES modules to page scripts that register
   with `AUR.shipModule` (one file per module, run on first use, so page load
   builds nothing), and writes `source.json`: the source commit, each module's
   hash, exports and the hash of the file generated from it, and a fingerprint
-  of the built ship's geometry, which the script first proves equal to what
-  the original modules build. Never edit those files: change the ship at its
-  source and run the script again (`--check` reports whether they are
-  current); it prints the script tags `index.html` needs.
-  `test/ships-source.test.js` holds the committed files to those hashes,
-  rebuilds the ship from them and compares the fingerprint.
+  of the built ship's geometry and of each variant the script names for the
+  ship (a call on the built ship: Petrel's `ring` is `setRing(true)`), each of
+  which the script first proves equal to what the original modules build.
+  Never edit those files: change the ship at its source and run the script
+  again (`--check` reports whether they are current); it prints the script
+  tags `index.html` needs. `test/ships-source.test.js` holds the committed
+  files to those hashes, rebuilds the ship and each variant from them and
+  compares the fingerprints.
 
 ## 5. Universe view (`3.universe-map-view.png`)
 
