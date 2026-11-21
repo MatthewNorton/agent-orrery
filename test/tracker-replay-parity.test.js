@@ -172,24 +172,6 @@ test('agree: a relative or drive-less edit path builds nothing in either model, 
   }
 });
 
-test('agree: under a POSIX root an edit path whose leading slashes are doubled builds in both models', async (t) => {
-  // Linux and macOS open '//home/u/a' as '/home/u/a'; the root is missing on disk, so any host works.
-  const { live, replay } = await runBoth(t, {
-    cwd: '/orrery-fixture-missing/demo',
-    records: (dir) => [
-      claude.prompt(dir, T0),
-      claude.tool(dir, T0 + 1 * SEC, 'toolu_one', 'Edit', { file_path: `${dir}/src/a.js` }),
-      claude.tool(dir, T0 + 2 * SEC, 'toolu_two', 'Edit', { file_path: `/${dir}/src/b.js` }),
-      claude.tool(dir, T0 + 3 * SEC, 'toolu_three', 'Edit', { file_path: `//${dir}/lib/c.js` }),
-    ],
-  });
-  for (const side of [live, replay]) {
-    assert.deepEqual(ofType(side.events, 'build').map((event) => [event.bucket, event.file.replaceAll('\\', '/')]),
-      [['src', 'src/a.js'], ['src', 'src/b.js'], ['lib', 'lib/c.js']]);
-  }
-  assert.equal(live.snapshot.projects[0].totalBuilds, 3);
-});
-
 test('differs: event volume — replay adds project-updated per record and ship-updated per turn/tool boundary', async (t) => {
   const { live, replay } = await runBoth(t);
   assert.deepEqual(countTypes(live.events), {

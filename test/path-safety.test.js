@@ -7,6 +7,8 @@ const os = require('node:os');
 const path = require('node:path');
 const { isLocalProjectPath, canonicalProjectPath } = require('../src/main/provider-adapters');
 const { Tracker } = require('../src/main/tracker');
+const { SEC, T0, ofType, claude } = require('./support/transcripts');
+const { runBoth } = require('./support/both-models');
 
 test('isLocalProjectPath accepts drive-rooted and POSIX-rooted paths only', () => {
   for (const ok of ['C:\\Work\\proj', 'c:/work/proj', '/Users/coder/proj', '/']) {
@@ -215,6 +217,24 @@ test('relativeInside takes a POSIX file\'s leading slashes as one, as the system
     assert.equal(relativeInside('C:\\server\\share\\Demo', file), null, file);
   }
   assert.equal(relativeInside('/server/share/Demo', '\\\\server\\share\\Demo\\a.js'), null);
+});
+
+test('under a POSIX root an edit path whose leading slashes are doubled builds in both models', async (t) => {
+  // Linux and macOS open '//home/u/a' as '/home/u/a'; the root is missing on disk, so any host works.
+  const { live, replay } = await runBoth(t, {
+    cwd: '/orrery-fixture-missing/demo',
+    records: (dir) => [
+      claude.prompt(dir, T0),
+      claude.tool(dir, T0 + 1 * SEC, 'toolu_one', 'Edit', { file_path: `${dir}/src/a.js` }),
+      claude.tool(dir, T0 + 2 * SEC, 'toolu_two', 'Edit', { file_path: `/${dir}/src/b.js` }),
+      claude.tool(dir, T0 + 3 * SEC, 'toolu_three', 'Edit', { file_path: `//${dir}/lib/c.js` }),
+    ],
+  });
+  for (const side of [live, replay]) {
+    assert.deepEqual(ofType(side.events, 'build').map((event) => [event.bucket, event.file.replaceAll('\\', '/')]),
+      [['src', 'src/a.js'], ['src', 'src/b.js'], ['lib', 'lib/c.js']]);
+  }
+  assert.equal(live.snapshot.projects[0].totalBuilds, 3);
 });
 
 test('pathFlavor names drive-rooted and POSIX paths and rejects UNC and //host/share', () => {
