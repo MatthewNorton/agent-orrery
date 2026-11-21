@@ -220,7 +220,6 @@ test('a ship wears the model finishes, with its trim copied once per palette in 
     }
     assert.equal(hull.imageProcessingConfiguration, base('pearl pressure hull').imageProcessingConfiguration);
     assert.equal(base('pearl pressure hull').emissiveColor.r, 2.5, 'the model material is untouched');
-    for (const name of Object.keys(petrel.trim)) assert.ok(base(name), name + ' is a material Petrel builds');
 
     // The whole hull's material for a palette: each finish in its place, the trim swapped for its copy.
     const worn = models.material(materials, petrel, 'claude', '#d97757', whole);
@@ -228,6 +227,21 @@ test('a ship wears the model finishes, with its trim copied once per palette in 
     assert.ok(sameItems(worn.subMaterials, whole.subMaterials.map((finish) => wear(finish.name, 'claude', '#d97757'))));
     assert.equal(worn.subMaterials.filter((finish, i) => finish !== whole.subMaterials[i]).length, Object.keys(petrel.trim).length);
     assert.equal(scene.textures.length, textures, 'a copy makes no texture of its own');
+
+    // Both Petrels, bare and ringed, wear the hull's guide lamps in the ship color, and each trim
+    // name of each names a material that model builds.
+    const ringed = models.inPlaceOf(manifest.hulls.find((entry) => entry.family === SCOUT.family && entry.minBuilds === 5)).model;
+    assert.notEqual(ringed, petrel);
+    for (const model of [petrel, ringed]) {
+      const finishes = models.container(scene, model).meshes[0].material.subMaterials;
+      const own = (name) => finishes.find((finish) => finish.name === name);
+      for (const name of Object.keys(model.trim)) assert.ok(own(name), `${name} is a material ${model.id} builds`);
+      assert.equal(model.trim['pearl pressure hull'].lamps, lamps, model.id);
+      const guide = (palette, hex) => shown(models.material(materials, model, palette, hex, own('pearl pressure hull')));
+      assert.ok(guide('claude', '#d97757').equalsWithEpsilon(claude.scale(2.5), 1e-6), model.id + ': terracotta guide lamps');
+      assert.ok(guide('codex', '#f2f0ea').equalsWithEpsilon(BABYLON.Color3.FromHexString('#f2f0ea').toLinearSpace().scale(2.5), 1e-6),
+        model.id + ': pearl guide lamps on a Codex ship');
+    }
   });
 });
 
