@@ -105,7 +105,7 @@
       limitPanning(box);
     }
 
-    const framed = { radius: NaN, x: NaN, z: NaN };
+    const framed = { radius: NaN, x: NaN, z: NaN, alpha: NaN, beta: NaN };
     const SKY_REACH = 0.9; // the share of the sky dome's radius the camera may be from its centre
     const CORNERS = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
 
@@ -171,16 +171,17 @@
       // them again from where the camera was, and each fit would turn and move the map.
       camera.setTarget(new BABYLON.Vector3(
         cx - right.x * dx + ground.x * dy, 0, cz - right.z * dx + ground.z * dy), false, false, true);
-      framed.radius = camera.radius;
-      framed.x = camera.target.x;
-      framed.z = camera.target.z;
+      Object.assign(framed, { radius: camera.radius, x: camera.target.x, z: camera.target.z,
+        alpha: camera.alpha, beta: camera.beta });
       limitPanning(box);
     }
 
-    // Re-fit after the layout, the top bar or the window changes, unless the viewer moved the camera.
+    // Re-fit after the layout, the top bar or the window changes, unless the viewer moved the
+    // camera: zoomed, panned, turned or tilted it.
     function reframeCamera(box) {
       const untouched = Number.isNaN(framed.radius) || (Math.abs(camera.radius - framed.radius) < 0.5 &&
-        Math.abs(camera.target.x - framed.x) < 0.5 && Math.abs(camera.target.z - framed.z) < 0.5);
+        Math.abs(camera.target.x - framed.x) < 0.5 && Math.abs(camera.target.z - framed.z) < 0.5 &&
+        Math.abs(camera.alpha - framed.alpha) < 1e-3 && Math.abs(camera.beta - framed.beta) < 1e-3);
       if (untouched) frameCamera(box);
     }
 

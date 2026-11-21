@@ -561,7 +561,8 @@ Design tokens (put in `:root`):
   along the ground (`mapPanning`), the ground following the pointer at any zoom, and the
   target stays within the galaxies' footprint; only a left-click opens a system, and a
   double-click on open space re-fits every galaxy. A layout change, a window resize or a
-  text-size change re-fits only while the viewer has not moved the camera.
+  text-size change re-fits only while the viewer has not zoomed, panned, turned or tilted the
+  camera.
 - States: system with ≥1 ship = "online" (brighter, sun pulse, label full
   opacity). Idle = normal dim. `exists: false` = derelict (very dim, ~40%
   opacity, no pulse).

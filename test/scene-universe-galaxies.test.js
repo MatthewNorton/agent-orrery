@@ -102,6 +102,35 @@ test('galaxies: resizing, folding, hiding or opening a panel never moves or scal
   }
 });
 
+test('galaxies: a map the viewer only turned or tilted stays put when the panels or the window change', () => {
+  for (const turn of [{ alpha: -Math.PI / 2 + 0.6 }, { beta: 1.1 }, { alpha: -2.4, beta: 0.4 }]) {
+    const chrome = page();
+    const map = universe(chrome);
+    map.part.frameCamera();
+    map.scene.render();
+    Object.assign(map.camera, turn); // an orbit or a tilt, no zoom and no pan
+    map.scene.render();
+    const turned = map.state();
+    for (const layout of [{ left: 296 }, { left: 296, right: 819 }, { timeline: false }]) {
+      chrome.layout(layout);
+      map.resize();
+      assert.deepEqual(map.state(), turned, `${JSON.stringify(turn)}, then ${JSON.stringify(layout)}`);
+    }
+    Object.assign(chrome.canvas, { clientWidth: 900, clientHeight: 700 });
+    map.resize();
+    assert.deepEqual(map.state(), turned, `${JSON.stringify(turn)}, then a window resize`);
+  }
+  // Left as framed, the camera still follows the window.
+  const chrome = page();
+  const map = universe(chrome);
+  map.part.frameCamera();
+  map.scene.render();
+  const framed = map.state();
+  Object.assign(chrome.canvas, { clientWidth: 900, clientHeight: 700 });
+  map.resize();
+  assert.notDeepEqual(map.state(), framed, 'an untouched camera re-fits on a window resize');
+});
+
 test('galaxies: a view built while other panels show frames as the first one did', () => {
   const first = universe(page());
   first.part.frameCamera();
