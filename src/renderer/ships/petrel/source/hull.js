@@ -45,7 +45,7 @@ function band(part,material,sign,index,a,b,hint,u0,u1,options={}) {
   const uvs=points.map((p,j)=>options.ventral ? [.5+p.x/4.32,(p.z-aft)/(bow-aft)] :
     chart(p,options.planar ? sign*p.x/13.9 : (j===0||j===3 ? u0 : u1),sign));
   if (options.port) {
-    circularFitting(part,options.port,material,points,normals,uvs,PORT_RADIUS,options.center);
+    return circularFitting(part,options.port,material,points,normals,uvs,PORT_RADIUS,options.center);
   } else if (options.liner) {
     const u=p=>(p.z-POCKET[0][0])/(POCKET.at(-1)[0]-POCKET[0][0]);
     part.face(material,points,out,normals,points.map((p,j)=>[u(p),j===0||j===3 ? 1 : 0]));
@@ -97,6 +97,7 @@ function aftDuct(part,sign,m) {
 // Every rail bounds two neighboring strips. The fins, side recesses, glazing and
 // belly ports replace patches of the pressure skin at their actual locations.
 function buildHull(part,m) {
+  const sockets=[];
   for (const sign of [-1,1]) {
     for (let i=0;i<SECTIONS.length-1;i++) {
       const a=SECTIONS[i], b=SECTIONS[i+1], z=(a.z+b.z)*.5;
@@ -108,7 +109,7 @@ function buildHull(part,m) {
       if (!canopy && !well) strip(m.hull,'center','cut',up,0,.035);
       strip(m.hull,'cut','deckEdge',up,.035,.090);
       strip(m.hull,'deckEdge','finInner',up,.090,.110);
-      strip(m.hull,'finOuter','shoulder',cheek,.110,.180,fitting ? {port:m,center:.56} : undefined);
+      const upperSocket=strip(m.hull,'finOuter','shoulder',cheek,.110,.180,fitting ? {port:m,center:.56} : undefined);
       strip(m.wingSkin,'shoulder','shoulderMid',cheek,.18,.21);
       strip(m.wingSkin,'shoulderMid','rootTop',up,.21,.24);
       if (z>WING_BOW) strip(m.pearl,'rootTop','rootUnder',side,.24,.26);
@@ -125,7 +126,8 @@ function buildHull(part,m) {
       strip(m.undercoat,'sill','lower',down,.33,.35);
       strip(m.undercoat,'lower','chine',v(.8,-.7,0),.35,.38);
       strip(m.undercoat,'chine','pan',down,.38,.40);
-      strip(m.undercoat,'pan','stripe',down,.40,.48,fitting ? {port:m,center:.48} : undefined);
+      const lowerSocket=strip(m.undercoat,'pan','stripe',down,.40,.48,fitting ? {port:m,center:.48} : undefined);
+      if (fitting) sockets.push(upperSocket,lowerSocket);
       strip(m.iron,'stripe','bottom',down,.48,.50);
       if (canopy) {
         const us=[.288,.277,.228,.155,.078,0];
@@ -139,6 +141,7 @@ function buildHull(part,m) {
       nose.chine,nose.pan,nose.stripe,nose.bottom];
     part.face(m.pearl,end.map(p=>reflect(p,sign)),v(0,0,1));
   }
+  return sockets;
 }
 return { buildHull };
 });

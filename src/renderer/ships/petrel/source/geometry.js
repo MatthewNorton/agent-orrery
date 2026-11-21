@@ -141,6 +141,7 @@ function circularFitting(part,m,skin,corners,normals,uvs,radius,centerU=.5) {
     last=next;
   }
   part.face(m.chamber,last,up);
+  return { center: blend(corners,center), normal: up };
 }
 return { Assembly, circularFitting, v };
 });

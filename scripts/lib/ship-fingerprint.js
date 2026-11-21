@@ -97,4 +97,10 @@ function fingerprintOf(BABYLON, build) {
   return withCanvas(() => onNullScene(BABYLON, (scene) => fingerprint(build(scene))));
 }
 
-module.exports = { lf, sha256, withCanvas, onNullScene, fingerprintOf, loadShipModules };
+/** The root of a ship a model's build returned, after a variant's call on it ([method, ...arguments]) when one is given. */
+function rootOf(ship, call) {
+  if (call) ship[call[0]](...call.slice(1));
+  return ship.root;
+}
+
+module.exports = { lf, sha256, withCanvas, onNullScene, fingerprintOf, loadShipModules, rootOf };
