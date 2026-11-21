@@ -21,10 +21,11 @@
  *   model's own units)
  * @property {(scene: BABYLON.Scene) => BABYLON.TransformNode} build one ship with its materials
  * @property {(scene: BABYLON.Scene) => BABYLON.BaseTexture} probe the reflections its finishes were tuned under
- * @property {Record<string, number | { lamps: string }>} trim by material name: a surface that
- *   becomes a trim light in the ship color (the number is how hot it emits;
+ * @property {Record<string, number | { lamps: string, halos?: boolean }>} trim by material name: a
+ *   surface that becomes a trim light in the ship color (the number is how hot it emits;
  *   AUR.shipModels.TRIM_LIGHT is a light, less is a lit panel), or one whose emissive map (its
- *   lamps, painted in the one color named) shows that color instead
+ *   lamps, painted in the color named) shows that color instead; `halos` when the map paints other
+ *   colors around them as well, which it then shows in the ship color too
  * @property {() => Array<{ position: number[], radius: number }>} nozzles in the model's own units
  */
 
@@ -159,6 +160,33 @@
   }
 
   /**
+   * Each pixel in grey, in place: its luminance, linearized as the frame reads the map and encoded
+   * back as the map was painted.
+   * @param {Uint8ClampedArray} data RGBA
+   */
+  function greyPixels(data) {
+    const color = new BABYLON.Color3();
+    for (let i = 0; i < data.length; i += 4) {
+      const light = color.set(data[i] / 255, data[i + 1] / 255, data[i + 2] / 255).toLinearSpaceToRef(color).toLuminance();
+      color.set(light, light, light).toGammaSpaceToRef(color);
+      data[i] = data[i + 1] = data[i + 2] = color.r * 255;
+    }
+  }
+
+  /** A painted map read in grey, sampled as the map is. @param {BABYLON.DynamicTexture} map @param {string} name */
+  function greyMap(map, name) {
+    const { width, height } = map.getSize();
+    const grey = new BABYLON.DynamicTexture(name, { width, height }, map.getScene(), true, map.samplingMode);
+    const SAMPLED = /** @type {const} */ (['wrapU', 'wrapV', 'anisotropicFilteringLevel', 'gammaSpace', 'coordinatesIndex', 'level', 'uScale', 'vScale', 'uOffset', 'vOffset']);
+    Object.assign(grey, Object.fromEntries(SAMPLED.map((key) => [key, map[key]])));
+    const image = map.getContext().getImageData(0, 0, width, height);
+    greyPixels(image.data);
+    grey.getContext().putImageData(image, 0, 0);
+    grey.update();
+    return grey;
+  }
+
+  /**
    * A trim light in the ship color: a dark surface, so the light adds no white, and the color as
    * the emission (the PBR emissive slot is linear: linearized, the frame shows the exact hex).
    * @param {BABYLON.PBRMaterial | BABYLON.StandardMaterial} material standard when a hull file's own could not be cloned
@@ -177,7 +205,8 @@
 
   /**
    * What a ship's hull wears: the model's own finishes, except its trim, which is copied once per
-   * palette into `materials` (the scene's hull materials, released with them).
+   * palette into `materials` (the scene's hull materials and the grey maps they share, released
+   * with them).
    * @param {Map<string, any>} materials @param {ShipModel} model @param {string} palette
    * @param {string} hex the ship color
    * @param {BABYLON.PBRMaterial | BABYLON.MultiMaterial} base the hull's material, or one of its finishes
@@ -198,16 +227,27 @@
         /** @type {BABYLON.Color3} */
         const tint = AUR.color3(hex);
         if (typeof role !== 'number') {
-          // The map times the emissive color is what shows: with the painted color divided out,
-          // that is the ship color, at the level the model lights its lamps to (the emissive
-          // color's brightest channel, so a tinted one loses its tint). (The glow pass reads the
-          // map without linearizing it, so a lamp's halo is a paler tint; around Petrel's hairline
-          // guide lamps on its hull no halo shows, even with the chase camera at its closest.)
+          // The map times the emissive color is what shows, and the level the model lights its
+          // lamps to is its emissive color's brightest channel (a tinted one loses its tint).
           const painted = AUR.color3(role.lamps).toLinearSpace();
           const shown = tint.toLinearSpace();
           const { r, g, b } = base.emissiveColor;
+          const level = Math.max(r, g, b);
+          if (role.halos) {
+            // The frame linearizes the map and the glow pass does not, so only a map without a hue
+            // of its own shows the ship color in both: read in grey, its lamps show it at that
+            // level and the rest of it as much dimmer as it is. One grey map serves every palette.
+            copy.emissiveTexture = AUR.memo(materials, model.id + ':grey:' + base.name,
+              () => greyMap(/** @type {BABYLON.DynamicTexture} */ (base.emissiveTexture), base.name + ' in grey'));
+            copy.emissiveColor = shown.scale(level / painted.toLuminance());
+            return;
+          }
+          // With the painted color divided out, the frame shows the ship color. The glow pass
+          // reads the map without linearizing it, so lamps painted in a warm color bloom bluer
+          // than the ship color: on a Codex Scout, a faint blue bloom around the hull's hairline
+          // guide lamps with the chase camera at its closest.
           copy.emissiveColor = new BABYLON.Color3(
-            shown.r / Math.max(painted.r, 0.01), shown.g / Math.max(painted.g, 0.01), shown.b / Math.max(painted.b, 0.01)).scale(Math.max(r, g, b));
+            shown.r / Math.max(painted.r, 0.01), shown.g / Math.max(painted.g, 0.01), shown.b / Math.max(painted.b, 0.01)).scale(level);
           return;
         }
         copy.albedoTexture = null;

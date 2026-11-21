@@ -16,8 +16,12 @@ const { manifest, loadShipModels: load, onSystem } = require('./support/ships-mo
 const record = JSON.parse(readRenderer('ships/petrel/source/source.json'));
 const rank = (minBuilds) => manifest.hulls.find((hull) => hull.family === manifest.providerFamilies.claude && hull.minBuilds === minBuilds);
 const [SCOUT, WORKHORSE, CAPITAL] = [0, 5, 20].map(rank);
-const onScene = (work) => withCanvas(() => onNullScene(BABYLON, (scene) => work(scene, load().shipModels)));
+const onScene = (work) => withCanvas(() => onNullScene(BABYLON, (scene) => {
+  const AUR = load();
+  return work(scene, AUR.shipModels, AUR);
+}));
 const near = (a, b, epsilon = 1e-9) => Math.abs(a - b) < epsilon;
+const HALO = '#aa601a'; // the inner color of the halo the ring's map paints around each rail lamp
 
 test('ringed, Petrel flies the Workhorse and Capital ranks: one container for both, a hull of its own in each', () => {
   const models = load().shipModels;
@@ -72,22 +76,73 @@ test('a ringed container holds the triangles the variant records, as one mesh', 
   });
 });
 
-// The rail's lamps are painted in one color and lit in an amber tint of the art's own; worn, they
-// show the ship color at the level of that tint's brightest channel.
-test('the ring\'s inspection rail lamps show the ship color: terracotta on Claude, pearl on Codex, not amber', () => {
-  onScene((scene, models) => {
+// The rail's map paints its lamps in one amber and a darker amber halo around each, and the art
+// lights it in an amber tint. Worn, it is read in grey: the frame (which linearizes the map) and
+// the glow pass (which reads it as stored) both show the ship color wherever it paints, the lamps
+// at the level of the tint's brightest channel and the halos as much dimmer as the art paints them.
+test('the ring\'s inspection rail shows the ship color on every palette: its lamps, their halos and their glow', () => {
+  onScene((scene, models, AUR) => {
     const ringed = models.inPlaceOf(WORKHORSE).model;
     const rail = models.container(scene, ringed).meshes[0].material.subMaterials.find((finish) => finish.name === 'amber inspection rail');
-    const { lamps } = ringed.trim['amber inspection rail'];
-    assert.ok(readRenderer('ships/petrel/source/surfaces.js').includes(`'${lamps}'`), 'the color the ring paints its lamps in');
+    const { lamps, halos } = ringed.trim['amber inspection rail'];
+    const art = readRenderer('ships/petrel/source/surfaces.js');
+    assert.ok(art.includes(`'${lamps}'`) && art.includes(`'${HALO}'`), 'the colors the ring paints its lamps and their halos in');
+    assert.equal(halos, true);
     const { r, g, b } = rail.emissiveColor;
     assert.ok(r > g && g > b, 'the art lights them in a tint');
+
+    // The art's map, a lamp texel and a halo texel, read as the grey map is made from it.
+    const color = (texel) => new BABYLON.Color3(texel[0] / 255, texel[1] / 255, texel[2] / 255);
+    const bytes = (hex) => BABYLON.Color3.FromHexString(hex).asArray().map((v) => v * 255).concat(255);
+    const image = { data: new Uint8ClampedArray([...bytes(lamps), ...bytes(HALO)]) };
+    Object.assign(rail.emissiveTexture, { getSize: () => ({ width: 2, height: 1 }), getContext: () => ({ getImageData: () => image }) });
+    const textures = scene.textures.length;
     const materials = new Map();
-    for (const hex of ['#d97757', '#f2f0ea']) {
-      const worn = models.material(materials, ringed, hex, hex, rail);
-      const shown = BABYLON.Color3.FromHexString(lamps).toLinearSpace().multiply(worn.emissiveColor);
-      assert.ok(shown.equalsWithEpsilon(BABYLON.Color3.FromHexString(hex).toLinearSpace().scale(r), 1e-6), hex);
-      assert.equal(worn.emissiveTexture, rail.emissiveTexture, 'on the lamp map the art painted');
+    const palettes = [['claude', AUR.PROVIDERS.claude.color], ['codex', AUR.PROVIDERS.codex.color], ['local', AUR.LOCAL_MODEL.color]];
+    // While the copies are made, a new canvas keeps the pixels put on it, and each texture update is noted.
+    const events = [];
+    class KeptCanvas {
+      constructor(width, height) {
+        const known = { putImageData: (pixels) => { known.kept = pixels; events.push('put'); } };
+        Object.assign(this, { width, height, context: new Proxy(known, { get: (target, key) => (key in target ? target[key] : () => {}), set: () => true }) });
+      }
+      getContext() { return this.context; }
+    }
+    const [canvas, { update }] = [globalThis.OffscreenCanvas, BABYLON.DynamicTexture.prototype];
+    let worn;
+    try {
+      globalThis.OffscreenCanvas = KeptCanvas;
+      BABYLON.DynamicTexture.prototype.update = function (...args) { events.push('update ' + this.name); return update.apply(this, args); };
+      worn = palettes.map(([palette, hex]) => models.material(materials, ringed, palette, hex, rail));
+    } finally {
+      globalThis.OffscreenCanvas = canvas;
+      BABYLON.DynamicTexture.prototype.update = update;
+    }
+    assert.equal(scene.textures.length, textures + 1, 'one grey map, for every palette');
+    assert.deepEqual(events, ['put', 'update amber inspection rail in grey'], 'its pixels put on its canvas, then sent to the GPU');
+    assert.ok(worn[0].emissiveTexture.getContext().kept === image, 'the grey map holds the art\'s pixels, read in grey');
+    const [lamp, halo] = [image.data.slice(0, 4), image.data.slice(4, 8)];
+    for (const texel of [lamp, halo]) assert.ok(texel[0] === texel[1] && texel[1] === texel[2], `${texel} is grey`);
+
+    const lit = (rgb) => rgb.toLuminance();
+    const sameHue = (a, b) => a.scale(1 / Math.max(a.r, a.g, a.b)).equalsWithEpsilon(b.scale(1 / Math.max(b.r, b.g, b.b)), 1e-6);
+    for (const [i, [palette, hex]] of palettes.entries()) {
+      const copy = worn[i];
+      assert.ok(copy.emissiveTexture !== rail.emissiveTexture, `${palette}: not on the amber map the art painted`);
+      assert.ok(copy.emissiveTexture === worn[0].emissiveTexture, `${palette}: on the one grey map`);
+      for (const key of ['level', 'gammaSpace', 'coordinatesIndex', 'wrapU', 'wrapV']) assert.equal(copy.emissiveTexture[key], rail.emissiveTexture[key], key);
+      const tint = BABYLON.Color3.FromHexString(hex).toLinearSpace();
+      // The frame: the map linearized, times the emissive color.
+      const frame = (texel) => color(texel).toLinearSpace().multiply(copy.emissiveColor);
+      // The glow pass (scene/system/view.js): the map as stored, times what the glow selector passes,
+      // the emissive color at the map's level and the material's intensity.
+      const selected = copy.emissiveColor.scale(copy.emissiveTexture.level * copy.emissiveIntensity);
+      const glow = (texel) => color(texel).multiply(selected);
+      assert.ok(frame(lamp).equalsWithEpsilon(tint.scale(r), 0.01 * r), `${palette}: lamps in the ship color, at the art's level`);
+      assert.ok(sameHue(frame(halo), tint), `${palette}: halos in the ship color`);
+      const dimmer = lit(BABYLON.Color3.FromHexString(HALO).toLinearSpace()) / lit(BABYLON.Color3.FromHexString(lamps).toLinearSpace());
+      assert.ok(Math.abs(lit(frame(halo)) / lit(frame(lamp)) / dimmer - 1) < 0.03, `${palette}: halos as much dimmer than the lamps as the art paints them`);
+      assert.ok(sameHue(glow(lamp), tint) && sameHue(glow(halo), tint), `${palette}: the lamps and halos glow in the ship color as the trim lights do`);
     }
   });
 });

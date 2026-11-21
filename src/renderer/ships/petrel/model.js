@@ -21,11 +21,9 @@
     'burnt orange bay liner': PANEL, 'orange anodized return': PANEL, 'orange wing duct': PANEL,
     'pearl pressure hull': { lamps: '#f4ba76' },
   };
-  // The survey ring's inspection rail is a row of lamps, so they take the color as well. Its map
-  // paints a halo around each lamp in a second, darker amber, and that keeps an amber hue: on a
-  // Codex ship each halo is about a quarter of its pearl lamp's brightness and five lamp widths
-  // across, and neighbouring halos meet, so the rail still reads amber around its lamps.
-  const RING_TRIM = { ...TRIM, 'amber inspection rail': { lamps: '#ffc074' } };
+  // The survey ring's inspection rail is a row of lamps, so they take the color as well, and so do
+  // the halos its map paints around them in a darker amber: lamps, halos and glow in the ship color.
+  const RING_TRIM = { ...TRIM, 'amber inspection rail': { lamps: '#ffc074', halos: true } };
 
   /** Both ships come from the one build, the ring fitted or not. @param {boolean} ring */
   const petrel = (ring) => ({
