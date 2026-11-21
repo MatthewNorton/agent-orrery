@@ -103,9 +103,12 @@
     return PATH_ERRORS.get(code) || 'The project path could not be updated.';
   }
 
+  // Sets the Projects tab's status line and answers the one it replaced.
   function setProjectSettingsStatus(message, error = false) {
+    const replaced = { message: S.projectSettings.status, error: S.projectSettings.error };
     S.projectSettings.status = message || '';
     S.projectSettings.error = Boolean(error);
+    return replaced;
   }
 
   function settingsRequestIsCurrent(owner, request) {
@@ -142,7 +145,8 @@
    * @template T
    * @param {string} statusText
    * @param {() => Promise<T>} call
-   * @param {(message: string) => void} [setStatus] where statusText shows
+   * @param {(message: string, error?: boolean) => { message: string, error: boolean }} [setStatus]
+   *   where statusText shows; it answers the status it replaced
    * @returns {Promise<T | Failure<ProjectPathFailureCode> | null>}
    */
   async function runSettingsRequest(statusText, call, setStatus = setProjectSettingsStatus) {
@@ -152,16 +156,20 @@
     // Once superseded, the flag is the session's that followed (resetSettingsSession cleared it,
     // and a request there may hold it).
     const isCurrent = () => settingsRequestIsCurrent(owner, request);
+    let replaced = null;
     const result = await AUR.settleBusy({
       raise() {
         S.projectSettings.busy = true;
-        setStatus(statusText);
+        replaced = setStatus(statusText);
         A.renderProjectSettings();
         S.projectSettings.els.close.focus();
       },
+      // After a raise() that threw, the request never went to main: the status it set goes too.
       lower(raised) {
         S.projectSettings.busy = false;
-        if (!raised) A.scheduleChrome(A.const.CHROME.SETTINGS);
+        if (raised) return;
+        if (replaced) setStatus(replaced.message, replaced.error);
+        A.scheduleChrome(A.const.CHROME.SETTINGS);
       },
       isCurrent,
     }, call);

@@ -29,9 +29,12 @@
     AUR.listen(els.importButton, 'click', () => runBackup(els.importButton, IMPORT));
   };
 
+  // Sets the backup section's status line and answers the one it replaced.
   A.setBackupStatus = function setBackupStatus(message, error = false) {
+    const replaced = { message: S.projectSettings.backupStatus, error: S.projectSettings.backupError };
     S.projectSettings.backupStatus = message || '';
     S.projectSettings.backupError = Boolean(error);
+    return replaced;
   };
 
   const BACKUP_ERRORS = new Map([

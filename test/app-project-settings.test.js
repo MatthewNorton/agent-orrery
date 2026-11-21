@@ -16,7 +16,7 @@ function setup() {
   state.projectSettings.els.close.focus = () => {};
   const scheduled = [];
   const app = { state, const: { CHROME: { SETTINGS: 32 } }, scheduleChrome: (mask) => scheduled.push(mask) };
-  runApp(['app/project/settings.js'], app, { window: { AU: {} }, document: fakeDocument() });
+  runApp(['app/project/settings.js', 'app/project/backup.js'], app, { window: { AU: {} }, document: fakeDocument() });
   app.renderProjectSettings = () => {};
   return { app, state, scheduled };
 }
@@ -52,3 +52,17 @@ test('settings requests: one whose render throws leaves the dialog open to the n
   assert.equal(await app.runSettingsRequest('Working', async () => 'answered'), 'answered');
   assert.deepEqual(scheduled, [32], 'a request drawn as it went up is drawn by its caller alone');
 });
+
+// The Projects tab's status line (the default setter) and the backup section's (backup.js's).
+for (const setter of ['the default setter', 'setBackupStatus']) {
+  test(`settings requests: one whose render throws puts back the status it set, through ${setter}`, async () => {
+    const { app, state, scheduled } = setup();
+    const before = { status: 'Scan failed.', error: true, backupStatus: 'Import failed.', backupError: true };
+    Object.assign(state.projectSettings, before);
+    app.renderProjectSettings = () => { throw new Error('render failed'); };
+    const setStatus = setter === 'setBackupStatus' ? app.setBackupStatus : undefined;
+    await assert.rejects(app.runSettingsRequest('Working', async () => 'never asked', setStatus), /render failed/);
+    const { status, error, backupStatus, backupError } = state.projectSettings;
+    assert.deepEqual([{ status, error, backupStatus, backupError }, scheduled], [before, [32]], 'what the frame draws');
+  });
+}
