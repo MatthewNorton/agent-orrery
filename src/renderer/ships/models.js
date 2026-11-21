@@ -12,10 +12,9 @@
  * @typedef {object} ShipModel one ship, built by its converted modules under ships/<id>/source/
  * @property {string} id also the id of the hull it flies as; in a later one of its own ranks,
  *   `<id>-<n>`, n counting those ranks from 1 (the ringed Petrel's Capital is `petrel-ring-2`)
- * @property {string | string[]} replaces the manifest hull whose rank it takes, or the hulls whose
- *   ranks it takes, lowest first
- * @property {number[]} [sizes] its longest side in each of those ranks, in the fleet's units (the
- *   Scout is one unit long); one unit when not given
+ * @property {Array<{ hull: string, size?: number }>} replaces the ranks it takes, lowest first: the
+ *   manifest hull whose rank it takes, and its longest side there in the fleet's units (the Scout
+ *   is one unit long), one unit when not given
  * @property {{ scale: number, offset: number[] }} correction to the fleet's frame: its longest
  *   side one unit, centred along its length and across its span, nose on +Z (the offset is in the
  *   model's own units)
@@ -48,19 +47,20 @@
   const TEXTURE_SLOTS = ['albedoTexture', 'bumpTexture', 'metallicTexture', 'emissiveTexture', 'reflectionTexture'];
   // The scene lists a build adds to.
   const BUILT = ['meshes', 'transformNodes', 'materials', 'multiMaterials', 'textures'];
+  // How a texture is sampled, which a grey copy of a painted map keeps.
+  const SAMPLED = /** @type {const} */ (['wrapU', 'wrapV', 'anisotropicFilteringLevel', 'gammaSpace', 'coordinatesIndex', 'level', 'uScale', 'vScale', 'uOffset', 'vOffset']);
 
-  /** @type {Map<string, ShipModel>} */
-  const models = new Map();
+  /** @type {Map<string, { model: ShipModel, rank: number, size: number }>} */
+  const ranks = new Map(); // replaced hull id -> the model that takes its rank, which of its ranks, its size
   /** @type {Map<string, HullEntry>} */
   const hulls = new Map(); // replaced hull id -> the hull entry the model flies as
+  /** @type {Map<string, HullEntry>} */
+  const flown = new Map(); // the id a model hull flies under -> its hull entry
 
   /** @param {ShipModel} model */
   function register(model) {
-    models.set(model.id, model);
+    model.replaces.forEach(({ hull, size = 1 }, rank) => ranks.set(hull, { model, rank, size }));
   }
-
-  /** @param {ShipModel} model @returns {string[]} */
-  const ranksOf = (model) => [model.replaces].flat();
 
   /**
    * The hull to fly for a manifest hull: the model that replaces it, in its rank and at its size
@@ -68,17 +68,20 @@
    * @param {HullEntry} hull @returns {HullEntry}
    */
   function inPlaceOf(hull) {
-    const model = [...models.values()].find((candidate) => ranksOf(candidate).includes(hull.id));
-    if (!model) return hull;
-    const rank = ranksOf(model).indexOf(hull.id);
-    const scale = model.correction.scale * (model.sizes ? model.sizes[rank] : 1);
+    const taken = ranks.get(hull.id);
+    if (!taken) return hull;
+    const { model, rank, size } = taken;
     // The file names no file: it keys the model's container, templates and materials in a scene,
     // one for every rank it flies. The id names the rank, so a promotion between two of them
     // rebuilds the hull at its new size.
-    return AUR.memo(hulls, hull.id, () => ({
-      id: rank ? model.id + '-' + (rank + 1) : model.id, file: 'model:' + model.id, family: hull.family,
-      role: hull.role, minBuilds: hull.minBuilds, correction: { ...model.correction, scale }, model,
-    }));
+    return AUR.memo(hulls, hull.id, () => {
+      const entry = {
+        id: rank ? model.id + '-' + (rank + 1) : model.id, file: 'model:' + model.id, family: hull.family,
+        role: hull.role, minBuilds: hull.minBuilds, correction: { ...model.correction, scale: model.correction.scale * size }, model,
+      };
+      flown.set(entry.id, entry);
+      return entry;
+    });
   }
 
   /**
@@ -166,10 +169,16 @@
    */
   function greyPixels(data) {
     const color = new BABYLON.Color3();
+    const greys = new Map(); // each color the map paints -> its grey, worked out once
     for (let i = 0; i < data.length; i += 4) {
-      const light = color.set(data[i] / 255, data[i + 1] / 255, data[i + 2] / 255).toLinearSpaceToRef(color).toLuminance();
-      color.set(light, light, light).toGammaSpaceToRef(color);
-      data[i] = data[i + 1] = data[i + 2] = color.r * 255;
+      const painted = data[i] << 16 | data[i + 1] << 8 | data[i + 2];
+      let grey = greys.get(painted);
+      if (grey === undefined) {
+        const light = color.set(data[i] / 255, data[i + 1] / 255, data[i + 2] / 255).toLinearSpaceToRef(color).toLuminance();
+        grey = color.set(light, light, light).toGammaSpaceToRef(color).r * 255;
+        greys.set(painted, grey);
+      }
+      data[i] = data[i + 1] = data[i + 2] = grey;
     }
   }
 
@@ -177,7 +186,6 @@
   function greyMap(map, name) {
     const { width, height } = map.getSize();
     const grey = new BABYLON.DynamicTexture(name, { width, height }, map.getScene(), true, map.samplingMode);
-    const SAMPLED = /** @type {const} */ (['wrapU', 'wrapV', 'anisotropicFilteringLevel', 'gammaSpace', 'coordinatesIndex', 'level', 'uScale', 'vScale', 'uOffset', 'vOffset']);
     Object.assign(grey, Object.fromEntries(SAMPLED.map((key) => [key, map[key]])));
     const image = map.getContext().getImageData(0, 0, width, height);
     greyPixels(image.data);
@@ -277,10 +285,10 @@
   /**
    * A model hull's stern nozzles in the ship root's frame (the root carries the display scale,
    * the hull's correction its rank's size), or null when the hull is not a model's.
-   * @param {string} hullId
+   * @param {string} hullId the id of a hull `inPlaceOf` returned
    */
   function nozzles(hullId) {
-    const hull = [...hulls.values()].find((entry) => entry.id === hullId);
+    const hull = flown.get(hullId);
     if (!hull) return null;
     const { scale, offset } = hull.correction;
     const shift = BABYLON.Vector3.FromArray(offset);

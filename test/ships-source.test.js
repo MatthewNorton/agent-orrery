@@ -69,9 +69,9 @@ for (const ship of ships) {
       assert.deepEqual(Object.keys(use(`${ship}/${stem}`)), record.modules[stem].exports, stem);
     }
     const [module, build] = record.build;
-    assert.deepEqual(fingerprintOf(BABYLON, (scene) => use(`${ship}/${module}`)[build](scene).root), record.geometry);
-    for (const [name, { call, geometry }] of Object.entries(record.variants)) {
-      assert.deepEqual(fingerprintOf(BABYLON, (scene) => rootOf(use(`${ship}/${module}`)[build](scene), call)), geometry, name);
-    }
+    // The fingerprint of the ship the recorded build makes, after a variant's call when one is given.
+    const built = (call) => fingerprintOf(BABYLON, (scene) => rootOf(use(`${ship}/${module}`)[build](scene), call));
+    assert.deepEqual(built(), record.geometry);
+    for (const [name, { call, geometry }] of Object.entries(record.variants)) assert.deepEqual(built(call), geometry, name);
   });
 }

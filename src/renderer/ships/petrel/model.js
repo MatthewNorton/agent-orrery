@@ -41,7 +41,7 @@
 
   AUR.shipModels.register({
     id: 'petrel',
-    replaces: 'aur-lance-interceptor-v3',
+    replaces: [{ hull: 'aur-lance-interceptor-v3' }],
     correction: { scale: 1 / LENGTH, offset: [0, 0, -MIDSHIP] },
     trim: TRIM,
     ...petrel(false),
@@ -49,8 +49,7 @@
   // Ringed, it flies at the fleet's Workhorse and Capital sizes: its ring as wide as those hulls are long.
   AUR.shipModels.register({
     id: 'petrel-ring',
-    replaces: ['aur-bastion-corvette-v3', 'aur-helix-destroyer-v3'],
-    sizes: [1.25, 1.55],
+    replaces: [{ hull: 'aur-bastion-corvette-v3', size: 1.25 }, { hull: 'aur-helix-destroyer-v3', size: 1.55 }],
     correction: { scale: 1 / RING_SPAN, offset: [0, 0, -MIDSHIP] },
     trim: RING_TRIM,
     ...petrel(true),

@@ -535,11 +535,12 @@ Design tokens (put in `:root`):
     `ship-updated` and `build` events, and the new hull lands as the fade shows
     the ship.
 - A rank can be flown by a ship model built in code instead of a file
-  (`AUR.shipModels`, `ships/models.js`). A model names the manifest hull it
-  `replaces`, or a list of them lowest first, and flies in those hulls' ranks
-  (`selectHull` asks `AUR.shipModels.inPlaceOf`); the frozen manifest is
-  unchanged. A model with several ranks gives each a size (`sizes`, its
-  longest side in fleet units) and flies the first as its id and a later one
+  (`AUR.shipModels`, `ships/models.js`). A model lists the ranks it
+  `replaces`, lowest first, each as the manifest hull whose rank it takes and
+  its size there (`{ hull, size }`, its longest side in fleet units, one when
+  not given), and flies in those hulls' ranks (`selectHull` asks
+  `AUR.shipModels.inPlaceOf`); the frozen manifest is unchanged. A model with
+  several ranks flies the first as its id and a later one
   as `<id>-<n>`, n counting the model's own ranks from 1 (the ringed Petrel's
   Capital, its second, is `petrel-ring-2`), so a promotion between two of them
   rebuilds the hull at its new size, while every rank keys the same container

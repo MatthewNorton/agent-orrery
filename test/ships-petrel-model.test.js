@@ -7,19 +7,14 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const BABYLON = require('babylonjs');
-const { withCanvas, onNullScene, fingerprintOf } = require('../scripts/lib/ship-fingerprint.js');
+const { fingerprintOf } = require('../scripts/lib/ship-fingerprint.js');
 const { readRenderer } = require('./support/renderer-source');
 const { readGlbJson, glbLength } = require('./support/glb');
 const { hullOf, ship } = require('./support/ship-assets');
-const { manifest, loadShipModels: load, onSystem } = require('./support/ships-models');
+const { rank, loadShipModels: load, onModelScene: onScene, onSystem } = require('./support/ships-models');
 
 const record = JSON.parse(readRenderer('ships/petrel/source/source.json'));
-const rank = (minBuilds) => manifest.hulls.find((hull) => hull.family === manifest.providerFamilies.claude && hull.minBuilds === minBuilds);
 const [SCOUT, WORKHORSE, CAPITAL] = [0, 5, 20].map(rank);
-const onScene = (work) => withCanvas(() => onNullScene(BABYLON, (scene) => {
-  const AUR = load();
-  return work(scene, AUR.shipModels, AUR);
-}));
 const near = (a, b, epsilon = 1e-9) => Math.abs(a - b) < epsilon;
 const HALO = '#aa601a'; // the inner color of the halo the ring's map paints around each rail lamp
 
@@ -41,7 +36,7 @@ test('each ringed rank flies at the size the fleet\'s hull for that rank is show
   for (const hull of [WORKHORSE, CAPITAL]) {
     const shown = hull.correction.scale * glbLength(readGlbJson(path.join(__dirname, '..', 'assets', 'ships', hull.file)).model);
     const { correction, model } = models.inPlaceOf(hull);
-    assert.ok(Math.abs(correction.scale / model.correction.scale - shown) < 0.01, `${hull.id}: shown ${shown} long`);
+    assert.ok(near(correction.scale / model.correction.scale, shown, 0.01), `${hull.id}: shown ${shown} long`);
     assert.deepEqual(correction.offset, model.correction.offset);
   }
 });
@@ -61,9 +56,9 @@ test('the ringed ship sits in the fleet frame its correction claims: its ring, i
     const { min, max } = root.getHierarchyBoundingVectors(true);
     const size = max.subtract(min);
     assert.ok(size.x > size.z && near(size.x, size.y, 0.01), 'the ring is wider than the hull is long');
-    assert.ok(Math.abs(size.x * scale - 1) < 0.005, `the ring is ${size.x * scale} across`);
-    assert.ok(Math.abs((max.z + min.z) / 2 + offset[2]) * scale < 0.005, 'centred along its length');
-    assert.ok(Math.abs(max.x + min.x) * scale < 0.005 && offset[0] === 0, 'centred across its span');
+    assert.ok(near(size.x * scale, 1, 0.005), `the ring is ${size.x * scale} across`);
+    assert.ok(near(((max.z + min.z) / 2 + offset[2]) * scale, 0, 0.005), 'centred along its length');
+    assert.ok(near((max.x + min.x) * scale, 0, 0.005) && offset[0] === 0, 'centred across its span');
   });
 });
 
@@ -91,11 +86,11 @@ test('the ring\'s inspection rail shows the ship color on every palette: its lam
     const { r, g, b } = rail.emissiveColor;
     assert.ok(r > g && g > b, 'the art lights them in a tint');
 
-    // The art's map, a lamp texel and a halo texel, read as the grey map is made from it.
-    const color = (texel) => new BABYLON.Color3(texel[0] / 255, texel[1] / 255, texel[2] / 255);
+    // The art's map, a lamp texel, a halo texel and another lamp texel, read as the grey map is made from it.
+    const color = ([red, green, blue]) => BABYLON.Color3.FromInts(red, green, blue);
     const bytes = (hex) => BABYLON.Color3.FromHexString(hex).asArray().map((v) => v * 255).concat(255);
-    const image = { data: new Uint8ClampedArray([...bytes(lamps), ...bytes(HALO)]) };
-    Object.assign(rail.emissiveTexture, { getSize: () => ({ width: 2, height: 1 }), getContext: () => ({ getImageData: () => image }) });
+    const image = { data: new Uint8ClampedArray([...bytes(lamps), ...bytes(HALO), ...bytes(lamps)]) };
+    Object.assign(rail.emissiveTexture, { getSize: () => ({ width: 3, height: 1 }), getContext: () => ({ getImageData: () => image }) });
     const textures = scene.textures.length;
     const materials = new Map();
     const palettes = [['claude', AUR.PROVIDERS.claude.color], ['codex', AUR.PROVIDERS.codex.color], ['local', AUR.LOCAL_MODEL.color]];
@@ -123,8 +118,8 @@ test('the ring\'s inspection rail shows the ship color on every palette: its lam
     assert.ok(worn[0].emissiveTexture.getContext().kept === image, 'the grey map holds the art\'s pixels, read in grey');
     const [lamp, halo] = [image.data.slice(0, 4), image.data.slice(4, 8)];
     for (const texel of [lamp, halo]) assert.ok(texel[0] === texel[1] && texel[1] === texel[2], `${texel} is grey`);
+    assert.deepEqual(image.data.slice(8), lamp, 'a color painted twice is the same grey both times');
 
-    const lit = (rgb) => rgb.toLuminance();
     const sameHue = (a, b) => a.scale(1 / Math.max(a.r, a.g, a.b)).equalsWithEpsilon(b.scale(1 / Math.max(b.r, b.g, b.b)), 1e-6);
     for (const [i, [palette, hex]] of palettes.entries()) {
       const copy = worn[i];
@@ -140,8 +135,8 @@ test('the ring\'s inspection rail shows the ship color on every palette: its lam
       const glow = (texel) => color(texel).multiply(selected);
       assert.ok(frame(lamp).equalsWithEpsilon(tint.scale(r), 0.01 * r), `${palette}: lamps in the ship color, at the art's level`);
       assert.ok(sameHue(frame(halo), tint), `${palette}: halos in the ship color`);
-      const dimmer = lit(BABYLON.Color3.FromHexString(HALO).toLinearSpace()) / lit(BABYLON.Color3.FromHexString(lamps).toLinearSpace());
-      assert.ok(Math.abs(lit(frame(halo)) / lit(frame(lamp)) / dimmer - 1) < 0.03, `${palette}: halos as much dimmer than the lamps as the art paints them`);
+      const dimmer = BABYLON.Color3.FromHexString(HALO).toLinearSpace().toLuminance() / BABYLON.Color3.FromHexString(lamps).toLinearSpace().toLuminance();
+      assert.ok(near(frame(halo).toLuminance() / frame(lamp).toLuminance() / dimmer, 1, 0.03), `${palette}: halos as much dimmer than the lamps as the art paints them`);
       assert.ok(sameHue(glow(lamp), tint) && sameHue(glow(halo), tint), `${palette}: the lamps and halos glow in the ship color as the trim lights do`);
     }
   });

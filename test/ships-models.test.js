@@ -4,20 +4,15 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const BABYLON = require('babylonjs');
-const { withCanvas, onNullScene } = require('../scripts/lib/ship-fingerprint.js');
+const { onNullScene } = require('../scripts/lib/ship-fingerprint.js');
 const { logsOf, readRenderer } = require('./support/renderer-source');
 const { hullOf, sameItems } = require('./support/ship-assets');
-const { manifest, loadShipModels: load, onSystem } = require('./support/ships-models');
+const { manifest, rank, loadShipModels: load, onModelScene, onSystem } = require('./support/ships-models');
 
 const SCOUT = manifest.hulls.find((hull) => hull.id === 'aur-lance-interceptor-v3');
 
 // Runs `work(scene, models, petrel, AUR)` on a fresh scene.
-function onScene(work) {
-  return withCanvas(() => onNullScene(BABYLON, (scene) => {
-    const AUR = load();
-    return work(scene, AUR.shipModels, AUR.shipModels.inPlaceOf(SCOUT).model, AUR);
-  }));
-}
+const onScene = (work) => onModelScene((scene, models, AUR) => work(scene, models, models.inPlaceOf(SCOUT).model, AUR));
 
 const trianglesOf = (mesh) => mesh.getTotalIndices() / 3;
 
@@ -30,7 +25,7 @@ test('Petrel flies the Scout rank: the first rank of the family both providers f
   const hull = models.inPlaceOf(SCOUT);
   assert.deepEqual({ id: hull.id, file: hull.file, family: hull.family, role: hull.role, minBuilds: hull.minBuilds },
     { id: 'petrel', file: 'model:petrel', family: SCOUT.family, role: SCOUT.role, minBuilds: 0 });
-  assert.deepEqual([hull.model.id, hull.model.replaces, hull.correction], ['petrel', SCOUT.id, hull.model.correction]);
+  assert.deepEqual([hull.model.id, hull.model.replaces, hull.correction], ['petrel', [{ hull: SCOUT.id }], hull.model.correction]);
   assert.equal(models.inPlaceOf(SCOUT), hull, 'one hull entry, so a refresh compares like with like');
   const flagship = manifest.hulls.find((entry) => entry.family === SCOUT.family && entry.minBuilds === 60);
   assert.equal(models.inPlaceOf(flagship), flagship, 'a rank no model has taken keeps its manifest hull');
@@ -231,7 +226,7 @@ test('a ship wears the model finishes, with its trim copied once per palette in 
     // Both Petrels, bare and ringed, wear the hull's guide lamps in the ship color on the lamp map
     // the art painted, each from its own container, and each trim name of each names a material
     // that model builds.
-    const ringed = models.inPlaceOf(manifest.hulls.find((entry) => entry.family === SCOUT.family && entry.minBuilds === 5)).model;
+    const ringed = models.inPlaceOf(rank(5)).model;
     assert.notEqual(ringed, petrel);
     for (const model of [petrel, ringed]) {
       const finishes = models.container(scene, model).meshes[0].material.subMaterials;
