@@ -183,7 +183,7 @@ test('a model container owns the materials and textures it was built with: dispo
 });
 
 test('a ship wears the model finishes, with its trim copied once per palette in the ship color', () => {
-  onScene((scene, models, petrel) => {
+  onScene((scene, models, petrel, AUR) => {
     const whole = models.container(scene, petrel).meshes[0].material;
     const base = (name) => whole.subMaterials.find((finish) => finish.name === name);
     const materials = new Map();
@@ -228,19 +228,22 @@ test('a ship wears the model finishes, with its trim copied once per palette in 
     assert.equal(worn.subMaterials.filter((finish, i) => finish !== whole.subMaterials[i]).length, Object.keys(petrel.trim).length);
     assert.equal(scene.textures.length, textures, 'a copy makes no texture of its own');
 
-    // Both Petrels, bare and ringed, wear the hull's guide lamps in the ship color, and each trim
-    // name of each names a material that model builds.
+    // Both Petrels, bare and ringed, wear the hull's guide lamps in the ship color on the lamp map
+    // the art painted, each from its own container, and each trim name of each names a material
+    // that model builds.
     const ringed = models.inPlaceOf(manifest.hulls.find((entry) => entry.family === SCOUT.family && entry.minBuilds === 5)).model;
     assert.notEqual(ringed, petrel);
     for (const model of [petrel, ringed]) {
       const finishes = models.container(scene, model).meshes[0].material.subMaterials;
       const own = (name) => finishes.find((finish) => finish.name === name);
       for (const name of Object.keys(model.trim)) assert.ok(own(name), `${name} is a material ${model.id} builds`);
-      assert.equal(model.trim['pearl pressure hull'].lamps, lamps, model.id);
-      const guide = (palette, hex) => shown(models.material(materials, model, palette, hex, own('pearl pressure hull')));
-      assert.ok(guide('claude', '#d97757').equalsWithEpsilon(claude.scale(2.5), 1e-6), model.id + ': terracotta guide lamps');
-      assert.ok(guide('codex', '#f2f0ea').equalsWithEpsilon(BABYLON.Color3.FromHexString('#f2f0ea').toLinearSpace().scale(2.5), 1e-6),
-        model.id + ': pearl guide lamps on a Codex ship');
+      assert.deepEqual(model.trim['pearl pressure hull'], { lamps }, model.id);
+      const copies = new Map();
+      for (const [palette, hex] of [['claude', '#d97757'], ['codex', '#f2f0ea'], ['local', AUR.LOCAL_MODEL.color]]) {
+        const guide = models.material(copies, model, palette, hex, own('pearl pressure hull'));
+        assert.ok(shown(guide).equalsWithEpsilon(BABYLON.Color3.FromHexString(hex).toLinearSpace().scale(2.5), 1e-6), `${model.id}: ${palette} guide lamps`);
+        assert.ok(guide.emissiveTexture === own('pearl pressure hull').emissiveTexture, `${model.id}: ${palette} guide lamps on the art's map`);
+      }
     }
   });
 });
