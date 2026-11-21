@@ -211,7 +211,7 @@
     return {
       store: S.store, galaxyFields: S.galaxyFields, worldMaps: S.worldMaps, quality: S.renderQuality,
       skyLook: S.skyLook, orbitRings: S.orbitRings,
-      openSystem: A.openSystem, openPlanet: A.openPlanet,
+      openSystem: A.openSystem, openPlanet: A.openPlanet, defaultPanelRoom: A.defaultPanelRoom,
       // The stream a view's scene is shown in, null once another view has its place (kit/SPEC.md view contract).
       shown: (scene) => (S.activeScene === scene ? String(S.streamEpoch) : null),
     };
