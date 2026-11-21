@@ -21,6 +21,8 @@
     'burnt orange bay liner': PANEL, 'orange anodized return': PANEL, 'orange wing duct': PANEL,
     'pearl pressure hull': { lamps: '#f4ba76' },
   };
+  // The survey ring's inspection rail is a row of lamps, so it takes the color as well.
+  const RING_TRIM = { ...TRIM, 'amber inspection rail': { lamps: '#ffc074' } };
 
   /** Both ships come from the one build, the ring fitted or not. @param {boolean} ring */
   const petrel = (ring) => ({
@@ -49,7 +51,7 @@
     replaces: ['aur-bastion-corvette-v3', 'aur-helix-destroyer-v3'],
     sizes: [1.25, 1.55],
     correction: { scale: 1 / RING_SPAN, offset: [0, 0, -MIDSHIP] },
-    trim: TRIM,
+    trim: RING_TRIM,
     ...petrel(true),
   });
 })();

@@ -72,6 +72,26 @@ test('a ringed container holds the triangles the variant records, as one mesh', 
   });
 });
 
+// The rail's lamps are painted in one color and lit in an amber tint of the art's own; worn, they
+// show the ship color at the level of that tint's brightest channel.
+test('the ring\'s inspection rail lamps show the ship color: terracotta on Claude, pearl on Codex, not amber', () => {
+  onScene((scene, models) => {
+    const ringed = models.inPlaceOf(WORKHORSE).model;
+    const rail = models.container(scene, ringed).meshes[0].material.subMaterials.find((finish) => finish.name === 'amber inspection rail');
+    const { lamps } = ringed.trim['amber inspection rail'];
+    assert.ok(readRenderer('ships/petrel/source/surfaces.js').includes(`'${lamps}'`), 'the color the ring paints its lamps in');
+    const { r, g, b } = rail.emissiveColor;
+    assert.ok(r > g && g > b, 'the art lights them in a tint');
+    const materials = new Map();
+    for (const hex of ['#d97757', '#f2f0ea']) {
+      const worn = models.material(materials, ringed, hex, hex, rail);
+      const shown = BABYLON.Color3.FromHexString(lamps).toLinearSpace().multiply(worn.emissiveColor);
+      assert.ok(shown.equalsWithEpsilon(BABYLON.Color3.FromHexString(hex).toLinearSpace().scale(r), 1e-6), hex);
+      assert.equal(worn.emissiveTexture, rail.emissiveTexture, 'on the lamp map the art painted');
+    }
+  });
+});
+
 test('the nozzles follow the rank\'s size', () => {
   const models = load().shipModels;
   const [scout, workhorse, capital] = [SCOUT, WORKHORSE, CAPITAL].map((hull) => models.inPlaceOf(hull));

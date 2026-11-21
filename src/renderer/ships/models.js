@@ -197,13 +197,15 @@
         const tint = AUR.color3(hex);
         if (typeof role !== 'number') {
           // The map times the emissive color is what shows: with the painted color divided out,
-          // that is the ship color, at the level the model lights its lamps to. (The glow pass
-          // reads the map without linearizing it, so a lamp's halo is a paler tint; on Petrel's
-          // hairline lamps no halo shows, even with the chase camera at its closest.)
+          // that is the ship color, at the level the model lights its lamps to (the emissive
+          // color's brightest channel, so a tinted one loses its tint). (The glow pass reads the
+          // map without linearizing it, so a lamp's halo is a paler tint; on Petrel's hairline
+          // lamps no halo shows, even with the chase camera at its closest.)
           const painted = AUR.color3(role.lamps).toLinearSpace();
           const shown = tint.toLinearSpace();
-          copy.emissiveColor = base.emissiveColor.multiply(new BABYLON.Color3(
-            shown.r / Math.max(painted.r, 0.01), shown.g / Math.max(painted.g, 0.01), shown.b / Math.max(painted.b, 0.01)));
+          const { r, g, b } = base.emissiveColor;
+          copy.emissiveColor = new BABYLON.Color3(
+            shown.r / Math.max(painted.r, 0.01), shown.g / Math.max(painted.g, 0.01), shown.b / Math.max(painted.b, 0.01)).scale(Math.max(r, g, b));
           return;
         }
         copy.albedoTexture = null;
