@@ -1,11 +1,11 @@
 // @ts-check
-// AUR.ships: instantiate a ship's hull, upgrade a fallback dart to one,
-// refresh it in place on promotion, and dispose a scene's hull state.
+// AUR.ships: instantiate a ship's hull, upgrade a fallback dart to one, refresh it in place on
+// promotion, fade the fleet while focus mode follows a ship, and dispose a scene's hull state.
 'use strict';
 
 /**
  * @import { Ship } from '../types/contract'
- * @import { ShipAssetsCore } from './ship-assets.js'
+ * @import { HullEntry, ShipAssetsCore } from './ship-assets.js'
  * @import { ShipAssetsHulls } from './ship-assets-hulls.js'
  */
 
@@ -14,9 +14,17 @@
   /** @type {ShipAssetsCore & ShipAssetsHulls} */
   const assets = AUR.shipAssets;
   const {
-    manifestPromise, settledManifest, sceneStates, stateFor, isSceneDisposed, viewLod, selectHull,
-    hullFiles, ensureContainer, fitsBudget, resolveAsset, lookOf, createShipEntry, swapHull,
+    logFailure, guarded, manifestPromise, settledManifest, sceneStates, stateFor, isSceneDisposed, apartVisibility,
+    ownVisibility, viewLod, selectHull, hullFiles, ensureContainer, fitsBudget, resolveAsset, lookOf,
+    createShipEntry, swapHull, forget,
   } = assets;
+
+  // A hull request that throws past buildHull's own catch is logged and resolves null.
+  /** @param {HullEntry | null} hull null when the throw came before it was chosen */
+  function failed(hull, error) {
+    logFailure(hull ? 'Hull ' + hull.id + ' request failed' : 'A hull request failed', error);
+    return null;
+  }
 
   function instantiate(scene, ship) {
     const state = stateFor(scene);
@@ -39,45 +47,101 @@
 
   function upgrade(scene, ship, fallback) {
     const state = stateFor(scene);
+    /** @type {HullEntry | null} */
+    let chosen = null;
     return manifestPromise.then((manifest) => {
       if (!manifest || isSceneDisposed(scene, state)) return null;
       const hull = selectHull(manifest, ship);
       if (!hull) return null;
-      return resolveAsset(scene, state, hull, 0).then((asset) => {
-        if (!asset || AUR.isNodeDisposed(fallback) || isSceneDisposed(scene, state)) return null;
+      chosen = hull;
+      return resolveAsset(scene, state, hull, () => 0, () => !AUR.isNodeDisposed(fallback), (asset) => {
+        const { isPickable, isVisible, metadata } = fallback;
         const entry = createShipEntry(scene, state, hull, asset, ship);
         if (!entry) return null;
         const assetRoot = entry.root;
-        entry.fallback = fallback;
-        // The dart root keeps the view's display scale; the hull sits inside it at unit scale.
-        assetRoot.parent = fallback;
-        fallback.isPickable = false;
-        fallback.isVisible = false; // children keep drawing; the dart itself leaves the render queues
-        AUR.markShipMesh(assetRoot, ship);
-        fallback.metadata = {
-          ...(fallback.metadata || {}),
-          isShip: false,
-          upgradedHullId: hull.id,
-        };
+        try {
+          entry.fallback = fallback;
+          // The dart root keeps the view's display scale; the hull sits inside it at unit scale.
+          assetRoot.parent = fallback;
+          fallback.isPickable = false;
+          fallback.isVisible = false; // children keep drawing; the dart itself leaves the render queues
+          fallback.metadata = {
+            ...(fallback.metadata || {}),
+            isShip: false,
+            upgradedHullId: hull.id,
+          };
+          AUR.markShipMesh(assetRoot, ship);
+        } catch (error) {
+          // A hull that cannot be installed under its dart: the install's cause is logged, then the
+          // dart is put back as it was and the hull is let go, each step guarded.
+          failed(hull, error);
+          guarded('Uninstalled hull ' + hull.id, [
+            [' could not restore its dart', () => Object.assign(fallback, { isPickable, isVisible })],
+            [" could not restore its dart's metadata", () => { if (fallback.metadata !== metadata) fallback.metadata = metadata; }],
+            [' could not be hidden', () => assetRoot.setEnabled(false)],
+            [' could not be disposed', () => assetRoot.dispose()],
+          ]);
+          forget(state, entry); // off the books, though its root could not go
+          return null;
+        }
         return assetRoot;
       });
-    }).catch(() => null);
+    }).catch((error) => failed(chosen, error));
   }
 
-  // Focus mode in the system view saves and restores each mesh's visibility;
-  // a hull swapped in meanwhile would escape that, so it waits.
-  function isFaded(entry) {
-    const nodes = AUR.nodeFamily(entry.root);
-    if (entry.fallback) nodes.push(entry.fallback);
-    return nodes.some((node) => typeof node.visibility === 'number' && node.visibility < 1);
+  /**
+   * Shows every hull in the scene at `visibility`, except the ship `apart` names, at its own (0
+   * hides it): focus mode in the system view fades the ships it does not follow and shows the one
+   * it follows in full, or hides it from inside, then restores them all at 1. It holds for hulls
+   * built later too (a ship that arrives, a promotion). The fleet fades on its templates. A ship
+   * is rebuilt exactly when it must move onto or off a template of its own: onto one when it is
+   * shown apart above 0 at a visibility other than the fleet's, off it when it is shown at the
+   * fleet's. Hiding or showing a ship that stays on the template it has rebuilds nothing. Focus
+   * mode shows one ship apart at a time, so entering or leaving focus rebuilds at most one hull
+   * and following another ship at most two. A ship that cannot be rebuilt keeps the hull it has,
+   * drawn exactly when the fade shows it and at the fade's visibility as far as that hull's
+   * template allows, and is rebuilt at a later fade. A dart or a signal has meshes of its own,
+   * which focus mode fades itself.
+   * @param {number} visibility
+   * @param {{ shipId: string, visibility: number }} [apart]
+   */
+  function fade(scene, visibility, apart) {
+    const state = stateFor(scene);
+    if (isSceneDisposed(scene, state)) return;
+    const before = state.apart;
+    state.visibility = visibility;
+    state.apart = apart ? { shipId: String(apart.shipId), visibility: apart.visibility } : null;
+    const show = (template, value) => { for (const mesh of template.meshes) mesh.visibility = value; };
+    for (const template of state.templates.values()) show(template, visibility);
+    // The ships apart before and now, and any that a failed rebuild left on a template of its own.
+    const ids = new Set([before && before.shipId, state.apart && state.apart.shipId]);
+    for (const [id, entry] of state.ships) if (entry.own) ids.add(id);
+    for (const id of ids) {
+      const entry = id ? state.ships.get(id) : null;
+      if (!entry) continue;
+      const shown = apartVisibility(state, entry.ship);
+      const own = ownVisibility(state, entry.ship);
+      const moves = shown !== 0 && (own !== null) !== Boolean(entry.own);
+      if (moves && swapHull(scene, state, entry, entry.hull, entry.asset, entry.ship)) continue; // lands as the fade says
+      // On the hull it has: shown as the fade shows it, as far as that hull's template allows.
+      if (entry.own && shown !== 0) show(entry.own, own === null ? visibility : own);
+      entry.correction.setEnabled(shown !== 0);
+    }
   }
 
   /**
    * Swaps a ship's hull in place when its rank or colors have changed (a ship
    * learns it runs a local model after it spawns). The asset root the scene
-   * holds (directly, or under its fallback dart) stays the same node. Resolves
-   * to the root once swapped, else null (no model yet, same look, superseded,
-   * or deferred while focus mode fades the ship).
+   * holds (directly, or under its fallback dart) stays the same node, and the
+   * new hull lands as focus mode's fade shows the ship (fade). Every call is a
+   * new request that ends the ones before it, so only the latest builds: a call
+   * for the look already loading takes over from the one before, and the hull
+   * is built once; a call for the look the ship has builds nothing. Resolves to
+   * the root once the new hull is in place, else null (no model, the same look,
+   * ended, no file of the hull within the triangle budget, or a throw; the last
+   * two are logged). The new hull's provider evidence or a
+   * label that cannot be written on the root or the dart is logged, and the
+   * root still resolves.
    * @param {Ship} ship
    * @returns {Promise<BABYLON.Mesh | null>}
    */
@@ -85,16 +149,13 @@
     const state = sceneStates.get(scene);
     const entry = state && ship ? state.ships.get(String(ship.id)) : null;
     if (!entry || isSceneDisposed(scene, state)) return Promise.resolve(null);
+    const request = ++entry.request;
     const hull = selectHull(settledManifest(), ship);
-    if (!hull) return Promise.resolve(null);
-    const look = lookOf(hull, ship);
-    entry.wanted = look; // also cancels a pending swap when the rank falls back
-    if (look === entry.look) return Promise.resolve(null);
-    return resolveAsset(scene, state, hull, entry.triangles).then((asset) => {
-      if (!asset || entry.wanted !== look || AUR.isNodeDisposed(entry.root) ||
-          isSceneDisposed(scene, state) || isFaded(entry)) return null;
-      return swapHull(scene, state, entry, hull, asset, ship) ? entry.root : null;
-    }).catch(() => null);
+    if (!hull || lookOf(hull, ship) === lookOf(entry.hull, entry.ship)) return Promise.resolve(null);
+    const live = () => entry.request === request && !AUR.isNodeDisposed(entry.root);
+    return resolveAsset(scene, state, hull, () => entry.asset.record.triangles, live,
+      (asset) => (swapHull(scene, state, entry, hull, asset, ship) ? entry.root : null))
+      .catch((error) => failed(hull, error));
   }
 
   function dispose(scene) {
@@ -112,5 +173,5 @@
     sceneStates.delete(scene);
   }
 
-  AUR.ships = { instantiate, upgrade, refresh, dispose };
+  AUR.ships = { instantiate, upgrade, refresh, fade, dispose };
 })();

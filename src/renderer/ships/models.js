@@ -1,7 +1,7 @@
 // @ts-check
 // Ship models built in code. A model flies the rank of one manifest hull: ship-assets.js asks here
 // for the hull to fly and for its container (the ship built once per scene, as one mesh that every
-// ship of the model copies or instances), ship-assets-hulls.js for what a ship's hull wears, the
+// ship of the model instances), ships/livery.js for what a ship's hull wears, the
 // views for the lights and the nozzles. A model keeps the finishes it was authored with, so it
 // brings its own reflections, tone curve and lights, and no other light of the view reaches it.
 'use strict';
@@ -66,16 +66,30 @@
     }));
   }
 
-  /** One built ship, dressed, held out of the scene as one mesh with a sub-mesh per finish. */
+  /**
+   * One built ship, dressed, held out of the scene as one mesh with a sub-mesh per finish. It owns
+   * the materials and textures it was built with, so disposing it releases them as a file's
+   * container does; they stay in the scene, which marks its materials dirty when it changes.
+   */
   function container(scene, model) {
-    const before = BUILT.map((list) => scene[list].length);
+    const counts = Object.fromEntries(BUILT.map((list) => [list, scene[list].length]));
+    // What the build added to a scene list, less the BRDF lookup texture a scene's first PBR
+    // material makes: that is the scene's, and every later PBR material uses it.
+    const made = (list) => scene[list].slice(counts[list]).filter((item) => item !== scene.environmentBRDFTexture);
+    let held;
     try {
-      return dressed(scene, model);
+      held = dressed(scene, model);
     } catch (error) {
-      // A build that fails part-way leaves nothing of itself in the scene.
-      BUILT.forEach((list, i) => { for (const made of scene[list].slice(before[i])) made.dispose(); });
+      // A build that fails part-way disposes what it made, and throws its own cause.
+      for (const list of BUILT) {
+        for (const item of made(list)) AUR.disposeLogged(item, item.name + ' from a failed build of ' + model.id);
+      }
       throw error;
     }
+    held.materials.push(...made('materials'));
+    held.multiMaterials.push(...made('multiMaterials'));
+    held.textures.push(...made('textures'));
+    return held;
   }
 
   function dressed(scene, model) {
@@ -93,8 +107,8 @@
       material.imageProcessingConfiguration = image;
       AUR.fadeWithMesh(material);
     }
-    // A hull's cost is its mesh count: thirty-odd parts per ship more than doubled a crowded
-    // system's frame time, so the parts become one mesh, grouped by finish.
+    // Every mesh of a hull is placed and culled once per ship, so the thirty-odd parts become one
+    // mesh, grouped by finish: one draw per finish for all the ships of a template.
     const hull = BABYLON.Mesh.MergeMeshes(parts, true, true, undefined, false, true);
     root.dispose();
     hull.name = model.id;
@@ -106,15 +120,28 @@
   }
 
   // Material.clone() would clone each texture too (and give a painted one a blank canvas): a copy
-  // shares the model's.
+  // shares the model's. The model's finish gets its maps back whether or not the clone is made,
+  // and a copy that cannot take them is not left in the scene.
   /** @param {BABYLON.PBRMaterial} material @param {string} name */
   function copyMaterial(material, name) {
+    const scene = material.getScene();
+    const count = scene.materials.length;
     const textures = TEXTURE_SLOTS.map((slot) => material[slot]);
-    for (const slot of TEXTURE_SLOTS) material[slot] = null;
-    const copy = material.clone(name);
-    TEXTURE_SLOTS.forEach((slot, i) => { material[slot] = copy[slot] = textures[i]; });
-    copy.imageProcessingConfiguration = material.imageProcessingConfiguration;
-    return copy;
+    let copy;
+    try {
+      for (const slot of TEXTURE_SLOTS) material[slot] = null;
+      copy = material.clone(name);
+    } catch (error) {
+      // A clone that failed once made: its copy is not left in the scene.
+      for (const partial of scene.materials.slice(count)) AUR.disposeLogged(partial, 'A failed copy of ' + material.name);
+      throw error;
+    } finally {
+      TEXTURE_SLOTS.forEach((slot, i) => { material[slot] = textures[i]; });
+    }
+    return AUR.dressed(copy, (made) => {
+      TEXTURE_SLOTS.forEach((slot, i) => { made[slot] = textures[i]; });
+      made.imageProcessingConfiguration = material.imageProcessingConfiguration;
+    });
   }
 
   /**
@@ -148,29 +175,29 @@
     if (!role && !whole) return base;
     return AUR.memo(materials, model.id + ':' + palette + ':' + base.name, () => {
       if (base instanceof BABYLON.MultiMaterial) {
-        const worn = new BABYLON.MultiMaterial(base.name + ' ' + palette, base.getScene());
-        worn.subMaterials = base.subMaterials.map((finish) =>
-          material(materials, model, palette, hex, /** @type {BABYLON.PBRMaterial} */ (finish)));
-        return worn;
+        return AUR.dressed(new BABYLON.MultiMaterial(base.name + ' ' + palette, base.getScene()), (worn) => {
+          worn.subMaterials = base.subMaterials.map((finish) =>
+            material(materials, model, palette, hex, /** @type {BABYLON.PBRMaterial} */ (finish)));
+        });
       }
-      /** @type {BABYLON.Color3} */
-      const tint = AUR.color3(hex);
-      const copy = copyMaterial(base, base.name + ' ' + palette);
-      if (typeof role !== 'number') {
-        // The map times the emissive color is what shows: with the painted color divided out, that
-        // is the ship color, at the level the model lights its lamps to. (The glow pass reads the
-        // map without linearizing it, so a lamp's halo is a paler tint; on Petrel's hairline
-        // lamps no halo shows, even with the chase camera at its closest.)
-        const painted = AUR.color3(role.lamps).toLinearSpace();
-        const shown = tint.toLinearSpace();
-        copy.emissiveColor = base.emissiveColor.multiply(new BABYLON.Color3(
-          shown.r / Math.max(painted.r, 0.01), shown.g / Math.max(painted.g, 0.01), shown.b / Math.max(painted.b, 0.01)));
-        return copy;
-      }
-      copy.albedoTexture = null;
-      copy.emissiveTexture = null;
-      trimLight(copy, tint, role);
-      return copy;
+      return AUR.dressed(copyMaterial(base, base.name + ' ' + palette), (copy) => {
+        /** @type {BABYLON.Color3} */
+        const tint = AUR.color3(hex);
+        if (typeof role !== 'number') {
+          // The map times the emissive color is what shows: with the painted color divided out,
+          // that is the ship color, at the level the model lights its lamps to. (The glow pass
+          // reads the map without linearizing it, so a lamp's halo is a paler tint; on Petrel's
+          // hairline lamps no halo shows, even with the chase camera at its closest.)
+          const painted = AUR.color3(role.lamps).toLinearSpace();
+          const shown = tint.toLinearSpace();
+          copy.emissiveColor = base.emissiveColor.multiply(new BABYLON.Color3(
+            shown.r / Math.max(painted.r, 0.01), shown.g / Math.max(painted.g, 0.01), shown.b / Math.max(painted.b, 0.01)));
+          return;
+        }
+        copy.albedoTexture = null;
+        copy.emissiveTexture = null;
+        trimLight(copy, tint, role);
+      });
     });
   }
 

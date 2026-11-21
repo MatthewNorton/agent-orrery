@@ -20,6 +20,29 @@
     if (material.transparencyMode === BABYLON.Material.MATERIAL_OPAQUE) material.transparencyMode = null;
   };
 
+  // Disposes what a failure left behind without losing that failure: a dispose that throws is
+  // logged once per message, and the caller goes on to report its own cause.
+  AUR.disposeLogged = function (item, name) {
+    try {
+      item.dispose();
+    } catch (error) {
+      const message = name + ' could not be disposed (' + ((error && error.message) || error) + ').';
+      AUR.logOnce(message, message);
+    }
+  };
+
+  // A material just made, once `dress` has run on it; one that cannot be dressed is disposed, so
+  // a copy is never left in the scene half dressed.
+  AUR.dressed = function (material, dress) {
+    try {
+      dress(material);
+    } catch (error) {
+      if (material) AUR.disposeLogged(material, 'Undressed material ' + material.name);
+      throw error;
+    }
+    return material;
+  };
+
   // A light that reaches only the meshes carrying a layer bit.
   AUR.layerLight = function (light, intensity, diffuse, layer) {
     light.intensity = intensity;
@@ -191,6 +214,13 @@
   AUR.shipHullId = function (mesh) {
     const metadata = mesh && mesh.metadata;
     return (metadata && (metadata.upgradedHullId || metadata.assetHullId)) || null;
+  };
+
+  // The node a ship mesh's hull hangs from: the asset root swapped in under a dart (beside the
+  // dart's plume anchors), or the mesh itself (an asset root, or a bare dart).
+  AUR.shipHullNode = function (mesh) {
+    const swapped = mesh.metadata && mesh.metadata.upgradedHullId;
+    return (swapped && mesh.getChildren((child) => Boolean(child.metadata && child.metadata.assetHullId), true)[0]) || mesh;
   };
 
   // The connected pieces of a mesh (triangles sharing a vertex position), each as its centre and
