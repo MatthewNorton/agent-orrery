@@ -44,7 +44,7 @@ Each hull's `build_<hull>.py` composes its parts from these and documents them i
   and bakes them into the GLB through the image-to-blender-asset toolkit. The maps tile every 2.4 m
   (Scout), 6 m (Workhorse), 20 m (Capital) and 60 m (Flagship); the geometry above carries the
   visible detail, the maps add close-range texture.
-- **The app owns the livery.** `src/renderer/ship-assets-hulls.js` keeps the three hull tones as
+- **The app owns the livery.** `src/renderer/ships/livery.js` keeps the three hull tones as
   baked and makes the ship color the hull's trim lighting: `accent_livery` (stripes, chevrons,
   collars) and `engine_glow` (nozzles, intakes) emit it (Claude terracotta, Codex pearl, a local
   model red) over a dark surface at 1.5x, so a line outshines the lit hull, and the glow pass blooms
