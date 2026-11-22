@@ -57,7 +57,7 @@ loaders), then:
 
 | Layer | Files |
 |---|---|
-| Shared libraries | `util.js` (creates `window.AUR`; `fnv1a`/`mulberry32` copied from `src/main/shared/hash.js` so seeds agree), `util-scene.js` (Babylon helpers), `procedural-worlds.js` (world profiles: class, palette, hue, seed; asteroids), `worlds/` (kit 15: the pure map generator `noise.js` + `classes.js` + `maps.js`, run by `worker.js`, a worker file and not a page script; `textures.js`, the map service on `AUR.app.state.worldMaps`; `shaders.js`; `material.js`, a world's globe and shells; `sun.js`, the system sun's photosphere plugin and billboards), `ship-assets.js` + `ship-assets-hulls.js` + `ship-assets-api.js` (`AUR.ships`), `polish-math.js`, `galaxy-layout.js` and `galaxy-field.js` (pure UMD; the field is a galaxy's emission/dust atlas and the stars drawn from it), `search-core.js`, `components/project-vcs-status.js` |
+| Shared libraries | `util.js` (creates `window.AUR`; `fnv1a`/`mulberry32` copied from `src/main/shared/hash.js` so seeds agree), `util-scene.js` (Babylon helpers), `procedural-worlds.js` (world profiles: class, palette, hue, seed; asteroids), `worlds/` (kit 15: the pure map generator `noise.js` + `classes.js` + `maps.js`, run by `worker.js`, a worker file and not a page script; `textures.js`, the map service on `AUR.app.state.worldMaps`; `shaders.js`; `material.js`, a world's globe and shells; `sun.js`, the system sun's photosphere plugin and billboards), `ship-assets.js` + `ship-assets-hulls.js` + `ship-assets-api.js` (`AUR.ships`), `ships/` (ship models built in code: `modules.js`, the registry the converted modules load into; `models.js`, `AUR.shipModels`; one folder per model, `ships/petrel/` with its generated `source/` and the hand-written `model.js`), `polish-math.js`, `galaxy-layout.js` and `galaxy-field.js` (pure UMD; the field is a galaxy's emission/dust atlas and the stars drawn from it), `search-core.js`, `components/project-vcs-status.js` |
 | Views | `scene/common.js` (`AUR.sceneParts`), `scene/sky.js` (`AUR.addSky`, the system and planet views' baked sky), then for each view in `scene/<view>/` (universe, system, planet) its parts before its `view.js` |
 | App state | `app/state.js` — the only file that assigns `AUR.app` (`state`, `const`) |
 | App modules | every other file in `app/`, `app/project/` and `app/panels/`, in `index.html` order; the last of them is `app/route.js`, the routes (universe, system, planet, the back button, the debug views of §8) |
@@ -485,13 +485,52 @@ Design tokens (put in `:root`):
   60); display length grows 1.9× over the ladder. A drone flies the first rank
   at `AUR.DRONE_SCALE` of its size. Each hull is one file: the universe map
   instances it from a per-provider template, the system and planet views clone
-  it (so focus mode can fade ships one by one); a view steps down to the dart at
-  400k hull triangles per scene. Ship size is one policy (`AUR.SHIP_SIZE` per
+  it (so focus mode can fade ships one by one; an opaque hull material gives
+  its transparency mode up, because Babylon ignores a mesh's visibility while
+  its material is set opaque or cut-out; blended glass fades as it is; a
+  cut-out keeps its mode and does not fade, and no hull has one);
+  a view steps down to the dart past its hull triangle budget: 900k in a
+  system or planet view, which holds fifty-one ships of the first rank, and
+  1.24M on the universe map, whose hulls are instances, which holds seventy. Ship size is one policy (`AUR.SHIP_SIZE` per
   view, `AUR.fitShip` with a pixel floor so a hull sized to its planets still
   reads from the default orbit). `AUR.ships.refresh(scene, ship)` swaps the hull
   inside the asset root the scene already holds; `app/boot.js` calls it after
   `ship-updated` and `build` events, and it waits while focus mode has the ship
   faded.
+- A rank can be flown by a ship model built in code instead of a file
+  (`AUR.shipModels`, `ships/models.js`). A model names the manifest hull it
+  `replaces` and flies in that hull's rank (`selectHull` asks
+  `AUR.shipModels.inPlaceOf`); the frozen manifest is unchanged. Petrel
+  (`ships/petrel/model.js`) flies the Scout rank, so it is also every drone.
+  Its container is the ship built once per scene and merged into one mesh
+  with a sub-mesh per finish, because a hull's cost is its mesh count; from
+  there it goes the way of a hull file's container (the hull entry
+  `inPlaceOf` returns carries the `model`, which is what tells the two
+  apart): the universe map instances a per-provider template, the system and
+  planet views copy the mesh (shared geometry, the ship's own visibility). A
+  model keeps the finishes it was authored with: its
+  materials reflect its own probe and use their own tone curve (ACES), and in
+  the views that light their ships three fixed lights are all that reaches a
+  model hull (`AUR.shipModels.LAYER`: the model lights include only that
+  layer and every other light of the view excludes it, since a material draws
+  four lights at most; the fleet's key and rim stay on `AUR.SHIP_LAYER`).
+  The ship color is still trim lighting, never hull paint: the model lists its
+  trim by material name, and each is copied once per palette as a light in the
+  ship color (a number: `TRIM_LIGHT` for a lamp, lower for a wide surface that
+  should glow as a lit panel) or, for `{ lamps: <the color its emissive map
+  is painted in> }`, keeps its surface and has that map show the ship color. `AUR.shipModels.trimLight` is that light, and
+  the fleet's livery stripes and nozzles are made by it too.
+- A model's `source/` folder is generated: `node scripts/import-ship.mjs <ship>
+  <source folder>` converts the ship's ES modules to page scripts that register
+  with `AUR.shipModule` (one file per module, run on first use, so page load
+  builds nothing), and writes `source.json`: the source commit, each module's
+  hash, exports and the hash of the file generated from it, and a fingerprint
+  of the built ship's geometry, which the script first proves equal to what
+  the original modules build. Never edit
+  those files: change the ship at its source and run the script again
+  (`--check` reports whether they are current); it prints the script tags
+  `index.html` needs. `test/ships-source.test.js` holds the committed files
+  to those hashes, rebuilds the ship from them and compares the fingerprint.
 
 ## 5. Universe view (`3.universe-map-view.png`)
 
@@ -621,8 +660,8 @@ route logs that and shows the universe instead (`app/route.js`).
 - Ships (only ships where `ship.project === projectId`): the hull of §4 (a dart
   until it loads) + name label (GUI, always visible, like `Claude-1` callouts in
   the mockup) + an exhaust plume from each stern nozzle (the `exhaust` part
-  reads them off the hull's `engine_glow` islands; a dart trails from its
-  tail). Modes: `patrol` outside the last orbit and the
+  reads them off the hull's `engine_glow` islands, or takes them from
+  `AUR.shipModels.nozzles` for a model; a dart trails from its tail). Modes: `patrol` outside the last orbit and the
   belt; on `build` → `flyto` (`AUR.MOTION.flyToSeconds`, arcing over the belt
   and the largest planet) to a standoff beside the `bucket` planet → `hold`
   (~2.4s, a thin emissive beam, planet pulses 1 → 1.15 → 1) → `return` to the

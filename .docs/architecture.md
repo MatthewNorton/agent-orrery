@@ -463,8 +463,8 @@ contract), `AUR`, `AUR_POLISH` and `AUR_GALAXY` (all `any` for now).
 
 | File | Lines | Job |
 |---|---|---|
-| `util.js` | 379 | Creates `AUR`; hashes, colours, provider metadata, motion tuning, asset paths, DOM helpers; bridge calls that fail soft (`AUR.settle`, `AUR.settleBusy` with a busy flag up meanwhile, `AUR.fetchSystem`) |
-| `util-scene.js` | 340 | Babylon helpers on `AUR`: skybox (PhotoDome), starfield, orbit rings, ship and signal markers, GUI labels |
+| `util.js` | 380 | Creates `AUR`; hashes, colours, provider metadata, motion tuning, asset paths, DOM helpers; bridge calls that fail soft (`AUR.settle`, `AUR.settleBusy` with a busy flag up meanwhile, `AUR.fetchSystem`) |
+| `util-scene.js` | 357 | Babylon helpers on `AUR`: skybox (PhotoDome), starfield, orbit rings, ship and signal markers, GUI labels |
 | `procedural-worlds.js` | 329 | Planet and asteroid surfaces (authored textures + generated normal maps) |
 | `ship-assets.js` | 252 | Manifest, per-scene state, hull choice by rank (`builds` against the manifest ladder), container loading; procedural dart fallback |
 | `ship-assets-hulls.js` | 252 | Builds a hull from a loaded model: provider livery, far-file instances on the universe map, near-file clones in system / planet views, within a 100k-triangle budget |
@@ -473,7 +473,7 @@ contract), `AUR`, `AUR_POLISH` and `AUR_GALAXY` (all `any` for now).
 | `polish-math.js` | 67 | Pure: label overlap, sun pulse |
 | `search-core.js` | 225 | Pure: ranks projects, agents and folders (prefix, substring, path or other text, then fuzzy) |
 | `components/project-vcs-status.js` | 277 | Pure presentation for git / GitHub markers and details |
-| `scene/common.js` | 137 | Creates `AUR.sceneParts`; the shared camera, ship mesh, teardown and mesh disposal |
+| `scene/common.js` | 133 | Creates `AUR.sceneParts`; the shared camera, ship mesh, teardown and mesh disposal |
 | `scene/universe/view.js` | 276 | Galaxy map: builds the `view` object and merges its parts |
 | `scene/universe/galaxies.js` | 208 | Galaxy discs, outlines, labels, glyph placement, camera framing |
 | `scene/universe/glyphs.js` | 144 | A project glyph's live state: dimming, search focus, attention halo, VCS markers, sun pulse |
@@ -507,7 +507,7 @@ contract), `AUR`, `AUR_POLISH` and `AUR_GALAXY` (all `any` for now).
 | `app/project/forget.js` | 84 | Forgetting a project from the settings dialog or the project card: main confirms and answers with a fresh LIVE snapshot; a reseed from it that fails is logged, and main's answer stands |
 | `app/project/tasks.js` | 271 | TASKS panel |
 | `app/project/control.js` | 337 | Project card, Open Terminal button (busy through `AUR.settleBusy`), planet card |
-| `index.html` | 582 | All panels exist in the HTML up front; modules show / hide them |
+| `index.html` | 597 | All panels exist in the HTML up front; modules show / hide them |
 | `styles/*.css` | 2,041 | All styles, in 13 files; `focus.css` and `focus-rooms.css` (445) are the cockpit |
 
 ### 6.3 Shared state and routing
