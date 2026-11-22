@@ -79,7 +79,7 @@ test('a rank a ship model has taken flies the model, built in code, until the sh
     container(_scene, model) { built.push(model.id); return assets.containerFor('model:' + model.id); },
     material: (_materials, model, palette, hex, base) => ({ worn: [model.id, palette, hex, base.name].join(' ') }),
   });
-  assets.models.register({ id: 'coded', replaces: 'small', correction: { scale: 0.1, offset: [0, 0, -1] }, trim: {} });
+  assets.models.register({ id: 'coded', replaces: [{ hull: 'small' }], correction: { scale: 0.1, offset: [0, 0, -1] }, trim: {} });
 
   const system = assets.scene('system');
   const root = await assets.ships.upgrade(system, ship('a', 0), assets.fallback('a'));
@@ -116,7 +116,7 @@ test('a model container queued for a scene that is gone before the build runs is
   const assets = loadShipAssets(LADDER_MANIFEST, {});
   const built = [];
   assets.models.container = (_scene, model) => { built.push(model.id); return assets.containerFor('model:' + model.id); };
-  assets.models.register({ id: 'coded', replaces: 'small', correction: { scale: 0.1, offset: [0, 0, 0] }, trim: {} });
+  assets.models.register({ id: 'coded', replaces: [{ hull: 'small' }], correction: { scale: 0.1, offset: [0, 0, 0] }, trim: {} });
   await assets.AUR.shipAssets.manifestPromise;
   const ends = { 'its hull state disposed': (scene) => assets.ships.dispose(scene), 'Babylon disposed': (scene) => { scene.isDisposed = () => true; } };
   for (const [how, end] of Object.entries(ends)) {

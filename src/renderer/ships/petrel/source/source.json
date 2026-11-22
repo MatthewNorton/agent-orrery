@@ -1,6 +1,6 @@
 {
   "ship": "petrel",
-  "commit": "633082693d67",
+  "commit": "d2051e77c270",
   "build": [
     "spacecraft",
     "createPetrel"
@@ -52,8 +52,8 @@
     },
     "geometry": {
       "source": "geometry.js",
-      "sha256": "14a7b882d8696dbdd78baab182a055c6f746709defcf7e4469c7e03224f0ebfa",
-      "generated": "1e1797a47e1256dae456d23734a779c33c1c38fbb729be5e42641aafc9d39915",
+      "sha256": "b57fbf4d93190686645b77902991eaaecee8f8be410a26bff34ef7f5630530a0",
+      "generated": "7175cce32f485ec5729af7f7e14ab13e68f4918728c5ae4d504b929e608c4a6f",
       "exports": [
         "Assembly",
         "circularFitting",
@@ -71,16 +71,16 @@
     },
     "surfaces": {
       "source": "surfaces.js",
-      "sha256": "698936a691ba1c8b8ab36ffd854a41e55783ac692ea912a79177ead530c5ad56",
-      "generated": "8fdbeb3f2fd0cb603b990d7f8fe1f00efd8bda4df77b6284a2378a22a0f00c0c",
+      "sha256": "f5f0545cf1696237bbe431d052bac57538fcb2e27c098331f34244a5f0f3f1fb",
+      "generated": "625206584ccb7c483c66bd65e07c0f544614334de347826aeeda23a3aea39346",
       "exports": [
         "createSurfaces"
       ]
     },
     "hull": {
       "source": "hull.js",
-      "sha256": "b581aab0a6361dc51426fd9afe241785e360c64fabb3c9be753f5a9e55b6d5b0",
-      "generated": "9b9d847cf8db6e9c75eeb3d55e18952fd6f7ed8c925e7c6a039d19a5ea17cec9",
+      "sha256": "2f020af6f10fdee701aec0ce9f57eaef59a8b02acd2d5574439b5ab7c32f7138",
+      "generated": "1ec44aa0e6c3e07f3b4a555421be2055048e8db9ce3bb9ac310085435555e297",
       "exports": [
         "buildHull"
       ]
@@ -119,10 +119,20 @@
         "buildWing"
       ]
     },
+    "survey-ring": {
+      "source": "survey-ring.js",
+      "sha256": "60853d8104de784fd87e8541bfe91506cdd609e500d2d01e622ed8af00411e49",
+      "generated": "b24b1735cd16e4d8cfb588dbfa4349a614209f576a696189f8ae62645a928c10",
+      "exports": [
+        "RING",
+        "createSurveyRing",
+        "ringPoint"
+      ]
+    },
     "spacecraft": {
       "source": "spacecraft.js",
-      "sha256": "043fff1eaf0319df274f3974220a9621992ece52165b3be3bb732c2b84ce312f",
-      "generated": "80aa3be793b2acb3b296c518369ebc51eacd8a7a3303f45911b325bc6af947f4",
+      "sha256": "a15043159712e39eda4a2cea464d92e67f3be1d918a48ede4298b59362e11744",
+      "generated": "a565279bb07c7a419236518d8b0ea4464784a204b4cbccdadd5b5101d91a6108",
       "exports": [
         "createPetrel"
       ]
@@ -140,5 +150,18 @@
     "meshes": 34,
     "triangles": 17544,
     "sha256": "d475cf9da7d28d043263b2b71a9985c27eb8095fa5457b8c6e649b13f7f12c16"
+  },
+  "variants": {
+    "ring": {
+      "call": [
+        "setRing",
+        true
+      ],
+      "geometry": {
+        "meshes": 46,
+        "triangles": 40840,
+        "sha256": "21062b635e4346b004924277005fca37b778231101a7cbac4c2e8f86cff54de6"
+      }
+    }
   }
 }

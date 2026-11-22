@@ -8,7 +8,8 @@
 // Each source module becomes one file under src/renderer/ships/<ship>/source/ that registers a
 // factory with AUR.shipModule. source.json beside them records the last source commit that touched
 // the ship, a hash of every source file and of the file generated from it, and a fingerprint of the
-// built geometry; test/ships-source.test.js holds the committed files to the last two. --check writes nothing and reports whether the files on disk are current.
+// built geometry, and of each variant's; test/ships-source.test.js holds the committed files to the
+// last two. --check writes nothing and reports whether the files on disk are current.
 // Nothing here edits a model: a change to a ship is made at its source, then this runs again.
 
 import { execFileSync } from 'node:child_process';
@@ -19,17 +20,22 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const require = createRequire(import.meta.url);
-const { lf, sha256, fingerprintOf, loadShipModules } = require('./lib/ship-fingerprint.js');
+const { lf, sha256, fingerprintOf, loadShipModules, rootOf } = require('./lib/ship-fingerprint.js');
 const BABYLON = require('babylonjs');
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const REGISTRY = path.join(ROOT, 'src', 'renderer', 'ships', 'modules.js');
 const BABYLON_PACKAGE = '@babylonjs/core/';
 
-// Per ship: the modules the app starts from (their imports are followed) and the function that
-// builds one ship, as [module, function]; it takes a scene and returns { root }.
+// Per ship: the modules the app starts from (their imports are followed), the function that
+// builds one ship, as [module, function] (it takes a scene and returns { root }), and its
+// variants, each the call made on what the build returns, as [method, ...arguments].
 const SHIPS = {
-  petrel: { entries: ['spacecraft.js', 'exhaust.js', 'light-probe.js'], build: ['spacecraft', 'createPetrel'] },
+  petrel: {
+    entries: ['spacecraft.js', 'exhaust.js', 'light-probe.js'],
+    build: ['spacecraft', 'createPetrel'],
+    variants: { ring: ['setRing', true] },
+  },
 };
 
 const IMPORT = /^import\s*(?:\{([^}]*)\}\s*from\s*)?(['"])([^'"\n]+)\2[ \t]*;?[ \t]*$/gm;
@@ -162,7 +168,7 @@ async function main() {
   const [buildModule, buildFunction] = spec.build;
 
   const files = new Map();
-  const record = { ship, commit, build: spec.build, modules: {}, geometry: null };
+  const record = { ship, commit, build: spec.build, modules: {}, geometry: null, variants: {} };
   for (const module of modules) {
     const exported = Object.keys(original.get(module.stem));
     const generated = convert(ship, module, exported);
@@ -170,16 +176,21 @@ async function main() {
     record.modules[module.stem] = { source: module.file, sha256: sha256(module.text), generated: sha256(generated), exports: exported };
   }
 
-  // The converted files must build the ship the source builds, vertex for vertex.
+  // The converted files must build the ship the source builds, vertex for vertex, in every variant.
   const stage = fs.mkdtempSync(path.join(os.tmpdir(), 'ship-import-out-'));
   try {
     for (const [name, text] of files) fs.writeFileSync(path.join(stage, name), text);
     const use = loadShipModules(BABYLON, REGISTRY, [...files.keys()].map((name) => path.join(stage, name)));
-    const reference = fingerprintOf(BABYLON, (scene) => original.get(buildModule)[buildFunction](scene).root);
-    record.geometry = fingerprintOf(BABYLON, (scene) => use(ship + '/' + buildModule)[buildFunction](scene).root);
-    if (JSON.stringify(reference) !== JSON.stringify(record.geometry)) {
-      fail('The converted modules build a different ship: ' + JSON.stringify(record.geometry) + ' against ' + JSON.stringify(reference));
-    }
+    const proven = (call, label) => {
+      const reference = fingerprintOf(BABYLON, (scene) => rootOf(original.get(buildModule)[buildFunction](scene), call));
+      const geometry = fingerprintOf(BABYLON, (scene) => rootOf(use(ship + '/' + buildModule)[buildFunction](scene), call));
+      if (JSON.stringify(reference) !== JSON.stringify(geometry)) {
+        fail('The converted modules build a different ' + label + ': ' + JSON.stringify(geometry) + ' against ' + JSON.stringify(reference));
+      }
+      return geometry;
+    };
+    record.geometry = proven(null, 'ship');
+    for (const [name, call] of Object.entries(spec.variants)) record.variants[name] = { call, geometry: proven(call, name + ' variant') };
   } finally {
     fs.rmSync(stage, { recursive: true, force: true });
   }
@@ -194,9 +205,9 @@ async function main() {
     for (const name of stale) fs.rmSync(path.join(outDir, name));
     for (const name of changed) fs.writeFileSync(path.join(outDir, name), files.get(name));
   }
-  const { meshes, triangles } = record.geometry;
-  console.log(labelOf(ship) + ' at ' + commit + ': ' + modules.length + ' modules, ' + meshes + ' meshes, ' + triangles +
-    ' triangles, geometry ' + record.geometry.sha256.slice(0, 12) + '.');
+  const counts = ({ meshes, triangles, sha256: hash }) => meshes + ' meshes, ' + triangles + ' triangles, geometry ' + hash.slice(0, 12);
+  console.log(labelOf(ship) + ' at ' + commit + ': ' + modules.length + ' modules, ' + counts(record.geometry) +
+    Object.entries(record.variants).map(([name, { geometry }]) => '; ' + name + ': ' + counts(geometry)).join('') + '.');
   console.log((check ? 'Would change: ' : 'Wrote: ') + (changed.join(', ') || 'nothing') + (stale.length ? '; removed: ' + stale.join(', ') : ''));
   console.log('Script tags, after ships/modules.js:');
   for (const name of files.keys()) if (name.endsWith('.js')) console.log('  <script src="ships/' + ship + '/source/' + name + '"></script>');

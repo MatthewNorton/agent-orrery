@@ -338,19 +338,21 @@ test('a hull request whose dart is gone or that is superseded while it waits on 
   assert.equal(assets.triangles(scene), 600000, 'its triangles never taken');
 });
 
-// The counts the budget comment and kit/SPEC.md state, at the size Petrel was imported at.
-test('a near view holds fifty-one ships of the first rank and the universe map, with a budget of its own, seventy', async () => {
+// The counts the budget comment and kit/SPEC.md state, at the sizes Petrel was imported at: bare
+// for the first rank, with its survey ring for the two above it.
+test('a near view holds fifty-one ships of the first rank or twenty-two ringed; the universe map, with a budget of its own, seventy or thirty', async () => {
   const petrel = JSON.parse(readRenderer('ships/petrel/source/source.json'));
-  const { triangles } = petrel.geometry;
-  const assets = loadShipAssets(LADDER_MANIFEST, { 'small-near.glb': triangles, 'small-far.glb': triangles });
-  const hulled = async (view) => {
+  const [bare, ringed] = [petrel.geometry.triangles, petrel.variants.ring.geometry.triangles];
+  const assets = loadShipAssets(LADDER_MANIFEST,
+    { 'small-near.glb': bare, 'small-far.glb': bare, 'mid-near.glb': ringed, 'mid-far.glb': ringed });
+  const hulled = async (view, builds) => {
     const scene = assets.scene(view);
     let count = 0;
-    for (let n = 0; n < 80; n++) count += (await assets.ships.upgrade(scene, ship('s' + n, 0), assets.fallback(view + n))) ? 1 : 0;
+    for (let n = 0; n < 80; n++) count += (await assets.ships.upgrade(scene, ship('s' + n, builds), assets.fallback(view + n))) ? 1 : 0;
     return count;
   };
-  assert.equal(await hulled('system'), 51);
-  assert.equal(await hulled('universe'), 70);
+  assert.deepEqual([await hulled('system', 0), await hulled('universe', 0)], [51, 70]);
+  assert.deepEqual([await hulled('system', 3), await hulled('universe', 3)], [22, 30]);
 });
 
 test('disposing a scene\'s hull state empties it, though a load still waiting holds on to it', async () => {

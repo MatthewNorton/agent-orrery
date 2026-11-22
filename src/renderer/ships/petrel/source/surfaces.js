@@ -310,7 +310,50 @@ function createSurfaces(scene) {
     for (const x of [.482,.518]) for (const y of [.15,.81]) {ctx.beginPath();ctx.arc(x,y,.0029,0,Math.PI*2);ctx.fill();}
     ctx.restore();
   },256);
+  function ringFinishes() {
+    const panel = finish('ring pearl enamel','#ffffff',.30,.32);
+    coat(panel,.52,.20);
+    panel.albedoTexture = paintTexture(scene,'ring panel fasteners',(ctx,size) => {
+      ctx.scale(size,size);
+      const base=ctx.createLinearGradient(0,0,.3,1);
+      base.addColorStop(0,'#e0d2c6'); base.addColorStop(1,'#c7bab0');
+      ctx.fillStyle=base; ctx.fillRect(0,0,1,1);
+      ctx.fillStyle='#80766c'; ctx.fillRect(0,0,.0045,1);
+      ctx.fillStyle='#eadcd1'; ctx.fillRect(.0045,0,.003,1);
+      for (const u of [.041,.959]) for (const t of [.10,.90]) {
+        ctx.fillStyle='#837971'; ctx.beginPath(); ctx.ellipse(u,t,.008,.018,0,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle='#b9aea3'; ctx.beginPath(); ctx.ellipse(u,t,.0055,.013,0,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle='#605955'; ctx.fillRect(u-.0035,t-.002,.007,.004);
+      }
+    });
+    const mount=finish('oxide red ring cleats','#ac422d',.46,.31);
+    coat(mount,.48,.21);
+    const rail=finish('amber inspection rail','#ffffff',.50,.34);
+    function lamps(ctx,w,emission) {
+      ctx.scale(w,w); ctx.fillStyle=emission ? '#000' : '#5d5044'; ctx.fillRect(0,0,1,1);
+      for (const u of [.15,.29,.43,.65,.79]) {
+        if (emission) {
+          const halo=ctx.createRadialGradient(u+.029,.5,.009,u+.029,.5,.145);
+          halo.addColorStop(0,'#aa601a'); halo.addColorStop(1,'rgba(122,53,9,0)');
+          ctx.fillStyle=halo; ctx.fillRect(u-.13,0,.32,1);
+        }
+        if (!emission) { ctx.fillStyle='#372e2b'; ctx.fillRect(u-.013,.19,.085,.62); }
+        ctx.fillStyle=emission ? '#ffc074' : '#d99954'; ctx.fillRect(u,.27,.058,.46);
+      }
+    }
+    rail.albedoTexture=paintTexture(scene,'machined lamp carriers',(ctx,w)=>lamps(ctx,w,false),256);
+    rail.emissiveTexture=paintTexture(scene,'amber running lights',(ctx,w)=>lamps(ctx,w,true),256);
+    rail.emissiveColor=new Color3(3.6,2.1,.9);
+    const wafers=finish('cobalt ring wafers','#ffffff',.22,.35);
+    wafers.albedoTexture=cells.albedoTexture;
+    wafers.albedoColor=new Color3(1,1.40,1.8);
+    wafers.environmentIntensity=.72; wafers.specularIntensity=.48;
+    coat(wafers,.18,.25);
+    const shaft=finish('satin titanium pull arms','#b9ada1',.75,.39);
+    return {panel,mount,rail,shaft,wafers};
+  }
   return {
+    ringFinishes,
     silver:finish('satin silver bezels','#d1cfd0',.84,.26), undercoat, wingBelly, transom, driveBack,
     hull, wingSkin, tailSkin, glass, cells, titanium, throat, bayWall, bayLip, duct,
     portLamp: positionLamp('port position lamp','#f5a564'), starboardLamp: positionLamp('starboard position lamp','#87beaa'),

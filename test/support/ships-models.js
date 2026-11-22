@@ -26,8 +26,20 @@ function loadShipModels() {
   return AUR;
 }
 
+// The manifest hull of the Claude family's rank that opens at `minBuilds` builds.
+const rank = (minBuilds) => manifest.hulls.find((hull) => hull.family === manifest.providerFamilies.claude && hull.minBuilds === minBuilds);
+
+// Runs `work(scene, AUR.shipModels, AUR)` on a fresh scene, with the registry and Petrel loaded.
+function onModelScene(work) {
+  return withCanvas(() => onNullScene(BABYLON, (scene) => {
+    const AUR = loadShipModels();
+    return work(scene, AUR.shipModels, AUR);
+  }));
+}
+
 // Runs `work(scene, AUR, fly)` on a system view's scene, with AUR.ships on the real Babylon build
-// and Petrel flying the Scout rank of the manifest on disk; `fly(id)` resolves to a ship's hull.
+// and Petrel in the ranks it takes from the manifest on disk (bare the Scout, ringed the
+// Workhorse and the Capital); `fly(id)` resolves to a Scout's hull.
 function onSystem(work) {
   return withCanvas(() => onNullScene(BABYLON, async (scene) => {
     const AUR = loadShipModels();
@@ -39,4 +51,4 @@ function onSystem(work) {
   }));
 }
 
-module.exports = { manifest, loadShipModels, onSystem };
+module.exports = { manifest, rank, loadShipModels, onModelScene, onSystem };
