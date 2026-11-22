@@ -22,7 +22,7 @@
   // Tokens, read before any rail is sized: each rail's width, the folded right rail's, the edge margin.
   /** @type {Record<string, number>} */
   const DEFAULT_WIDTH = Object.fromEntries(SIDES.map((r) => [r.side, cssPx(r.width)]));
-  const COMPACT_W = cssPx('--sidebar-compact-w'), MARGIN = cssPx('--space-3');
+  const COMPACT_W = cssPx('--sidebar-compact-w'), MARGIN = cssPx('--space-3'), DOCK_H = cssPx('--dock-h');
 
   const zoom = () => A.uiZoom();
   /** @param {string} module */
@@ -60,6 +60,16 @@
     }
     return L.fitRails(room(), want, state, COMPACT_W, yields);
   }
+
+  /**
+   * How far the side rails and the timeline reach in from the window's edges at their default sizes,
+   * in screen px at the current text size, whatever they are doing now. The universe map frames to
+   * clear them (scene/universe/galaxies.js). @returns {{ left: number, right: number, bottom: number }}
+   */
+  A.defaultPanelRoom = function defaultPanelRoom() {
+    const scale = zoom();
+    return { left: (MARGIN + DEFAULT_WIDTH.left) * scale, right: (MARGIN + DEFAULT_WIDTH.right) * scale, bottom: (MARGIN + DOCK_H) * scale };
+  };
 
   /** Sets both rails to widths that fit the window. @param {string} [yields] */
   A.fitRails = function fitRails(yields = 'left') {
