@@ -1,0 +1,167 @@
+{
+  "ship": "petrel",
+  "commit": "d2051e77c270",
+  "build": [
+    "spacecraft",
+    "createPetrel"
+  ],
+  "modules": {
+    "airframe": {
+      "source": "airframe.mjs",
+      "sha256": "8689d9052b93b24c486afd0d49ac3872f237af15bacf51a7352f96b19dcc8303",
+      "generated": "f5a5445f38638bbcf414249e639e91bf5cc17056c9ae18f097e4656b70300dc6",
+      "exports": [
+        "CANOPY",
+        "FIN_AFT",
+        "FIN_BOW",
+        "FIN_TIP",
+        "HINGE_X",
+        "HINGE_Y",
+        "HULL",
+        "INTAKE",
+        "POCKET",
+        "PORT_AFT",
+        "PORT_BOW",
+        "PORT_RADIUS",
+        "RADIATOR",
+        "SOLAR_INSET",
+        "STATIONS",
+        "STOW_ANGLE",
+        "WING_AFT",
+        "WING_BOW",
+        "WING_EDGE",
+        "rootX",
+        "sample",
+        "wellWidth",
+        "wingDeck",
+        "wingThickness"
+      ]
+    },
+    "loft": {
+      "source": "loft.mjs",
+      "sha256": "ce1e3ecee49537cfe4c4ee0a8c5a2f069cf8dded63356c29d15683356f11f0f9",
+      "generated": "48f3cff71708a11e80429de7632efa43f2e84c0c5d220bc4169963410901bb04",
+      "exports": [
+        "SECTIONS",
+        "borderTriangles",
+        "ductOutline",
+        "reflect",
+        "section",
+        "sideOutline"
+      ]
+    },
+    "geometry": {
+      "source": "geometry.js",
+      "sha256": "b57fbf4d93190686645b77902991eaaecee8f8be410a26bff34ef7f5630530a0",
+      "generated": "7175cce32f485ec5729af7f7e14ab13e68f4918728c5ae4d504b929e608c4a6f",
+      "exports": [
+        "Assembly",
+        "circularFitting",
+        "v"
+      ]
+    },
+    "plating": {
+      "source": "plating.js",
+      "sha256": "5d59416cbf71f57c77e4324e6ed064ab61cbf4963b7351b339b4bbb5c50f9c08",
+      "generated": "30b1e4d0b7d2e7c71b6391f9cc3caec3b97e91f059aff54fe12a5410a7e9b533",
+      "exports": [
+        "paintPlating",
+        "paintTrim"
+      ]
+    },
+    "surfaces": {
+      "source": "surfaces.js",
+      "sha256": "f5f0545cf1696237bbe431d052bac57538fcb2e27c098331f34244a5f0f3f1fb",
+      "generated": "625206584ccb7c483c66bd65e07c0f544614334de347826aeeda23a3aea39346",
+      "exports": [
+        "createSurfaces"
+      ]
+    },
+    "hull": {
+      "source": "hull.js",
+      "sha256": "2f020af6f10fdee701aec0ce9f57eaef59a8b02acd2d5574439b5ab7c32f7138",
+      "generated": "1ec44aa0e6c3e07f3b4a555421be2055048e8db9ce3bb9ac310085435555e297",
+      "exports": [
+        "buildHull"
+      ]
+    },
+    "deck": {
+      "source": "deck.js",
+      "sha256": "ea76271a80cd40403f3199131417fdf232b6711e6b66f51fa14a758fa21ad8c3",
+      "generated": "35009657d92c9d0dc311a8f12c72ed8d785d46285379c5731a3b09538841264b",
+      "exports": [
+        "buildDeck"
+      ]
+    },
+    "exhaust": {
+      "source": "exhaust.js",
+      "sha256": "ec7cef39c7c625a1b180adebdc0c8c2400a87161e631715a648738a3b92e1cd3",
+      "generated": "f72d5c56226643aae2d52524a7f47ed8d920695a4c0ccbeb08caaf1109f63fec",
+      "exports": [
+        "DRIVE",
+        "createExhaust"
+      ]
+    },
+    "drives": {
+      "source": "drives.js",
+      "sha256": "cb7517249f99314528a00043a8a98504a8f21b5c5b3abc94efa84c8a87b42bdc",
+      "generated": "1e358269c52e6522b30db6b38ac55c0daef1caba650c8e487e938baffd9a451a",
+      "exports": [
+        "buildDrive"
+      ]
+    },
+    "wings": {
+      "source": "wings.js",
+      "sha256": "a86496c5b69786079e18b4ff48f8a0fe20a964df78a5636b104477b502677453",
+      "generated": "7b51db6108da3cac919dba9910833eead23925050c9c842a547f91e7c3fdc488",
+      "exports": [
+        "HINGE_CLEARANCE",
+        "buildWing"
+      ]
+    },
+    "survey-ring": {
+      "source": "survey-ring.js",
+      "sha256": "60853d8104de784fd87e8541bfe91506cdd609e500d2d01e622ed8af00411e49",
+      "generated": "b24b1735cd16e4d8cfb588dbfa4349a614209f576a696189f8ae62645a928c10",
+      "exports": [
+        "RING",
+        "createSurveyRing",
+        "ringPoint"
+      ]
+    },
+    "spacecraft": {
+      "source": "spacecraft.js",
+      "sha256": "a15043159712e39eda4a2cea464d92e67f3be1d918a48ede4298b59362e11744",
+      "generated": "a565279bb07c7a419236518d8b0ea4464784a204b4cbccdadd5b5101d91a6108",
+      "exports": [
+        "createPetrel"
+      ]
+    },
+    "light-probe": {
+      "source": "light-probe.js",
+      "sha256": "3c837b1eb10429c46dd7e175e522a7433a4c12361bc317bec36746313b077df0",
+      "generated": "7b5ebe9741779cfb2c0df42df0080ff75468a2df4762015d02d66e0f04801468",
+      "exports": [
+        "createInspectionProbe"
+      ]
+    }
+  },
+  "geometry": {
+    "meshes": 34,
+    "triangles": 17544,
+    "sha256": "d475cf9da7d28d043263b2b71a9985c27eb8095fa5457b8c6e649b13f7f12c16"
+  },
+  "variants": {
+    "ring": {
+      "call": [
+        "setRing",
+        true
+      ],
+      "geometry": {
+        "meshes": 46,
+        "triangles": 40840,
+        "sha256": "21062b635e4346b004924277005fca37b778231101a7cbac4c2e8f86cff54de6"
+      }
+    }
+  }
+}

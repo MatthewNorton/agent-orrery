@@ -173,8 +173,9 @@
   });
   // A drone (subagent) flies its family's first rank at this fraction of the rank's size.
   AUR.DRONE_SCALE = 0.6;
-  // The layer bit every ship mesh carries: the ship-only lights (AUR.shipLights) affect only
-  // meshes with it, and it sits outside the cameras' default mask so visibility is unchanged.
+  // The layer bit every dart and fleet hull mesh carries (a ship model's hull carries
+  // AUR.shipModels.LAYER): the ship-only key and rim (AUR.shipLights) affect only meshes with it,
+  // and it sits outside the cameras' default mask so visibility is unchanged.
   AUR.SHIP_LAYER = 0x10000000;
   AUR.dampedAmount = (rate, dt) => 1 - Math.exp(-Math.max(0, rate) * Math.max(0, dt || 0));
   AUR.configureComfortCamera = function configureComfortCamera(camera) {
@@ -375,5 +376,12 @@
   AUR.log = function log() {
     const args = ['[AUR]'].concat(Array.prototype.slice.call(arguments));
     console.log.apply(console, args);
+  };
+  // Logged the first time its key is seen: a failure that every ship meets is logged once.
+  const logged = new Set();
+  AUR.logOnce = function logOnce(key, message) {
+    if (logged.has(key)) return;
+    logged.add(key);
+    AUR.log(message);
   };
 })();

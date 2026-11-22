@@ -14,6 +14,7 @@
   // The chase camera's default orbit: how far back it stands in hull diagonals, how high it looks
   // down, and how far it swings off the vantage so a long hull shows its length, not its stern.
   const CHASE = Object.freeze({ distance: 1.3, pitch: 0.42, yaw: 0.6 });
+  const FADED = 0.16; // the visibility of the ships focus mode does not follow
   // The viewer's orbit: the zoom per pixel of wheel delta and the limits that keep the hull in
   // view. The drag takes its feel from the system camera (orbitShipFocus).
   const ORBIT = Object.freeze({
@@ -41,13 +42,15 @@
     }
 
     // What focus mode shows of a ship: the focused one in full from outside, hidden from inside
-    // (the viewer sits in it), every other ship faded.
+    // (the viewer sits in it), every other ship faded. AUR.ships fades the hulls (setShipFocus);
+    // the dart, a signal's glyph and the plumes are meshes of their own, faded here.
     function applyShipFocusVisual(rec) {
       const { shipFocus } = view;
       if (!shipFocus) return;
-      const visibility = rec.id !== shipFocus.shipId ? 0.16 : shipFocus.exterior ? 1 : 0;
+      const visibility = rec.id !== shipFocus.shipId ? FADED : shipFocus.exterior ? 1 : 0;
       const saved = savedVisibilities(rec);
       for (const node of recordVisualNodes(rec)) {
+        if (node.isAnInstance) continue;
         if (!saved.has(node)) saved.set(node, node.visibility);
         node.visibility = visibility;
       }
@@ -59,6 +62,7 @@
     function restoreShipFocusVisuals() {
       const { shipFocus } = view;
       if (!shipFocus) return;
+      AUR.ships.fade(scene, 1);
       for (const [id, saved] of shipFocus.saved) {
         for (const [node, visibility] of saved) {
           if (!AUR.isNodeDisposed(node)) node.visibility = visibility;
@@ -153,19 +157,17 @@
       out.addInPlace(focusOffset);
     }
 
-    // The hull's diagonal this frame: measured per unit of the ship's scaling once per hull, then
-    // scaled by the size the pixel floor gives the ship right now. A hull swapped in under a dart
-    // is noted on the dart (ship-assets-api.js) and sits under it; a hull built in place, or the
-    // bare dart, is the mesh itself.
+    // The hull's diagonal this frame: measured per unit of the ship's scaling once per hull (the
+    // ship's mesh and its hull id, which a promotion changes in place), then scaled by the size the
+    // pixel floor gives the ship right now.
     function hullSpan(rec) {
       const { shipFocus } = view;
-      const swapped = rec.mesh.metadata && rec.mesh.metadata.upgradedHullId;
-      const key = swapped || rec.mesh;
-      if (shipFocus.measured !== key) {
-        const node = swapped ? rec.mesh.getChildren()[0] : rec.mesh;
-        const bounds = node.getHierarchyBoundingVectors();
+      const hull = AUR.shipHullId(rec.mesh);
+      if (shipFocus.measuredMesh !== rec.mesh || shipFocus.measuredHull !== hull) {
+        const bounds = AUR.shipHullNode(rec.mesh).getHierarchyBoundingVectors();
         const diagonal = bounds.max.subtract(bounds.min).length() / (rec.mesh.scaling.x || 1);
-        shipFocus.measured = key;
+        shipFocus.measuredMesh = rec.mesh;
+        shipFocus.measuredHull = hull;
         shipFocus.unitSpan = Number.isFinite(diagonal) && diagonal > 0 ? diagonal : 1.2;
       }
       return shipFocus.unitSpan * rec.mesh.scaling.x;
@@ -207,7 +209,7 @@
       const rec = ships.get(id);
       if (!rec) return false;
       clearShipFocus();
-      view.shipFocus = { shipId: id, saved: new Map(), measured: null, unitSpan: 0 };
+      view.shipFocus = { shipId: id, saved: new Map(), measuredMesh: null, measuredHull: null, unitSpan: 0 };
       setShipFocus(settings);
       camera.detachControl(canvas);
       scene.skipPointerMovePicking = true; // the pointer orbits; nothing under it is picked
@@ -227,6 +229,7 @@
       shipFocus.vantage = typeof vantage === 'string' && Object.hasOwn(SHIP_FOCUS_VANTAGE_YAW, vantage) ? vantage : 'forward';
       shipFocus.exterior = exterior !== false;
       shipFocus.orbit = { yaw: CHASE.yaw, pitch: CHASE.pitch, zoom: 1 };
+      AUR.ships.fade(scene, FADED, { shipId: shipFocus.shipId, visibility: shipFocus.exterior ? 1 : 0 });
       for (const item of ships.values()) applyShipFocusVisual(item);
       return true;
     }

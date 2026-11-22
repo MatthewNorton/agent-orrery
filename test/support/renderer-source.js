@@ -1,15 +1,21 @@
 'use strict';
 
 // Renderer source for the source-text tests, listed by folder under src/renderer, and
-// runRenderer() for the tests that run a renderer script; settled() for what its events start.
+// runRenderer() and loadUtilLayer() for the tests that run renderer scripts; settled() for what
+// their events start.
 
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
+const { scriptTags: tagsOf } = require('../../scripts/lib/script-tags.js');
+
 const RENDERER = path.join(__dirname, '..', '..', 'src', 'renderer');
 
 const readRenderer = (file) => fs.readFileSync(path.join(RENDERER, file), 'utf8');
+
+/** The `src` of every script tag in index.html, in load order. Throws on a tag that is not a plain one. */
+const scriptTags = () => tagsOf(readRenderer('index.html'));
 
 /**
  * Runs src/renderer/<file>, after `edit`, with each key of `globals` bound to its value. It runs
@@ -18,6 +24,16 @@ const readRenderer = (file) => fs.readFileSync(path.join(RENDERER, file), 'utf8'
 function runRenderer(file, globals, edit = (code) => code) {
   const source = `(function (${Object.keys(globals).join(', ')}) {\n${edit(readRenderer(file))}\n})`;
   vm.runInThisContext(source, { filename: `src/renderer/${file}` })(...Object.values(globals));
+}
+
+/**
+ * Runs util.js, which makes window.AUR, and util-scene.js, which adds its Babylon helpers, as the
+ * page loads them before any other renderer file. Returns AUR.
+ */
+function loadUtilLayer(window = {}, BABYLON = undefined) {
+  runRenderer('util.js', { window });
+  runRenderer('util-scene.js', { window, BABYLON });
+  return window.AUR;
 }
 
 /**
@@ -40,6 +56,13 @@ function rendererFiles(dir, keep = (file) => file.endsWith('.js')) {
 
 const rendererSource = (dir, keep) => rendererFiles(dir, keep).map(readRenderer).join('\n');
 
+/** Everything `AUR.log` is given from here on, in order. */
+function logsOf({ AUR }) {
+  const logs = [];
+  AUR.log = (message) => logs.push(message);
+  return logs;
+}
+
 /** Runs `act` (a click, say), lets what it started settle, and returns what rejected unhandled. */
 async function settled(act) {
   const unhandled = [];
@@ -54,4 +77,6 @@ async function settled(act) {
   return unhandled;
 }
 
-module.exports = { readRenderer, rendererFiles, rendererSource, runApp, runRenderer, settled };
+module.exports = {
+  loadUtilLayer, logsOf, readRenderer, rendererFiles, rendererSource, runApp, runRenderer, scriptTags, settled,
+};

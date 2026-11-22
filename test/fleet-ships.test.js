@@ -4,34 +4,16 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { readGlbJson, glbLength } = require('./support/glb');
 
 const ROOT = path.resolve(__dirname, '..');
 const SHIP_ROOT = path.join(ROOT, 'assets', 'ships');
-
-function readGlbJson(filePath) {
-  const bytes = fs.readFileSync(filePath);
-  assert.equal(bytes.readUInt32LE(0), 0x46546c67, 'GLB magic');
-  assert.equal(bytes.readUInt32LE(4), 2, 'GLB version');
-  assert.equal(bytes.readUInt32LE(8), bytes.length, 'declared GLB length');
-  const jsonLength = bytes.readUInt32LE(12);
-  return {
-    bytes,
-    model: JSON.parse(bytes.subarray(20, 20 + jsonLength).toString('utf8').trim()),
-  };
-}
 
 const readManifest = () => JSON.parse(fs.readFileSync(path.join(SHIP_ROOT, 'manifest.json'), 'utf8'));
 
 function glbTriangles(model) {
   return model.meshes.reduce((sum, mesh) => sum + mesh.primitives.reduce((total, primitive) =>
     total + model.accessors[primitive.indices].count / 3, 0), 0);
-}
-
-function glbLength(model) {
-  const positions = model.meshes.flatMap((mesh) =>
-    mesh.primitives.map((primitive) => model.accessors[primitive.attributes.POSITION]));
-  return Math.max(...positions.map((accessor) => accessor.max[2])) -
-    Math.min(...positions.map((accessor) => accessor.min[2]));
 }
 
 test('the legacy shared fleet keeps six original textured hulls and no Kenney or drone models', () => {

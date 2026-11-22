@@ -4,23 +4,12 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const vm = require('node:vm');
+const { loadUtilLayer, logsOf, scriptTags } = require('./support/renderer-source');
 
 const RENDERER = path.join(__dirname, '..', 'src', 'renderer');
 
-// util.js creates window.AUR; util-scene.js adds the Babylon-facing helpers to it. `globals` are
-// the page's other globals (BABYLON, say).
-function loadUtilLayer(globals = {}) {
-  const sandbox = { window: {}, ...globals };
-  for (const file of ['util.js', 'util-scene.js']) {
-    vm.runInNewContext(fs.readFileSync(path.join(RENDERER, file), 'utf8'), sandbox, { filename: file });
-  }
-  return sandbox.window.AUR;
-}
-
 test('index.html loads every util-*.js file directly after util.js', () => {
-  const html = fs.readFileSync(path.join(RENDERER, 'index.html'), 'utf8');
-  const tags = [...html.matchAll(/<script\s+src="([^"]+)"/g)].map((m) => m[1]);
+  const tags = scriptTags();
   const parts = fs.readdirSync(RENDERER).filter((f) => /^util-[a-z0-9-]+\.js$/.test(f)).sort();
   const at = tags.indexOf('util.js');
   assert.ok(at >= 0, 'util.js is loaded');
@@ -80,8 +69,7 @@ test('meshIslands splits a mesh into its connected pieces, each with a centre an
   const indices = [0, 1, 2, 0, 2, 3, 4, 5, 6, 7, 8, 9];
   const islands = AUR.meshIslands(positions, indices).sort((a, b) => a.center[0] - b.center[0]);
 
-  // Copied out of the sandbox realm: deepEqual also compares prototypes.
-  assert.deepEqual(Array.from(islands, (island) => [...island.center]), [[0.5, 0.5, 0], [10.5, 0.5, 0]], 'a vertex no triangle uses is no island');
+  assert.deepEqual(islands.map((island) => island.center), [[0.5, 0.5, 0], [10.5, 0.5, 0]], 'a vertex no triangle uses is no island');
   for (const island of islands) assert.ok(Math.abs(island.radius - Math.SQRT1_2) < 1e-9);
 });
 
@@ -102,6 +90,24 @@ test('shipHullId names the hull under a dart, the asset root itself, or nothing 
   assert.equal(AUR.shipHullId(null), null);
 });
 
+test('shipHullNode finds the hull swapped in under a dart, past its plume anchors, or gives the mesh itself', () => {
+  const AUR = loadUtilLayer();
+  const anchor = { metadata: null };
+  const hull = { metadata: { assetHullId: 'scout' } };
+  const under = (children) => (predicate, directOnly) => {
+    assert.equal(directOnly, true, 'only the dart\'s own children: a hull holds parts tagged with its id too');
+    return children.filter(predicate);
+  };
+  const dart = { metadata: { upgradedHullId: 'scout' }, getChildren: under([anchor, hull]) };
+  assert.equal(AUR.shipHullNode(dart), hull);
+  const root = { metadata: { assetHullId: 'capital' }, getChildren: under([]) };
+  assert.equal(AUR.shipHullNode(root), root, 'a hull built in place');
+  const bare = { metadata: { isShip: true }, getChildren: under([anchor]) };
+  assert.equal(AUR.shipHullNode(bare), bare, 'a dart that flies no hull');
+  const arriving = { metadata: { upgradedHullId: 'scout' }, getChildren: under([anchor]) };
+  assert.equal(AUR.shipHullNode(arriving), arriving, 'a dart noted before its hull is under it');
+});
+
 test('memo builds an entry once and hands the same one back after', () => {
   const AUR = loadUtilLayer();
   const map = new Map();
@@ -109,6 +115,37 @@ test('memo builds an entry once and hands the same one back after', () => {
   const build = () => ({ build: ++builds });
   assert.equal(AUR.memo(map, 'k', build), AUR.memo(map, 'k', build));
   assert.equal(builds, 1);
+});
+
+test('AUR.dressed returns a material once dressed, and disposes one that cannot be', () => {
+  const AUR = loadUtilLayer();
+  const made = () => ({ disposed: 0, dispose() { this.disposed += 1; } });
+  const whole = made();
+  assert.equal(AUR.dressed(whole, (material) => { material.worn = true; }), whole);
+  assert.deepEqual([whole.worn, whole.disposed], [true, 0]);
+
+  const half = made();
+  const fault = new Error('no trim');
+  assert.throws(() => AUR.dressed(half, () => { throw fault; }), (error) => error === fault);
+  assert.equal(half.disposed, 1);
+
+  const logs = logsOf({ AUR });
+  const stuck = { name: 'lamp claude', dispose() { throw new Error('no dispose'); } };
+  assert.throws(() => AUR.dressed(stuck, () => { throw fault; }), (error) => error === fault, 'the cause stays the dressing\'s');
+  assert.throws(() => AUR.dressed(null, () => { throw fault; }), (error) => error === fault, 'and for a material never made');
+  assert.deepEqual(logs, ['Undressed material lamp claude could not be disposed (no dispose).']);
+});
+
+test('AUR.disposeLogged logs a dispose that throws once per message', () => {
+  const AUR = loadUtilLayer();
+  const logs = logsOf({ AUR });
+  let cause = 'no dispose';
+  const stuck = { dispose() { throw new Error(cause); } };
+  AUR.disposeLogged(stuck, 'A copy');
+  AUR.disposeLogged(stuck, 'A copy');
+  cause = 'context lost';
+  AUR.disposeLogged(stuck, 'A copy');
+  assert.deepEqual(logs, ['A copy could not be disposed (no dispose).', 'A copy could not be disposed (context lost).']);
 });
 
 test('label: a label joins the layer before it links to its mesh, and a layer that cannot take it throws', () => {
@@ -129,7 +166,7 @@ test('label: a label joins the layer before it links to its mesh, and a layer th
       this.controls.push(control);
     },
   });
-  const AUR = loadUtilLayer({ BABYLON: { GUI: { TextBlock } } });
+  const AUR = loadUtilLayer({}, { GUI: { TextBlock } });
   const gui = layer(), mesh = {};
   const label = AUR.label(gui, 'src', { mesh, offsetY: -20 });
   assert.deepEqual([gui.controls, label.text, label.linked, label.linkOffsetY, logged], [[label], 'src', mesh, -20, []]);

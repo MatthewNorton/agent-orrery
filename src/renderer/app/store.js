@@ -96,14 +96,13 @@
   };
 
   /**
-   * Promotes hulls whose build count crossed a rank. Every stored ship when no
-   * ids are given, e.g. after focus mode stops fading ships.
-   * @param {Iterable<string>} [ids]
+   * Promotes the hulls of these ships whose build count crossed a rank.
+   * @param {Iterable<string>} ids
    */
   A.refreshShipHulls = function refreshShipHulls(ids) {
     const scene = S.activeScene;
     if (!scene || !AUR.ships || typeof AUR.ships.refresh !== 'function') return;
-    for (const id of ids || S.store.ships.keys()) {
+    for (const id of ids) {
       const ship = S.store.ships.get(id);
       if (ship) AUR.ships.refresh(scene, ship);
     }

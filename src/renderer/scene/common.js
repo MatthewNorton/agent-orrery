@@ -52,14 +52,9 @@
 
   // Ship-only key and rim: hull maps need a viewer-relative key while the planets keep their sun
   // (the studio environment is the fill). The lights follow the active camera each frame and
-  // affect only meshes carrying AUR.SHIP_LAYER, which every dart and hull mesh gets at birth.
-  function shipLight(light, intensity, diffuse) {
-    light.intensity = intensity;
-    light.diffuse = diffuse;
-    light.specular = diffuse.clone();
-    light.includeOnlyWithLayerMask = AUR.SHIP_LAYER;
-    return light;
-  }
+  // affect only meshes carrying AUR.SHIP_LAYER, which every dart and fleet hull mesh gets at birth
+  // (a ship model's hull carries AUR.shipModels.LAYER and its own lights instead).
+  const shipLight = (light, intensity, diffuse) => AUR.layerLight(light, intensity, diffuse, AUR.SHIP_LAYER);
   AUR.shipLights = function (scene) {
     const keyDir = new BABYLON.Vector3(0.45, -0.55, 1); // camera-relative: over the right shoulder
     const rimDir = new BABYLON.Vector3(-0.5, -0.3, -1); // and from behind the ship, cool
@@ -71,6 +66,7 @@
       camera.getDirectionToRef(keyDir, key.direction);
       camera.getDirectionToRef(rimDir, rim.direction);
     });
+    AUR.shipModels.lights(scene); // the ships built in code bring their own
   };
 
   // Every view's orbit camera; settings are properties set on it, such as its radius and beta limits.

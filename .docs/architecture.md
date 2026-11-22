@@ -118,7 +118,7 @@ Start here when you want to change something. Paths under "Main process" are rel
 | **Git / GitHub status markers** | `vcs-status/`: `collector.js` (git), `github-metadata-provider.js` (`gh`), `service.js` (cache), `controller.js` (wiring) | push `project-vcs-status-changed` (from `replay-control.js`), `vcs` field in snapshot | `components/project-vcs-status.js` + `.css` | memory only | `vcs-status-*` tests |
 | **Find a moved project** (settings dialog) | `ipc/project-paths.js` → `project-paths.js` | `project-paths-scan`, `project-path-locate`, `project-path-apply` | `app/project/settings.js` | `universe-state.json` `pathOverrides` | **none** |
 | **First-person ship cockpit** | — | — | `app/agent-focus.js`, `scene/system/view.js` `focusShip`, `scene/system/focus.js`, `assets/*.png` | `localStorage` | `agent-focus-hologram.test.js` (source text) |
-| **Ship 3D models** | `live/ships.js` + `live/builds.js`, `history/apply-record.js` (each ship's `builds` count); `universe/ships.js` `createShipRecord` | `builds` on every ship | `ship-assets.js` (manifest, rank → hull), `ship-assets-hulls.js` (far / near file per view), `ship-assets-api.js` (`AUR.ships`, in-place `refresh`) + `assets/ships/manifest.json` + GLBs; `app/store.js` `refreshShipHulls` | — | ship tests, `grade-ships.mjs` |
+| **Ship 3D models** | `live/ships.js` + `live/builds.js`, `history/apply-record.js` (each ship's `builds` count); `universe/ships.js` `createShipRecord` | `builds` on every ship | `ship-assets.js` (manifest, rank → hull, far / near file per view, triangle budget), `ships/livery.js` (livery), `ship-assets-hulls.js` (instanced hull templates), `ship-assets-api.js` (`AUR.ships`: in-place `refresh`, focus mode's `fade`), `ships/` (models built in code: Petrel flies the Scout rank, and with its survey ring the Workhorse and Capital ranks) + `assets/ships/manifest.json` + GLBs; `app/store.js` `refreshShipHulls` | — | ship tests, `grade-ships.mjs` |
 | **Headless test modes** (`--shots`, `--polish-test`, …) | `flags.js`, `harness/fixtures.js`, `harness/driver.js`, `harness/metrics.js`, `harness/modes/*.js` | `debug-view`, `debug-ready` | `app/route.js` `handleDebugView` | `.shots/`, `result.json` | every dynamic gate |
 
 ---
@@ -440,7 +440,7 @@ file attaches to the global `window.AUR`. A file may only use what loaded above 
 ```mermaid
 flowchart TB
   V["1 · Vendor — babylon.js, babylon.gui, babylonjs.loaders (UMD from node_modules)"]
-  L["2 · Shared libraries — util.js creates window.AUR · util-scene · procedural-worlds · ship-assets · ship-assets-hulls · ship-assets-api · polish-math · galaxy-layout · search-core · components/project-vcs-status"]
+  L["2 · Shared libraries — util.js creates window.AUR · util-scene · procedural-worlds · ship-assets · ships/livery · ship-assets-hulls · ship-assets-api · polish-math · galaxy-layout · search-core · components/project-vcs-status"]
   S["3 · Views — scene/common creates AUR.sceneParts · scene/universe/* parts · scene/universe · scene/system/* parts · scene/system · scene/planet → AUR.views.*"]
   ST["4 · app/state.js — the only file that creates AUR.app.state and AUR.app.const"]
   M["5 · Feature modules — app/agent-focus · app/chrome · app/chrome-queue · app/history-metrics · app/ideas · app/ideas-list · app/playback · app/project/control · app/project/directory · app/project/search-rows · app/project/search · app/project/settings · app/project/tasks · app/replay · app/route · app/store"]
@@ -463,17 +463,21 @@ contract), `AUR`, `AUR_POLISH` and `AUR_GALAXY` (all `any` for now).
 
 | File | Lines | Job |
 |---|---|---|
-| `util.js` | 379 | Creates `AUR`; hashes, colours, provider metadata, motion tuning, asset paths, DOM helpers; bridge calls that fail soft (`AUR.settle`, `AUR.settleBusy` with a busy flag up meanwhile, `AUR.fetchSystem`) |
-| `util-scene.js` | 340 | Babylon helpers on `AUR`: skybox (PhotoDome), starfield, orbit rings, ship and signal markers, GUI labels |
+| `util.js` | 387 | Creates `AUR`; hashes, colours, provider metadata, motion tuning, asset paths, DOM helpers; bridge calls that fail soft (`AUR.settle`, `AUR.settleBusy` with a busy flag up meanwhile, `AUR.fetchSystem`) |
+| `util-scene.js` | 387 | Babylon helpers on `AUR`: skybox (PhotoDome), starfield, orbit rings, ship and signal markers, GUI labels |
 | `procedural-worlds.js` | 329 | Planet and asteroid surfaces (authored textures + generated normal maps) |
-| `ship-assets.js` | 252 | Manifest, per-scene state, hull choice by rank (`builds` against the manifest ladder), container loading; procedural dart fallback |
-| `ship-assets-hulls.js` | 252 | Builds a hull from a loaded model: provider livery, far-file instances on the universe map, near-file clones in system / planet views, within a 100k-triangle budget |
-| `ship-assets-api.js` | 118 | `AUR.ships`: instantiate, upgrade a fallback dart, `refresh` in place on promotion, dispose a scene's hull state |
+| `ships/modules.js` | 32 | The registry the converted ship models load into: a module registers a factory with `AUR.shipModule` and runs the first time `AUR.useShipModule` asks for it, so loading the page builds nothing and the modules' script order does not matter |
+| `ships/models.js` | 302 | `AUR.shipModels`, the ship models built in code: a model flies the ranks of the manifest hulls it replaces (`inPlaceOf`), at a size per rank, as a hull entry per rank on one container; its container is the ship built once per scene as one merged mesh with a sub-mesh per finish, and owns its materials and textures; its trim is copied once per palette in the ship color (a lamp map painted in other colors as well is worn as one grey copy per model); the three model lights a view adds reach model hulls only; `nozzles` for the plumes |
+| `ships/petrel/` | 1,611 | Petrel, the Scout, and with its survey ring the Workhorse and the Capital: `model.js` (57) registers the bare ship in the Scout rank, in place of the manifest's interceptor, and the ringed one in the two ranks above it; `source/` (13 files, 1,554 lines, and `source.json`) builds both, written by `scripts/import-ship.mjs` from the ship's own modules and never edited by hand |
+| `ship-assets.js` | 321 | Manifest, per-scene state, hull choice by rank (`builds` against the manifest ladder; a rank a ship model has taken flies the model), container loading, and the triangle budget a view's hulls stay under: 900k in a system or planet view (51 Scouts or 22 ringed Petrels), 1.24M on the universe map (70 or 30; in a near view a hull with levels of detail steps down to its far file first; a ship that does not fit keeps its dart or current hull) |
+| `ships/livery.js` | 195 | What a hull wears, on `AUR.shipAssets`: the procedural studio sky its reflections show, a hull file's materials in the livery of a palette (a ship model keeps its own finishes and wears the ship color on its trim), and the root's provider evidence; loads between `ship-assets.js` and `ship-assets-hulls.js` |
+| `ship-assets-hulls.js` | 279 | Builds a hull from a loaded container, in its livery: instances of a hidden template per hull file and palette in every view, a template of its own for the ship focus mode shows apart, and in-place swaps on promotion or a fade |
+| `ship-assets-api.js` | 177 | `AUR.ships`: `instantiate`, `upgrade` a fallback dart, `refresh` in place on promotion or new colors, `fade` the fleet on its templates while focus mode follows a ship, `dispose` a scene's hull state |
 | `galaxy-layout.js` | 284 | Pure: galaxy grouping, spiral placement, Graveyard |
 | `polish-math.js` | 67 | Pure: label overlap, sun pulse |
 | `search-core.js` | 225 | Pure: ranks projects, agents and folders (prefix, substring, path or other text, then fuzzy) |
 | `components/project-vcs-status.js` | 277 | Pure presentation for git / GitHub markers and details |
-| `scene/common.js` | 142 | Creates `AUR.sceneParts`; the shared camera, ship mesh, teardown and mesh disposal |
+| `scene/common.js` | 138 | Creates `AUR.sceneParts`; the shared camera, ship mesh, teardown and mesh disposal |
 | `scene/universe/view.js` | 277 | Galaxy map: builds the `view` object and merges its parts |
 | `scene/universe/galaxies.js` | 214 | Galaxy discs, outlines, labels, glyph placement, camera framing |
 | `scene/universe/glyphs.js` | 144 | A project glyph's live state: dimming, search focus, attention halo, VCS markers, sun pulse |
@@ -488,7 +492,7 @@ contract), `AUR`, `AUR_POLISH` and `AUR_GALAXY` (all `any` for now).
 | `scene/system/worlds.js` | 100 | The planets' generated worlds, lit from the sun: maps placeholder, then system size, and the hovered planet's detail map fetched ahead for the planet view; the sun's photosphere and billboards |
 | `scene/planet/view.js` | 195 | Planet close-up |
 | `app/state.js` | 236 | Shared state and constants (including the chrome dirty bits, `AUR.app.const.CHROME`) |
-| `app/store.js` | 132 | `seedStore`, `applyEvent`, `maybeNotifyAttention`, `refreshShipHulls`, `workedShipIds` |
+| `app/store.js` | 131 | `seedStore`, `applyEvent`, `maybeNotifyAttention`, `refreshShipHulls`, `workedShipIds` |
 | `app/chrome-queue.js` | 75 | `chromeMaskFor`, `scheduleChrome`, `renderChrome`, `renderChromeNow`: one panel redraw per frame, or now |
 | `app/playback.js` | 231 | History bar |
 | `app/replay.js` | 172 | Stream epochs, playback state, `issueReplay` |
@@ -502,12 +506,12 @@ contract), `AUR`, `AUR_POLISH` and `AUR_GALAXY` (all `any` for now).
 | `app/ideas.js` | 154 | IDEAS panel |
 | `app/ideas-list.js` | 264 | IDEAS list rendering |
 | `app/chrome.js` | 258 | Command rail, project-name helpers, agent list, feed, summary, back button |
-| `app/agent-focus.js` | 324 | Cockpit overlay, hologram mini-map |
+| `app/agent-focus.js` | 321 | Cockpit overlay, hologram mini-map |
 | `app/project/settings.js` | 340 | Moved-project dialog |
 | `app/project/forget.js` | 84 | Forgetting a project from the settings dialog or the project card: main confirms and answers with a fresh LIVE snapshot; a reseed from it that fails is logged, and main's answer stands |
 | `app/project/tasks.js` | 271 | TASKS panel |
 | `app/project/control.js` | 337 | Project card, Open Terminal button (busy through `AUR.settleBusy`), planet card |
-| `index.html` | 582 | All panels exist in the HTML up front; modules show / hide them |
+| `index.html` | 599 | All panels exist in the HTML up front; modules show / hide them |
 | `styles/*.css` | 2,041 | All styles, in 13 files; `focus.css` and `focus-rooms.css` (445) are the cockpit |
 
 ### 6.3 Shared state and routing
