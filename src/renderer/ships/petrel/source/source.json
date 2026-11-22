@@ -1,6 +1,6 @@
 {
   "ship": "petrel",
-  "commit": "0e0735144fd1",
+  "commit": "d2051e77c270",
   "build": [
     "spacecraft",
     "createPetrel"
