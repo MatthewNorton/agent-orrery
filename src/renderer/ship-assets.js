@@ -1,7 +1,7 @@
 // @ts-check
 // Manifest-backed original hull loading with procedural fallback: the manifest,
-// per-scene state, hull choice and container loading. ship-assets-hulls.js builds hulls from these
-// and ship-assets-api.js publishes AUR.ships.
+// per-scene state, hull choice and container loading. ships/livery.js dresses hulls,
+// ship-assets-hulls.js builds them from these and ship-assets-api.js publishes AUR.ships.
 'use strict';
 
 /**
@@ -18,44 +18,72 @@
  *   triangles: number }} HullRecord
  * @typedef {{ file: string, lod: 'far' | 'near' | null, model?: ShipModel }} HullFile
  * @typedef {HullFile & { record: HullRecord }} HullAsset
- * @typedef {{ root: BABYLON.Mesh, correction: BABYLON.TransformNode, hull: HullEntry,
- *   triangles: number, look: string, wanted: string, fallback: BABYLON.AbstractMesh | null }} ShipEntry
+ * @typedef {{ roots: BABYLON.TransformNode[], meshes: BABYLON.AbstractMesh[] }} HullTemplate a hidden
+ *   copy of a hull that ships draw as instances of, and its meshes
+ * @typedef {{ root: BABYLON.Mesh, correction: BABYLON.TransformNode, own: HullTemplate | null,
+ *   hull: HullEntry, asset: HullAsset, ship: any, request: number, counted: boolean,
+ *   fallback: BABYLON.AbstractMesh | null }} ShipEntry `hull`, `asset` and `ship` are what its hull
+ *   was last built from, so a fade can rebuild that hull exactly (its triangles are its asset's,
+ *   its look lookOf(hull, ship)); `request` counts its refresh calls, so a waiting one can tell a
+ *   later one came; `own` is the template of its own it is built on while focus mode shows it
+ *   apart; `counted` while its triangles are in the scene's count
  * @typedef {{ containers: Map<string, HullRecord>, materials: Map<string, any>,
- *   templates: Map<string, BABYLON.TransformNode[]>, ships: Map<string, ShipEntry>,
- *   triangles: number, disposed: boolean }} SceneState
- * @typedef {object} ShipAssetsCore shared by the ship-assets*.js files as AUR.shipAssets
- * @property {(key: string, message: string) => void} logOnce
+ *   templates: Map<string, HullTemplate>, ships: Map<string, ShipEntry>, triangles: number,
+ *   visibility: number, apart: { shipId: string, visibility: number } | null,
+ *   disposed: boolean }} SceneState `visibility` is the fleet's, which every template shows, and
+ *   `apart` the one ship focus mode shows at a visibility of its own (AUR.ships.fade)
+ * @typedef {object} ShipAssetsCore shared by the ship-assets*.js files and ships/livery.js as AUR.shipAssets
+ * @property {(failure: string, error: any, outcome?: string) => void} logFailure logged once per message
+ * @property {(name: string, steps: [string, () => void][]) => void} guarded
  * @property {Promise<ShipManifest | null>} manifestPromise
  * @property {() => ShipManifest | null} settledManifest null until the manifest has loaded
  * @property {WeakMap<object, SceneState>} sceneStates
  * @property {(scene: any) => SceneState} stateFor
  * @property {(scene: any, state: SceneState) => boolean} isSceneDisposed
+ * @property {(state: SceneState, ship: any) => number | null} apartVisibility
+ * @property {(state: SceneState, ship: any) => number | null} ownVisibility
  * @property {(scene: any) => 'far' | 'near' | null} viewLod
  * @property {(manifest: ShipManifest | null, ship: Ship) => HullEntry | null} selectHull
  * @property {(hull: HullEntry, lod: 'far' | 'near') => HullFile[]} hullFiles
  * @property {(scene: any, state: SceneState, file: HullFile) => Promise<HullRecord | null>} ensureContainer
  * @property {(scene: any, state: SceneState, record: HullRecord, released: number) => boolean} fitsBudget
- * @property {(scene: any, state: SceneState, hull: HullEntry, released: number) => Promise<HullAsset | null>} resolveAsset
+ * @property {<T>(scene: any, state: SceneState, hull: HullEntry, released: () => number, live: () => boolean,
+ *   build: (asset: HullAsset) => T) => Promise<T | null>} resolveAsset
  */
 
 (function () {
   const AUR = window.AUR;
   const MANIFEST_PATH = '../../assets/ships/manifest.json';
   const HULL_ROOT = '../../assets/ships/';
-  // Hulls carry their detail as geometry (10k to 58k triangles each), and past its budget a view
-  // steps down to darts. A system or planet view holds fifty-one ships of the first rank (Petrel,
-  // 17,544): the most it drew inside a 60 fps frame on an integrated GPU (about 14 ms, nearly all
-  // of it on the CPU, which a hull loads by its draws, so triangles stand in for them). The
-  // universe map instances its hulls and holds seventy (about 4 ms).
+  // The triangles a view's hulls may hold. A ship whose hull does not fit keeps its dart, or its
+  // current hull when a promotion does not fit (a near view first tries the far file of a hull
+  // that has one). Hulls carry their detail as geometry (10k to 58k triangles each), and
+  // a template's ships draw in one draw per part, so what grows with the fleet is the triangles
+  // drawn, which is what this counts. A system or planet view holds fifty-one ships of the first
+  // rank (Petrel, 17,544), the universe map seventy.
   const TRIANGLE_BUDGET = { near: 900000, far: 1240000 };
   /** @type {WeakMap<object, SceneState>} */
   const sceneStates = new WeakMap();
-  const logged = new Set();
 
-  function logOnce(key, message) {
-    if (logged.has(key)) return;
-    logged.add(key);
-    AUR.log(message);
+  // A failure, its cause and what it leaves, logged once per message: one that every ship meets
+  // is logged once, and a different cause or outcome is logged too.
+  function logFailure(failure, error, outcome) {
+    const message = failure + ' (' + String((error && error.message) || error) + ')' + (outcome ? '; ' + outcome : '.');
+    AUR.logOnce(message, message);
+  }
+
+  // Runs steps that must not throw past their caller, each named by what it could not do
+  // (' could not be disposed'). One that throws is logged, not thrown, so the rest still run and
+  // what the caller reports stands.
+  /** @param {string} name @param {[string, () => void][]} steps */
+  function guarded(name, steps) {
+    for (const [what, step] of steps) {
+      try {
+        step();
+      } catch (error) {
+        logFailure(name + what, error);
+      }
+    }
   }
 
   function loadWithFetch() {
@@ -99,8 +127,8 @@
   const manifestPromise = loadWithFetch()
     .catch(() => loadWithXhr())
     .then(validateManifest)
-    .catch(() => {
-      logOnce('manifest', 'Ship assets unavailable; using procedural hulls.');
+    .catch((error) => {
+      logFailure('Ship assets unavailable', error, 'using procedural hulls.');
       return null;
     })
     .then((manifest) => {
@@ -119,11 +147,24 @@
     if (!state) {
       state = {
         containers: new Map(), materials: new Map(), templates: new Map(), ships: new Map(),
-        triangles: 0, disposed: false,
+        triangles: 0, visibility: 1, apart: null, disposed: false,
       };
       sceneStates.set(scene, state);
     }
     return state;
+  }
+
+  // What focus mode's fade shows of a ship apart from the fleet, or null when it shows the fleet's.
+  function apartVisibility(state, ship) {
+    const { apart } = state;
+    return apart && apart.shipId === String(ship.id) ? apart.visibility : null;
+  }
+
+  // The visibility of the template of its own a ship's hull is built on, or null for the fleet's
+  // template of its look. A hidden ship (0) is disabled, never built on a template at 0.
+  function ownVisibility(state, ship) {
+    const visibility = apartVisibility(state, ship);
+    return visibility === null || visibility === 0 || visibility === state.visibility ? null : visibility;
   }
 
   // ---------- hull choice ----------
@@ -205,13 +246,15 @@
     if (record.container) return Promise.resolve(record);
     if (record.promise) return record.promise;
     const loading = record;
-    // A model's container is built in code, a manifest hull's is loaded from its file.
+    // A model's container is built in code, a manifest hull's is loaded from its file. A build
+    // queued for a scene that is gone by the time it runs builds nothing.
     record.promise = (model
-      ? Promise.resolve().then(() => AUR.shipModels.container(scene, model))
+      ? Promise.resolve().then(() => (isSceneDisposed(scene, state) ? null : AUR.shipModels.container(scene, model)))
       : BABYLON.SceneLoader.LoadAssetContainerAsync(HULL_ROOT, file, scene))
       .then((container) => {
+        if (!container) return null;
         if (isSceneDisposed(scene, state)) {
-          container.dispose();
+          container.dispose(); // with its materials and textures, a model's as a file's
           return null;
         }
         loading.container = container;
@@ -222,7 +265,7 @@
         return loading;
       })
       .catch((error) => {
-        logOnce('hull:' + file, 'Hull ' + file + ' unavailable (' + (error && error.message || error) + '); using procedural hulls.');
+        logFailure('Hull ' + file + ' unavailable', error, 'ships keep the hull or dart they have.');
         return null;
       });
     return record.promise;
@@ -233,24 +276,34 @@
   }
 
   function logBudget(scene) {
-    logOnce('budget:' + scene.uid, 'Ship hull triangle budget reached; using procedural hulls.');
+    AUR.logOnce('budget:' + scene.uid,
+      'Ship hull triangle budget reached; ships that do not fit keep the hull or dart they have.');
   }
 
   /**
-   * Loads the first of the hull's files that fits the scene's triangle budget.
-   * @param {number} released triangles the ship gives back if this replaces its hull
-   * @returns {Promise<HullAsset | null>}
+   * Builds the hull from the first of its files that fits the scene's triangle budget, in the
+   * callback that finds it fits. A build is synchronous, so no other hull is built between that
+   * check and this one, and ships waiting on one container keep to the budget as ships that come
+   * one by one do. A request that has ended (its scene or ship gone, its swap superseded) starts
+   * no further load and builds nothing.
+   * @template T
+   * @param {() => number} released triangles the ship gives back if this replaces its hull
+   * @param {() => boolean} live
+   * @param {(asset: HullAsset) => T} build
+   * @returns {Promise<T | null>}
    */
-  function resolveAsset(scene, state, hull, released) {
+  function resolveAsset(scene, state, hull, released, live, build) {
     const files = hullFiles(hull, viewLod(scene) || 'far');
+    const ended = () => isSceneDisposed(scene, state) || !live();
     const tryFile = (index) => {
+      if (ended()) return Promise.resolve(null);
       if (index >= files.length) {
         logBudget(scene);
         return Promise.resolve(null);
       }
       return ensureContainer(scene, state, files[index]).then((record) => {
-        if (!record || isSceneDisposed(scene, state)) return null;
-        if (fitsBudget(scene, state, record, released)) return { ...files[index], record };
+        if (!record || ended()) return null;
+        if (fitsBudget(scene, state, record, released())) return build({ ...files[index], record });
         return tryFile(index + 1);
       });
     };
@@ -259,7 +312,7 @@
 
   /** @type {ShipAssetsCore} */
   const core = {
-    logOnce, manifestPromise, sceneStates, stateFor, isSceneDisposed,
+    logFailure, guarded, manifestPromise, sceneStates, stateFor, isSceneDisposed, apartVisibility, ownVisibility,
     settledManifest: () => (manifestSettled ? manifestValue : null),
     viewLod, selectHull, hullFiles, ensureContainer, fitsBudget, resolveAsset,
   };

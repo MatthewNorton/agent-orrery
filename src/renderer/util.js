@@ -377,4 +377,11 @@
     const args = ['[AUR]'].concat(Array.prototype.slice.call(arguments));
     console.log.apply(console, args);
   };
+  // Logged the first time its key is seen: a failure that every ship meets is logged once.
+  const logged = new Set();
+  AUR.logOnce = function logOnce(key, message) {
+    if (logged.has(key)) return;
+    logged.add(key);
+    AUR.log(message);
+  };
 })();

@@ -1,7 +1,8 @@
 'use strict';
 
 // Renderer source for the source-text tests, listed by folder under src/renderer, and
-// runRenderer() for the tests that run a renderer script; settled() for what its events start.
+// runRenderer() and loadUtilLayer() for the tests that run renderer scripts; settled() for what
+// their events start.
 
 const fs = require('node:fs');
 const path = require('node:path');
@@ -26,6 +27,16 @@ function runRenderer(file, globals, edit = (code) => code) {
 }
 
 /**
+ * Runs util.js, which makes window.AUR, and util-scene.js, which adds its Babylon helpers, as the
+ * page loads them before any other renderer file. Returns AUR.
+ */
+function loadUtilLayer(window = {}, BABYLON = undefined) {
+  runRenderer('util.js', { window });
+  runRenderer('util-scene.js', { window, BABYLON });
+  return window.AUR;
+}
+
+/**
  * Runs util.js and then `files` in a page whose AUR.app is `app`, and returns the page's AUR. `aur`
  * is what else AUR holds before the files run; `window` and `document` are the page's own, and
  * `globals` the other names the files see (requestAnimationFrame, say).
@@ -45,6 +56,13 @@ function rendererFiles(dir, keep = (file) => file.endsWith('.js')) {
 
 const rendererSource = (dir, keep) => rendererFiles(dir, keep).map(readRenderer).join('\n');
 
+/** Everything `AUR.log` is given from here on, in order. */
+function logsOf({ AUR }) {
+  const logs = [];
+  AUR.log = (message) => logs.push(message);
+  return logs;
+}
+
 /** Runs `act` (a click, say), lets what it started settle, and returns what rejected unhandled. */
 async function settled(act) {
   const unhandled = [];
@@ -59,4 +77,6 @@ async function settled(act) {
   return unhandled;
 }
 
-module.exports = { readRenderer, rendererFiles, rendererSource, runApp, runRenderer, scriptTags, settled };
+module.exports = {
+  loadUtilLayer, logsOf, readRenderer, rendererFiles, rendererSource, runApp, runRenderer, scriptTags, settled,
+};

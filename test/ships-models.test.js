@@ -3,31 +3,13 @@
 // AUR.shipModels and the Petrel model on the real Babylon build (a NullEngine and a stand-in canvas).
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
 const BABYLON = require('babylonjs');
-const { withCanvas, onNullScene, loadShipModules } = require('../scripts/lib/ship-fingerprint.js');
-const { readRenderer, runRenderer } = require('./support/renderer-source');
+const { withCanvas, onNullScene } = require('../scripts/lib/ship-fingerprint.js');
+const { logsOf, readRenderer } = require('./support/renderer-source');
+const { hullOf, sameItems } = require('./support/ship-assets');
+const { manifest, loadShipModels: load, onSystem } = require('./support/ships-models');
 
-const ROOT = path.join(__dirname, '..');
-const SHIPS = path.join(ROOT, 'src', 'renderer', 'ships');
-const SOURCE = path.join(SHIPS, 'petrel', 'source');
-const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'assets', 'ships', 'manifest.json'), 'utf8'));
 const SCOUT = manifest.hulls.find((hull) => hull.id === 'aur-lance-interceptor-v3');
-
-// The registry and Petrel on the renderer's own helpers, as the page loads them.
-function load() {
-  const window = {};
-  runRenderer('util.js', { window });
-  runRenderer('util-scene.js', { window, BABYLON });
-  const { AUR } = window;
-  const sources = fs.readdirSync(SOURCE).filter((name) => name.endsWith('.js')).map((name) => path.join(SOURCE, name));
-  loadShipModules(BABYLON, path.join(SHIPS, 'modules.js'),
-    [...sources, path.join(SHIPS, 'models.js'), path.join(SHIPS, 'petrel', 'model.js')], AUR);
-  // A NullEngine cannot make the raw cube texture the probe is, so the model reflects a stand-in here.
-  AUR.shipModule('petrel/light-probe', () => ({ createInspectionProbe: (scene) => new BABYLON.Texture(null, scene) }));
-  return AUR;
-}
 
 // Runs `work(scene, models, petrel, AUR)` on a fresh scene.
 function onScene(work) {
@@ -38,8 +20,6 @@ function onScene(work) {
 }
 
 const trianglesOf = (mesh) => mesh.getTotalIndices() / 3;
-// Babylon objects compare by identity: a deepEqual that fails tries to print them whole.
-const same = (actual, expected, message) => assert.ok(actual.length === expected.length && actual.every((item, i) => item === expected[i]), message);
 
 test('Petrel flies the Scout rank: the first rank of the family both providers fly', () => {
   const models = load().shipModels;
@@ -81,15 +61,68 @@ test('a model container holds the dressed ship out of the scene, as one mesh wit
     }
     hull.visibility = 1;
     assert.equal(new Set(hull.material.subMaterials.map((finish) => finish.reflectionTexture)).size, 1, 'one probe');
-
-    // A ship is a copy: the container's geometry, its own visibility.
-    const copy = (name) => held.instantiateModelsToScene((source) => name + source, false, { doNotInstantiate: true }).rootNodes[0];
-    const a = copy('a_'), b = copy('b_');
-    a.visibility = 0.16;
-    same(scene.meshes, [a, b]);
-    same([a.geometry, a.material, b.visibility], [b.geometry, hull.material, 1]);
   });
 });
+
+test('in a system every Petrel of a provider is an instance of one template, lit by the model lights, and a faded one blends', () =>
+  onSystem(async (scene, AUR, fly) => {
+    AUR.shipModels.lights(scene);
+    const a = await fly('a'), b = await fly('b');
+    assert.equal(a.metadata.assetHullId, 'petrel');
+    const template = hullOf(a).sourceMesh;
+    assert.equal(hullOf(b).sourceMesh, template, 'one template for the provider');
+    assert.deepEqual([template.isVisible, hullOf(a).isVisible], [false, true], 'a hidden template, drawn as its instances');
+    const lights = (mesh) => mesh.lightSources.map((light) => light.name).sort();
+    assert.ok((template.layerMask & AUR.shipModels.LAYER) && hullOf(a).layerMask === 0x0FFFFFFF, 'the layer is the template\'s');
+    assert.deepEqual(lights(hullOf(a)), ['model-fill', 'model-rim', 'model-sun'], 'an instance is lit as its template is');
+    const blends = (mesh) => mesh.material.subMaterials.map((finish) => finish.needAlphaBlendingForMesh(mesh));
+    assert.ok(!blends(hullOf(a)).some(Boolean), 'no finish blends in full');
+
+    AUR.ships.fade(scene, 0.16, { shipId: 'a', visibility: 1 });
+    assert.deepEqual([hullOf(b).sourceMesh, hullOf(b).visibility], [template, 0.16], 'the fleet fades on its template');
+    assert.ok(blends(hullOf(b)).every(Boolean), 'every finish of a faded ship blends');
+    const own = hullOf(a).sourceMesh;
+    assert.ok(own !== template && hullOf(a).visibility === 1 && !blends(hullOf(a)).some(Boolean), 'the followed ship, apart and in full');
+    assert.deepEqual(lights(hullOf(a)), ['model-fill', 'model-rim', 'model-sun'], 'and lit as the fleet is');
+    AUR.ships.fade(scene, 0.16, { shipId: 'a', visibility: 0 });
+    assert.ok(!hullOf(a).isEnabled() && hullOf(b).isEnabled(), 'hidden from inside: a disabled mesh is never drawn');
+    AUR.ships.fade(scene, 1);
+    assert.deepEqual([hullOf(a).sourceMesh, template.visibility, own.isDisposed()], [template, 1, true], 'restored');
+    assert.ok(hullOf(a).isEnabled());
+  }));
+
+// Babylon sorts a frame's blended sub-meshes by alphaIndex, then back to front; an instance batch
+// is sorted as its template's sub-mesh, at the template's place (the origin, like the sun's glow).
+test('a faded fleet draws after every other blended mesh, from either side of the sun', () =>
+  onSystem(async (scene, AUR, fly) => {
+    const a = await fly('a');
+    AUR.ships.fade(scene, 0.16);
+    const template = hullOf(a).sourceMesh;
+    const glow = Object.assign(BABYLON.MeshBuilder.CreatePlane('sun-glow', { size: 40 }, scene), { material: new BABYLON.StandardMaterial('glow', scene) });
+    const camera = new BABYLON.UniversalCamera('camera', BABYLON.Vector3.Zero(), scene);
+    const drawn = (z) => {
+      camera.position.set(3, 2, z);
+      camera.getViewMatrix(true);
+      for (const mesh of [template, glow]) mesh.computeWorldMatrix(true);
+      const queue = new BABYLON.SmartArray(64);
+      for (const subMesh of [...template.subMeshes, ...glow.subMeshes]) queue.push(subMesh);
+      const names = [];
+      const render = BABYLON.SubMesh.prototype.render;
+      BABYLON.SubMesh.prototype.render = function () { names.push(this.getMesh().name); };
+      try {
+        BABYLON.RenderingGroup._RenderSorted(queue, BABYLON.RenderingGroup.defaultTransparentSortCompare, camera, true);
+      } finally {
+        BABYLON.SubMesh.prototype.render = render;
+      }
+      return names;
+    };
+    for (const z of [-30, 30]) {
+      const names = drawn(z);
+      assert.equal(names.length, template.subMeshes.length + 1);
+      assert.equal(names[0], 'sun-glow', `the glow first, the faded finishes after it, with the camera at z ${z}`);
+    }
+    assert.equal(glow.alphaIndex, Number.MAX_VALUE, 'every other mesh keeps Babylon\'s default');
+  }));
 
 test('the model sits in the fleet frame its correction claims: one unit long, centred', () => {
   onScene((scene, models, petrel) => {
@@ -105,12 +138,47 @@ test('the model sits in the fleet frame its correction claims: one unit long, ce
   });
 });
 
-test('a build that fails part-way leaves nothing in the scene', () => {
+// A scene's first PBR material makes the BRDF lookup texture that every later one uses: the scene's.
+const leavesOnlyTheScenes = (scene) => {
+  assert.deepEqual(['meshes', 'transformNodes', 'materials', 'multiMaterials'].map((list) => scene[list].length), [0, 0, 0, 0]);
+  assert.ok(sameItems(scene.textures, [scene.environmentBRDFTexture]), 'no texture but the scene\'s BRDF lookup, kept');
+};
+
+test('a build that fails part-way leaves nothing of its own in the scene', () => {
   onScene((scene, models, petrel) => {
     const failing = { ...petrel, probe() { throw new Error('no probe'); } };
     assert.throws(() => models.container(scene, failing), /no probe/);
-    assert.deepEqual(['meshes', 'transformNodes', 'materials', 'multiMaterials', 'textures'].map((list) => scene[list].length), [0, 0, 0, 0, 0]);
+    leavesOnlyTheScenes(scene);
     assert.equal(models.container(scene, petrel).meshes.length, 1, 'and the scene can still build the model');
+  });
+});
+
+test('a build that fails part-way and cannot dispose one of its materials throws its own cause, and disposes the rest', () => {
+  onScene((scene, models, petrel, AUR) => {
+    const logs = logsOf({ AUR });
+    const count = scene.materials.length;
+    let stuck = null;
+    const failing = {
+      ...petrel,
+      probe() {
+        stuck = Object.assign(scene.materials[count], { dispose() { throw new Error('no dispose'); } });
+        throw new Error('no probe');
+      },
+    };
+    assert.throws(() => models.container(scene, failing), /no probe/);
+    assert.ok(sameItems(scene.materials, [stuck]), 'only the material that could not be disposed stays');
+    assert.deepEqual(['meshes', 'transformNodes', 'multiMaterials'].map((list) => scene[list].length), [0, 0, 0]);
+    assert.ok(sameItems(scene.textures, [scene.environmentBRDFTexture]), 'and the scene\'s BRDF lookup');
+    assert.deepEqual(logs, [stuck.name + ' from a failed build of petrel could not be disposed (no dispose).']);
+    delete stuck.dispose;
+    stuck.dispose();
+  });
+});
+
+test('a model container owns the materials and textures it was built with: disposing it releases them', () => {
+  onScene((scene, models, petrel) => {
+    models.container(scene, petrel).dispose();
+    leavesOnlyTheScenes(scene);
   });
 });
 
@@ -157,7 +225,7 @@ test('a ship wears the model finishes, with its trim copied once per palette in 
     // The whole hull's material for a palette: each finish in its place, the trim swapped for its copy.
     const worn = models.material(materials, petrel, 'claude', '#d97757', whole);
     assert.equal(models.material(materials, petrel, 'claude', '#d97757', whole), worn, 'one per palette');
-    same(worn.subMaterials, whole.subMaterials.map((finish) => wear(finish.name, 'claude', '#d97757')));
+    assert.ok(sameItems(worn.subMaterials, whole.subMaterials.map((finish) => wear(finish.name, 'claude', '#d97757'))));
     assert.equal(worn.subMaterials.filter((finish, i) => finish !== whole.subMaterials[i]).length, Object.keys(petrel.trim).length);
     assert.equal(scene.textures.length, textures, 'a copy makes no texture of its own');
   });
@@ -215,3 +283,81 @@ test('an opaque material fades with its mesh once it gives its transparency mode
   cutOut.transparencyMode = null;
   assert.deepEqual([cutOut.needAlphaBlendingForMesh(mesh), cutOut.needAlphaTestingForMesh(mesh)], [true, false]);
 }));
+
+test('a trim copy that cannot be dressed is not left in the scene, and the next one is made whole', () => onNullScene(BABYLON, (scene) => {
+  const models = load().shipModels;
+  const lamp = new BABYLON.PBRMaterial('lamp', scene);
+  const hull = new BABYLON.MultiMaterial('hull', scene);
+  hull.subMaterials = [lamp];
+  const model = { id: 'probe', trim: { lamp: { lamps: '#ffb24a' } } };
+  const materials = new Map();
+  const made = () => [scene.materials.length, scene.multiMaterials.length];
+  const before = made();
+
+  const emissive = lamp.emissiveColor;
+  lamp.emissiveColor = null; // what a lamp's dressing reads
+  lamp.clone('a copy can still be made').dispose();
+  assert.throws(() => models.material(materials, model, 'claude', '#ff7a1a', hull), TypeError);
+  assert.deepEqual(made(), before, 'neither the lamp copy nor the hull material that was to hold it stays');
+  assert.equal(materials.size, 0, 'and nothing half dressed is kept for the next ship');
+
+  lamp.emissiveColor = emissive;
+  const worn = models.material(materials, model, 'claude', '#ff7a1a', hull);
+  assert.deepEqual(made(), [before[0] + 1, before[1] + 1]);
+  assert.notEqual(worn.subMaterials[0], lamp, 'the hull wears the lamp in the ship color');
+}));
+
+test('a trim copy that cannot be made leaves the model finish every map it had, and the next copy is whole', () => {
+  onScene((scene, models, petrel) => {
+    const finish = models.container(scene, petrel).meshes[0].material.subMaterials.find((made) => made.name === 'pearl pressure hull');
+    const slots = ['albedoTexture', 'bumpTexture', 'metallicTexture', 'emissiveTexture', 'reflectionTexture'];
+    const maps = slots.map((slot) => finish[slot]);
+    const mapsOf = (material) => slots.map((slot) => material[slot]);
+    const materials = new Map();
+    const count = scene.materials.length;
+    const wear = () => models.material(materials, petrel, 'claude', '#d97757', finish);
+    const clone = finish.clone;
+
+    finish.clone = () => { throw new Error('no clone'); };
+    assert.throws(wear, /no clone/);
+    assert.ok(sameItems(mapsOf(finish), maps), 'the finish keeps its maps when the clone fails');
+    finish.clone = function (name) { // a clone that fails once Babylon has made the copy
+      clone.call(this, name);
+      throw new Error('no plugins');
+    };
+    assert.throws(wear, /no plugins/);
+    assert.equal(scene.materials.length, count, 'a copy the clone made before it failed is not left in the scene');
+    assert.ok(sameItems(mapsOf(finish), maps), 'and the finish keeps its maps');
+    finish.clone = function (name) { // and one whose copy cannot be disposed either: the cause is still the clone's
+      clone.call(this, name).dispose = () => { throw new Error('no dispose'); };
+      throw new Error('no plugins');
+    };
+    assert.throws(wear, /no plugins/);
+    assert.ok(sameItems(mapsOf(finish), maps));
+    const kept = scene.materials[scene.materials.length - 1]; // the copy that could not be disposed
+    delete kept.dispose;
+    kept.dispose();
+    finish.getScene = () => { throw new Error('no scene'); }; // a failure before the copy is begun
+    assert.throws(wear, /no scene/);
+    assert.ok(sameItems(mapsOf(finish), maps), 'the finish keeps its maps whatever fails');
+    delete finish.getScene;
+    finish.clone = function (name) { // a copy made that cannot take the model's tone curve
+      return Object.defineProperty(clone.call(this, name), 'imageProcessingConfiguration', { set() { throw new Error('no tone curve'); } });
+    };
+    assert.throws(wear, /no tone curve/);
+    assert.ok(sameItems(mapsOf(finish), maps), 'and when the copy cannot take them');
+    assert.deepEqual([scene.materials.length, materials.size], [count, 0], 'no copy is left in the scene or kept');
+    let metallic = finish.metallicTexture; // a map that cannot be taken off, after two that were
+    Object.defineProperty(finish, 'metallicTexture', {
+      configurable: true,
+      get: () => metallic,
+      set(value) { if (value === null) throw new Error('no strip'); metallic = value; },
+    });
+    assert.throws(wear, /no strip/);
+    assert.ok(sameItems(mapsOf(finish), maps), 'and when a map cannot be taken off');
+    delete finish.metallicTexture;
+
+    delete finish.clone;
+    assert.ok(maps.every(Boolean) && sameItems(mapsOf(wear()), maps), 'the next copy shares every map');
+  });
+});
