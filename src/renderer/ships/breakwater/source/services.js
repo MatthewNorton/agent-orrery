@@ -5,7 +5,7 @@
 
 window.AUR.shipModule('breakwater/services', function (use) {
 const { v, rad, radial } = use('breakwater/fabrication');
-const { RIM_START, RIM_END, apronHalfWidthAtRim } = use('breakwater/layout');
+const { QUARTER, RIM_START, RIM_END, apronHalfWidthAtRim } = use('breakwater/layout');
 
 function housing(g, m, a, r, y, side, width, height, depth) {
   g.bar(m,radial(a,r-depth/2,y,side),radial(a,r+depth/2,y,side),width,height);
@@ -47,7 +47,10 @@ function airlock(g,m,a,r,sill,w,h) {
   housing(g,m.dark,a,r+.31,sill+h-.18,0,w*.47,.19,.18);
   housing(g,m.lamp,a,r+.42,sill+h-.18,0,w*.39,.075,.046);
   housing(g,m.brass,a,r+.38,sill+.16,0,w-.83,.115,.075);
-  for(let s=-w/2+.56;s<w/2-.54;s+=.25) {
+  // Hazard chevrons every 0.25 along the sill, from 0.56 in from one side to short of 0.54 from the other.
+  const chevrons=Math.ceil((w-1.10)/.25);
+  for(let k=0;k<chevrons;k++) {
+    const s=-w/2+.56+k*.25;
     g.bar(m.seam,radial(a,r+.426,sill+.11,s),radial(a,r+.426,sill+.213,s+.09),.085,.026,radial(a,1,0));
   }
 }
@@ -108,7 +111,7 @@ function blanket(g,m,a,r,y,w,h) {
     const crease=Math.abs(Math.sin(19*d+8*t+2.6*lobe))*.068;
     return .04+edge*(.21+.085*lobe+crease+.025*Math.sin(47*d-12*t));
   };
-  const nx=24,ny=16,step=.001,samples=[],normals=[];
+  const nx=16,ny=12,step=.001,samples=[],normals=[];
   for(let j=0;j<=ny;j++){
     samples[j]=[];normals[j]=[];
     for(let i=0;i<=nx;i++){
@@ -148,7 +151,7 @@ function buildRim(g,m) {
       return [0,.55,1].map((t)=>{
         const angle=edgeAngle+(a-edgeAngle)*t;
         const edgeY=y>-.60 ? -.16+(y+.60)*.09 : y;
-        return radial(mirror?Math.PI/2-angle:angle,radius,edgeY+(y-edgeY)*t);
+        return radial(mirror?QUARTER-angle:angle,radius,edgeY+(y-edgeY)*t);
       });
     });
     for(let j=0;j<skin.length-1;j++){
@@ -160,10 +163,12 @@ function buildRim(g,m) {
   }
   windowBelt(g,m,24.26,-2.17,-1.32,a,b,false);
   windowBelt(g,m,18.13,-2.17,-1.32,a,b,true);
-  const serviceStart=rad(12),serviceEnd=Math.PI/2-serviceStart;
+  const serviceStart=rad(12),serviceEnd=QUARTER-serviceStart;
   g.band(m.structural,18.38,23.86,-6.26,-5.99,serviceStart,serviceEnd,46);
-  g.band(m.dark,19.2,22.90,-7.91,-7.67,a,b,steps);
-  g.revolve([[19.27,-7.62,m.dark],[19.27,-3.13,m.dark],[22.28,-3.13,m.dark],[22.28,-7.62]],a,b,steps);
+  const bandTop=-7.67;
+  g.band(m.dark,19.2,22.90,-7.91,bandTop,a,b,steps);
+  // The service box is open below: its walls stand on the band under it, which closes it.
+  g.revolve([[19.27,bandTop,m.dark],[19.27,-3.13,m.dark],[22.28,-3.13,m.dark],[22.28,bandTop]],a,b,steps);
   const outerFeeds=[[23.09,-3.72,.18,m.pipe],[23.43,-4.69,.12,m.brass],[23.52,-5.02,.105,m.brass]];
   const conduits=[...outerFeeds,[22.93,-5.51,.14,m.pipe],[18.85,-4.65,.12,m.brass],[19.04,-4.95,.092,m.pipe]];
   for(const [radius,y,size,material] of conduits) {
@@ -232,10 +237,11 @@ function buildRim(g,m) {
     for(let j=0;j<=12;j++){
       const angle=a+(b-a)*j/12;
       g.tube(m.pipe,radial(angle,radius,.55),radial(angle,radius,1.14),.033,.027,7);
-      if(radius<20 && j%2===0){
-        g.bar(m.structural,radial(angle,18.32,-2.75),radial(angle,17.67,-3.04),.16,.16);
-      }
     }
+  }
+  for(let j=0;j<=12;j+=2){
+    const angle=a+(b-a)*j/12;
+    g.bar(m.structural,radial(angle,18.32,-2.75),radial(angle,17.67,-3.04),.16,.16);
   }
   for(const d of [30,61]){
     const angle=rad(d),a0=radial(angle,23.65,-5.64),a1=radial(angle,23.65,-4.93);

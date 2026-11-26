@@ -137,7 +137,7 @@ function normalMap(c) {
 }
 
 function apron(c) {
-  const n=c.canvas.width,rand=random(562);
+  const n=1024,rand=random(562);
   c.fillStyle='#58585a';c.fillRect(0,0,n,n);
   for(let j=0;j<7;j++) for(let i=-1;i<7;i++){
     const x=i*166+(j%2)*60,y=j*153,t=73+Math.floor(rand()*17);
@@ -183,7 +183,7 @@ function apron(c) {
 
 // Eight occupied workstations share one atlas. The mullions and inset returns remain geometry.
 function rooms(c,emission) {
-  const w=c.canvas.width/8,h=c.canvas.height;
+  const w=128,h=128;
   const rand=random(779);
   for(let j=0;j<8;j++){
     const light=[.94,.67,1,.42,.85,.98,.64,.88][j],ox=(j%3-1)*13;
@@ -242,7 +242,9 @@ function createFinishes(scene) {
     if(map)m.albedoTexture=map;
     return m;
   }
-  const skin=texture('Riveted plates and wear',1024,1024,c=>armor(c,false));
+  // The plate map repeats every few units, so at 512 a texel stays under a pixel at the nearest view.
+  // The deck's map covers a whole apron and a room a whole window, so those keep their size.
+  const skin=texture('Riveted plates and wear',512,512,c=>armor(c,false));
   const relief=texture('Panel recess normals',512,512,normalMap);
   const plating=metal('Weathered porcelain armor','#edf0f3',.36,.60,skin,6.2);
   relief.gammaSpace=false;

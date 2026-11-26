@@ -20,8 +20,9 @@ function addGear(scene,parent,m) {
     const axle=v(x,AXLE_Y,z);
     gear.tube(m.pipe,v(x,mountY,z-.16),axle,.096,.074);
     gear.tube(m.dark,v(x,mountY,z+.43),axle,.059,.055);
-    gear.tube(m.tire,axle.add(v(-.118,0,0)),axle.add(v(.118,0,0)),WHEEL_RADIUS,WHEEL_RADIUS,24);
-    for(const s of [-1,1])gear.tube(m.structural,axle.add(v(s*.118,0,0)),axle.add(v(s*.14,0,0)),.12,.10,14);
+    // Sides in a multiple of four put a vertex at the bottom of the tire, the point createDrydock sets on the deck.
+    gear.tube(m.tire,axle.add(v(-.118,0,0)),axle.add(v(.118,0,0)),WHEEL_RADIUS,WHEEL_RADIUS,12);
+    for(const s of [-1,1])gear.tube(m.structural,axle.add(v(s*.118,0,0)),axle.add(v(s*.14,0,0)),.12,.10,8);
   }
   gear.finish();
 }
@@ -58,7 +59,7 @@ function createDrydock(scene) {
     ships[i].rotation.y=heading;
     ships[i].scaling.setAll(CUTTER_SCALE);
   });
-  return {root,sectors,ships};
+  return {root};
 }
 return { createDrydock };
 });

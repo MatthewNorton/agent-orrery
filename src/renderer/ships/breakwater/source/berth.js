@@ -5,7 +5,7 @@
 
 window.AUR.shipModule('breakwater/berth', function (use) {
 const { v } = use('breakwater/fabrication');
-const { APRON, BERTH_RADIUS, DECK_Y, padUV } = use('breakwater/layout');
+const { APRON, DECK_Y, padUV, scaleApron } = use('breakwater/layout');
 const { airlock } = use('breakwater/services');
 
 function freight(g,m,x,z,size,base=0) {
@@ -34,9 +34,11 @@ function railing(g,m) {
   for(let i=1;i<APRON.length;i++) {
     const p=APRON[i],q=APRON[(i+1)%APRON.length];
     /** @param {number[]} point @param {number} y */
-    const endpoint=([x,z],y)=>v(x*.986,y,BERTH_RADIUS+(z-BERTH_RADIUS)*.986);
+    const endpoint=(point,y)=>{const [x,z]=scaleApron(point,.986);return v(x,y,z);};
     const a=endpoint(p,0),b=endpoint(q,0),count=Math.ceil(b.subtract(a).length()/1.62);
-    for(let j=0;j<count;j++){
+    // A run's end post is the next run's first; the last run, which stops at the corridor, needs its own.
+    const posts=i===APRON.length-1?count+1:count;
+    for(let j=0;j<posts;j++){
       const f=j/count,x=a.x+(b.x-a.x)*f,z=a.z+(b.z-a.z)*f;
       g.box(m.structural,x,.054,z,.15,.10,.14);
       g.tube(m.pipe,v(x,.09,z),v(x,.72,z),.039,.034,7);
@@ -54,11 +56,11 @@ function undercroft(g,m) {
   airlock(g,m,0,22.99,-5.73,3.66,2.89);
   for(const s of [-1,1]){
     const x=s*3.28;
-    g.tube(m.structural,v(x,-3.19,18.88),v(x,-3.19,22.72),.69,.69,24);
-    g.tube(m.pipe,v(x,-3.19,22.72),v(x,-3.19,23.02),.69,.46,24);
-    g.tube(m.dark,v(x,-3.19,23.02),v(x,-3.19,23.20),.46,.18,20);
+    g.tube(m.structural,v(x,-3.19,18.88),v(x,-3.19,22.72),.69,.69,16);
+    g.tube(m.pipe,v(x,-3.19,22.72),v(x,-3.19,23.02),.69,.46,16);
+    g.tube(m.dark,v(x,-3.19,23.02),v(x,-3.19,23.20),.46,.18,16);
     for(const z of [19.04,20.15,21.78,22.67]){
-      g.tube(m.enamel,v(x,-3.19,z),v(x,-3.19,z+.12),.72,.72,20);
+      g.tube(m.enamel,v(x,-3.19,z),v(x,-3.19,z+.12),.72,.72,16);
       g.box(m.structural,x,-3.97,z+.06,.47,.38,.22);
     }
     for(const [y,r,mat] of [[-4.10,.112,m.brass],[-4.48,.14,m.pipe],[-4.85,.102,m.dark]]){
@@ -96,7 +98,7 @@ function undercroft(g,m) {
 
 function dockingDeck(g,m) {
   g.slab(m.structural,APRON,-.60,DECK_Y,m.deck,APRON.map(padUV));
-  const scaleOutline=(size)=>APRON.map(([x,z])=>[x*size,BERTH_RADIUS+(z-BERTH_RADIUS)*size]);
+  const scaleOutline=(size)=>APRON.map(point=>scaleApron(point,size));
   g.slab(m.dark,scaleOutline(.97),-.82,-.60);
   const serviceOutline=size=>scaleOutline(size).map(([x,z])=>[x,z-.59]);
   g.slab(m.structural,serviceOutline(.71),-6.20,-5.89,m.dark);
@@ -133,7 +135,8 @@ function dockingDeck(g,m) {
   }
   signal(g,m,-3.94,16.55,true); signal(g,m,5.47,18.1); signal(g,m,-5.63,23.92);
   freight(g,m,-3.92,18.06,1.2); freight(g,m,-2.72,17.75,.86);
-  freight(g,m,3.69,17.04,.95); freight(g,m,3.65,17.04,.71,.75);
+  // This stack stands outboard of the deck lamp beside it.
+  freight(g,m,3.69,17.5,.95); freight(g,m,3.65,17.5,.71,.75);
   g.box(m.dark,4.95,.34,18.18,.45,.68,.53);
   g.tube(m.brass,v(4.81,.75,18.19),v(5.08,.75,18.19),.089);
 }
