@@ -57,6 +57,98 @@ test('the yard sits in the fleet frame its correction claims, and its container 
     for (const side of [reach.minimum.x, reach.maximum.x, reach.minimum.z, reach.maximum.z]) {
       assert.ok(Math.abs(side) > 20 && Math.abs(side) < 25, `a berth ${side} from the axis`);
     }
+    // A tire has a vertex at its foot, the point the yard sets on the deck at y 0.
+    assert.ok(Math.abs(reach.minimum.y) < 1e-4, `the tires reach ${reach.minimum.y}, not the deck`);
+  });
+});
+
+// One berth as the yard builds it (the master quadrant the other three instance), and the hub: each
+// a mesh per finish.
+function onBerth(work) {
+  onScene((scene, models, AUR) => {
+    const { root } = built(scene, models.inPlaceOf(FLAGSHIP).model);
+    const berth = root.getChildTransformNodes(true).find((node) => node.name === 'North quadrant');
+    const finishOf = (node) => (name) => node.getChildMeshes(true).find((mesh) => mesh.material.name === name);
+    work(finishOf(berth), finishOf(root), AUR);
+    root.dispose(false, true);
+  });
+}
+const pointsOf = (mesh) => {
+  const p = mesh.getVerticesData('position');
+  return Array.from({ length: p.length / 3 }, (_, i) => BABYLON.Vector3.FromArray(p, 3 * i));
+};
+
+test('the rail around a berth\'s apron stands on a post at every corner, the two beside the corridor included', () => {
+  onBerth((finish, hub, AUR) => {
+    const { APRON } = AUR.useShipModule('breakwater/layout');
+    const pipes = pointsOf(finish('Distribution lines'));
+    for (const [x, z] of APRON) {
+      // A post rises from the deck to the top rail; the lower rail's end, also a pipe, is only a ring.
+      const ys = pipes.filter((p) => Math.hypot(p.x - x, p.z - z) < 0.2 && p.y > 0 && p.y < 1).map((p) => p.y);
+      const height = ys.length ? Math.max(...ys) - Math.min(...ys) : 0;
+      assert.ok(height > 0.5, `no post at the corner (${x}, ${z})`);
+    }
+  });
+});
+
+test('no work light on a berth is shut inside a freight container', () => {
+  onBerth((finish) => {
+    // Every crate and lamp is a box of six faces, 24 vertices.
+    const boxes = (mesh) => {
+      const positions = mesh.getVerticesData('position');
+      assert.equal(positions.length % 72, 0, mesh.name);
+      return Array.from({ length: positions.length / 72 }, (_, i) => {
+        const { minimum, maximum } = BABYLON.extractMinAndMax(positions, 24 * i, 24);
+        return new BABYLON.BoundingBox(minimum, maximum);
+      });
+    };
+    const crates = boxes(finish('Freight containers'));
+    assert.equal(crates.length, 4, 'the four crates of a berth');
+    for (const lamp of boxes(finish('Work lights'))) {
+      const { x, y, z } = lamp.center;
+      assert.ok(!crates.some((crate) => BABYLON.BoundingBox.Intersects(lamp, crate)),
+        `the lamp at (${x.toFixed(2)}, ${y.toFixed(2)}, ${z.toFixed(2)}) is inside a crate`);
+    }
+  });
+});
+
+test('the service box under the rim stands on the band below it, and the mast beside the communications cap on the collar', () => {
+  onBerth((finish, hub) => {
+    const radius = (p) => Math.hypot(p.x, p.z);
+    const ys = (points, keep) => points.filter(keep).map((p) => p.y);
+    // The box's walls are at radius 19.27 and 22.28, over a band from 19.2 to 22.9.
+    const machinery = pointsOf(finish('Graphite machinery'));
+    const bandTop = Math.max(...ys(machinery, (p) => near(radius(p), 19.2, 1e-3)));
+    const wallFoot = Math.min(...ys(machinery, (p) => near(radius(p), 19.27, 1e-3) || near(radius(p), 22.28, 1e-3)));
+    assert.ok(near(wallFoot, bandTop, 1e-6), `the box's walls end at ${wallFoot}, the band's top is at ${bandTop}`);
+    // The collar is the hub's dark ring of radius 1.79; the mast at (-1.49, -0.12) has its foot on it.
+    const collarTop = Math.max(...ys(pointsOf(hub('Graphite machinery')), (p) => near(radius(p), 1.79, 1e-3)));
+    const mastFoot = Math.min(...ys(pointsOf(hub('Load-bearing steel')), (p) => Math.abs(p.x + 1.49) < 0.25 && Math.abs(p.z + 0.12) < 0.25));
+    assert.ok(near(mastFoot, collarTop, 1e-6), `the mast's foot is at ${mastFoot}, the collar's top at ${collarTop}`);
+  });
+});
+
+test('a bar of no length, a girder facing along itself and an apron width asked for off the apron are refused, not built wrong', () => {
+  onScene((scene, models, AUR) => {
+    const { Fabrication, v } = AUR.useShipModule('breakwater/fabrication');
+    const { APRON, apronHalfWidthAtRim } = AUR.useShipModule('breakwater/layout');
+    const frame = new Fabrication(scene, new BABYLON.TransformNode('frame', scene));
+    const steel = new BABYLON.PBRMaterial('steel', scene);
+    steel.metadata = { tile: 5 };
+    assert.throws(() => frame.bar(steel, v(0, 0, 0), v(0, 0, 0), 0.1, 0.1), /two ends apart/);
+    assert.throws(() => frame.girder(steel, v(0, 0, 0), v(0, 1, 0), 0.3, 0.3), /face along its own axis/);
+    // Hinted along itself, a bar takes an axis it is not along for its side, along X too.
+    frame.bar(steel, v(0, 0, 0), v(0, 1, 0), 0.1, 0.1);
+    frame.bar(steel, v(0, 0, 0), v(1, 0, 0), 0.1, 0.1, v(1, 0, 0));
+    assert.equal(frame.surfaces.get(steel).positions.length / 3, 48, 'two bars of six faces');
+
+    // The width follows the apron's side, corner to corner, from its first station to its last.
+    const side = APRON.slice(1, 6);
+    for (const [x, z] of side) assert.ok(near(apronHalfWidthAtRim(z), x), `at ${z}`);
+    const [[x1, z1], [x2, z2]] = side;
+    assert.ok(near(apronHalfWidthAtRim((z1 + z2) / 2), (x1 + x2) / 2), 'midway along its first edge');
+    assert.throws(() => apronHalfWidthAtRim(side[0][1] - 0.01), /no width/);
+    assert.throws(() => apronHalfWidthAtRim(side[4][1] + 0.01), /no width/);
   });
 });
 
