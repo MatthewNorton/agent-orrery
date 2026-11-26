@@ -30,8 +30,9 @@
  * @typedef {{ containers: Map<string, HullRecord>, materials: Map<string, any>,
  *   templates: Map<string, HullTemplate>, ships: Map<string, ShipEntry>, triangles: number,
  *   visibility: number, apart: { shipId: string, visibility: number } | null,
- *   disposed: boolean }} SceneState `visibility` is the fleet's, which every template shows, and
- *   `apart` the one ship focus mode shows at a visibility of its own (AUR.ships.fade)
+ *   disposed: boolean, building: Promise<void> }} SceneState `visibility` is the fleet's, which
+ *   every template shows, `apart` the one ship focus mode shows at a visibility of its own
+ *   (AUR.ships.fade), and `building` settles when the model builds queued so far are done
  * @typedef {object} ShipAssetsCore shared by the ship-assets*.js files and ships/livery.js as AUR.shipAssets
  * @property {(failure: string, error: any, outcome?: string) => void} logFailure logged once per message
  * @property {(name: string, steps: [string, () => void][]) => void} guarded
@@ -57,14 +58,14 @@
   const HULL_ROOT = '../../assets/ships/';
   // The triangles a view's hulls may hold. A ship whose hull does not fit keeps its dart, or its
   // current hull when a promotion does not fit (a near view first tries the far file of a hull
-  // that has one). Hulls carry their detail as geometry (10k to 58k triangles each), and
+  // that has one). Hulls carry their detail as geometry (17k to 229k triangles each), and
   // a template's ships draw in one draw per part, so what grows with the fleet is the triangles
   // drawn, which is what this counts. A system or planet view holds eleven ships of the top rank
   // (the Breakwater yard, 229,360), sixty-six of the two below it (Petrel with its survey ring,
-  // 40,840) or 153 of the first (Petrel, 17,544); the universe map sixteen, ninety-one or 212. On
-  // an integrated GPU (Radeon 890M) a system view of eleven yards draws in 5.2 ms a frame, against
-  // 2.3 ms with none.
+  // 40,840) or 153 of the first (Petrel, 17,544); the universe map sixteen, ninety-one or 212.
   const TRIANGLE_BUDGET = { near: 2700000, far: 3720000 };
+  // Between two model builds of a scene, so a frame draws: each stalls the page while it builds.
+  const BUILD_GAP_MS = 16;
   /** @type {WeakMap<object, SceneState>} */
   const sceneStates = new WeakMap();
 
@@ -150,7 +151,7 @@
     if (!state) {
       state = {
         containers: new Map(), materials: new Map(), templates: new Map(), ships: new Map(),
-        triangles: 0, visibility: 1, apart: null, disposed: false,
+        triangles: 0, visibility: 1, apart: null, disposed: false, building: Promise.resolve(),
       };
       sceneStates.set(scene, state);
     }
@@ -238,6 +239,17 @@
 
   // ---------- loading ----------
 
+  // A scene's models are built one at a time, each in a task of its own after a gap: a view that
+  // opens on several would otherwise stall for all of them at once. A build whose scene is gone
+  // by the time it runs builds nothing.
+  function buildModel(scene, state, model) {
+    const built = state.building
+      .then(() => new Promise((resolve) => { setTimeout(resolve, BUILD_GAP_MS); }))
+      .then(() => (isSceneDisposed(scene, state) ? null : AUR.shipModels.container(scene, model)));
+    state.building = built.then(() => {}, () => {});
+    return built;
+  }
+
   /** @param {HullFile} hullFile @returns {Promise<HullRecord | null>} */
   function ensureContainer(scene, state, hullFile) {
     const { file, model } = hullFile;
@@ -249,11 +261,8 @@
     if (record.container) return Promise.resolve(record);
     if (record.promise) return record.promise;
     const loading = record;
-    // A model's container is built in code, a manifest hull's is loaded from its file. A build
-    // queued for a scene that is gone by the time it runs builds nothing.
-    record.promise = (model
-      ? Promise.resolve().then(() => (isSceneDisposed(scene, state) ? null : AUR.shipModels.container(scene, model)))
-      : BABYLON.SceneLoader.LoadAssetContainerAsync(HULL_ROOT, file, scene))
+    // A model's container is built in code, a manifest hull's is loaded from its file.
+    record.promise = (model ? buildModel(scene, state, model) : BABYLON.SceneLoader.LoadAssetContainerAsync(HULL_ROOT, file, scene))
       .then((container) => {
         if (!container) return null;
         if (isSceneDisposed(scene, state)) {
