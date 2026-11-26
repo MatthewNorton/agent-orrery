@@ -123,17 +123,21 @@
 
   /**
    * A part as a mesh: a model may instance the parts it repeats, and a merge takes no instance, so
-   * each becomes a mesh on its source's geometry, standing where the instance stood.
+   * each gets a mesh on its source's geometry, standing where the instance stands. The instance
+   * stays, since parts under it stand on it, and goes with the built root.
    * @param {BABYLON.AbstractMesh} part @returns {BABYLON.Mesh}
    */
   function solid(part) {
     if (!(part instanceof BABYLON.InstancedMesh)) return /** @type {BABYLON.Mesh} */ (part);
-    const mesh = part.sourceMesh.clone(part.name, part.parent, true);
+    const source = part.sourceMesh;
+    const mesh = new BABYLON.Mesh(part.name, part.getScene(), part.parent);
+    source.geometry.applyToMesh(mesh);
+    mesh.material = source.material;
+    mesh.sideOrientation = source.sideOrientation;
     mesh.position.copyFrom(part.position);
     mesh.rotation.copyFrom(part.rotation);
     mesh.rotationQuaternion = part.rotationQuaternion && part.rotationQuaternion.clone();
     mesh.scaling.copyFrom(part.scaling);
-    part.dispose();
     return mesh;
   }
 

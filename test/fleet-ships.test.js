@@ -4,7 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { readGlbJson, glbLength } = require('./support/glb');
+const { readGlbJson, shownLength } = require('./support/glb');
 
 const ROOT = path.resolve(__dirname, '..');
 const SHIP_ROOT = path.join(ROOT, 'assets', 'ships');
@@ -98,8 +98,7 @@ test('fleet-v3 display size grows 1.9x over the ladder from a unit Scout', () =>
   const manifest = readManifest();
   const ranks = manifest.hulls.filter((hull) => hull.family === manifest.providerFamilies.claude && Number.isFinite(hull.minBuilds))
     .sort((a, b) => a.minBuilds - b.minBuilds);
-  const lengths = ranks.map((hull) =>
-    hull.correction.scale * glbLength(readGlbJson(path.join(SHIP_ROOT, hull.file)).model));
+  const lengths = ranks.map(shownLength);
   assert.ok(Math.abs(lengths[0] - 1) < 0.01, `the Scout displays ${lengths[0]} long: the fleet's unit`);
   assert.deepEqual(lengths.map((l) => Math.round(l * 100) / 100), [1, 1.25, 1.55, 1.9], 'Scout, Workhorse, Capital, Flagship');
 });
@@ -108,8 +107,7 @@ test('fleet-v2 display size grows gently with rank, from today\'s hull size', ()
   const manifest = readManifest();
   const ranks = manifest.hulls.filter((hull) => hull.family === 'aur-fleet-v2' && Number.isFinite(hull.minBuilds))
     .sort((a, b) => a.minBuilds - b.minBuilds);
-  const lengths = ranks.map((hull) =>
-    hull.correction.scale * glbLength(readGlbJson(path.join(SHIP_ROOT, hull.file)).model));
+  const lengths = ranks.map(shownLength);
   for (let i = 1; i < lengths.length; i++) assert.ok(lengths[i] > lengths[i - 1], 'each rank is larger');
   assert.ok(Math.abs(lengths[0] - 3) < 0.05, `interceptor displays ${lengths[0]} long, like today's hulls`);
   const growth = lengths.at(-1) / lengths[0];

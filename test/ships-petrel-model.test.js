@@ -5,17 +5,17 @@
 // fitted flies the Workhorse and Capital ranks.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const path = require('node:path');
 const BABYLON = require('babylonjs');
 const { fingerprintOf } = require('../scripts/lib/ship-fingerprint.js');
 const { readRenderer } = require('./support/renderer-source');
-const { readGlbJson, glbLength } = require('./support/glb');
+const { shownLength } = require('./support/glb');
 const { hullOf, ship } = require('./support/ship-assets');
-const { rank, loadShipModels: load, onModelScene: onScene, onSystem } = require('./support/ships-models');
+const {
+  rank, loadShipModels: load, onModelScene: onScene, onSystem, near, trianglesOf, palettes: palettesOf, built,
+} = require('./support/ships-models');
 
 const record = JSON.parse(readRenderer('ships/petrel/source/source.json'));
 const [SCOUT, WORKHORSE, CAPITAL] = [0, 5, 20].map(rank);
-const near = (a, b, epsilon = 1e-9) => Math.abs(a - b) < epsilon;
 const HALO = '#aa601a'; // the inner color of the halo the ring's map paints around each rail lamp
 
 test('ringed, Petrel flies the Workhorse and Capital ranks: one container for both, a hull of its own in each', () => {
@@ -34,7 +34,7 @@ test('ringed, Petrel flies the Workhorse and Capital ranks: one container for bo
 test('each ringed rank flies at the size the fleet\'s hull for that rank is shown at', () => {
   const models = load().shipModels;
   for (const hull of [WORKHORSE, CAPITAL]) {
-    const shown = hull.correction.scale * glbLength(readGlbJson(path.join(__dirname, '..', 'assets', 'ships', hull.file)).model);
+    const shown = shownLength(hull);
     const { correction, model } = models.inPlaceOf(hull);
     assert.ok(near(correction.scale / model.correction.scale, shown, 0.01), `${hull.id}: shown ${shown} long`);
     assert.deepEqual(correction.offset, model.correction.offset);
@@ -51,10 +51,7 @@ test('the ringed ship sits in the fleet frame its correction claims: its ring, i
   onScene((scene, models) => {
     const ringed = models.inPlaceOf(WORKHORSE).model;
     const { scale, offset } = ringed.correction;
-    const root = ringed.build(scene);
-    root.computeWorldMatrix(true);
-    const { min, max } = root.getHierarchyBoundingVectors(true);
-    const size = max.subtract(min);
+    const { min, max, size } = built(scene, ringed);
     assert.ok(size.x > size.z && near(size.x, size.y, 0.01), 'the ring is wider than the hull is long');
     assert.ok(near(size.x * scale, 1, 0.005), `the ring is ${size.x * scale} across`);
     assert.ok(near(((max.z + min.z) / 2 + offset[2]) * scale, 0, 0.005), 'centred along its length');
@@ -67,7 +64,7 @@ test('a ringed container holds the triangles the variant records, as one mesh', 
   onScene((scene, models) => {
     const held = models.container(scene, models.inPlaceOf(CAPITAL).model);
     assert.equal(held.meshes.length, 1);
-    assert.equal(held.meshes[0].getTotalIndices() / 3, record.variants.ring.geometry.triangles);
+    assert.equal(trianglesOf(held.meshes[0]), record.variants.ring.geometry.triangles);
   });
 });
 
@@ -93,7 +90,7 @@ test('the ring\'s inspection rail shows the ship color on every palette: its lam
     Object.assign(rail.emissiveTexture, { getSize: () => ({ width: 3, height: 1 }), getContext: () => ({ getImageData: () => image }) });
     const textures = scene.textures.length;
     const materials = new Map();
-    const palettes = [['claude', AUR.PROVIDERS.claude.color], ['codex', AUR.PROVIDERS.codex.color], ['local', AUR.LOCAL_MODEL.color]];
+    const palettes = palettesOf(AUR);
     // While the copies are made, a new canvas keeps the pixels put on it, and each texture update is noted.
     const events = [];
     class KeptCanvas {
@@ -153,9 +150,8 @@ test('the nozzles follow the rank\'s size', () => {
 });
 
 test('in a system both ringed ranks of a provider draw from one template, and a promotion between them grows the hull', () =>
-  onSystem(async (scene, AUR) => {
+  onSystem(async (scene, AUR, fly) => {
     AUR.shipModels.lights(scene);
-    const fly = (id, builds) => AUR.ships.upgrade(scene, ship(id, builds), new BABYLON.Mesh('dart ' + id, scene));
     const [w, c, s] = [await fly('w', 5), await fly('c', 20), await fly('s', 0)];
     assert.deepEqual([w, c, s].map((root) => root.metadata.assetHullId), ['petrel-ring', 'petrel-ring-2', 'petrel']);
     assert.equal(hullOf(w).sourceMesh, hullOf(c).sourceMesh, 'one template for both ranks');

@@ -7,6 +7,7 @@
 (function () {
   const AUR = window.AUR;
   const use = AUR.useShipModule;
+  const petrel = AUR.shipModels.model('petrel');
   // Its axis is Y and its landing decks lie at Y = 0, so it flies deck up as a ship does, its north
   // berth as its nose. Across two opposite berths' beacons in the model's units, its longest side.
   const SPAN = 54.39;
@@ -18,10 +19,10 @@
     correction: { scale: 1 / SPAN, offset: [0, 0, 0] },
     // Its work lights are lamps in the ship color, and the Petrels parked on it wear the trim they
     // fly in. Its windows keep the warm rooms the art lights behind them.
-    trim: { ...AUR.shipModels.model('petrel').trim, 'Work lights': AUR.shipModels.TRIM_LIGHT },
+    trim: { ...petrel.trim, 'Work lights': AUR.shipModels.TRIM_LIGHT },
     build: (scene) => use('breakwater/yard').createDrydock(scene).root,
     // The yard was finished under the probe its Petrels reflect.
-    probe: (scene) => use('petrel/light-probe').createInspectionProbe(scene),
+    probe: petrel.probe,
     // A yard has no drive of its own: it trails no plume.
     nozzles: () => [],
   });

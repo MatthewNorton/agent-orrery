@@ -65,7 +65,9 @@
       });
     }
 
+    // Hangs the plumes of the hull the ship flies, which the record then names.
     function attachExhaust(rec) {
+      rec.hull = AUR.shipHullId(rec.mesh);
       const material = plumeMaterial(rec.tint);
       rec.plumes = nozzles(rec).map(({ position, radius }, i) => {
         const id = rec.id + '_' + i;
@@ -80,15 +82,12 @@
       });
     }
 
-    // Hangs the plumes on the ship's current hull unless they are there already: its arrival under
-    // the dart, a promotion, a local-model swap. True when it did, so focus mode can fade the new
-    // meshes; the ships part asks every frame. A new record's hull is undefined, which no ship
-    // flies (a dart's is null), so its first call hangs them; a hull that trails nothing is asked once.
+    // Hangs the plumes again when the hull under the ship has changed: its arrival under the dart,
+    // a promotion. True when it did, so focus mode can fade the new meshes; the ships part asks
+    // every frame.
     function refreshExhaust(rec) {
-      const hull = AUR.shipHullId(rec.mesh);
-      if (rec.hull === hull) return false;
+      if (rec.hull === AUR.shipHullId(rec.mesh)) return false;
       detachExhaust(rec);
-      rec.hull = hull;
       attachExhaust(rec);
       return true;
     }
@@ -101,6 +100,6 @@
       rec.plumes = [];
     }
 
-    return { refreshExhaust, detachExhaust };
+    return { attachExhaust, refreshExhaust, detachExhaust };
   };
 })();

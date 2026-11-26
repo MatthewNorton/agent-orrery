@@ -1,9 +1,11 @@
 'use strict';
 
-// A hull file's glTF JSON and the length it spans along Z, for test/fleet-ships.test.js and
-// test/ships-petrel-model.test.js.
+// A hull file's glTF JSON, the length it spans along Z and the length the fleet shows it at.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const path = require('node:path');
+
+const SHIP_ROOT = path.join(__dirname, '..', '..', 'assets', 'ships');
 
 function readGlbJson(filePath) {
   const bytes = fs.readFileSync(filePath);
@@ -24,4 +26,7 @@ function glbLength(model) {
     Math.min(...positions.map((accessor) => accessor.min[2]));
 }
 
-module.exports = { readGlbJson, glbLength };
+// How long the fleet shows a manifest hull: its file's length at its correction's scale.
+const shownLength = (hull) => hull.correction.scale * glbLength(readGlbJson(path.join(SHIP_ROOT, hull.file)).model);
+
+module.exports = { readGlbJson, glbLength, shownLength };
