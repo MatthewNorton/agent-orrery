@@ -559,7 +559,9 @@ Design tokens (put in `:root`):
     with a sub-mesh per finish, because every mesh of a hull is placed and
     culled once per ship. A part the build instances (the yard builds one
     quadrant and one Petrel, and instances each three times) becomes a mesh
-    of its own first, since a merge takes no instance. From there it goes the way of a hull file's
+    of its own first, since a merge takes no instance. A build stalls the page
+    while it runs, so a scene's models are built one at a time, each in a task
+    of its own with a frame's gap before it. From there it goes the way of a hull file's
     container (the hull entry `inPlaceOf` returns carries the `model`, which
     tells the two apart), so all the ships of one model and palette draw in one
     draw per finish (the bare and the ringed Petrel are two models). Like a file's container it owns the materials and textures it was
