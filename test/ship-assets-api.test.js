@@ -258,7 +258,7 @@ test('a replaced hull that cannot be disposed leaves its ship one hull, counted,
 
 test('the triangle budget steps near hulls down to far before falling back to the dart', async () => {
   const assets = loadShipAssets(LADDER_MANIFEST, {
-    'small-near.glb': 360000, 'small-far.glb': 135000, 'mid-near.glb': 540000, 'mid-far.glb': 180000, // a 900k budget
+    'small-near.glb': 1080000, 'small-far.glb': 405000, 'mid-near.glb': 1620000, 'mid-far.glb': 540000, // a 2.7M budget
   });
   const scene = assets.scene('system');
   const lods = [];
@@ -273,27 +273,27 @@ test('the triangle budget steps near hulls down to far before falling back to th
   roots[0].dispose();
   const freed = await assets.ships.upgrade(scene, ship('e', 0), assets.fallback('e'));
   assert.equal(freed.metadata.assetLod, 'near', 'a disposed hull returns its triangles');
-  // 360k + 135k + 360k are in use: the 540k near hull of the next rank does not
+  // 1,080k + 405k + 1,080k are in use: the 1,620k near hull of the next rank does not
   // fit, so the promoted ship takes that rank's far file.
   assert.equal(await assets.ships.refresh(scene, ship('b', 3)), roots[1]);
   assert.equal(hullId(roots[1]), 'mid');
   assert.equal(roots[1].metadata.assetLod, 'far');
   roots[1].dispose();
-  assert.equal(assets.triangles(scene), 360000 + 135000, 'a promoted ship gives back the triangles of the hull it flies');
+  assert.equal(assets.triangles(scene), 1080000 + 405000, 'a promoted ship gives back the triangles of the hull it flies');
 });
 
 test('ships that open together, waiting on one container, keep to the budget as ships that come one by one do', async () => {
-  const assets = loadShipAssets(LADDER_MANIFEST, { 'small-near.glb': 300000, 'small-far.glb': 100000 }); // a 900k budget
+  const assets = loadShipAssets(LADDER_MANIFEST, { 'small-near.glb': 900000, 'small-far.glb': 300000 }); // a 2.7M budget
   const scene = assets.scene('system');
   const roots = await Promise.all(['a', 'b', 'c', 'd', 'e', 'f'].map((id) => assets.ships.upgrade(scene, ship(id, 0), assets.fallback(id))));
   assert.deepEqual(roots.map((root) => root ? root.metadata.assetLod : 'dart'), ['near', 'near', 'far', 'far', 'dart', 'dart'],
-    '300k + 300k + 100k + 100k: the next file of either size reaches the 900k budget, which a hull must stay under');
-  assert.equal(assets.triangles(scene), 800000);
+    '900k + 900k + 300k + 300k: the next file of either size reaches the 2.7M budget, which a hull must stay under');
+  assert.equal(assets.triangles(scene), 2400000);
 });
 
 test('a hull request whose dart is gone or that is superseded while it waits on the budget loads no further file', async () => {
   const assets = loadShipAssets(LADDER_MANIFEST, {
-    'small-near.glb': 500000, 'small-far.glb': 100000, 'mid-near.glb': 500000, 'mid-far.glb': 100000, // a 900k budget
+    'small-near.glb': 1500000, 'small-far.glb': 300000, 'mid-near.glb': 1500000, 'mid-far.glb': 300000, // a 2.7M budget
   });
   const scene = assets.scene('system');
   // Two ships wait on one container that only the first fits: the second would step down.
@@ -311,7 +311,7 @@ test('a hull request whose dart is gone or that is superseded while it waits on 
   assert.equal(stepped.metadata.assetLod, 'far', 'the file a ship still waiting steps down to');
   assets.loads.length = 0;
 
-  // 600k in use: the next rank's near file does not fit in place of c's 100k, so c would step down.
+  // 1.8M in use: the next rank's near file does not fit in place of c's 300k, so c would step down.
   const promoted = assets.ships.refresh(scene, ship('c', 3));
   assert.equal(await assets.ships.refresh(scene, ship('c', 0)), null, 'back to its rank before the file arrives');
   assert.equal(await promoted, null);
@@ -335,24 +335,27 @@ test('a hull request whose dart is gone or that is superseded while it waits on 
   held.release();
   assert.equal(await leaving, null, 'no hull under a dart that is gone');
   assert.deepEqual(assets.loads, ['big-near.glb']);
-  assert.equal(assets.triangles(scene), 600000, 'its triangles never taken');
+  assert.equal(assets.triangles(scene), 1800000, 'its triangles never taken');
 });
 
-// The counts the budget comment and kit/SPEC.md state, at the sizes Petrel was imported at: bare
-// for the first rank, with its survey ring for the two above it.
-test('a near view holds fifty-one ships of the first rank or twenty-two ringed; the universe map, with a budget of its own, seventy or thirty', async () => {
+// The counts the budget comment and kit/SPEC.md state, at the sizes the models were imported at:
+// Petrel bare for the first rank, with its survey ring for the next, and the Breakwater yard.
+test('a near view holds 153 ships of the first rank, sixty-six ringed or eleven yards; the universe map, with a budget of its own, 212, ninety-one or sixteen', async () => {
   const petrel = JSON.parse(readRenderer('ships/petrel/source/source.json'));
+  const yard = JSON.parse(readRenderer('ships/breakwater/source/source.json')).geometry.triangles;
   const [bare, ringed] = [petrel.geometry.triangles, petrel.variants.ring.geometry.triangles];
-  const assets = loadShipAssets(LADDER_MANIFEST,
-    { 'small-near.glb': bare, 'small-far.glb': bare, 'mid-near.glb': ringed, 'mid-far.glb': ringed });
+  const assets = loadShipAssets(LADDER_MANIFEST, {
+    'small-near.glb': bare, 'small-far.glb': bare, 'mid-near.glb': ringed, 'mid-far.glb': ringed, 'big-near.glb': yard, 'big-far.glb': yard,
+  });
   const hulled = async (view, builds) => {
     const scene = assets.scene(view);
     let count = 0;
-    for (let n = 0; n < 80; n++) count += (await assets.ships.upgrade(scene, ship('s' + n, builds), assets.fallback(view + n))) ? 1 : 0;
+    for (let n = 0; n < 220; n++) count += (await assets.ships.upgrade(scene, ship('s' + n, builds), assets.fallback(view + n))) ? 1 : 0;
     return count;
   };
-  assert.deepEqual([await hulled('system', 0), await hulled('universe', 0)], [51, 70]);
-  assert.deepEqual([await hulled('system', 3), await hulled('universe', 3)], [22, 30]);
+  assert.deepEqual([await hulled('system', 0), await hulled('universe', 0)], [153, 212]);
+  assert.deepEqual([await hulled('system', 3), await hulled('universe', 3)], [66, 91]);
+  assert.deepEqual([await hulled('system', 10), await hulled('universe', 10)], [11, 16]);
 });
 
 test('disposing a scene\'s hull state empties it, though a load still waiting holds on to it', async () => {

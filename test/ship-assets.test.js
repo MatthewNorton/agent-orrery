@@ -284,7 +284,7 @@ test('a hull whose provider evidence cannot be made is not built, and leaves no 
 });
 
 test('a hull file that cannot be loaded logs its cause once per file and cause, and a full budget says what ships keep', async () => {
-  const assets = loadShipAssets(LADDER_MANIFEST, { 'mid-near.glb': 950000, 'mid-far.glb': 950000 }); // over a 900k budget
+  const assets = loadShipAssets(LADDER_MANIFEST, { 'mid-near.glb': 2850000, 'mid-far.glb': 2850000 }); // over a 2.7M budget
   const logs = logsOf(assets);
   const load = assets.BABYLON.SceneLoader.LoadAssetContainerAsync;
   for (const cause of ['file missing', 'file missing', 'not a glTF']) {

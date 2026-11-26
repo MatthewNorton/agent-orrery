@@ -59,10 +59,12 @@
   // current hull when a promotion does not fit (a near view first tries the far file of a hull
   // that has one). Hulls carry their detail as geometry (10k to 58k triangles each), and
   // a template's ships draw in one draw per part, so what grows with the fleet is the triangles
-  // drawn, which is what this counts. A system or planet view holds fifty-one ships of the first
-  // rank (Petrel, 17,544) or twenty-two of the two above it (Petrel with its survey ring, 40,840),
-  // the universe map seventy or thirty.
-  const TRIANGLE_BUDGET = { near: 900000, far: 1240000 };
+  // drawn, which is what this counts. A system or planet view holds eleven ships of the top rank
+  // (the Breakwater yard, 229,360), sixty-six of the two below it (Petrel with its survey ring,
+  // 40,840) or 153 of the first (Petrel, 17,544); the universe map sixteen, ninety-one or 212. On
+  // an integrated GPU (Radeon 890M) a system view of eleven yards draws in 5.2 ms a frame, against
+  // 2.3 ms with none.
+  const TRIANGLE_BUDGET = { near: 2700000, far: 3720000 };
   /** @type {WeakMap<object, SceneState>} */
   const sceneStates = new WeakMap();
 
