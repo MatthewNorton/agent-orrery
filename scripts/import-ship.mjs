@@ -150,7 +150,7 @@ async function loadOriginal(own, borrowed) {
       fs.mkdirSync(path.dirname(path.join(home, file)), { recursive: true });
       fs.writeFileSync(path.join(home, file), text.replace(IMPORT, (statement, list, quote, from) => {
         if (!from.startsWith(BABYLON_PACKAGE)) return statement;
-        return list ? 'import {' + list + "} from '" + shim + "';" : '';
+        return list ? 'import {' + list + '} from ' + JSON.stringify(shim) + ';' : '';
       }));
     }
     globalThis.BABYLON = BABYLON;
