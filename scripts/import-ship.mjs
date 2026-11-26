@@ -23,11 +23,12 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const require = createRequire(import.meta.url);
-const { lf, sha256, fingerprintOf, loadShipModules, rootOf } = require('./lib/ship-fingerprint.js');
+const { lf, sha256, fingerprintOf, loadShipModules, rootOf, convertedShip } = require('./lib/ship-fingerprint.js');
 const BABYLON = require('babylonjs');
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-const REGISTRY = path.join(ROOT, 'src', 'renderer', 'ships', 'modules.js');
+const SHIPS_DIR = path.join(ROOT, 'src', 'renderer', 'ships');
+const REGISTRY = path.join(SHIPS_DIR, 'modules.js');
 const BABYLON_PACKAGE = '@babylonjs/core/';
 
 // Per ship: the modules the app starts from (their imports are followed), the function that
@@ -50,8 +51,9 @@ const SHIPS = {
 
 const IMPORT = /^import\s*(?:\{([^}]*)\}\s*from\s*)?(['"])([^'"\n]+)\2[ \t]*;?[ \t]*$/gm;
 const EXPORT = /^export\s+(?=(?:async\s+)?function\b|class\b|const\b|let\b)/gm;
-// A list of the module's own names, none renamed: the factory returns every export by its name already.
-const EXPORT_LIST = /^export\s*\{(?:\s*[\w$]+\s*,?)*\}[ \t]*;?[ \t]*\n?/gm;
+// A list of the module's own names, alone on its lines: the factory returns every export by its
+// name already. A renamed or re-exported name is left for LEFTOVER to refuse.
+const EXPORT_LIST = /^export\s*\{\s*[\w$]+(?:\s*,\s*[\w$]+)*\s*,?\s*\}[ \t]*;?[ \t]*$\n?/gm;
 const LEFTOVER = /^[ \t]*(?:import|export)\b.*$|\bimport\s*\(|\bimport\.meta\b/m;
 
 // A module of the ship's own folder, or of the folder beside it that holds a borrowed ship's source.
@@ -60,7 +62,6 @@ const MODULE_PATH = /^(?:\.\.\/[^/]+\/)?[^/]+$/;
 const fail = (message) => { throw new Error(message); };
 const stemOf = (file) => path.basename(file).replace(/\.m?js$/, '');
 const labelOf = (ship) => ship[0].toUpperCase() + ship.slice(1);
-const shipsDir = (...parts) => path.join(ROOT, 'src', 'renderer', 'ships', ...parts);
 /** The module an import names, as a path from the ship's folder, or null for a package. */
 const importedFile = (file, from) => (from.startsWith('.') ? path.posix.normalize(path.posix.join(path.posix.dirname(file), from)) : null);
 const isBorrowed = (file) => file.includes('/');
@@ -84,7 +85,7 @@ function babylonPath(name) {
 
 /**
  * Reads the entry modules and every module they import, in dependency order, each named by its
- * path from the ship's folder: one in a folder beside it is borrowed from another ship.
+ * path from the ship's folder: its own, and those borrowed from another ship's folder beside it.
  */
 function readModules(sourceDir, entries) {
   const modules = new Map();
@@ -104,44 +105,41 @@ function readModules(sourceDir, entries) {
       visit(target);
     }
     visiting.delete(file);
-    modules.set(file, { file, stem: stemOf(file), borrowed: isBorrowed(file), text, imports });
+    modules.set(file, { file, stem: stemOf(file), text, imports });
   }
   entries.forEach(visit);
+  // A borrowed module is named by the ship it comes from, and checked against that ship's record.
+  const { own = [], borrowed = [] } = Object.groupBy(modules.values(), ({ file }) => (isBorrowed(file) ? 'borrowed' : 'own'));
   const stems = new Set();
-  for (const { stem, file, borrowed } of modules.values()) {
-    if (borrowed) continue; // named by the ship they come from, and checked against its record
+  for (const { stem, file } of own) {
     if (stems.has(stem)) fail('Two modules are named ' + stem + ' (' + file + ').');
     stems.add(stem);
   }
-  return [...modules.values()];
-}
-
-/** The record of a converted ship, and its converted modules as files. */
-function converted(ship) {
-  const record = JSON.parse(fs.readFileSync(shipsDir(ship, 'source', 'source.json'), 'utf8'));
-  return { record, files: Object.keys(record.modules).map((stem) => shipsDir(ship, 'source', stem + '.js')) };
+  return { own, borrowed };
 }
 
 /** A borrowed module must be the very source the ship it comes from was converted from. */
-function checkBorrowed(ship, lender, modules) {
-  for (const { file, stem, text, borrowed } of modules) {
-    if (!borrowed) continue;
-    if (!lender) fail(labelOf(ship) + ' imports ' + file + ', and it borrows from no ship.');
+function checkBorrowed(ship, borrows, lender, borrowed) {
+  if (borrowed.length && !lender) fail(labelOf(ship) + ' imports ' + borrowed[0].file + ', and it borrows from no ship.');
+  for (const { file, stem, text } of borrowed) {
     const known = lender.record.modules[stem];
     if (!known || known.sha256 !== sha256(text)) {
-      fail(file + ' is not the ' + stem + ' module ' + labelOf(lender.record.ship) + ' was converted from: import ' + lender.record.ship + ' from this source first.');
+      fail(file + ' is not the ' + stem + ' module ' + labelOf(borrows) + ' was converted from: import ' + borrows + ' from this source first.');
     }
   }
 }
 
 /**
- * The source as real ES modules, with Babylon coming from the UMD build: what each module
- * exports, straight from the module loader, and the reference the converted files must match.
+ * The source as real ES modules, with Babylon coming from the UMD build: what each of the ship's
+ * own modules exports, straight from the module loader, and the reference the converted files
+ * must match.
  */
-async function loadOriginal(modules) {
+async function loadOriginal(own, borrowed) {
+  const modules = [...own, ...borrowed];
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ship-import-'));
-  // The ship's folder, a borrowed ship's beside it as at the source, and Babylon two levels up.
-  const home = path.join(dir, 'ships', 'own');
+  // The ship's folder, with a borrowed ship's beside it as at the source.
+  const home = path.join(dir, 'own');
+  const shim = pathToFileURL(path.join(dir, '__babylon.mjs')).href;
   try {
     const names = new Set(modules.flatMap((module) => module.imports)
       .filter(({ from }) => from.startsWith(BABYLON_PACKAGE)).flatMap(({ names: list }) => list.map(([name]) => name)));
@@ -152,14 +150,12 @@ async function loadOriginal(modules) {
       fs.mkdirSync(path.dirname(path.join(home, file)), { recursive: true });
       fs.writeFileSync(path.join(home, file), text.replace(IMPORT, (statement, list, quote, from) => {
         if (!from.startsWith(BABYLON_PACKAGE)) return statement;
-        return list ? 'import {' + list + "} from '../../__babylon.mjs';" : '';
+        return list ? 'import {' + list + "} from '" + shim + "';" : '';
       }));
     }
     globalThis.BABYLON = BABYLON;
     const loaded = new Map();
-    for (const { file, stem, borrowed } of modules) {
-      if (!borrowed) loaded.set(stem, await import(pathToFileURL(path.join(home, file)).href));
-    }
+    for (const { file, stem } of own) loaded.set(stem, await import(pathToFileURL(path.join(home, file)).href));
     return loaded;
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
@@ -214,18 +210,17 @@ async function main() {
   const spec = SHIPS[ship];
   if (!spec || !sourceArg) fail('Usage: node scripts/import-ship.mjs <' + Object.keys(SHIPS).join('|') + '> <source folder> [--check]');
   const sourceDir = path.resolve(sourceArg);
-  const outDir = shipsDir(ship, 'source');
+  const outDir = path.join(SHIPS_DIR, ship, 'source');
   const commit = sourceCommit(sourceDir);
-  const modules = readModules(sourceDir, spec.entries);
-  const lender = spec.borrows ? converted(spec.borrows) : null;
-  checkBorrowed(ship, lender, modules);
-  const original = await loadOriginal(modules);
+  const { own, borrowed } = readModules(sourceDir, spec.entries);
+  const lender = spec.borrows ? convertedShip(SHIPS_DIR, spec.borrows) : null;
+  checkBorrowed(ship, spec.borrows, lender, borrowed);
+  const original = await loadOriginal(own, borrowed);
   const [buildModule, buildFunction] = spec.build;
 
   const files = new Map();
-  const record = { ship, commit, build: spec.build, ...(lender && { borrows: spec.borrows }), modules: {}, geometry: null, variants: {} };
-  for (const module of modules) {
-    if (module.borrowed) continue;
+  const record = { ship, commit, build: spec.build, borrows: spec.borrows, modules: {}, geometry: null, variants: {} };
+  for (const module of own) {
     const exported = Object.keys(original.get(module.stem));
     const generated = convert(ship, spec.borrows, module, exported);
     files.set(module.stem + '.js', generated);
@@ -263,7 +258,7 @@ async function main() {
     for (const name of changed) fs.writeFileSync(path.join(outDir, name), files.get(name));
   }
   const counts = ({ meshes, triangles, sha256: hash }) => meshes + ' meshes, ' + triangles + ' triangles, geometry ' + hash.slice(0, 12);
-  console.log(labelOf(ship) + ' at ' + commit + ': ' + Object.keys(record.modules).length + ' modules, ' + counts(record.geometry) +
+  console.log(labelOf(ship) + ' at ' + commit + ': ' + own.length + ' modules, ' + counts(record.geometry) +
     Object.entries(record.variants).map(([name, { geometry }]) => '; ' + name + ': ' + counts(geometry)).join('') + '.');
   console.log((check ? 'Would change: ' : 'Wrote: ') + (changed.join(', ') || 'nothing') + (stale.length ? '; removed: ' + stale.join(', ') : ''));
   console.log('Script tags, after ships/modules.js:');

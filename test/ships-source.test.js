@@ -8,7 +8,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const BABYLON = require('babylonjs');
-const { lf, sha256, fingerprintOf, loadShipModules, rootOf } = require('../scripts/lib/ship-fingerprint.js');
+const { lf, sha256, fingerprintOf, loadShipModules, rootOf, convertedShip } = require('../scripts/lib/ship-fingerprint.js');
 const { scriptTags } = require('./support/renderer-source');
 
 const SHIPS = path.join(__dirname, '..', 'src', 'renderer', 'ships');
@@ -16,8 +16,7 @@ const scripts = scriptTags();
 const ships = fs.readdirSync(SHIPS, { withFileTypes: true })
   .filter((entry) => entry.isDirectory() && fs.existsSync(path.join(SHIPS, entry.name, 'source', 'source.json')))
   .map((entry) => entry.name);
-const recordOf = (ship) => JSON.parse(fs.readFileSync(path.join(SHIPS, ship, 'source', 'source.json'), 'utf8'));
-const modulesOf = (ship) => Object.keys(recordOf(ship).modules).map((stem) => path.join(SHIPS, ship, 'source', stem + '.js'));
+const recordOf = (ship) => convertedShip(SHIPS, ship).record;
 
 test('at least one ship model is converted, Petrel with its survey ring as a variant', () => {
   assert.ok(ships.includes('petrel'));
@@ -76,8 +75,7 @@ for (const ship of ships) {
   });
 
   test(`${ship}: the modules export what was recorded and build the recorded ship`, () => {
-    const use = loadShipModules(BABYLON, path.join(SHIPS, 'modules.js'),
-      [...(record.borrows ? modulesOf(record.borrows) : []), ...modulesOf(ship)]);
+    const use = loadShipModules(BABYLON, path.join(SHIPS, 'modules.js'), convertedShip(SHIPS, ship).files);
     for (const stem of stems) {
       assert.deepEqual(Object.keys(use(`${ship}/${stem}`)), record.modules[stem].exports, stem);
     }

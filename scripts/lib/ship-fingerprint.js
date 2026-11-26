@@ -5,6 +5,7 @@
 // a fingerprint of its geometry. scripts/import-ship.mjs and the tests share this.
 const crypto = require('node:crypto');
 const fs = require('node:fs');
+const path = require('node:path');
 
 const lf = (text) => text.replace(/\r\n/g, '\n');
 const sha256 = (text) => crypto.createHash('sha256').update(text).digest('hex');
@@ -103,4 +104,15 @@ function rootOf(ship, call) {
   return ship.root;
 }
 
-module.exports = { lf, sha256, withCanvas, onNullScene, fingerprintOf, loadShipModules, rootOf };
+/**
+ * A converted ship under `shipsDir` (src/renderer/ships): its source.json, and its converted
+ * modules as files, after those of the ship it is built on when it borrows one's.
+ */
+function convertedShip(shipsDir, ship) {
+  const dir = path.join(shipsDir, ship, 'source');
+  const record = JSON.parse(fs.readFileSync(path.join(dir, 'source.json'), 'utf8'));
+  const own = Object.keys(record.modules).map((stem) => path.join(dir, stem + '.js'));
+  return { record, files: record.borrows ? [...convertedShip(shipsDir, record.borrows).files, ...own] : own };
+}
+
+module.exports = { lf, sha256, withCanvas, onNullScene, fingerprintOf, loadShipModules, rootOf, convertedShip };
