@@ -52,16 +52,17 @@
       return { islands, length: zMax - zMin };
     }
 
-    // The nozzles a ship trails from: the ones its model names, else its hull's stern glow discs
-    // (found once per hull), else a dart's tail.
+    // The nozzles a ship trails from, found once per hull: the ones its model names (a station
+    // names none, and trails nothing), else its hull's stern glow discs, else a dart's tail.
     function nozzles(rec) {
-      const found = rec.hull ? AUR.memo(hulls, rec.hull, () => {
+      if (!rec.hull) return dartNozzles;
+      return AUR.memo(hulls, rec.hull, () => {
         const named = AUR.shipModels.nozzles(rec.hull);
         if (named) return named;
         const { islands, length } = glowIslands(rec.mesh);
-        return AUR.sternIslands(islands, length, PLUME.sternShare);
-      }) : [];
-      return found.length ? found : dartNozzles;
+        const stern = AUR.sternIslands(islands, length, PLUME.sternShare);
+        return stern.length ? stern : dartNozzles;
+      });
     }
 
     function attachExhaust(rec) {
@@ -81,10 +82,11 @@
 
     // Hangs the plumes on the ship's current hull unless they are there already: its arrival under
     // the dart, a promotion, a local-model swap. True when it did, so focus mode can fade the new
-    // meshes; the ships part asks every frame.
+    // meshes; the ships part asks every frame. A new record's hull is undefined, which no ship
+    // flies (a dart's is null), so its first call hangs them; a hull that trails nothing is asked once.
     function refreshExhaust(rec) {
       const hull = AUR.shipHullId(rec.mesh);
-      if (rec.plumes.length && rec.hull === hull) return false;
+      if (rec.hull === hull) return false;
       detachExhaust(rec);
       rec.hull = hull;
       attachExhaust(rec);

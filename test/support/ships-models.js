@@ -12,15 +12,18 @@ const { SHIP_ASSET_FILES, ship } = require('./ship-assets');
 
 const ROOT = path.join(__dirname, '..', '..');
 const SHIPS = path.join(ROOT, 'src', 'renderer', 'ships');
-const SOURCE = path.join(SHIPS, 'petrel', 'source');
+const MODELS = ['petrel', 'breakwater']; // in the order the page loads their adapters
 const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'assets', 'ships', 'manifest.json'), 'utf8'));
 
-// The registry and Petrel on the renderer's own helpers, as the page loads them.
+// The registry and the models on the renderer's own helpers, as the page loads them.
 function loadShipModels() {
   const AUR = loadUtilLayer({}, BABYLON);
-  const sources = fs.readdirSync(SOURCE).filter((name) => name.endsWith('.js')).map((name) => path.join(SOURCE, name));
+  const sources = MODELS.flatMap((model) => {
+    const dir = path.join(SHIPS, model, 'source');
+    return fs.readdirSync(dir).filter((name) => name.endsWith('.js')).map((name) => path.join(dir, name));
+  });
   loadShipModules(BABYLON, path.join(SHIPS, 'modules.js'),
-    [...sources, path.join(SHIPS, 'models.js'), path.join(SHIPS, 'petrel', 'model.js')], AUR);
+    [...sources, path.join(SHIPS, 'models.js'), ...MODELS.map((model) => path.join(SHIPS, model, 'model.js'))], AUR);
   // A NullEngine cannot make the raw cube texture the probe is, so the model reflects a stand-in here.
   AUR.shipModule('petrel/light-probe', () => ({ createInspectionProbe: (scene) => new BABYLON.Texture(null, scene) }));
   return AUR;

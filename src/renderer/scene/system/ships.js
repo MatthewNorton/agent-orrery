@@ -44,7 +44,7 @@
         fontSize: 12, mono: true, color: AUR.attentionColor(s.attention), mesh, offsetY: -22,
       });
       const rec = {
-        id: s.id, mesh, label, suffix, tint, providerKey, scale, hull: null, plumes: [],
+        id: s.id, mesh, label, suffix, tint, providerKey, scale, hull: undefined, plumes: [],
         r, a: a0, speed: (AUR.MOTION.systemShipOrbitMin +
           rand() * AUR.MOTION.systemShipOrbitRange) * (rand() > 0.5 ? 1 : -1),
         bob: rand() * 6.28, mode: 'patrol', fly: null, born: performance.now(),

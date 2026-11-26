@@ -2,7 +2,9 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { readRenderer: renderer } = require('./support/renderer-source');
+const BABYLON = require('babylonjs');
+const { readRenderer: renderer, runRenderer } = require('./support/renderer-source');
+const { rank, onModelScene } = require('./support/ships-models');
 
 test('the system view trails a plume from each stern nozzle of a hull, read off its glow discs', () => {
   const exhaust = renderer('scene/system/exhaust.js');
@@ -25,3 +27,31 @@ test('the system view trails a plume from each stern nozzle of a hull, read off 
   assert.match(ships, /view\.detachExhaust\(r\);/);
   assert.match(focus, /rec\.plumes/, 'focus fades the plumes with the ship');
 });
+
+// On the real Babylon build (a NullEngine): the part itself, over a dart, a Petrel and the yard.
+test('a dart trails from its tail and a Petrel from its two nozzles; a yard names no nozzle, trails nothing and is asked once', () =>
+  onModelScene((scene, models, AUR) => {
+    AUR.sceneParts = { system: {} };
+    runRenderer('scene/system/exhaust.js', { window: { AUR }, BABYLON });
+    const part = AUR.sceneParts.system.exhaust({ scene, glow: { addExcludedMesh() {} } });
+    const [petrel, yard] = [0, 60].map((builds) => models.inPlaceOf(rank(builds)).id);
+    // A ship record as the ships part makes it, flying the hull named (none: a dart).
+    const flying = (hull) => {
+      const mesh = new BABYLON.Mesh('ship', scene);
+      mesh.metadata = hull ? { assetHullId: hull } : null;
+      return { id: 'ship', mesh, tint: '#ffffff', hull: undefined, plumes: [] };
+    };
+    const trails = (rec) => [part.refreshExhaust(rec), rec.plumes.length, part.refreshExhaust(rec)];
+
+    assert.deepEqual(trails(flying(null)), [true, 1, false], 'a dart');
+    assert.deepEqual(trails(flying(petrel)), [true, 2, false], 'a Petrel');
+    const station = flying(yard);
+    assert.equal(models.nozzles(yard).length, 0);
+    assert.deepEqual(trails(station), [true, 0, false], 'no plume, and not hung again each frame');
+
+    station.mesh.metadata.assetHullId = petrel; // another hull under the same record
+    assert.deepEqual(trails(station), [true, 2, false], 'the plumes follow the hull');
+    station.mesh.metadata.assetHullId = yard;
+    assert.deepEqual(trails(station), [true, 0, false], 'and leave with it');
+    assert.equal(scene.meshes.filter((mesh) => mesh.name.startsWith('t_')).length, 3, 'the dart\'s and the Petrel\'s are all that is left');
+  }));

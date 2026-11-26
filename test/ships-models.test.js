@@ -27,8 +27,8 @@ test('Petrel flies the Scout rank: the first rank of the family both providers f
     { id: 'petrel', file: 'model:petrel', family: SCOUT.family, role: SCOUT.role, minBuilds: 0 });
   assert.deepEqual([hull.model.id, hull.model.replaces, hull.correction], ['petrel', [{ hull: SCOUT.id }], hull.model.correction]);
   assert.equal(models.inPlaceOf(SCOUT), hull, 'one hull entry, so a refresh compares like with like');
-  const flagship = manifest.hulls.find((entry) => entry.family === SCOUT.family && entry.minBuilds === 60);
-  assert.equal(models.inPlaceOf(flagship), flagship, 'a rank no model has taken keeps its manifest hull');
+  const other = manifest.hulls.find((entry) => entry.family !== SCOUT.family);
+  assert.equal(models.inPlaceOf(other), other, 'a hull no model has taken stays the manifest\'s');
 });
 
 test('a model container holds the dressed ship out of the scene, as one mesh with a sub-mesh per finish', () => {

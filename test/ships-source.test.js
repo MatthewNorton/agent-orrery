@@ -16,11 +16,20 @@ const scripts = scriptTags();
 const ships = fs.readdirSync(SHIPS, { withFileTypes: true })
   .filter((entry) => entry.isDirectory() && fs.existsSync(path.join(SHIPS, entry.name, 'source', 'source.json')))
   .map((entry) => entry.name);
+const recordOf = (ship) => JSON.parse(fs.readFileSync(path.join(SHIPS, ship, 'source', 'source.json'), 'utf8'));
+const modulesOf = (ship) => Object.keys(recordOf(ship).modules).map((stem) => path.join(SHIPS, ship, 'source', stem + '.js'));
 
 test('at least one ship model is converted, Petrel with its survey ring as a variant', () => {
   assert.ok(ships.includes('petrel'));
-  const petrel = JSON.parse(fs.readFileSync(path.join(SHIPS, 'petrel', 'source', 'source.json'), 'utf8'));
-  assert.deepEqual(petrel.variants.ring.call, ['setRing', true]);
+  assert.deepEqual(recordOf('petrel').variants.ring.call, ['setRing', true]);
+});
+
+test('Breakwater is built on Petrel: it borrows that ship\'s modules and converts none of them again', () => {
+  const { borrows, modules } = recordOf('breakwater');
+  assert.equal(borrows, 'petrel');
+  assert.deepEqual(Object.keys(modules).filter((stem) => stem in recordOf('petrel').modules), []);
+  const yard = fs.readFileSync(path.join(SHIPS, 'breakwater', 'source', 'yard.js'), 'utf8');
+  assert.ok(yard.includes("use('petrel/spacecraft')"), 'the ships parked on it are the Petrel the fleet flies');
 });
 
 test('every folder under ships/ is a converted model with its adapter', () => {
@@ -31,7 +40,7 @@ test('every folder under ships/ is a converted model with its adapter', () => {
 
 for (const ship of ships) {
   const dir = path.join(SHIPS, ship, 'source');
-  const record = JSON.parse(fs.readFileSync(path.join(dir, 'source.json'), 'utf8'));
+  const record = recordOf(ship);
   const stems = Object.keys(record.modules);
 
   test(`${ship}: the folder holds exactly the recorded modules, as the script generated them`, () => {
@@ -61,10 +70,14 @@ for (const ship of ships) {
     assert.ok(at('ships/models.js') > at('ships/modules.js'));
     assert.ok(at(`ships/${ship}/model.js`) > at('ships/models.js'), 'the adapter registers with ships/models.js');
     assert.ok(at('ship-assets.js') > at(`ships/${ship}/model.js`), 'ship-assets finds the model registered');
+    if (record.borrows) {
+      assert.ok(at(`ships/${ship}/model.js`) > at(`ships/${record.borrows}/model.js`), 'its adapter reads the adapter of the ship it is built on');
+    }
   });
 
   test(`${ship}: the modules export what was recorded and build the recorded ship`, () => {
-    const use = loadShipModules(BABYLON, path.join(SHIPS, 'modules.js'), stems.map((stem) => path.join(dir, stem + '.js')));
+    const use = loadShipModules(BABYLON, path.join(SHIPS, 'modules.js'),
+      [...(record.borrows ? modulesOf(record.borrows) : []), ...modulesOf(ship)]);
     for (const stem of stems) {
       assert.deepEqual(Object.keys(use(`${ship}/${stem}`)), record.modules[stem].exports, stem);
     }
