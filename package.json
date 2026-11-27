@@ -19,7 +19,7 @@
   "author": "Matt Norton (https://github.com/MatthewNorton)",
   "license": "Apache-2.0",
   "devDependencies": {
-    "electron": "^45.3.2",
+    "electron": "^45.4.1",
     "typescript": "7.0.2"
   },
   "dependencies": {
