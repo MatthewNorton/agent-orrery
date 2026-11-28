@@ -64,7 +64,8 @@
   // (the Breakwater yard, 196,672), sixty-six of the two below it (Petrel with its survey ring,
   // 40,840) or 153 of the first (Petrel, 17,544); the universe map eighteen, ninety-one or 212.
   const TRIANGLE_BUDGET = { near: 2700000, far: 3720000 };
-  // Between two model builds of a scene, so a frame draws: each stalls the page while it builds.
+  // Between two model builds of a scene, a frame's length at 60 Hz, so a frame can draw between
+  // them (a timer, so one usually does): each stalls the page while it builds.
   const BUILD_GAP_MS = 16;
   /** @type {WeakMap<object, SceneState>} */
   const sceneStates = new WeakMap();

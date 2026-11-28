@@ -31,6 +31,21 @@ test('Breakwater is built on Petrel: it borrows that ship\'s modules and convert
   assert.ok(yard.includes("use('petrel/spacecraft')"), 'the ships parked on it are the Petrel the fleet flies');
 });
 
+test('the fingerprint covers where each part stands and how it is turned, an instanced part too', () => {
+  const yard = (x, turn = 0) => fingerprintOf(BABYLON, (scene) => {
+    const root = new BABYLON.TransformNode('root', scene);
+    const hull = BABYLON.MeshBuilder.CreateBox('hull', { size: 1 }, scene);
+    const parked = hull.createInstance('parked');
+    hull.parent = parked.parent = root;
+    parked.position.x = x;
+    parked.rotation.y = turn;
+    return root;
+  }).sha256;
+  assert.equal(yard(5), yard(5));
+  assert.notEqual(yard(5), yard(6), 'the same parts, one parked elsewhere');
+  assert.notEqual(yard(5), yard(5, Math.PI / 2), 'the same parts, one turned');
+});
+
 test('every folder under ships/ is a converted model with its adapter', () => {
   const folders = fs.readdirSync(SHIPS, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => entry.name);
   assert.deepEqual(folders, ships);

@@ -149,7 +149,7 @@
   "geometry": {
     "meshes": 34,
     "triangles": 17544,
-    "sha256": "d475cf9da7d28d043263b2b71a9985c27eb8095fa5457b8c6e649b13f7f12c16"
+    "sha256": "60de2d02e77dd2884e5793531dc07cd99b267ee879b8c94f95e5c62d4e7375ad"
   },
   "variants": {
     "ring": {
@@ -160,7 +160,7 @@
       "geometry": {
         "meshes": 46,
         "triangles": 40840,
-        "sha256": "21062b635e4346b004924277005fca37b778231101a7cbac4c2e8f86cff54de6"
+        "sha256": "1fbce8afd65a90aae2bd161baa2baaad4b74c387eab80e21e5abcffc51df008d"
       }
     }
   }

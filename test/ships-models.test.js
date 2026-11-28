@@ -162,9 +162,13 @@ const leavesOnlyTheScenes = (scene) => {
 
 test('a build that fails part-way leaves nothing of its own in the scene', () => {
   onScene((scene, models, petrel) => {
-    const failing = { ...petrel, probe() { throw new Error('no probe'); } };
-    assert.throws(() => models.container(scene, failing), /no probe/);
+    assert.throws(() => models.container(scene, { ...petrel, probe() { throw new Error('no probe'); } }), /no probe/);
     leavesOnlyTheScenes(scene);
+    for (const finish of [() => null, () => new BABYLON.MultiMaterial('two finishes', scene)]) { // a part wears one finish
+      const build = () => { const root = petrel.build(scene); root.getChildMeshes(false)[0].material = finish(); return root; };
+      assert.throws(() => models.container(scene, { ...petrel, build }), /wears (no finish|several finishes); a model gives each part one/);
+      leavesOnlyTheScenes(scene);
+    }
     assert.equal(models.container(scene, petrel).meshes.length, 1, 'and the scene can still build the model');
   });
 });
