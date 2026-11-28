@@ -124,15 +124,22 @@ test('the service box under the rim stands on the band below it', () => {
   });
 });
 
-test('no mast on the hub\'s roof stands across the wall of the communications cap or of the collar around it', () => {
+test('every mast on the hub\'s roof stands on one level: none across the wall of the communications cap or of the collar around it, none sunk into the cap', () => {
   onBerth((finish, hub) => {
-    // On the roof at 5.63 the cap's wall comes down to the collar at radius 1.48 and the collar's own
-    // wall is at 1.79; the cap's top is 0.84 above the roof. A mast is steel, armor and dark stays.
-    for (const name of ['Load-bearing steel', 'Weathered porcelain armor', 'Graphite machinery']) {
-      const across = pointsOf(hub(name)).filter((p) => p.y > 5.62 && p.y < 5.63 + 0.84 && radius(p) > 1.49 && radius(p) < 1.78);
-      const [one] = across;
-      assert.equal(across.length, 0, one && `${name}: ${across.length} points between the two walls, one at (${one.x.toFixed(2)}, ${one.y.toFixed(2)}, ${one.z.toFixed(2)})`);
-    }
+    // Above the roof at 5.63 the cap's flat top, 0.84 up, ends at radius 1.31. Its wall comes down to
+    // the collar at 1.48, past a steel ring of its own at 1.45, and the collar's own wall is at 1.79.
+    const above = (p) => p.y - 5.63;
+    const steel = pointsOf(hub('Load-bearing steel')).filter((p) => above(p) > -0.01 && above(p) < 0.84 + 0.25);
+    const misplaced = [
+      // A mast's base is steel: none of it over either wall, on the cap's level or the roof's, and none inside the cap.
+      ...steel.filter((p) => radius(p) > 1.311 && radius(p) < 1.78 && !near(radius(p), 1.45, 1e-3)),
+      ...steel.filter((p) => radius(p) < 1.309 && above(p) < 0.84 - 1e-6),
+      // Its can is armor and its stays are dark: none of them between the two walls.
+      ...['Weathered porcelain armor', 'Graphite machinery'].flatMap((name) => pointsOf(hub(name)))
+        .filter((p) => above(p) > -0.01 && above(p) < 0.84 && radius(p) > 1.49 && radius(p) < 1.78),
+    ];
+    const [one] = misplaced;
+    assert.equal(misplaced.length, 0, one && `${misplaced.length} points of a mast out of place, one at (${one.x.toFixed(2)}, ${one.y.toFixed(2)}, ${one.z.toFixed(2)})`);
   });
 });
 
@@ -141,7 +148,7 @@ test('each painted map is drawn to the size of the canvas it is given', () => {
     const Blank = globalThis.OffscreenCanvas;
     const layouts = [];
     // A canvas that notes, from the scale its painter sets, the size the painter lays its map out at.
-    // The engine here makes no canvas wider or higher than 512, so each painter but the rooms' has to scale.
+    // The engine here makes no canvas wider or higher than 512, so every painter has to scale, the rooms' in width.
     globalThis.OffscreenCanvas = class extends Blank {
       getContext() {
         const scale = (x, y) => layouts.push([this.width / x, this.height / y]);
@@ -173,7 +180,9 @@ test('a bar of no length, a girder facing along itself and an apron width asked 
     // A hint along the bar is one whatever its length: half a unit, and none.
     frame.bar(steel, v(0, 0, 0), v(0, 1, 0), 0.1, 0.1, v(0, 0.5, 0));
     frame.bar(steel, v(0, 0, 0), v(0, 1, 0), 0.1, 0.1, v(0, 0, 0));
-    assert.equal(frame.surfaces.get(steel).positions.length / 3, 96, 'four bars of six faces');
+    // A short hint across the bar is as good as a long one.
+    frame.bar(steel, v(0, 0, 0), v(0, 1, 0), 0.1, 0.1, v(1e-7, 0, 0));
+    assert.equal(frame.surfaces.get(steel).positions.length / 3, 120, 'five bars of six faces');
 
     // The width follows the apron's side, corner to corner, from its first station to its last.
     const side = APRON.slice(1, 6);

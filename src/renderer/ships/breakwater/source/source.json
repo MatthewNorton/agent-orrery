@@ -1,6 +1,6 @@
 {
   "ship": "breakwater",
-  "commit": "5bbce336246a",
+  "commit": "5fa203c84d08",
   "build": [
     "yard",
     "createDrydock"
@@ -9,8 +9,8 @@
   "modules": {
     "fabrication": {
       "source": "fabrication.js",
-      "sha256": "0f88ae8ef46d1664ce96effe1e78e99d26c964e85ce88eb0f167b9847fbda904",
-      "generated": "d893929da8a1463fbb6542498f34a979e2ee7600ba6352ce1d25d0d629fa8065",
+      "sha256": "a0a134c5649ef1bda78ebafe257fede31d3558c65e3552ef4661a0f26e443539",
+      "generated": "3e50e9d83ccfe5c896d611dd34b40c1a1ff0b7d11eb68d82341c7821bf7b13b1",
       "exports": [
         "Fabrication",
         "TAU",

@@ -54,9 +54,10 @@ class Fabrication extends Assembly {
 
   // Local width follows the edge perpendicular to the supplied face direction.
   bar(material, a, b, width, height, hint = up) {
-    const along = b.subtract(a).normalize();
-    // A hint along the bar, whatever the hint's length, gives it no side: it takes an axis the bar is not along.
-    const guide = Math.abs(Vector3.Dot(along, hint)) >= .995*hint.length() ?(Math.abs(along.x) > .9 ? v(0,0,1) : v(1,0,0)) : hint;
+    const along = b.subtract(a).normalize(), reach = hint.length();
+    // A hint along the bar, or too short to point anywhere, gives it no side: it takes an axis the bar
+    // is not along. Any other hint is taken at one unit long, whatever its length.
+    const guide = reach < 1e-9 || Math.abs(Vector3.Dot(along, hint)) >= .995*reach ? (Math.abs(along.x) > .9 ? v(0,0,1) : v(1,0,0)) : hint.scale(1/reach);
     const across = Vector3.Cross(guide, along);
     // Only a bar of no length is left without a side: every face would be dropped.
     if (across.lengthSquared() < 1e-12) throw new RangeError('A bar needs two ends apart.');
