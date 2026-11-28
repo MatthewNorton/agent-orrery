@@ -122,7 +122,8 @@
       if (shipFocus.exterior) {
         // The camera rides the ship's position, so the ship's own motion never pulls it away.
         chaseSpan += (hullSpan(rec) - chaseSpan) * amount;
-        const back = Math.max(0.25, chaseSpan * CHASE.distance * orbit.zoom);
+        // Whatever the hull's size, never nearer than its own radius and the near plane.
+        const back = Math.max(chaseSpan / 2 + focusCamera.minZ, chaseSpan * CHASE.distance * orbit.zoom);
         place(focusCamera.position, shipPosition, -back * Math.cos(orbit.pitch), back * Math.sin(orbit.pitch));
         focusLookCurrent.copyFrom(shipPosition);
       } else {

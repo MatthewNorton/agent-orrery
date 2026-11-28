@@ -162,4 +162,16 @@ test('the chase camera measures a hull again when a promotion swaps it in place,
     arrived.mesh = bigger.mesh;
     view.updateShipFocusCamera(true, 0);
     near(back(arrived), unit * 2, 'a mesh of its own');
+
+    // A drone is a twentieth of that hull: the camera stands off by its span too, and the wheel
+    // brings it nearer until the hull's own radius and the near plane stop it.
+    const drone = addShip(scene, view, hiddenTemplate(scene, 0.05), 'drone');
+    view.clearShipFocus();
+    view.focusShip('drone', { exterior: true });
+    near(back(drone), unit * 0.05, 'a small hull, by its own span');
+    view.shipFocus.orbit.zoom = 0.5;
+    view.updateShipFocusCamera(true, 0);
+    const span = Math.sqrt(3) * 0.05;
+    near(back(drone), span / 2 + scene.activeCamera.minZ, 'at its nearest, clear of the hull and the near plane');
+    assert.ok(back(drone) < unit * 0.05, 'nearer than it started');
   }));

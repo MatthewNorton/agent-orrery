@@ -12,6 +12,12 @@
   const LENGTH = 15.4;
   const MIDSHIP = 0.79;
   const RING_SPAN = 19;
+  // The fleet is drawn to one scale, the Breakwater yard's (ships/breakwater/model.js), which parks
+  // four Petrels on its berths at the size a Scout flies. The Workhorse is that Petrel with its
+  // ring, and the Capital the same ship drawn 1.24 times larger.
+  const SCOUT = AUR.SCOUT_LENGTH;
+  const WORKHORSE = SCOUT * RING_SPAN / LENGTH;
+  const CAPITAL = WORKHORSE * 1.24;
   const LIGHT = AUR.shipModels.TRIM_LIGHT;
   const PANEL = 0.55;
   // The position lamps and the nozzle liners are lights in the ship color; the side inlets and
@@ -41,15 +47,15 @@
 
   AUR.shipModels.register({
     id: 'petrel',
-    replaces: [{ hull: 'aur-lance-interceptor-v3' }],
+    replaces: [{ hull: 'aur-lance-interceptor-v3', size: SCOUT }],
     correction: { scale: 1 / LENGTH, offset: [0, 0, -MIDSHIP] },
     trim: TRIM,
     ...petrel(false),
   });
-  // Ringed, it flies at the fleet's Workhorse and Capital sizes: its ring as wide as those hulls are long.
+  // Ringed, its longest side is its ring.
   AUR.shipModels.register({
     id: 'petrel-ring',
-    replaces: [{ hull: 'aur-bastion-corvette-v3', size: 1.25 }, { hull: 'aur-helix-destroyer-v3', size: 1.55 }],
+    replaces: [{ hull: 'aur-bastion-corvette-v3', size: WORKHORSE }, { hull: 'aur-helix-destroyer-v3', size: CAPITAL }],
     correction: { scale: 1 / RING_SPAN, offset: [0, 0, -MIDSHIP] },
     trim: RING_TRIM,
     ...petrel(true),

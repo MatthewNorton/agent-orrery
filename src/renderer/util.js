@@ -163,14 +163,20 @@
   // and flights are sized against.
   AUR.PLANET_DIA = Object.freeze({ min: 1.1, max: 4.5 });
 
-  // Ship display size per view: the signal marker's plane, a hull's length in scene units (a
-  // fifth of the smallest planet in the system view), and the pixel floor AUR.fitShip keeps so a
-  // hull sized to its planets still reads from the default orbit.
+  // Ship display size per view: the signal marker's plane, the length in scene units of a hull one
+  // fleet unit long (a fifth of the smallest planet in the system view), and the pixel floor
+  // AUR.fitShip keeps for such a hull, so ships sized to their planets still read from the default
+  // orbit. The floor is per fleet unit on purpose: at it the yard (1.9 units) is 1.9 times minPx and
+  // a Scout (AUR.SCOUT_LENGTH) about a quarter of it, so the fleet keeps its scale, ship against ship.
   AUR.SHIP_SIZE = Object.freeze({
     universe: Object.freeze({ signal: 0.64, hull: 0.2, minPx: 12 }),
     system: Object.freeze({ signal: 0.72, hull: AUR.PLANET_DIA.min / 5, minPx: 20 }),
     planet: Object.freeze({ signal: 0.72, hull: 0.6, minPx: 22 }),
   });
+  // The fleet's first rank, the Scout, in fleet units: the Scout's model, the yard that parks Scouts
+  // on its berths and the dart that stands in for a hull are sized from it. At 0.256 the yard, which
+  // holds its parked ships at the size they fly, comes out 1.9 across.
+  AUR.SCOUT_LENGTH = 0.256;
   // A drone (subagent) flies its family's first rank at this fraction of the rank's size.
   AUR.DRONE_SCALE = 0.6;
   // The layer bit every dart and fleet hull mesh carries (a ship model's hull carries

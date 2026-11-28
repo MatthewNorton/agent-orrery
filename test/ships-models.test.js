@@ -23,7 +23,10 @@ test('Petrel flies the Scout rank: the first rank of the family both providers f
   const hull = models.inPlaceOf(SCOUT);
   assert.deepEqual({ id: hull.id, file: hull.file, family: hull.family, role: hull.role, minBuilds: hull.minBuilds },
     { id: 'petrel', file: 'model:petrel', family: SCOUT.family, role: SCOUT.role, minBuilds: 0 });
-  assert.deepEqual([hull.model.id, hull.model.replaces, hull.correction], ['petrel', [{ hull: SCOUT.id }], hull.model.correction]);
+  const [{ size }] = hull.model.replaces;
+  assert.equal(size, load().SCOUT_LENGTH, 'the Scout\'s length, which the yard and the dart are sized from too');
+  assert.deepEqual([hull.model.id, hull.model.replaces, hull.correction],
+    ['petrel', [{ hull: SCOUT.id, size }], { ...hull.model.correction, scale: hull.model.correction.scale * size }]);
   assert.equal(models.inPlaceOf(SCOUT), hull, 'one hull entry, so a refresh compares like with like');
   const other = manifest.hulls.find((entry) => entry.family !== SCOUT.family);
   assert.equal(models.inPlaceOf(other), other, 'a hull no model has taken stays the manifest\'s');
@@ -291,10 +294,12 @@ test('a model hull is lit by the three model lights and nothing else; they light
 test('the nozzles sit at the stern in the fleet frame', () => {
   const models = load().shipModels;
   assert.equal(models.nozzles('aur-ark-carrier-v3'), null, 'a manifest hull finds its own');
-  const [port, starboard] = models.nozzles(models.inPlaceOf(SCOUT).id);
+  const scout = models.inPlaceOf(SCOUT);
+  const [port, starboard] = models.nozzles(scout.id);
+  const length = scout.correction.scale / scout.model.correction.scale; // the Scout's, in fleet units
   assert.ok(Math.abs(port.position.x + starboard.position.x) < 1e-9 && starboard.position.x > 0, 'mirrored');
-  assert.ok(port.position.z < -0.4 && port.position.z > -0.5, 'at the stern of a hull one unit long, centred');
-  assert.ok(port.radius > 0.02 && port.radius < 0.05);
+  assert.ok(port.position.z < -0.4 * length && port.position.z > -0.5 * length, 'at the stern of the hull, which is centred');
+  assert.ok(port.radius > 0.02 * length && port.radius < 0.05 * length);
 });
 
 test('an opaque material fades with its mesh once it gives its transparency mode up; a cut-out keeps its own', () => onNullScene(BABYLON, (scene) => {

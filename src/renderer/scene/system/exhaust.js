@@ -6,14 +6,14 @@
 (function () {
   const AUR = window.AUR;
   // Ribbon history in frames, its blend, the share of the hull's length from the stern that holds
-  // its nozzles, and the dart's tail (an octahedron of size 0.5).
-  const PLUME = Object.freeze({ length: 18, alpha: 0.5, sternShare: 0.25, dartTail: -0.5, dartRadius: 0.08 });
+  // its nozzles, and the dart's tail and its plume's radius in the dart's own size (AUR.DART_SIZE).
+  const PLUME = Object.freeze({ length: 18, alpha: 0.5, sternShare: 0.25, dartTail: -1, dartRadius: 0.16 });
 
   AUR.sceneParts.system.exhaust = function (view) {
     const { scene, glow } = view;
     const materials = new Map(); // tint -> the plume material every ship of that tint shares
     const hulls = new Map(); // hull id -> its stern nozzles, the same for every ship of that hull
-    const dartNozzles = [{ position: new BABYLON.Vector3(0, 0, PLUME.dartTail), radius: PLUME.dartRadius }];
+    const dartNozzles = [{ position: new BABYLON.Vector3(0, 0, PLUME.dartTail * AUR.DART_SIZE), radius: PLUME.dartRadius * AUR.DART_SIZE }];
 
     const plumeMaterial = (tint) => AUR.memo(materials, tint, () => {
       const material = AUR.unlitMaterial(scene, 'plume_' + tint, AUR.color3(tint), PLUME.alpha);

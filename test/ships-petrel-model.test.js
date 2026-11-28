@@ -30,15 +30,15 @@ test('ringed, Petrel flies the Workhorse and Capital ranks: one container for bo
   assert.equal(models.inPlaceOf(CAPITAL), capital, 'one hull entry per rank');
 });
 
-// The fleet's ladder grows by display length; the ringed ship's longest side is its ring.
-test('each ringed rank flies at the size the fleet\'s hull for that rank is shown at', () => {
+// The fleet is drawn to the yard's scale: a model unit is as long on a Scout as on a Workhorse, and
+// the Capital is the Workhorse drawn larger by the step the fleet's hull files take there.
+test('the Scout and the Workhorse fly at one scale, and the Capital as much larger as the fleet\'s hull for it', () => {
   const models = load().shipModels;
-  for (const hull of [WORKHORSE, CAPITAL]) {
-    const shown = shownLength(hull);
-    const { correction, model } = models.inPlaceOf(hull);
-    assert.ok(near(correction.scale / model.correction.scale, shown, 0.01), `${hull.id}: shown ${shown} long`);
-    assert.deepEqual(correction.offset, model.correction.offset);
-  }
+  const [scout, workhorse, capital] = [SCOUT, WORKHORSE, CAPITAL].map((hull) => models.inPlaceOf(hull));
+  assert.ok(near(scout.correction.scale, workhorse.correction.scale, 1e-9), 'the Petrel inside the ring is as long as a Scout');
+  assert.ok(near(capital.correction.scale / workhorse.correction.scale, shownLength(CAPITAL) / shownLength(WORKHORSE), 0.01));
+  assert.ok(scout.correction.scale < scout.model.correction.scale, 'a Scout is shorter than a fleet unit');
+  for (const hull of [workhorse, capital]) assert.deepEqual(hull.correction.offset, hull.model.correction.offset);
 });
 
 test('the ringed model is the build the Scout flies with its ring fitted: the variant source.json records', () => {
@@ -146,7 +146,7 @@ test('the nozzles follow the rank\'s size', () => {
   const grows = (from, to, ratio) => from.every((nozzle, i) =>
     nozzle.position.scale(ratio).equalsWithEpsilon(to[i].position, 1e-9) && near(nozzle.radius * ratio, to[i].radius));
   assert.ok(grows(bare, small, workhorse.correction.scale / scout.correction.scale), 'the same stern, at the Workhorse size');
-  assert.ok(grows(small, large, 1.55 / 1.25), 'and at the Capital size');
+  assert.ok(grows(small, large, capital.correction.scale / workhorse.correction.scale), 'and at the Capital size');
 });
 
 test('in a system both ringed ranks of a provider draw from one template, and a promotion between them grows the hull', () =>
@@ -158,7 +158,7 @@ test('in a system both ringed ranks of a provider draw from one template, and a 
     assert.notEqual(hullOf(w).sourceMesh, hullOf(s).sourceMesh, 'and another for the Scout');
     const { ships } = AUR.shipAssets.sceneStates.get(scene);
     const sizeOf = (id) => ships.get(id).correction.scaling.x;
-    assert.ok(near(sizeOf('c') / sizeOf('w'), 1.55 / 1.25));
+    assert.ok(near(sizeOf('c') / sizeOf('w'), 1.24));
 
     const workhorse = sizeOf('w');
     assert.equal(await AUR.ships.refresh(scene, ship('w', 20)), w);

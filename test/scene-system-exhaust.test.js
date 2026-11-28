@@ -47,7 +47,17 @@ test('a dart trails from its tail and a Petrel from its two nozzles; a yard name
     // The plumes it trails, and whether a later frame hangs them again.
     const trails = (rec) => [rec.plumes.length, part.refreshExhaust(rec)];
 
-    assert.deepEqual(trails(flying(null)), [1, false], 'a dart');
+    const dart = flying(null);
+    assert.deepEqual(trails(dart), [1, false], 'a dart');
+    // The dart stands in for a Scout: about a Scout and a half across, its plume from inside its tail.
+    const shape = AUR.dartMesh(scene, 'dart', '#ffffff');
+    shape.refreshBoundingInfo();
+    const { minimum, maximum } = shape.getBoundingInfo().boundingBox;
+    const across = (maximum.z - minimum.z) / AUR.SCOUT_LENGTH;
+    assert.ok(across > 1.3 && across < 1.5, `the dart is ${across} Scouts across`);
+    const tail = dart.plumes[0].anchor.position;
+    assert.ok(tail.z < 0 && tail.z > minimum.z && tail.x === 0 && tail.y === 0, 'from inside its tail');
+    shape.dispose(false, true);
     assert.deepEqual(trails(flying(petrel)), [2, false], 'a Petrel');
     const station = flying(yard);
     assert.deepEqual(trails(station), [0, false], 'no plume, and not hung again each frame');
