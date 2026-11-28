@@ -492,10 +492,12 @@ Design tokens (put in `:root`):
   floor the yard (1.9 units) is drawn at 1.9 times `minPx` and a Scout
   (`AUR.SCOUT_LENGTH`) at about a quarter of it. This is the owner's choice
   of size, true to the yard's scale in every view. In a system and on the
-  map the floor holds at every zoom, so a ship keeps one size on screen there
-  (measured on a 1180 px high view: a Scout about 5 px in a system and 3 on
-  the map, the yard 38 and 23), and the chase camera, opened from the fleet
-  list, is what shows a ship close.
+  map the floor holds for any ship more than a few units from the camera,
+  which is nearly all of them at any zoom, so a ship keeps one size on screen
+  there (measured on a 1180 px high view: a Scout about 5 px in a system and
+  3 on the map, the yard 38 and 23); only a ship passing close by the camera
+  at the nearest zoom of a small system is drawn larger, at its true size.
+  The chase camera, opened from the fleet list, is what shows a ship close.
   - **Instancing.** Each hull is one file. Every view draws its ships as
     instances of a hidden template, one per hull file and palette (the
     provider's, or local red), in one draw per part. An instance shows its

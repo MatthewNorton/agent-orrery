@@ -69,10 +69,13 @@ test('a dart trails from its tail and a Petrel from its two nozzles; a yard name
     assert.deepEqual([part.refreshExhaust(station), ...trails(station)], [true, 0, false], 'and leave with it');
     assert.equal(scene.meshes.filter((mesh) => mesh.name.startsWith('t_')).length, 3, 'the dart\'s and the Petrel\'s are all that is left');
 
-    // A hull file that shows no nozzle trails from the middle of its own stern, not from a dart's tail.
+    // A hull file that shows no nozzle trails from the end of its own hull, wherever the hull sits
+    // on its root, not from a dart's tail.
     const bare = flying('a-hull-file', (mesh) => {
-      BABYLON.MeshBuilder.CreateBox('part', { width: 0.4, height: 0.2, depth: 2 }, scene).parent = mesh;
+      const part = BABYLON.MeshBuilder.CreateBox('part', { width: 0.4, height: 0.2, depth: 2 }, scene);
+      part.parent = mesh;
+      part.position.z = 0.5;
     });
     assert.equal(bare.plumes.length, 1);
-    assert.ok(bare.plumes[0].anchor.position.equalsWithEpsilon(new BABYLON.Vector3(0, 0, -1), 1e-6), 'at the stern of a hull two units long');
+    assert.ok(bare.plumes[0].anchor.position.equalsWithEpsilon(new BABYLON.Vector3(0, 0, -0.5), 1e-6), 'at the stern of a hull two units long, set half a unit forward');
   }));

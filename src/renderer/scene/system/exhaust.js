@@ -50,20 +50,20 @@
           });
         }
       }
-      return { islands, length: zMax - zMin };
+      return { islands, length: zMax - zMin, stern: zMin };
     }
 
     // The nozzles a ship trails from, found once per hull: the ones its model names (a station
-    // names none, and trails nothing), else its hull's stern glow discs, else the middle of its
-    // stern (a hull is centred along its length). A dart trails from its tail.
+    // names none, and trails nothing), else its hull's stern glow discs, else the end of its hull
+    // on its axis. A dart trails from its tail.
     function nozzles(rec) {
       if (!rec.hull) return dartNozzles;
       return AUR.memo(hulls, rec.hull, () => {
         const named = AUR.shipModels.nozzles(rec.hull);
         if (named) return named;
-        const { islands, length } = glowIslands(rec.mesh);
-        const stern = AUR.sternIslands(islands, length, PLUME.sternShare);
-        return stern.length ? stern : [{ position: new BABYLON.Vector3(0, 0, -length / 2), radius: PLUME.bareRadius * length }];
+        const { islands, length, stern } = glowIslands(rec.mesh);
+        const discs = AUR.sternIslands(islands, length, PLUME.sternShare);
+        return discs.length ? discs : [{ position: new BABYLON.Vector3(0, 0, stern), radius: PLUME.bareRadius * length }];
       });
     }
 
