@@ -112,19 +112,49 @@ test('no work light on a berth is shut inside a freight container', () => {
   });
 });
 
-test('the service box under the rim stands on the band below it, and the mast beside the communications cap on the collar', () => {
-  onBerth((finish, hub) => {
-    const radius = (p) => Math.hypot(p.x, p.z);
-    const ys = (points, keep) => points.filter(keep).map((p) => p.y);
+const radius = (p) => Math.hypot(p.x, p.z);
+
+test('the service box under the rim stands on the band below it', () => {
+  onBerth((finish) => {
     // The box's walls are at radius 19.27 and 22.28, over a band from 19.2 to 22.9.
-    const machinery = pointsOf(finish('Graphite machinery'));
-    const bandTop = Math.max(...ys(machinery, (p) => near(radius(p), 19.2, 1e-3)));
-    const wallFoot = Math.min(...ys(machinery, (p) => near(radius(p), 19.27, 1e-3) || near(radius(p), 22.28, 1e-3)));
+    const ys = (keep) => pointsOf(finish('Graphite machinery')).filter(keep).map((p) => p.y);
+    const bandTop = Math.max(...ys((p) => near(radius(p), 19.2, 1e-3)));
+    const wallFoot = Math.min(...ys((p) => near(radius(p), 19.27, 1e-3) || near(radius(p), 22.28, 1e-3)));
     assert.ok(near(wallFoot, bandTop, 1e-6), `the box's walls end at ${wallFoot}, the band's top is at ${bandTop}`);
-    // The collar is the hub's dark ring of radius 1.79; the mast at (-1.49, -0.12) has its foot on it.
-    const collarTop = Math.max(...ys(pointsOf(hub('Graphite machinery')), (p) => near(radius(p), 1.79, 1e-3)));
-    const mastFoot = Math.min(...ys(pointsOf(hub('Load-bearing steel')), (p) => Math.abs(p.x + 1.49) < 0.25 && Math.abs(p.z + 0.12) < 0.25));
-    assert.ok(near(mastFoot, collarTop, 1e-6), `the mast's foot is at ${mastFoot}, the collar's top at ${collarTop}`);
+  });
+});
+
+test('no mast on the hub\'s roof stands across the wall of the communications cap or of the collar around it', () => {
+  onBerth((finish, hub) => {
+    // On the roof at 5.63 the cap's wall comes down to the collar at radius 1.48 and the collar's own
+    // wall is at 1.79; the cap's top is 0.84 above the roof. A mast is steel, armor and dark stays.
+    for (const name of ['Load-bearing steel', 'Weathered porcelain armor', 'Graphite machinery']) {
+      const across = pointsOf(hub(name)).filter((p) => p.y > 5.62 && p.y < 5.63 + 0.84 && radius(p) > 1.49 && radius(p) < 1.78);
+      const [one] = across;
+      assert.equal(across.length, 0, one && `${name}: ${across.length} points between the two walls, one at (${one.x.toFixed(2)}, ${one.y.toFixed(2)}, ${one.z.toFixed(2)})`);
+    }
+  });
+});
+
+test('each painted map is drawn to the size of the canvas it is given', () => {
+  onScene((scene, models, AUR) => {
+    const Blank = globalThis.OffscreenCanvas;
+    const layouts = [];
+    // A canvas that notes, from the scale its painter sets, the size the painter lays its map out at.
+    // The engine here makes no canvas wider or higher than 512, so each painter but the rooms' has to scale.
+    globalThis.OffscreenCanvas = class extends Blank {
+      getContext() {
+        const scale = (x, y) => layouts.push([this.width / x, this.height / y]);
+        return new Proxy(super.getContext(), { get: (context, key) => (key === 'canvas' ? this : key === 'scale' ? scale : context[key]) });
+      }
+    };
+    try {
+      AUR.useShipModule('breakwater/finishes').createFinishes(scene);
+    } finally {
+      globalThis.OffscreenCanvas = Blank;
+    }
+    // The plates and their relief, the rooms by day and lit (eight of 128 side by side), and the deck.
+    assert.deepEqual(layouts, [[1024, 1024], [1024, 1024], [1024, 128], [1024, 128], [1024, 1024]]);
   });
 });
 
@@ -140,7 +170,10 @@ test('a bar of no length, a girder facing along itself and an apron width asked 
     // Hinted along itself, a bar takes an axis it is not along for its side, along X too.
     frame.bar(steel, v(0, 0, 0), v(0, 1, 0), 0.1, 0.1);
     frame.bar(steel, v(0, 0, 0), v(1, 0, 0), 0.1, 0.1, v(1, 0, 0));
-    assert.equal(frame.surfaces.get(steel).positions.length / 3, 48, 'two bars of six faces');
+    // A hint along the bar is one whatever its length: half a unit, and none.
+    frame.bar(steel, v(0, 0, 0), v(0, 1, 0), 0.1, 0.1, v(0, 0.5, 0));
+    frame.bar(steel, v(0, 0, 0), v(0, 1, 0), 0.1, 0.1, v(0, 0, 0));
+    assert.equal(frame.surfaces.get(steel).positions.length / 3, 96, 'four bars of six faces');
 
     // The width follows the apron's side, corner to corner, from its first station to its last.
     const side = APRON.slice(1, 6);

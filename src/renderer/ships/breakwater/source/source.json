@@ -1,6 +1,6 @@
 {
   "ship": "breakwater",
-  "commit": "104f7e5819a5",
+  "commit": "5bbce336246a",
   "build": [
     "yard",
     "createDrydock"
@@ -9,8 +9,8 @@
   "modules": {
     "fabrication": {
       "source": "fabrication.js",
-      "sha256": "bd3ab29b771c345ddfbb05cdf7c6dfc607b287d29de10cb1b1b5aa4c0a0e8979",
-      "generated": "edab30316cec6570ea5c06db58d14da2d15a6410d8bc27e1955058bc02f1d222",
+      "sha256": "0f88ae8ef46d1664ce96effe1e78e99d26c964e85ce88eb0f167b9847fbda904",
+      "generated": "d893929da8a1463fbb6542498f34a979e2ee7600ba6352ce1d25d0d629fa8065",
       "exports": [
         "Fabrication",
         "TAU",
@@ -62,16 +62,16 @@
     },
     "hub": {
       "source": "hub.js",
-      "sha256": "cd7dc54a79571114c35151d33ead1992c17fc5df76f0afa4fd9efa6d093b96ef",
-      "generated": "8364a813020d72e8c56c15daf3452d0518d7a45ba35ca34bb4031e96f5643e58",
+      "sha256": "37f9f33bdce032dc5583266c6be0849a00bdeba380f36256f6f2493bebb349df",
+      "generated": "e6223f2b9fe94aefa3605de0393816bc9bc5aa932270fa7909c52f2df1003c0c",
       "exports": [
         "buildHub"
       ]
     },
     "finishes": {
       "source": "finishes.js",
-      "sha256": "0438d1b2cddc8b63d2058f319f1676824eb95dec6f864d8fb7933d84f70bef73",
-      "generated": "2165f3cbd990400b275c2a40f636d1375b0a3bff99a6e8cde0c3e7290f124101",
+      "sha256": "f73bc90215884c98155e98c772f6ec9e57abf289071533148bb2242fd39bd4d1",
+      "generated": "ea3b5dc16565982406821d7b92b407bdbfb5f80e2895e30a930526f62308e1bd",
       "exports": [
         "createFinishes"
       ]
@@ -88,7 +88,7 @@
   "geometry": {
     "meshes": 209,
     "triangles": 196672,
-    "sha256": "00c8f9cf24e134d56971b5c9251295d736566949baf2e0e6c9c95c1610dd1dd1"
+    "sha256": "9954e7daa58d91a5bf150daba532459a5e159c4590222269efff0fbaf47d77a6"
   },
   "variants": {}
 }

@@ -23,7 +23,8 @@ function communications(g,m) {
     g.tube(m.brass,radial(a,3.39,floor+.55),radial(b,3.39,floor+.55),.030,.030,8);
   }
   // Oxide-stained couplers, receiver cans and stepped aerials have different silhouettes.
-  for(const [x,z,height,size] of [[-.66,-.64,10.73,1],[-1.49,-.12,9.39,.73],[.28,-.97,9.05,.61],[-1.86,1.1,7.68,.58],[1.12,1.69,7.48,.56],[2.27,-.29,7.07,.50]]){
+  // Each stands wholly on one level, clear of the cap's wall and the collar's.
+  for(const [x,z,height,size] of [[-.66,-.64,10.73,1],[-2.1,-.17,9.39,.73],[.28,-.97,9.05,.61],[-1.86,1.1,7.68,.58],[1.12,1.69,7.48,.56],[2.27,-.29,7.07,.50]]){
     // A mast stands on the cap, on the dark band around it, or on the floor.
     const r=Math.hypot(x,z), base=r<capFoot?capTop:r<collar?collarTop:floor;
     g.box(m.structural,x,base+.12,z,.56*size,.24,.52*size);

@@ -138,6 +138,7 @@ function normalMap(c) {
 
 function apron(c) {
   const n=1024,rand=random(562);
+  c.save();c.scale(c.canvas.width/n,c.canvas.height/n);
   c.fillStyle='#58585a';c.fillRect(0,0,n,n);
   for(let j=0;j<7;j++) for(let i=-1;i<7;i++){
     const x=i*166+(j%2)*60,y=j*153,t=73+Math.floor(rand()*17);
@@ -179,12 +180,14 @@ function apron(c) {
     c.fillStyle=smudge;c.fillRect(x-size,y-size,size*2,size*2);
   }
   grain(c,21,15);
+  c.restore();
 }
 
 // Eight occupied workstations share one atlas. The mullions and inset returns remain geometry.
 function rooms(c,emission) {
   const w=128,h=128;
   const rand=random(779);
+  c.save();c.scale(c.canvas.width/(8*w),c.canvas.height/h);
   for(let j=0;j<8;j++){
     const light=[.94,.67,1,.42,.85,.98,.64,.88][j],ox=(j%3-1)*13;
     c.save();c.translate(j*w,0);c.beginPath();c.rect(0,0,w,h);c.clip();
@@ -228,6 +231,7 @@ function rooms(c,emission) {
     }
     c.restore();
   }
+  c.restore();
 }
 
 function createFinishes(scene) {
