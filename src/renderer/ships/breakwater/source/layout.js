@@ -13,21 +13,26 @@ const AXLE_Y = -1.42;
 const WHEEL_RADIUS = .243;
 const GEAR = [[0,4.85,-.36],[-1.22,-3.66,-.66],[1.22,-3.66,-.66]];
 const BERTHS = ['North','East','South','West'];
-const RIM_START = rad(20.5);
-const RIM_END = rad(69.5);
 const QUARTER = Math.PI/2;
+// The service arc is symmetric in its quarter: the fairing mirrored at QUARTER - angle meets its end.
+const RIM_START = rad(20.5);
+const RIM_END = QUARTER - RIM_START;
 
 // x is tangential and z is the outward radial station. Values come from the plan.
 const APRON = [
   [-3.62,15.60],[3.62,15.60],[5.78,16.72],[6.76,20.0],[6.76,24.10],[4.29,26.80],
   [-4.29,26.80],[-6.76,24.10],[-6.76,20.0],[-5.78,16.72],
 ];
-// Over the service arc the rim meets the sloping and then straight side of the apron.
+// The apron's half width at the outward station z, along its side from APRON[1] to APRON[5].
 function apronHalfWidthAtRim(z) {
-  const [innerWidth,innerZ]=APRON[2], [outerWidth,outerZ]=APRON[3];
-  const slope=(outerWidth-innerWidth)/(outerZ-innerZ);
-  return z<outerZ ? innerWidth+(z-innerZ)*slope : outerWidth;
+  for(let i=1;i<5;i++) {
+    const [x0,z0]=APRON[i], [x1,z1]=APRON[i+1];
+    if (z>=z0 && z<=z1) return x0+(z-z0)*((x1-x0)/(z1-z0));
+  }
+  throw new RangeError('The apron runs from z '+APRON[1][1]+' to '+APRON[5][1]+'; it has no width at '+z+'.');
 }
 const padUV = ([x,z]) => [(x+7.3)/14.6,(z-14.95)/12.5];
-return { APRON, AXLE_Y, BERTHS, BERTH_RADIUS, CUTTER_SCALE, DECK_Y, GEAR, QUARTER, RIM_END, RIM_START, WHEEL_RADIUS, apronHalfWidthAtRim, padUV };
+/** An apron point [x, z] scaled toward the berth's centre. @param {number[]} point @param {number} size */
+const scaleApron = (point,size) => [point[0]*size,BERTH_RADIUS+(point[1]-BERTH_RADIUS)*size];
+return { APRON, AXLE_Y, BERTHS, BERTH_RADIUS, CUTTER_SCALE, DECK_Y, GEAR, QUARTER, RIM_END, RIM_START, WHEEL_RADIUS, apronHalfWidthAtRim, padUV, scaleApron };
 });

@@ -1,6 +1,6 @@
 {
   "ship": "breakwater",
-  "commit": "9c4ff47ac605",
+  "commit": "5fa203c84d08",
   "build": [
     "yard",
     "createDrydock"
@@ -9,8 +9,8 @@
   "modules": {
     "fabrication": {
       "source": "fabrication.js",
-      "sha256": "f4f9e7e8bf172b75a6186e261e3f9c95d6ace22c04b7ea5353fb4a8649c40f19",
-      "generated": "5705e90c6b1abd1830672de8eefe2a45e6a8add4d533f2342f073fc09fb328e8",
+      "sha256": "a0a134c5649ef1bda78ebafe257fede31d3558c65e3552ef4661a0f26e443539",
+      "generated": "3e50e9d83ccfe5c896d611dd34b40c1a1ff0b7d11eb68d82341c7821bf7b13b1",
       "exports": [
         "Fabrication",
         "TAU",
@@ -22,8 +22,8 @@
     },
     "layout": {
       "source": "layout.js",
-      "sha256": "db9236205705f49e5b98c3ca97b5af98bcb37564ee625a271590c9a433dddf54",
-      "generated": "8a476bb8396c111f48b4f56b6309f8513b2c1e995f3577ad28122acf076aa8cb",
+      "sha256": "bff2d8c9059cb3f3cb477618a4a4296016bcccd8fca237aedad61eb98a972cc3",
+      "generated": "1e3fda2ad51f80b67a29545b06642a911608ec4a91044a21baad09b8ac8cb421",
       "exports": [
         "APRON",
         "AXLE_Y",
@@ -37,13 +37,14 @@
         "RIM_START",
         "WHEEL_RADIUS",
         "apronHalfWidthAtRim",
-        "padUV"
+        "padUV",
+        "scaleApron"
       ]
     },
     "services": {
       "source": "services.js",
-      "sha256": "bb897d4f85e4ea6d944eee9c1f3a1efad6e4efbdfc42e3a79304edd6fe1d429a",
-      "generated": "9bec6886dc2f6c9074f09095fff77258999914e7ac5be3a5c11292e51241a4d3",
+      "sha256": "48595916ec9620c56420060ca98f4ee4009021ab87e8101ee7a016dca3535bd5",
+      "generated": "0cd619fbcce0834a6756c918c9e1fac06d0f2f65bff5bf25f4ef8031e1218c69",
       "exports": [
         "airlock",
         "buildRim",
@@ -53,32 +54,32 @@
     },
     "berth": {
       "source": "berth.js",
-      "sha256": "08db10c69ce42c9a081dee3e08088d5bc97652b7bd5132bc6b47bc6d13f3ea61",
-      "generated": "7d70d27a22594f132ad58d84480f797de961b58c467efc8f3de3c9671c430ebd",
+      "sha256": "82b490fb26c31926874b7a9c3ae88c37e1a10b88535f8d927ef0e413cf2e0a47",
+      "generated": "c95a9ba32453bdd59876a238ae0e76b0c7179c4a175489f62b29af7f59b38c38",
       "exports": [
         "buildBerth"
       ]
     },
     "hub": {
       "source": "hub.js",
-      "sha256": "36f404c8c7b113b773b60c488169fb0dccd447a44ef8d430ec73f636c94086d3",
-      "generated": "b1f6a658edfe1d7b0af17d37391e84e003607d5b037ded55b7fbf04f3e9cc1e4",
+      "sha256": "37f9f33bdce032dc5583266c6be0849a00bdeba380f36256f6f2493bebb349df",
+      "generated": "e6223f2b9fe94aefa3605de0393816bc9bc5aa932270fa7909c52f2df1003c0c",
       "exports": [
         "buildHub"
       ]
     },
     "finishes": {
       "source": "finishes.js",
-      "sha256": "1932604214e0074c21a62cf317e1c8c9ecb4bb59a5535d285e987d1b6cf91118",
-      "generated": "1a5677932c698682c9cb324d9c55d76a5e9d872c5fcf200d483acdeb40bf5d75",
+      "sha256": "f73bc90215884c98155e98c772f6ec9e57abf289071533148bb2242fd39bd4d1",
+      "generated": "ea3b5dc16565982406821d7b92b407bdbfb5f80e2895e30a930526f62308e1bd",
       "exports": [
         "createFinishes"
       ]
     },
     "yard": {
       "source": "yard.js",
-      "sha256": "93995fc0ca46fc0d252de6e4fadaad6ddd2491413e3f4f907b12a4a48336d8b4",
-      "generated": "a7b6dd4d643ae3985f542372aa526424072b2170e4f9b140ea4120554cec80d3",
+      "sha256": "c96ddc426ae248ae67709408a40431be62636c9a003c0f620d974f0830679acf",
+      "generated": "b61bf890871649d41c1df24f58e11cb280cbdc97ed4ef19cd743d1b3856f5d37",
       "exports": [
         "createDrydock"
       ]
@@ -86,8 +87,8 @@
   },
   "geometry": {
     "meshes": 209,
-    "triangles": 229360,
-    "sha256": "0aebf59a34a1188828b6f47f560c9205d516f1ebd7ce37a040cc0ac1ed903139"
+    "triangles": 196672,
+    "sha256": "9954e7daa58d91a5bf150daba532459a5e159c4590222269efff0fbaf47d77a6"
   },
   "variants": {}
 }

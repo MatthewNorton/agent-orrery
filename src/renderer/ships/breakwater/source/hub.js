@@ -7,10 +7,15 @@ window.AUR.shipModule('breakwater/hub', function (use) {
 const { v, up, TAU, radial } = use('breakwater/fabrication');
 const { glazing, housing, airlock } = use('breakwater/services');
 
+// The hull's flat roof, which carries the communications deck and the dish.
+const ROOF_Y=5.63;
+
 function communications(g,m) {
-  const floor=5.63;
-  g.band(m.dark,0,1.79,floor,floor+.19);
-  g.revolve([[0,floor+.84,m.plating],[1.31,floor+.84,m.structural],[1.45,floor+.72,m.plating],[1.48,floor+.19]],0,TAU,48);
+  const floor=ROOF_Y;
+  // A collar under the cap: its top and outer wall show; it stands on the roof, so it has no floor.
+  const collar=1.79,collarTop=floor+.19,capFoot=1.48,capTop=floor+.84;
+  g.revolve([[0,collarTop,m.dark],[collar,collarTop,m.dark],[collar,floor]],0,TAU,64);
+  g.revolve([[0,capTop,m.plating],[1.31,capTop,m.structural],[1.45,floor+.72,m.plating],[capFoot,collarTop]],0,TAU,48);
   for(let i=0;i<20;i++){
     const a=i*TAU/20,b=(i+1)*TAU/20;
     g.tube(m.pipe,radial(a,3.39,floor),radial(a,3.39,floor+.54),.035,.028,8);
@@ -18,8 +23,10 @@ function communications(g,m) {
     g.tube(m.brass,radial(a,3.39,floor+.55),radial(b,3.39,floor+.55),.030,.030,8);
   }
   // Oxide-stained couplers, receiver cans and stepped aerials have different silhouettes.
-  for(const [x,z,height,size] of [[-.66,-.64,10.73,1],[-1.49,-.12,9.39,.73],[.28,-.97,9.05,.61],[-1.86,1.1,7.68,.58],[1.12,1.69,7.48,.56],[2.27,-.29,7.07,.50]]){
-    const base=Math.hypot(x,z)<1.48?floor+.84:floor;
+  // Each stands wholly on one level, clear of the cap's wall and the collar's.
+  for(const [x,z,height,size] of [[-.66,-.64,10.73,1],[-2.1,-.17,9.39,.73],[.28,-.97,9.05,.61],[-1.86,1.1,7.68,.58],[1.12,1.69,7.48,.56],[2.27,-.29,7.07,.50]]){
+    // A mast stands on the cap, on the dark band around it, or on the floor.
+    const r=Math.hypot(x,z), base=r<capFoot?capTop:r<collar?collarTop:floor;
     g.box(m.structural,x,base+.12,z,.56*size,.24,.52*size);
     g.tube(m.plating,v(x,base+.23,z),v(x,base+.82*size,z),.22*size,.18*size,18);
     g.tube(m.structural,v(x,base+.82*size,z),v(x,height-.60*size,z),.12*size,.062*size,10);
@@ -36,10 +43,11 @@ function dish(g,m,base) {
   const w=axis.cross(u).normalize();
   const point=(r,a,depth)=>base.add(u.scale(r*Math.cos(a))).addInPlace(w.scale(r*Math.sin(a))).addInPlace(axis.scale(depth));
   const radius=.95,depth=r=>.34*(r/radius)**2;
-  g.tube(m.structural,v(base.x,5.63,base.z),base,.13,.09,12);
+  g.tube(m.structural,v(base.x,ROOF_Y,base.z),base,.13,.09,12);
   g.tube(m.dark,base.subtract(axis.scale(.26)),base,.31,.24,18);
-  for(let i=0;i<40;i++){
-    const a=i*TAU/40,b=(i+1)*TAU/40;
+  const segments=24;
+  for(let i=0;i<segments;i++){
+    const a=i*TAU/segments,b=(i+1)*TAU/segments;
     for(let j=0;j<5;j++){
       const r=radius*j/5,s=radius*(j+1)/5;
       const corners=[[r,a],[s,a],[s,b],[r,b]];
@@ -50,7 +58,7 @@ function dish(g,m,base) {
     }
     const p=point(radius,a,depth(radius)),q=point(radius,b,depth(radius));
     g.plate(m.pipe,[p,q,q.subtract(axis.scale(.064)),p.subtract(axis.scale(.064))],p.subtract(base));
-    if(i%10===0){
+    if(i%(segments/4)===0){
       g.tube(m.dark,point(.15,a,-.065),point(radius*.96,a,.235),.038,.031,6);
       g.tube(m.pipe,point(radius*.8,a,depth(radius*.8)),base.add(axis.scale(.66)),.026,.018,7);
     }
@@ -61,7 +69,7 @@ function dish(g,m,base) {
 function buildHub(g,m) {
   // The service keel is visible below the rim in every elevation.
   g.revolve([
-    [0,5.63,m.plating],[3.44,5.63,m.structural],[3.76,5.49,m.dark],[3.83,5.36,null],
+    [0,ROOF_Y,m.plating],[3.44,ROOF_Y,m.structural],[3.76,5.49,m.dark],[3.83,5.36,null],
     [4.66,3.93,m.structural],[4.81,3.86,m.enamel],[4.91,3.73,m.plating],
     [6.74,3.18,m.plating],[8.57,2.40,m.plating],[9.74,1.67,m.structural],
     [9.95,1.45,m.plating],[10.21,.82,m.plating],[10.39,.67,m.structural],
@@ -72,7 +80,7 @@ function buildHub(g,m) {
     [5.07,-8.84,m.plating],[4.96,-10.19,m.dark],[4.37,-10.43,m.structural],
     [4.16,-11.04,m.plating],[3.90,-11.62,m.dark],[2.90,-11.78,m.plating],
     [2.79,-12.62,m.dark],[2.48,-12.78,m.plating],[2.29,-13.55,m.dark],[1.98,-13.72,m.structural],[0,-13.72],
-  ]);
+  ],0,TAU,48);
   for(let i=0;i<26;i++) {
     const a=i*TAU/26,b=(i+1)*TAU/26;
     glazing(g,m,4.65,3.94,3.828,5.36,a,b,i);
@@ -80,8 +88,6 @@ function buildHub(g,m) {
   }
   for(let i=0;i<32;i++) {
     const a=i*TAU/32,b=(i+1)*TAU/32,mid=(a+b)/2;
-    const crown=radial(a,4.93,3.744),shoulder=radial(a,9.73,1.693);
-    g.bar(m.structural,crown,shoulder,.021,.018);
     if(i%3!==0){
       housing(g,m.dark,mid,10.018,1.11,0,.92,.38,.12);
       housing(g,m.lamp,mid,10.094,1.11,0,.34,.14,.04);
@@ -112,7 +118,7 @@ function buildHub(g,m) {
     if(i%8===3)airlock(g,m,mid,5.95,-8.38,2.31,1.85);
   }
   for(const [r,y,s,mat] of [[9.35,-2.02,.12,m.pipe],[9.22,-3.15,.12,m.brass],[6.99,-6.3,.12,m.brass],[6.24,-7.83,.16,m.pipe],[3.02,-12.02,.095,m.pipe]]){
-    g.pipeArc(mat,r,y,s,0,TAU,80);
+    g.pipeArc(mat,r,y,s,0,TAU,48);
   }
   communications(g,m);
 }

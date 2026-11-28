@@ -340,7 +340,7 @@ test('a hull request whose dart is gone or that is superseded while it waits on 
 
 // The counts the budget comment and kit/SPEC.md state, at the sizes the models were imported at:
 // Petrel bare for the first rank, with its survey ring for the next, and the Breakwater yard.
-test('a near view holds 153 ships of the first rank, sixty-six ringed or eleven yards; the universe map, with a budget of its own, 212, ninety-one or sixteen', async () => {
+test('a near view holds 153 ships of the first rank, sixty-six ringed or thirteen yards; the universe map, with a budget of its own, 212, ninety-one or eighteen', async () => {
   const petrel = JSON.parse(readRenderer('ships/petrel/source/source.json'));
   const yard = JSON.parse(readRenderer('ships/breakwater/source/source.json')).geometry.triangles;
   const [bare, ringed] = [petrel.geometry.triangles, petrel.variants.ring.geometry.triangles];
@@ -355,7 +355,7 @@ test('a near view holds 153 ships of the first rank, sixty-six ringed or eleven 
   };
   assert.deepEqual([await hulled('system', 0), await hulled('universe', 0)], [153, 212]);
   assert.deepEqual([await hulled('system', 3), await hulled('universe', 3)], [66, 91]);
-  assert.deepEqual([await hulled('system', 10), await hulled('universe', 10)], [11, 16]);
+  assert.deepEqual([await hulled('system', 10), await hulled('universe', 10)], [13, 18]);
 });
 
 test('disposing a scene\'s hull state empties it, though a load still waiting holds on to it', async () => {

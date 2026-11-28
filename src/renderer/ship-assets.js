@@ -58,11 +58,11 @@
   const HULL_ROOT = '../../assets/ships/';
   // The triangles a view's hulls may hold. A ship whose hull does not fit keeps its dart, or its
   // current hull when a promotion does not fit (a near view first tries the far file of a hull
-  // that has one). Hulls carry their detail as geometry (17k to 229k triangles each), and
+  // that has one). Hulls carry their detail as geometry (17k to 197k triangles each), and
   // a template's ships draw in one draw per part, so what grows with the fleet is the triangles
-  // drawn, which is what this counts. A system or planet view holds eleven ships of the top rank
-  // (the Breakwater yard, 229,360), sixty-six of the two below it (Petrel with its survey ring,
-  // 40,840) or 153 of the first (Petrel, 17,544); the universe map sixteen, ninety-one or 212.
+  // drawn, which is what this counts. A system or planet view holds thirteen ships of the top rank
+  // (the Breakwater yard, 196,672), sixty-six of the two below it (Petrel with its survey ring,
+  // 40,840) or 153 of the first (Petrel, 17,544); the universe map eighteen, ninety-one or 212.
   const TRIANGLE_BUDGET = { near: 2700000, far: 3720000 };
   // Between two model builds of a scene, a frame's length at 60 Hz, so a frame can draw between
   // them (a timer, so one usually does): each stalls the page while it builds.

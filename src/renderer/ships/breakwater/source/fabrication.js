@@ -9,8 +9,9 @@ const { Assembly, v } = use('petrel/geometry');
 
 const TAU = Math.PI * 2;
 const rad = degrees => degrees * Math.PI / 180;
-const up = v(0, 1, 0);
-const down = v(0, -1, 0);
+// Shared default directions, frozen so that no caller can change them for every other one.
+const up = Object.freeze(v(0, 1, 0));
+const down = Object.freeze(v(0, -1, 0));
 const radial = (a, r, y, side = 0) => v(
   Math.sin(a) * r + Math.cos(a) * side, y, Math.cos(a) * r - Math.sin(a) * side,
 );
@@ -53,9 +54,14 @@ class Fabrication extends Assembly {
 
   // Local width follows the edge perpendicular to the supplied face direction.
   bar(material, a, b, width, height, hint = up) {
-    const along = b.subtract(a).normalize();
-    const guide = Math.abs(Vector3.Dot(along, hint)) > .995 ? v(1,0,0) : hint;
-    const side = Vector3.Cross(guide, along).normalize().scale(width/2);
+    const along = b.subtract(a).normalize(), reach = hint.length();
+    // A hint along the bar, or too short to point anywhere, gives it no side: it takes an axis the bar
+    // is not along. Any other hint is taken at one unit long, whatever its length.
+    const guide = reach < 1e-9 || Math.abs(Vector3.Dot(along, hint)) >= .995*reach ? (Math.abs(along.x) > .9 ? v(0,0,1) : v(1,0,0)) : hint.scale(1/reach);
+    const across = Vector3.Cross(guide, along);
+    // Only a bar of no length is left without a side: every face would be dropped.
+    if (across.lengthSquared() < 1e-12) throw new RangeError('A bar needs two ends apart.');
+    const side = across.normalize().scale(width/2);
     const rise = Vector3.Cross(along, side).normalize().scale(height/2);
     const offsets = [side.negate().subtract(rise), side.subtract(rise), side.add(rise), rise.subtract(side)];
     const low = offsets.map(p => a.add(p)), high = offsets.map(p => b.add(p));
@@ -69,7 +75,9 @@ class Fabrication extends Assembly {
 
   girder(material, a, b, width, height, face = up) {
     const axis = b.subtract(a).normalize();
-    const normal = face.subtract(axis.scale(Vector3.Dot(axis, face))).normalize();
+    const normal = face.subtract(axis.scale(Vector3.Dot(axis, face)));
+    if (normal.lengthSquared() < 1e-12) throw new RangeError('A girder cannot face along its own axis.');
+    normal.normalize();
     const lip = height * .17, offset = normal.scale((height-lip)/2);
     this.bar(material, a, b, width*.34, height-2*lip, normal);
     this.bar(material, a.add(offset), b.add(offset), width, lip, normal);
@@ -120,10 +128,11 @@ class Fabrication extends Assembly {
     this.revolve([[inside,bottom,m],[inside,top,m],[outside,top,m],[outside,bottom,m],[inside,bottom]], a,b,count);
   }
 
+  // The yard's pipes are a few pixels thick at the nearest view: six sides draw them round.
   pipeArc(m, r, y, radius, a, b, sections = 20) {
-    const row = [];
-    for (let j=0; j<=10; j++) {
-      const cross = Math.PI - TAU*j/10;
+    const row = [], sides = 6;
+    for (let j=0; j<=sides; j++) {
+      const cross = Math.PI - TAU*j/sides;
       row.push([r+radius*Math.cos(cross), y+radius*Math.sin(cross), m]);
     }
     this.revolve(row,a,b,sections,(angle,rr,yy)=>radial(angle,rr-r,yy-y).normalize());

@@ -524,10 +524,10 @@ Design tokens (put in `:root`):
   - **Triangle budget.** Past its budget a ship keeps its dart, or its current
     hull when a promotion does not fit, a near view first trying the hull's far
     file when it has one: 2.7M in a system or planet view, which
-    holds eleven ships of the top rank (the Breakwater yard, 229,360
+    holds thirteen ships of the top rank (the Breakwater yard, 196,672
     triangles), sixty-six of the two below it (Petrel with its survey ring,
     40,840) or 153 of the first (Petrel, 17,544), and 3.72M on the universe
-    map, which holds sixteen, ninety-one or 212. A hull is
+    map, which holds eighteen, ninety-one or 212. A hull is
     checked in the step that builds it, so ships
     waiting on one container keep to the budget, and a request that ends while
     it waits (its dart gone, its swap superseded) loads and builds nothing more.
