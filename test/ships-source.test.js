@@ -72,8 +72,9 @@ for (const ship of ships) {
     }
   });
 
-  // The page builds nothing at load, so the order among a ship's modules is free; the registry
-  // comes before them, the model registry before the adapter, and all of it before ship-assets.
+  // A module runs when it is first used, so the order among a ship's modules is free; the registry
+  // comes before them, the model registry before the adapter, and all of it before ship-assets. An
+  // adapter may read a module's constants as it loads, so it comes after the ship's modules.
   test(`${ship}: index.html loads the registry, the modules, the model registry and the adapter, in that order`, () => {
     const at = (file) => {
       assert.ok(scripts.includes(file), file + ' has a script tag');
@@ -83,6 +84,7 @@ for (const ship of ships) {
     assert.ok(Math.min(...modules) > at('ships/modules.js'), 'the modules load after ships/modules.js');
     assert.ok(at('ships/models.js') > at('ships/modules.js'));
     assert.ok(at(`ships/${ship}/model.js`) > at('ships/models.js'), 'the adapter registers with ships/models.js');
+    assert.ok(at(`ships/${ship}/model.js`) > Math.max(...modules), 'the adapter finds its ship\'s modules loaded');
     assert.ok(at('ship-assets.js') > at(`ships/${ship}/model.js`), 'ship-assets finds the model registered');
     if (record.borrows) {
       assert.ok(at(`ships/${ship}/model.js`) > at(`ships/${record.borrows}/model.js`), 'its adapter reads the adapter of the ship it is built on');

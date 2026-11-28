@@ -14,10 +14,10 @@
   const RING_SPAN = 19;
   // The fleet is drawn to one scale, the Breakwater yard's (ships/breakwater/model.js), which parks
   // four Petrels on its berths at the size a Scout flies. The Workhorse is that Petrel with its
-  // ring, and the Capital the same ship drawn 1.24 times larger.
+  // ring, and the Capital the ringed ship drawn larger by the step the fleet's hull files take there.
   const SCOUT = AUR.SCOUT_LENGTH;
   const WORKHORSE = SCOUT * RING_SPAN / LENGTH;
-  const CAPITAL = WORKHORSE * 1.24;
+  const CAPITAL = WORKHORSE * 1.55 / 1.25;
   const LIGHT = AUR.shipModels.TRIM_LIGHT;
   const PANEL = 0.55;
   // The position lamps and the nozzle liners are lights in the ship color; the side inlets and

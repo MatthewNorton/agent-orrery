@@ -6,8 +6,9 @@
 (function () {
   const AUR = window.AUR;
   // Ribbon history in frames, its blend, the share of the hull's length from the stern that holds
-  // its nozzles, and the dart's tail and its plume's radius in the dart's own size (AUR.DART_SIZE).
-  const PLUME = Object.freeze({ length: 18, alpha: 0.5, sternShare: 0.25, dartTail: -1, dartRadius: 0.16 });
+  // its nozzles, the dart's tail and its plume's radius in the dart's own size (AUR.DART_SIZE), and
+  // the plume's radius, as a share of its length, of a hull that shows no nozzle.
+  const PLUME = Object.freeze({ length: 18, alpha: 0.5, sternShare: 0.25, dartTail: -1, dartRadius: 0.16, bareRadius: 0.08 });
 
   AUR.sceneParts.system.exhaust = function (view) {
     const { scene, glow } = view;
@@ -53,7 +54,8 @@
     }
 
     // The nozzles a ship trails from, found once per hull: the ones its model names (a station
-    // names none, and trails nothing), else its hull's stern glow discs, else a dart's tail.
+    // names none, and trails nothing), else its hull's stern glow discs, else the middle of its
+    // stern (a hull is centred along its length). A dart trails from its tail.
     function nozzles(rec) {
       if (!rec.hull) return dartNozzles;
       return AUR.memo(hulls, rec.hull, () => {
@@ -61,7 +63,7 @@
         if (named) return named;
         const { islands, length } = glowIslands(rec.mesh);
         const stern = AUR.sternIslands(islands, length, PLUME.sternShare);
-        return stern.length ? stern : dartNozzles;
+        return stern.length ? stern : [{ position: new BABYLON.Vector3(0, 0, -length / 2), radius: PLUME.bareRadius * length }];
       });
     }
 

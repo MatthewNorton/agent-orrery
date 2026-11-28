@@ -488,14 +488,14 @@ Design tokens (put in `:root`):
   per view, `AUR.fitShip` with a pixel floor so a hull sized to its planets
   still reads from the default orbit). The floor (`minPx`) is the least a
   hull one fleet unit long is drawn at, and every hull keeps its own length
-  against it, so the fleet keeps its scale, ship against ship: from a view's
-  default camera the yard (1.9 units) is drawn at 1.9 times `minPx` and a
-  Scout (`AUR.SCOUT_LENGTH`, 0.256) at about a quarter of it. This is the
-  owner's choice of size, true to the yard's scale in every view, and small
-  from a view's default camera, where the wheel or a click on the ship
-  brings it near: on a 1180 px high view a Scout is about 5 px in a system,
-  10 at a planet and 3 on the universe map, a Capital 8, 14 and 5, and the
-  yard 38, 70 and 23.
+  against it, so the fleet keeps its scale, ship against ship: under the
+  floor the yard (1.9 units) is drawn at 1.9 times `minPx` and a Scout
+  (`AUR.SCOUT_LENGTH`) at about a quarter of it. This is the owner's choice
+  of size, true to the yard's scale in every view. In a system and on the
+  map the floor holds at every zoom, so a ship keeps one size on screen there
+  (measured on a 1180 px high view: a Scout about 5 px in a system and 3 on
+  the map, the yard 38 and 23), and the chase camera, opened from the fleet
+  list, is what shows a ship close.
   - **Instancing.** Each hull is one file. Every view draws its ships as
     instances of a hidden template, one per hull file and palette (the
     provider's, or local red), in one draw per part. An instance shows its

@@ -158,7 +158,7 @@ test('in a system both ringed ranks of a provider draw from one template, and a 
     assert.notEqual(hullOf(w).sourceMesh, hullOf(s).sourceMesh, 'and another for the Scout');
     const { ships } = AUR.shipAssets.sceneStates.get(scene);
     const sizeOf = (id) => ships.get(id).correction.scaling.x;
-    assert.ok(near(sizeOf('c') / sizeOf('w'), 1.24));
+    assert.ok(near(sizeOf('c') / sizeOf('w'), shownLength(CAPITAL) / shownLength(WORKHORSE), 0.01));
 
     const workhorse = sizeOf('w');
     assert.equal(await AUR.ships.refresh(scene, ship('w', 20)), w);

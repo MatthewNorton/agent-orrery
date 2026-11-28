@@ -185,7 +185,11 @@
       const event = pi.event;
       const types = BABYLON.PointerEventTypes;
       if (pi.type === types.POINTERWHEEL) {
-        orbit.zoom = AUR.clamp(orbit.zoom * Math.exp(event.deltaY * ORBIT.wheel), ORBIT.zoom.min, ORBIT.zoom.max);
+        // A small hull's nearest stand-off comes before the zoom's own limit: the wheel stops there
+        // too, so it never winds on past what the camera can show.
+        const nearest = chaseSpan > 0 ? (chaseSpan / 2 + focusCamera.minZ) / (chaseSpan * CHASE.distance) : 0;
+        const least = Math.min(ORBIT.zoom.max, Math.max(ORBIT.zoom.min, nearest));
+        orbit.zoom = AUR.clamp(orbit.zoom * Math.exp(event.deltaY * ORBIT.wheel), least, ORBIT.zoom.max);
       } else if (pi.type === types.POINTERDOWN && event.button === 0) {
         drag.pointerId = event.pointerId;
         drag.x = event.clientX;

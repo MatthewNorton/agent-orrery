@@ -15,16 +15,13 @@ const SCOUT = manifest.hulls.find((hull) => hull.id === 'aur-lance-interceptor-v
 const onScene = (work) => onModelScene((scene, models, AUR) => work(scene, models, models.inPlaceOf(SCOUT).model, AUR));
 
 test('Petrel flies the Scout rank: the first rank of the family both providers fly', () => {
-  const models = load().shipModels;
+  const { shipModels: models, SCOUT_LENGTH: size } = load(); // the length the yard and the dart are sized from too
   assert.equal(SCOUT.minBuilds, 0);
   assert.equal(SCOUT.family, manifest.providerFamilies.claude);
   assert.equal(SCOUT.family, manifest.providerFamilies.codex);
-
   const hull = models.inPlaceOf(SCOUT);
   assert.deepEqual({ id: hull.id, file: hull.file, family: hull.family, role: hull.role, minBuilds: hull.minBuilds },
     { id: 'petrel', file: 'model:petrel', family: SCOUT.family, role: SCOUT.role, minBuilds: 0 });
-  const [{ size }] = hull.model.replaces;
-  assert.equal(size, load().SCOUT_LENGTH, 'the Scout\'s length, which the yard and the dart are sized from too');
   assert.deepEqual([hull.model.id, hull.model.replaces, hull.correction],
     ['petrel', [{ hull: SCOUT.id, size }], { ...hull.model.correction, scale: hull.model.correction.scale * size }]);
   assert.equal(models.inPlaceOf(SCOUT), hull, 'one hull entry, so a refresh compares like with like');
@@ -292,11 +289,9 @@ test('a model hull is lit by the three model lights and nothing else; they light
 }));
 
 test('the nozzles sit at the stern in the fleet frame', () => {
-  const models = load().shipModels;
+  const { shipModels: models, SCOUT_LENGTH: length } = load();
   assert.equal(models.nozzles('aur-ark-carrier-v3'), null, 'a manifest hull finds its own');
-  const scout = models.inPlaceOf(SCOUT);
-  const [port, starboard] = models.nozzles(scout.id);
-  const length = scout.correction.scale / scout.model.correction.scale; // the Scout's, in fleet units
+  const [port, starboard] = models.nozzles(models.inPlaceOf(SCOUT).id);
   assert.ok(Math.abs(port.position.x + starboard.position.x) < 1e-9 && starboard.position.x > 0, 'mirrored');
   assert.ok(port.position.z < -0.4 * length && port.position.z > -0.5 * length, 'at the stern of the hull, which is centred');
   assert.ok(port.radius > 0.02 * length && port.radius < 0.05 * length);

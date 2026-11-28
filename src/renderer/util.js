@@ -166,8 +166,7 @@
   // Ship display size per view: the signal marker's plane, the length in scene units of a hull one
   // fleet unit long (a fifth of the smallest planet in the system view), and the pixel floor
   // AUR.fitShip keeps for such a hull, so ships sized to their planets still read from the default
-  // orbit. The floor is per fleet unit on purpose: at it the yard (1.9 units) is 1.9 times minPx and
-  // a Scout (AUR.SCOUT_LENGTH) about a quarter of it, so the fleet keeps its scale, ship against ship.
+  // orbit. The floor is per fleet unit on purpose: every hull keeps its own length against it.
   AUR.SHIP_SIZE = Object.freeze({
     universe: Object.freeze({ signal: 0.64, hull: 0.2, minPx: 12 }),
     system: Object.freeze({ signal: 0.72, hull: AUR.PLANET_DIA.min / 5, minPx: 20 }),

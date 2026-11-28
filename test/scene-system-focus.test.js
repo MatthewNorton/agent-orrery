@@ -169,9 +169,15 @@ test('the chase camera measures a hull again when a promotion swaps it in place,
     view.clearShipFocus();
     view.focusShip('drone', { exterior: true });
     near(back(drone), unit * 0.05, 'a small hull, by its own span');
-    view.shipFocus.orbit.zoom = 0.5;
-    view.updateShipFocusCamera(true, 0);
-    const span = Math.sqrt(3) * 0.05;
-    near(back(drone), span / 2 + scene.activeCamera.minZ, 'at its nearest, clear of the hull and the near plane');
+    const wheel = (deltaY) => {
+      view.orbitShipFocus({ type: BABYLON.PointerEventTypes.POINTERWHEEL, event: { deltaY } });
+      view.updateShipFocusCamera(true, 0);
+    };
+    wheel(-5000);
+    const nearest = Math.sqrt(3) * 0.05 / 2 + scene.activeCamera.minZ;
+    near(back(drone), nearest, 'at its nearest, clear of the hull and the near plane');
     assert.ok(back(drone) < unit * 0.05, 'nearer than it started');
+    // The wheel stopped where the camera did, so the first turn back out moves it.
+    wheel(200);
+    assert.ok(back(drone) > nearest * 1.1, 'a turn out moves the camera at once');
   }));

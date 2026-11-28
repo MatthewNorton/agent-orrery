@@ -37,9 +37,10 @@ test('a dart trails from its tail and a Petrel from its two nozzles; a yard name
     const part = AUR.sceneParts.system.exhaust({ scene, glow: { addExcludedMesh() {} } });
     const [petrel, yard] = [0, 60].map((builds) => models.inPlaceOf(rank(builds)).id);
     // A ship record as the ships part makes it and hangs its plumes, flying the hull named (none: a dart).
-    const flying = (hull) => {
+    const flying = (hull, dress = () => {}) => {
       const mesh = new BABYLON.Mesh('ship', scene);
       mesh.metadata = hull ? { assetHullId: hull } : null;
+      dress(mesh);
       const rec = { id: 'ship', mesh, tint: '#ffffff', hull: null, plumes: [] };
       part.attachExhaust(rec);
       return rec;
@@ -67,4 +68,11 @@ test('a dart trails from its tail and a Petrel from its two nozzles; a yard name
     station.mesh.metadata.assetHullId = yard;
     assert.deepEqual([part.refreshExhaust(station), ...trails(station)], [true, 0, false], 'and leave with it');
     assert.equal(scene.meshes.filter((mesh) => mesh.name.startsWith('t_')).length, 3, 'the dart\'s and the Petrel\'s are all that is left');
+
+    // A hull file that shows no nozzle trails from the middle of its own stern, not from a dart's tail.
+    const bare = flying('a-hull-file', (mesh) => {
+      BABYLON.MeshBuilder.CreateBox('part', { width: 0.4, height: 0.2, depth: 2 }, scene).parent = mesh;
+    });
+    assert.equal(bare.plumes.length, 1);
+    assert.ok(bare.plumes[0].anchor.position.equalsWithEpsilon(new BABYLON.Vector3(0, 0, -1), 1e-6), 'at the stern of a hull two units long');
   }));
