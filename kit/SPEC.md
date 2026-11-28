@@ -599,7 +599,8 @@ Design tokens (put in `:root`):
   with `AUR.shipModule` (one file per module, run on first use, so page load
   builds nothing), and writes `source.json`: the source commit, each module's
   hash, exports and the hash of the file generated from it, and a fingerprint
-  of the built ship's geometry and of each variant the script names for the
+  of the built ship's geometry (each part's vertices and where the part
+  stands) and of each variant the script names for the
   ship (a call on the built ship: Petrel's `ring` is `setRing(true)`), each of
   which the script first proves equal to what the original modules build.
   A ship built on another ship's modules borrows them (Breakwater imports the

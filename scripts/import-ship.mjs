@@ -90,11 +90,13 @@ function babylonPath(name) {
 function readModules(sourceDir, entries) {
   const modules = new Map();
   const visiting = new Set();
-  function visit(file) {
+  function visit(file, importer) {
     if (modules.has(file)) return;
     if (visiting.has(file)) fail('Circular import through ' + file + '.');
     visiting.add(file);
-    const text = lf(fs.readFileSync(path.join(sourceDir, file), 'utf8'));
+    const from = path.join(sourceDir, file);
+    if (!fs.existsSync(from)) fail('There is no ' + from + ', which ' + (importer ? importer + ' imports.' : 'the ship starts from.'));
+    const text = lf(fs.readFileSync(from, 'utf8'));
     const imports = [...text.matchAll(IMPORT)].map((match) => ({ names: namesOf(match[1] || ''), from: match[3] }));
     for (const { from } of imports) {
       if (from.startsWith(BABYLON_PACKAGE)) continue;
@@ -102,14 +104,17 @@ function readModules(sourceDir, entries) {
       if (!target || !MODULE_PATH.test(target)) {
         fail(file + ' imports ' + from + ': only modules in the ship\'s own folder, in a borrowed ship\'s beside it and ' + BABYLON_PACKAGE + ' are supported.');
       }
-      visit(target);
+      visit(target, file);
     }
     visiting.delete(file);
     modules.set(file, { file, stem: stemOf(file), text, imports });
   }
-  entries.forEach(visit);
+  for (const entry of entries) visit(entry);
   // A borrowed module is named by the ship it comes from, and checked against that ship's record.
   const { own = [], borrowed = [] } = Object.groupBy(modules.values(), ({ file }) => (isBorrowed(file) ? 'borrowed' : 'own'));
+  // One ship is borrowed from, so one folder beside the ship's own holds every borrowed module.
+  const folders = [...new Set(borrowed.map(({ file }) => path.posix.dirname(file)))];
+  if (folders.length > 1) fail('The ship borrows one ship\'s modules, and its imports reach into ' + folders.join(' and ') + '.');
   const stems = new Set();
   for (const { stem, file } of own) {
     if (stems.has(stem)) fail('Two modules are named ' + stem + ' (' + file + ').');
@@ -124,7 +129,8 @@ function checkBorrowed(ship, borrows, lender, borrowed) {
   for (const { file, stem, text } of borrowed) {
     const known = lender.record.modules[stem];
     if (!known || known.sha256 !== sha256(text)) {
-      fail(file + ' is not the ' + stem + ' module ' + labelOf(borrows) + ' was converted from: import ' + borrows + ' from this source first.');
+      fail(file + ' is not the ' + stem + ' module ' + labelOf(borrows) + ' was converted from. ' + labelOf(ship) + ' borrows only ' +
+        labelOf(borrows) + '\'s modules: if ' + path.posix.dirname(file) + ' is that ship\'s folder, import ' + borrows + ' from this source first.');
     }
   }
 }

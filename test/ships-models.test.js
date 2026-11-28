@@ -169,6 +169,24 @@ test('a build that fails part-way leaves nothing of its own in the scene', () =>
   });
 });
 
+test('a model that gives a part several finishes is refused, a part it instances too, and leaves nothing in the scene', () => {
+  onModelScene((scene, models) => {
+    const build = (instanced) => () => {
+      const root = new BABYLON.TransformNode('root', scene);
+      const part = BABYLON.MeshBuilder.CreateBox('part', { size: 1 }, scene);
+      const finishes = part.material = new BABYLON.MultiMaterial('two finishes', scene);
+      finishes.subMaterials.push(new BABYLON.PBRMaterial('one', scene), new BABYLON.PBRMaterial('other', scene));
+      (instanced ? part.createInstance('copy') : part).parent = root;
+      return root;
+    };
+    for (const instanced of [false, true]) {
+      const model = { id: 'patchwork', build: build(instanced), probe: () => new BABYLON.Texture(null, scene) };
+      assert.throws(() => models.container(scene, model), /A part of patchwork wears several finishes \(two finishes\)/);
+      leavesOnlyTheScenes(scene);
+    }
+  });
+});
+
 test('a build that fails part-way and cannot dispose one of its materials throws its own cause, and disposes the rest', () => {
   onScene((scene, models, petrel, AUR) => {
     const logs = logsOf({ AUR });

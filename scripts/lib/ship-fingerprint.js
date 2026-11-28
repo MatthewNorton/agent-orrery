@@ -62,17 +62,18 @@ function onNullScene(BABYLON, work) {
   return cleanUpAfter(() => work(new BABYLON.Scene(engine)), () => engine.dispose());
 }
 
-// Positions, normals and UVs are rounded to 1e-5 so the last bit of a sine never changes the result.
+// Each mesh's positions, normals and UVs, and where it stands (its world matrix: an instance has
+// its source's vertices and a place of its own). All are rounded to 1e-5 so the last bit of a sine
+// never changes the result.
 function fingerprint(root) {
   const hash = crypto.createHash('sha256');
+  const rounded = (values) => Buffer.from(Int32Array.from(values || [], (value) => Math.round(value * 1e5)).buffer);
   const meshes = root.getChildMeshes(false).slice().sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
   let triangles = 0;
   for (const mesh of meshes) {
     hash.update(mesh.name + '|' + (mesh.parent ? mesh.parent.name : '') + '\n');
-    for (const kind of ['position', 'normal', 'uv']) {
-      const rounded = Int32Array.from(mesh.getVerticesData(kind) || [], (value) => Math.round(value * 1e5));
-      hash.update(Buffer.from(rounded.buffer));
-    }
+    hash.update(rounded(mesh.computeWorldMatrix(true).m));
+    for (const kind of ['position', 'normal', 'uv']) hash.update(rounded(mesh.getVerticesData(kind)));
     const indices = Uint32Array.from(mesh.getIndices() || []);
     hash.update(Buffer.from(indices.buffer));
     triangles += indices.length / 3;

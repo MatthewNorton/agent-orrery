@@ -152,6 +152,8 @@
     const parts = root.getChildMeshes(false).map(solid);
     for (const material of new Set(parts.map((part) => /** @type {BABYLON.PBRMaterial} */ (part.material)))) {
       if (!material) continue;
+      // A part wears one finish: the dressing here and the merge below take its material as that finish.
+      if (material instanceof BABYLON.MultiMaterial) throw new Error(`A part of ${model.id} wears several finishes (${material.name}); a model gives each part one.`);
       material.reflectionTexture = probe;
       material.imageProcessingConfiguration = image;
       AUR.fadeWithMesh(material);
