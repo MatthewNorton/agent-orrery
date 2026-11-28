@@ -63,8 +63,9 @@ function onNullScene(BABYLON, work) {
 }
 
 // Each mesh's positions, normals and UVs, and where it stands (its world matrix: an instance has
-// its source's vertices and a place of its own). All are rounded to 1e-5 so the last bit of a sine
-// never changes the result.
+// its source's vertices and a place of its own). All are rounded to 1e-5, which keeps the result
+// through most last-bit differences in how a number is computed, not all: a number that lies at a
+// rounding step, as one written to six decimals ending in 5 does, tips with its last bit.
 function fingerprint(root) {
   const hash = crypto.createHash('sha256');
   const rounded = (values) => Buffer.from(Int32Array.from(values || [], (value) => Math.round(value * 1e5)).buffer);
