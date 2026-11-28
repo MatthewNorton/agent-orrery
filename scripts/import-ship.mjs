@@ -95,7 +95,8 @@ function readModules(sourceDir, entries) {
     if (visiting.has(file)) fail('Circular import through ' + file + '.');
     visiting.add(file);
     const from = path.join(sourceDir, file);
-    if (!fs.existsSync(from)) fail('There is no ' + from + ', which ' + (importer ? importer + ' imports.' : 'the ship starts from.'));
+    const found = fs.statSync(from, { throwIfNoEntry: false });
+    if (!found || !found.isFile()) fail('There is no module ' + from + ', which ' + (importer ? importer + ' imports.' : 'the ship starts from.'));
     const text = lf(fs.readFileSync(from, 'utf8'));
     const imports = [...text.matchAll(IMPORT)].map((match) => ({ names: namesOf(match[1] || ''), from: match[3] }));
     for (const { from } of imports) {
@@ -112,9 +113,6 @@ function readModules(sourceDir, entries) {
   for (const entry of entries) visit(entry);
   // A borrowed module is named by the ship it comes from, and checked against that ship's record.
   const { own = [], borrowed = [] } = Object.groupBy(modules.values(), ({ file }) => (isBorrowed(file) ? 'borrowed' : 'own'));
-  // One ship is borrowed from, so one folder beside the ship's own holds every borrowed module.
-  const folders = [...new Set(borrowed.map(({ file }) => path.posix.dirname(file)))];
-  if (folders.length > 1) fail('The ship borrows one ship\'s modules, and its imports reach into ' + folders.join(' and ') + '.');
   const stems = new Set();
   for (const { stem, file } of own) {
     if (stems.has(stem)) fail('Two modules are named ' + stem + ' (' + file + ').');
@@ -126,6 +124,9 @@ function readModules(sourceDir, entries) {
 /** A borrowed module must be the very source the ship it comes from was converted from. */
 function checkBorrowed(ship, borrows, lender, borrowed) {
   if (borrowed.length && !lender) fail(labelOf(ship) + ' imports ' + borrowed[0].file + ', and it borrows from no ship.');
+  // One ship is borrowed from, so one folder beside the ship's own holds every borrowed module.
+  const folders = [...new Set(borrowed.map(({ file }) => path.posix.dirname(file)))];
+  if (folders.length > 1) fail(labelOf(ship) + ' borrows only ' + labelOf(borrows) + '\'s modules, and its imports reach into ' + folders.join(' and ') + '.');
   for (const { file, stem, text } of borrowed) {
     const known = lender.record.modules[stem];
     if (!known || known.sha256 !== sha256(text)) {

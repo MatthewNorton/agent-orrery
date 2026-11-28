@@ -29,8 +29,10 @@ function refusal(files) {
 }
 
 test('a module that is not there is named, with the module that imports it', () => {
-  assert.match(refusal({ 'yard.js': "import { hull } from '../one/hull.js';\n" }), /There is no \S+one[\\/]hull\.js, which yard\.js imports\./);
-  assert.match(refusal({ 'berth.js': 'export const berths = 4;\n' }), /There is no \S+yard\.js, which the ship starts from\./);
+  assert.match(refusal({ 'yard.js': "import { hull } from '../one/hull.js';\n" }), /There is no module .+one[\\/]hull\.js, which yard\.js imports\./);
+  assert.match(refusal({ 'berth.js': 'export const berths = 4;\n' }), /There is no module .+yard\.js, which the ship starts from\./);
+  // A folder of that name is not the module.
+  assert.match(refusal({ 'yard.js': "import { hull } from './hull.js';\n", 'hull.js/keel.js': '' }), /There is no module .+hull\.js, which yard\.js imports\./);
 });
 
 test('a ship that borrows one ship\'s modules may import from one folder beside its own', () => {
@@ -39,7 +41,7 @@ test('a ship that borrows one ship\'s modules may import from one folder beside 
     '../one/hull.js': 'export const hull = 1;\n',
     '../two/ring.js': 'export const ring = 2;\n',
   });
-  assert.match(said, /borrows one ship's modules, and its imports reach into \.\.\/one and \.\.\/two\./);
+  assert.match(said, /Breakwater borrows only Petrel's modules, and its imports reach into \.\.\/one and \.\.\/two\./);
 });
 
 test('a borrowed module that is not the one its ship was converted from is refused, by its folder', () => {

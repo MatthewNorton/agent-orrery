@@ -150,10 +150,11 @@
     image.toneMappingType = BABYLON.ImageProcessingConfiguration.TONEMAPPING_ACES;
     image.exposure = EXPOSURE;
     const parts = root.getChildMeshes(false).map(solid);
+    // A part wears one finish: the probe, the tone curve and the fade below go on its one material,
+    // and a part with none would be merged into the first finish.
+    const odd = parts.find((part) => !part.material || part.material instanceof BABYLON.MultiMaterial);
+    if (odd) throw new Error(`${odd.name} of ${model.id} wears ${odd.material ? 'several finishes' : 'no finish'}; a model gives each part one.`);
     for (const material of new Set(parts.map((part) => /** @type {BABYLON.PBRMaterial} */ (part.material)))) {
-      if (!material) continue;
-      // A part wears one finish: the dressing here and the merge below take its material as that finish.
-      if (material instanceof BABYLON.MultiMaterial) throw new Error(`A part of ${model.id} wears several finishes (${material.name}); a model gives each part one.`);
       material.reflectionTexture = probe;
       material.imageProcessingConfiguration = image;
       AUR.fadeWithMesh(material);
