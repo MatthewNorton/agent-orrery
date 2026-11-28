@@ -6,14 +6,15 @@
 (function () {
   const AUR = window.AUR;
   // Ribbon history in frames, its blend, the share of the hull's length from the stern that holds
-  // its nozzles, and the dart's tail (an octahedron of size 0.5).
-  const PLUME = Object.freeze({ length: 18, alpha: 0.5, sternShare: 0.25, dartTail: -0.5, dartRadius: 0.08 });
+  // its nozzles, the dart's tail and its plume's radius in the dart's own size (AUR.DART_SIZE), and
+  // the plume's radius, as a share of its length, of a hull that shows no nozzle.
+  const PLUME = Object.freeze({ length: 18, alpha: 0.5, sternShare: 0.25, dartTail: -1, dartRadius: 0.16, bareRadius: 0.08 });
 
   AUR.sceneParts.system.exhaust = function (view) {
     const { scene, glow } = view;
     const materials = new Map(); // tint -> the plume material every ship of that tint shares
     const hulls = new Map(); // hull id -> its stern nozzles, the same for every ship of that hull
-    const dartNozzles = [{ position: new BABYLON.Vector3(0, 0, PLUME.dartTail), radius: PLUME.dartRadius }];
+    const dartNozzles = [{ position: new BABYLON.Vector3(0, 0, PLUME.dartTail * AUR.DART_SIZE), radius: PLUME.dartRadius * AUR.DART_SIZE }];
 
     const plumeMaterial = (tint) => AUR.memo(materials, tint, () => {
       const material = AUR.unlitMaterial(scene, 'plume_' + tint, AUR.color3(tint), PLUME.alpha);
@@ -49,19 +50,20 @@
           });
         }
       }
-      return { islands, length: zMax - zMin };
+      return { islands, length: zMax - zMin, stern: zMin };
     }
 
     // The nozzles a ship trails from, found once per hull: the ones its model names (a station
-    // names none, and trails nothing), else its hull's stern glow discs, else a dart's tail.
+    // names none, and trails nothing), else its hull's stern glow discs, else the end of its hull
+    // on its axis. A dart trails from its tail.
     function nozzles(rec) {
       if (!rec.hull) return dartNozzles;
       return AUR.memo(hulls, rec.hull, () => {
         const named = AUR.shipModels.nozzles(rec.hull);
         if (named) return named;
-        const { islands, length } = glowIslands(rec.mesh);
-        const stern = AUR.sternIslands(islands, length, PLUME.sternShare);
-        return stern.length ? stern : dartNozzles;
+        const { islands, length, stern } = glowIslands(rec.mesh);
+        const discs = AUR.sternIslands(islands, length, PLUME.sternShare);
+        return discs.length ? discs : [{ position: new BABYLON.Vector3(0, 0, stern), radius: PLUME.bareRadius * length }];
       });
     }
 

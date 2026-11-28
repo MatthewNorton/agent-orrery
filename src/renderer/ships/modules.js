@@ -1,7 +1,8 @@
 // @ts-check
 // The registry the converted ship models load into (scripts/import-ship.mjs writes them). A module
-// registers a factory and runs the first time something uses it, so loading the page builds nothing
-// and the order of the script tags does not matter.
+// registers a factory and runs the first time something uses it, so loading the page builds no ship
+// and the order of the modules' script tags does not matter. A ship's adapter may read a module's
+// constants as its own script loads, so its tag comes after the modules'.
 'use strict';
 
 (function () {

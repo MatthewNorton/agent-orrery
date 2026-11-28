@@ -23,6 +23,27 @@ test('Breakwater flies the Flagship rank, as wide as the fleet shows its Flagshi
   assert.ok(near(hull.correction.scale / hull.model.correction.scale, shown, 0.01), `shown ${shown} long`);
 });
 
+// Measured on the built yard, not read from the two adapters' numbers.
+test('the fleet is drawn to one scale: each Petrel parked on a berth is as long as a Scout in flight', () => {
+  onScene((scene, models) => {
+    const yard = models.inPlaceOf(FLAGSHIP);
+    const scout = models.inPlaceOf(SCOUT);
+    const flying = built(scene, scout.model);
+    const scoutLength = flying.size.z * scout.correction.scale;
+    flying.root.dispose(false, true);
+    const { root } = built(scene, yard.model);
+    const parked = root.getChildTransformNodes(true).filter((node) => node.name.startsWith('Petrel / '));
+    assert.equal(parked.length, 4);
+    for (const petrel of parked) {
+      // A berth heads along X or Z, so the parked ship's length is the longer side of its box.
+      const { min, max } = petrel.getHierarchyBoundingVectors(true);
+      const length = Math.max(max.x - min.x, max.z - min.z) * yard.correction.scale;
+      assert.ok(near(length, scoutLength, scoutLength * 0.005), `${petrel.name} is ${length} fleet units long, a Scout ${scoutLength}`);
+    }
+    root.dispose(false, true);
+  });
+});
+
 // The yard builds one quadrant and one Petrel and instances each three times; a merge takes no
 // instance, and it builds a finish from many parts.
 test('the yard sits in the fleet frame its correction claims, and its container holds all of it as one mesh, a sub-mesh per finish', () => {

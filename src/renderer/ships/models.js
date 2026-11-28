@@ -13,8 +13,8 @@
  * @property {string} id also the id of the hull it flies as; in a later one of its own ranks,
  *   `<id>-<n>`, n counting those ranks from 1 (the ringed Petrel's Capital is `petrel-ring-2`)
  * @property {Array<{ hull: string, size?: number }>} replaces the ranks it takes, lowest first: the
- *   manifest hull whose rank it takes, and its longest side there in the fleet's units (the Scout
- *   is one unit long), one unit when not given
+ *   manifest hull whose rank it takes, and its longest side there in the fleet's units (the
+ *   manifest's Scout file is one unit long), one unit when not given
  * @property {{ scale: number, offset: number[] }} correction to the fleet's frame: its longest
  *   side one unit, centred along its length and across its span, nose on +Z (the offset is in the
  *   model's own units)

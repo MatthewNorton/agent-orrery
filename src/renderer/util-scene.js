@@ -109,9 +109,11 @@
     return line;
   };
 
-  // Small emissive dart mesh for ships (an octahedron; the view scales it like any hull root).
+  // Small emissive dart mesh for ships (an octahedron; the view scales it like any hull root). It
+  // stands in for a hull, so it is sized to the fleet's first rank: about a Scout and a half across.
+  AUR.DART_SIZE = 0.5 * AUR.SCOUT_LENGTH;
   AUR.dartMesh = function (scene, name, hex) {
-    const m = BABYLON.MeshBuilder.CreatePolyhedron(name, { type: 1, size: 0.5 }, scene);
+    const m = BABYLON.MeshBuilder.CreatePolyhedron(name, { type: 1, size: AUR.DART_SIZE }, scene);
     m.layerMask |= AUR.SHIP_LAYER;
     const mat = new BABYLON.StandardMaterial(name + '_m', scene);
     const c = BABYLON.Color3.FromHexString(hex);

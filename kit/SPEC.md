@@ -482,10 +482,22 @@ Design tokens (put in `:root`):
 - Main Claude/Codex ships fly the `aur-fleet-v3` rank ladder in
   `assets/ships/manifest.json`: the hull is the highest rank whose `minBuilds`
   the ship's `builds` has reached (Scout 0, Workhorse 5, Capital 20, Flagship
-  60); display length grows 1.9× over the ladder. A drone flies the first rank
+  60); the hull files' display length grows 1.9× over the ladder, and the
+  models that fly these ranks have sizes of their own (below). A drone flies the first rank
   at `AUR.DRONE_SCALE` of its size. Ship size is one policy (`AUR.SHIP_SIZE`
   per view, `AUR.fitShip` with a pixel floor so a hull sized to its planets
-  still reads from the default orbit).
+  still reads from the default orbit). The floor (`minPx`) is the least a
+  hull one fleet unit long is drawn at, and every hull keeps its own length
+  against it, so the fleet keeps its scale, ship against ship: under the
+  floor the yard (1.9 units) is drawn at 1.9 times `minPx` and a Scout
+  (`AUR.SCOUT_LENGTH`) at about a quarter of it. This is the owner's choice
+  of size, true to the yard's scale in every view. In a system and on the
+  map the floor holds for any ship more than a few units from the camera,
+  which is nearly all of them at any zoom, so a ship keeps one size on screen
+  there (measured on a 1180 px high view: a Scout about 5 px in a system and
+  3 on the map, the yard 38 and 23); only a ship passing close by the camera
+  at the nearest zoom of a small system is drawn larger, at its true size.
+  The chase camera, opened from the fleet list, is what shows a ship close.
   - **Instancing.** Each hull is one file. Every view draws its ships as
     instances of a hidden template, one per hull file and palette (the
     provider's, or local red), in one draw per part. An instance shows its
@@ -548,11 +560,16 @@ Design tokens (put in `:root`):
   and template. Petrel
   (`ships/petrel/model.js`) flies the Scout rank, so it is also every drone;
   the same build with its survey ring fitted (`petrel-ring`) flies the
-  Workhorse and Capital ranks, its ring, its longest side, as wide as the
-  fleet shows those hulls long (1.25 and 1.55). Breakwater
+  Workhorse and Capital ranks. Breakwater
   (`ships/breakwater/model.js`), a drydock with four Petrels parked on its
   berths, flies the Flagship rank, as wide as the fleet shows that hull long
-  (1.9), its landing decks up and its north berth as its nose. So every rank
+  (1.9), its landing decks up and its north berth as its nose. The fleet is
+  drawn to the yard's scale, so a Scout in flight is as long as a Petrel
+  parked on a berth (the yard draws its parked ships at 0.475 of its own
+  units, and its size here takes that in): the Scout is 0.256 fleet units
+  long, the Workhorse the same Petrel with its ring (0.32 across the ring, its
+  longest side), and the Capital the ringed ship drawn 1.24 times larger
+  (0.39). So every rank
   of the Claude and Codex fleets is a model, and the manifest's hull files
   load only for a rank a model has not taken.
   - **Container.** The ship is built once per scene and merged into one mesh

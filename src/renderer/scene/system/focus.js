@@ -122,7 +122,8 @@
       if (shipFocus.exterior) {
         // The camera rides the ship's position, so the ship's own motion never pulls it away.
         chaseSpan += (hullSpan(rec) - chaseSpan) * amount;
-        const back = Math.max(0.25, chaseSpan * CHASE.distance * orbit.zoom);
+        // Whatever the hull's size, never nearer than its own radius and the near plane.
+        const back = Math.max(chaseSpan / 2 + focusCamera.minZ, chaseSpan * CHASE.distance * orbit.zoom);
         place(focusCamera.position, shipPosition, -back * Math.cos(orbit.pitch), back * Math.sin(orbit.pitch));
         focusLookCurrent.copyFrom(shipPosition);
       } else {
@@ -184,7 +185,11 @@
       const event = pi.event;
       const types = BABYLON.PointerEventTypes;
       if (pi.type === types.POINTERWHEEL) {
-        orbit.zoom = AUR.clamp(orbit.zoom * Math.exp(event.deltaY * ORBIT.wheel), ORBIT.zoom.min, ORBIT.zoom.max);
+        // A small hull's nearest stand-off comes before the zoom's own limit: the wheel stops there
+        // too, so it never winds on past what the camera can show.
+        const nearest = chaseSpan > 0 ? (chaseSpan / 2 + focusCamera.minZ) / (chaseSpan * CHASE.distance) : 0;
+        const least = Math.min(ORBIT.zoom.max, Math.max(ORBIT.zoom.min, nearest));
+        orbit.zoom = AUR.clamp(orbit.zoom * Math.exp(event.deltaY * ORBIT.wheel), least, ORBIT.zoom.max);
       } else if (pi.type === types.POINTERDOWN && event.button === 0) {
         drag.pointerId = event.pointerId;
         drag.x = event.clientX;
