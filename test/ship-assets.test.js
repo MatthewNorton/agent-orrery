@@ -12,6 +12,23 @@ const {
   SHIP_ASSET_FILES, SHIP_LAYER, instanceOnLayer, loadShipAssets, LADDER_MANIFEST, ship, hullId, partMaterial,
   instancesOf, templatesOf, sameItems, logsOf,
 } = require('./support/ship-assets');
+const { onSystem } = require('./support/ships-models');
+
+// A model's build stalls the page while it runs: one task each, so a frame can draw between two.
+test('a view that opens on several ship models builds them one at a time, each in a task of its own', () =>
+  onSystem(async (scene, AUR, fly) => {
+    const order = [];
+    const { container } = AUR.shipModels;
+    AUR.shipModels.container = (target, model) => {
+      order.push('build ' + model.id);
+      setTimeout(() => order.push('task'), 0); // runs once the task this build is in has ended
+      return container(target, model);
+    };
+    const hulls = await Promise.all([fly('s', 0), fly('w', 5), fly('f', 60)]);
+    await new Promise((resolve) => { setTimeout(resolve, 0); });
+    assert.deepEqual(hulls.map((root) => root.metadata.assetHullId), ['petrel', 'petrel-ring', 'breakwater']);
+    assert.deepEqual(order, ['build petrel', 'task', 'build petrel-ring', 'task', 'build breakwater', 'task']);
+  }));
 
 test('index.html loads every ship-assets file, the core first, and the livery before the hulls', () => {
   const onDisk = fs.readdirSync(path.join(__dirname, '..', 'src', 'renderer')).filter((file) => /^ship-assets.*\.js$/.test(file));
@@ -284,7 +301,7 @@ test('a hull whose provider evidence cannot be made is not built, and leaves no 
 });
 
 test('a hull file that cannot be loaded logs its cause once per file and cause, and a full budget says what ships keep', async () => {
-  const assets = loadShipAssets(LADDER_MANIFEST, { 'mid-near.glb': 950000, 'mid-far.glb': 950000 }); // over a 900k budget
+  const assets = loadShipAssets(LADDER_MANIFEST, { 'mid-near.glb': 2850000, 'mid-far.glb': 2850000 }); // over a 2.7M budget
   const logs = logsOf(assets);
   const load = assets.BABYLON.SceneLoader.LoadAssetContainerAsync;
   for (const cause of ['file missing', 'file missing', 'not a glTF']) {

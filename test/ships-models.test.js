@@ -7,14 +7,12 @@ const BABYLON = require('babylonjs');
 const { onNullScene } = require('../scripts/lib/ship-fingerprint.js');
 const { logsOf, readRenderer } = require('./support/renderer-source');
 const { hullOf, sameItems } = require('./support/ship-assets');
-const { manifest, rank, loadShipModels: load, onModelScene, onSystem } = require('./support/ships-models');
+const { manifest, rank, loadShipModels: load, onModelScene, onSystem, trianglesOf, palettes, built } = require('./support/ships-models');
 
 const SCOUT = manifest.hulls.find((hull) => hull.id === 'aur-lance-interceptor-v3');
 
 // Runs `work(scene, models, petrel, AUR)` on a fresh scene.
 const onScene = (work) => onModelScene((scene, models, AUR) => work(scene, models, models.inPlaceOf(SCOUT).model, AUR));
-
-const trianglesOf = (mesh) => mesh.getTotalIndices() / 3;
 
 test('Petrel flies the Scout rank: the first rank of the family both providers fly', () => {
   const models = load().shipModels;
@@ -27,8 +25,8 @@ test('Petrel flies the Scout rank: the first rank of the family both providers f
     { id: 'petrel', file: 'model:petrel', family: SCOUT.family, role: SCOUT.role, minBuilds: 0 });
   assert.deepEqual([hull.model.id, hull.model.replaces, hull.correction], ['petrel', [{ hull: SCOUT.id }], hull.model.correction]);
   assert.equal(models.inPlaceOf(SCOUT), hull, 'one hull entry, so a refresh compares like with like');
-  const flagship = manifest.hulls.find((entry) => entry.family === SCOUT.family && entry.minBuilds === 60);
-  assert.equal(models.inPlaceOf(flagship), flagship, 'a rank no model has taken keeps its manifest hull');
+  const other = manifest.hulls.find((entry) => entry.family !== SCOUT.family);
+  assert.equal(models.inPlaceOf(other), other, 'a hull no model has taken stays the manifest\'s');
 });
 
 test('a model container holds the dressed ship out of the scene, as one mesh with a sub-mesh per finish', () => {
@@ -119,12 +117,35 @@ test('a faded fleet draws after every other blended mesh, from either side of th
     assert.equal(glow.alphaIndex, Number.MAX_VALUE, 'every other mesh keeps Babylon\'s default');
   }));
 
+// A merge takes no instance, so each instanced part is merged as a mesh, where the instance stands.
+test('a part a build instances is merged where its instance stands, with the parts under it', () => {
+  onModelScene((scene, models) => {
+    const build = () => {
+      const root = new BABYLON.TransformNode('root', scene);
+      const arm = BABYLON.MeshBuilder.CreateBox('arm', { size: 1 }, scene);
+      const tip = BABYLON.MeshBuilder.CreateBox('tip', { size: 0.2 }, scene);
+      arm.parent = root;
+      tip.parent = arm;
+      tip.position.y = 2;
+      arm.material = new BABYLON.PBRMaterial('arm finish', scene);
+      tip.material = new BABYLON.PBRMaterial('tip finish', scene);
+      arm.instantiateHierarchy(root).position.x = 10; // a second arm, with a tip of its own
+      return root;
+    };
+    const held = models.container(scene, { id: 'arms', build, probe: () => new BABYLON.Texture(null, scene) });
+    const [hull] = held.meshes;
+    assert.deepEqual([scene.meshes.length, scene.transformNodes.length], [0, 0], 'the instances went with the build');
+    const positions = hull.getVerticesData('position');
+    const corners = { arm: [0, 0], tip: [0, 0] }; // of each part, at the first arm and at the second
+    for (let i = 0; i < positions.length; i += 3) corners[positions[i + 1] > 1.5 ? 'tip' : 'arm'][positions[i] > 5 ? 1 : 0]++;
+    assert.deepEqual(corners, { arm: [24, 24], tip: [24, 24] });
+  });
+});
+
 test('the model sits in the fleet frame its correction claims: one unit long, centred', () => {
   onScene((scene, models, petrel) => {
     const { scale, offset } = petrel.correction;
-    const root = petrel.build(scene);
-    root.computeWorldMatrix(true);
-    const { min, max } = root.getHierarchyBoundingVectors(true);
+    const { min, max } = built(scene, petrel);
     assert.ok(Math.abs((max.z - min.z) * scale - 1) < 0.005, `the hull is ${(max.z - min.z) * scale} units long`);
     assert.ok(Math.abs((max.z + min.z) / 2 + offset[2]) * scale < 0.005, 'centred along its length');
     assert.ok(Math.abs(max.x + min.x) * scale < 0.005 && offset[0] === 0, 'centred across its span');
@@ -141,9 +162,13 @@ const leavesOnlyTheScenes = (scene) => {
 
 test('a build that fails part-way leaves nothing of its own in the scene', () => {
   onScene((scene, models, petrel) => {
-    const failing = { ...petrel, probe() { throw new Error('no probe'); } };
-    assert.throws(() => models.container(scene, failing), /no probe/);
+    assert.throws(() => models.container(scene, { ...petrel, probe() { throw new Error('no probe'); } }), /no probe/);
     leavesOnlyTheScenes(scene);
+    for (const finish of [() => null, () => new BABYLON.MultiMaterial('two finishes', scene)]) { // a part wears one finish
+      const build = () => { const root = petrel.build(scene); root.getChildMeshes(false)[0].material = finish(); return root; };
+      assert.throws(() => models.container(scene, { ...petrel, build }), /wears (no finish|several finishes); a model gives each part one/);
+      leavesOnlyTheScenes(scene);
+    }
     assert.equal(models.container(scene, petrel).meshes.length, 1, 'and the scene can still build the model');
   });
 });
@@ -234,7 +259,7 @@ test('a ship wears the model finishes, with its trim copied once per palette in 
       for (const name of Object.keys(model.trim)) assert.ok(own(name), `${name} is a material ${model.id} builds`);
       assert.deepEqual(model.trim['pearl pressure hull'], { lamps }, model.id);
       const copies = new Map();
-      for (const [palette, hex] of [['claude', '#d97757'], ['codex', '#f2f0ea'], ['local', AUR.LOCAL_MODEL.color]]) {
+      for (const [palette, hex] of palettes(AUR)) {
         const guide = models.material(copies, model, palette, hex, own('pearl pressure hull'));
         assert.ok(shown(guide).equalsWithEpsilon(BABYLON.Color3.FromHexString(hex).toLinearSpace().scale(2.5), 1e-6), `${model.id}: ${palette} guide lamps`);
         assert.ok(guide.emissiveTexture === own('pearl pressure hull').emissiveTexture, `${model.id}: ${palette} guide lamps on the art's map`);

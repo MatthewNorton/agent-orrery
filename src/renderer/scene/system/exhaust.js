@@ -52,19 +52,22 @@
       return { islands, length: zMax - zMin };
     }
 
-    // The nozzles a ship trails from: the ones its model names, else its hull's stern glow discs
-    // (found once per hull), else a dart's tail.
+    // The nozzles a ship trails from, found once per hull: the ones its model names (a station
+    // names none, and trails nothing), else its hull's stern glow discs, else a dart's tail.
     function nozzles(rec) {
-      const found = rec.hull ? AUR.memo(hulls, rec.hull, () => {
+      if (!rec.hull) return dartNozzles;
+      return AUR.memo(hulls, rec.hull, () => {
         const named = AUR.shipModels.nozzles(rec.hull);
         if (named) return named;
         const { islands, length } = glowIslands(rec.mesh);
-        return AUR.sternIslands(islands, length, PLUME.sternShare);
-      }) : [];
-      return found.length ? found : dartNozzles;
+        const stern = AUR.sternIslands(islands, length, PLUME.sternShare);
+        return stern.length ? stern : dartNozzles;
+      });
     }
 
+    // Hangs the plumes of the hull the ship flies, which the record then names.
     function attachExhaust(rec) {
+      rec.hull = AUR.shipHullId(rec.mesh);
       const material = plumeMaterial(rec.tint);
       rec.plumes = nozzles(rec).map(({ position, radius }, i) => {
         const id = rec.id + '_' + i;
@@ -79,14 +82,12 @@
       });
     }
 
-    // Hangs the plumes on the ship's current hull unless they are there already: its arrival under
-    // the dart, a promotion, a local-model swap. True when it did, so focus mode can fade the new
-    // meshes; the ships part asks every frame.
+    // Hangs the plumes again when the hull under the ship has changed: its arrival under the dart,
+    // a promotion. True when it did, so focus mode can fade the new meshes; the ships part asks
+    // every frame.
     function refreshExhaust(rec) {
-      const hull = AUR.shipHullId(rec.mesh);
-      if (rec.plumes.length && rec.hull === hull) return false;
+      if (rec.hull === AUR.shipHullId(rec.mesh)) return false;
       detachExhaust(rec);
-      rec.hull = hull;
       attachExhaust(rec);
       return true;
     }
@@ -99,6 +100,6 @@
       rec.plumes = [];
     }
 
-    return { refreshExhaust, detachExhaust };
+    return { attachExhaust, refreshExhaust, detachExhaust };
   };
 })();

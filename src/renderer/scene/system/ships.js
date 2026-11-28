@@ -51,7 +51,7 @@
       };
       applyShipAttention(rec, s);
       ships.set(s.id, rec);
-      view.refreshExhaust(rec);
+      view.attachExhaust(rec);
       view.applyShipFocusVisual(rec);
       return rec;
     }
@@ -106,8 +106,7 @@
     function animateShips(dt, now, t) {
       const fit = AUR.shipFit(scene, SIZE.minPx);
       for (const r of ships.values()) {
-        // The plumes follow the hull (its arrival, a promotion, a local model); focus mode's fade
-        // covers the new meshes.
+        // The plumes follow the hull (its arrival, a promotion); focus mode's fade covers the new meshes.
         if (view.refreshExhaust(r)) view.applyShipFocusVisual(r);
         const f = r.fly;
         if (r.mode === 'patrol') {

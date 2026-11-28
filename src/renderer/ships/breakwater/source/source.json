@@ -1,0 +1,93 @@
+{
+  "ship": "breakwater",
+  "commit": "9c4ff47ac605",
+  "build": [
+    "yard",
+    "createDrydock"
+  ],
+  "borrows": "petrel",
+  "modules": {
+    "fabrication": {
+      "source": "fabrication.js",
+      "sha256": "f4f9e7e8bf172b75a6186e261e3f9c95d6ace22c04b7ea5353fb4a8649c40f19",
+      "generated": "5705e90c6b1abd1830672de8eefe2a45e6a8add4d533f2342f073fc09fb328e8",
+      "exports": [
+        "Fabrication",
+        "TAU",
+        "rad",
+        "radial",
+        "up",
+        "v"
+      ]
+    },
+    "layout": {
+      "source": "layout.js",
+      "sha256": "db9236205705f49e5b98c3ca97b5af98bcb37564ee625a271590c9a433dddf54",
+      "generated": "8a476bb8396c111f48b4f56b6309f8513b2c1e995f3577ad28122acf076aa8cb",
+      "exports": [
+        "APRON",
+        "AXLE_Y",
+        "BERTHS",
+        "BERTH_RADIUS",
+        "CUTTER_SCALE",
+        "DECK_Y",
+        "GEAR",
+        "QUARTER",
+        "RIM_END",
+        "RIM_START",
+        "WHEEL_RADIUS",
+        "apronHalfWidthAtRim",
+        "padUV"
+      ]
+    },
+    "services": {
+      "source": "services.js",
+      "sha256": "bb897d4f85e4ea6d944eee9c1f3a1efad6e4efbdfc42e3a79304edd6fe1d429a",
+      "generated": "9bec6886dc2f6c9074f09095fff77258999914e7ac5be3a5c11292e51241a4d3",
+      "exports": [
+        "airlock",
+        "buildRim",
+        "glazing",
+        "housing"
+      ]
+    },
+    "berth": {
+      "source": "berth.js",
+      "sha256": "08db10c69ce42c9a081dee3e08088d5bc97652b7bd5132bc6b47bc6d13f3ea61",
+      "generated": "7d70d27a22594f132ad58d84480f797de961b58c467efc8f3de3c9671c430ebd",
+      "exports": [
+        "buildBerth"
+      ]
+    },
+    "hub": {
+      "source": "hub.js",
+      "sha256": "36f404c8c7b113b773b60c488169fb0dccd447a44ef8d430ec73f636c94086d3",
+      "generated": "b1f6a658edfe1d7b0af17d37391e84e003607d5b037ded55b7fbf04f3e9cc1e4",
+      "exports": [
+        "buildHub"
+      ]
+    },
+    "finishes": {
+      "source": "finishes.js",
+      "sha256": "1932604214e0074c21a62cf317e1c8c9ecb4bb59a5535d285e987d1b6cf91118",
+      "generated": "1a5677932c698682c9cb324d9c55d76a5e9d872c5fcf200d483acdeb40bf5d75",
+      "exports": [
+        "createFinishes"
+      ]
+    },
+    "yard": {
+      "source": "yard.js",
+      "sha256": "93995fc0ca46fc0d252de6e4fadaad6ddd2491413e3f4f907b12a4a48336d8b4",
+      "generated": "a7b6dd4d643ae3985f542372aa526424072b2170e4f9b140ea4120554cec80d3",
+      "exports": [
+        "createDrydock"
+      ]
+    }
+  },
+  "geometry": {
+    "meshes": 209,
+    "triangles": 229360,
+    "sha256": "0aebf59a34a1188828b6f47f560c9205d516f1ebd7ce37a040cc0ac1ed903139"
+  },
+  "variants": {}
+}

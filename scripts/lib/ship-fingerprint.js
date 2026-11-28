@@ -5,6 +5,7 @@
 // a fingerprint of its geometry. scripts/import-ship.mjs and the tests share this.
 const crypto = require('node:crypto');
 const fs = require('node:fs');
+const path = require('node:path');
 
 const lf = (text) => text.replace(/\r\n/g, '\n');
 const sha256 = (text) => crypto.createHash('sha256').update(text).digest('hex');
@@ -61,17 +62,19 @@ function onNullScene(BABYLON, work) {
   return cleanUpAfter(() => work(new BABYLON.Scene(engine)), () => engine.dispose());
 }
 
-// Positions, normals and UVs are rounded to 1e-5 so the last bit of a sine never changes the result.
+// Each mesh's positions, normals and UVs, and where it stands (its world matrix: an instance has
+// its source's vertices and a place of its own). All are rounded to 1e-5, which keeps the result
+// through most last-bit differences in how a number is computed, not all: a number that lies at a
+// rounding step, as one written to six decimals ending in 5 does, tips with its last bit.
 function fingerprint(root) {
   const hash = crypto.createHash('sha256');
+  const rounded = (values) => Buffer.from(Int32Array.from(values || [], (value) => Math.round(value * 1e5)).buffer);
   const meshes = root.getChildMeshes(false).slice().sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
   let triangles = 0;
   for (const mesh of meshes) {
     hash.update(mesh.name + '|' + (mesh.parent ? mesh.parent.name : '') + '\n');
-    for (const kind of ['position', 'normal', 'uv']) {
-      const rounded = Int32Array.from(mesh.getVerticesData(kind) || [], (value) => Math.round(value * 1e5));
-      hash.update(Buffer.from(rounded.buffer));
-    }
+    hash.update(rounded(mesh.computeWorldMatrix(true).m));
+    for (const kind of ['position', 'normal', 'uv']) hash.update(rounded(mesh.getVerticesData(kind)));
     const indices = Uint32Array.from(mesh.getIndices() || []);
     hash.update(Buffer.from(indices.buffer));
     triangles += indices.length / 3;
@@ -103,4 +106,15 @@ function rootOf(ship, call) {
   return ship.root;
 }
 
-module.exports = { lf, sha256, withCanvas, onNullScene, fingerprintOf, loadShipModules, rootOf };
+/**
+ * A converted ship under `shipsDir` (src/renderer/ships): its source.json, and its converted
+ * modules as files, after those of the ship it is built on when it borrows one's.
+ */
+function convertedShip(shipsDir, ship) {
+  const dir = path.join(shipsDir, ship, 'source');
+  const record = JSON.parse(fs.readFileSync(path.join(dir, 'source.json'), 'utf8'));
+  const own = Object.keys(record.modules).map((stem) => path.join(dir, stem + '.js'));
+  return { record, files: record.borrows ? [...convertedShip(shipsDir, record.borrows).files, ...own] : own };
+}
+
+module.exports = { lf, sha256, withCanvas, onNullScene, fingerprintOf, loadShipModules, rootOf, convertedShip };

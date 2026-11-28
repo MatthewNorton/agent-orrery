@@ -57,9 +57,20 @@
   /** @type {Map<string, HullEntry>} */
   const flown = new Map(); // the id a model hull flies under -> its hull entry
 
+  /** @type {Map<string, ShipModel>} */
+  const models = new Map(); // id -> the model registered under it
+
   /** @param {ShipModel} model */
   function register(model) {
+    models.set(model.id, model);
     model.replaces.forEach(({ hull, size = 1 }, rank) => ranks.set(hull, { model, rank, size }));
+  }
+
+  /** A registered model, for one built on it: a station wears the trim of the ships parked on it. @param {string} id */
+  function modelOf(id) {
+    const model = models.get(id);
+    if (!model) throw new Error('Ship model ' + id + ' is not registered.');
+    return model;
   }
 
   /**
@@ -110,6 +121,26 @@
     return held;
   }
 
+  /**
+   * A part as a mesh: a model may instance the parts it repeats, and a merge takes no instance, so
+   * each gets a mesh on its source's geometry, standing where the instance stands. The instance
+   * stays, since parts under it stand on it, and goes with the built root.
+   * @param {BABYLON.AbstractMesh} part @returns {BABYLON.Mesh}
+   */
+  function solid(part) {
+    if (!(part instanceof BABYLON.InstancedMesh)) return /** @type {BABYLON.Mesh} */ (part);
+    const source = part.sourceMesh;
+    const mesh = new BABYLON.Mesh(part.name, part.getScene(), part.parent);
+    source.geometry.applyToMesh(mesh);
+    mesh.material = source.material;
+    mesh.sideOrientation = source.sideOrientation;
+    mesh.position.copyFrom(part.position);
+    mesh.rotation.copyFrom(part.rotation);
+    mesh.rotationQuaternion = part.rotationQuaternion && part.rotationQuaternion.clone();
+    mesh.scaling.copyFrom(part.scaling);
+    return mesh;
+  }
+
   function dressed(scene, model) {
     const root = model.build(scene);
     const probe = model.probe(scene);
@@ -118,15 +149,18 @@
     image.toneMappingEnabled = true;
     image.toneMappingType = BABYLON.ImageProcessingConfiguration.TONEMAPPING_ACES;
     image.exposure = EXPOSURE;
-    const parts = /** @type {BABYLON.Mesh[]} */ (root.getChildMeshes(false));
+    const parts = root.getChildMeshes(false).map(solid);
+    // A part wears one finish: the probe, the tone curve and the fade below go on its one material,
+    // and a part with none would be merged into the first finish.
+    const odd = parts.find((part) => !part.material || part.material instanceof BABYLON.MultiMaterial);
+    if (odd) throw new Error(`${odd.name} of ${model.id} wears ${odd.material ? 'several finishes' : 'no finish'}; a model gives each part one.`);
     for (const material of new Set(parts.map((part) => /** @type {BABYLON.PBRMaterial} */ (part.material)))) {
-      if (!material) continue;
       material.reflectionTexture = probe;
       material.imageProcessingConfiguration = image;
       AUR.fadeWithMesh(material);
     }
-    // Every mesh of a hull is placed and culled once per ship, so the thirty-odd parts become one
-    // mesh, grouped by finish: one draw per finish for all the ships of a template.
+    // Every mesh of a hull is placed and culled once per ship, so its parts, thirty-odd or two
+    // hundred, become one mesh, grouped by finish: one draw per finish for all the ships of a template.
     const hull = BABYLON.Mesh.MergeMeshes(parts, true, true, undefined, false, true);
     root.dispose();
     hull.name = model.id;
@@ -298,5 +332,5 @@
     }));
   }
 
-  AUR.shipModels = { LAYER, TRIM_LIGHT, register, inPlaceOf, container, material, trimLight, lights, nozzles };
+  AUR.shipModels = { LAYER, TRIM_LIGHT, register, model: modelOf, inPlaceOf, container, material, trimLight, lights, nozzles };
 })();

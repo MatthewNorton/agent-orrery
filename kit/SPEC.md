@@ -523,10 +523,11 @@ Design tokens (put in `:root`):
     a cut-out would keep its mode and not fade, and no hull has one.
   - **Triangle budget.** Past its budget a ship keeps its dart, or its current
     hull when a promotion does not fit, a near view first trying the hull's far
-    file when it has one: 900k in a system or planet view, which
-    holds fifty-one ships of the first rank (Petrel, 17,544 triangles) or
-    twenty-two of the two above it (Petrel with its survey ring, 40,840), and
-    1.24M on the universe map, which holds seventy or thirty. A hull is
+    file when it has one: 2.7M in a system or planet view, which
+    holds eleven ships of the top rank (the Breakwater yard, 229,360
+    triangles), sixty-six of the two below it (Petrel with its survey ring,
+    40,840) or 153 of the first (Petrel, 17,544), and 3.72M on the universe
+    map, which holds sixteen, ninety-one or 212. A hull is
     checked in the step that builds it, so ships
     waiting on one container keep to the budget, and a request that ends while
     it waits (its dart gone, its swap superseded) loads and builds nothing more.
@@ -548,11 +549,19 @@ Design tokens (put in `:root`):
   (`ships/petrel/model.js`) flies the Scout rank, so it is also every drone;
   the same build with its survey ring fitted (`petrel-ring`) flies the
   Workhorse and Capital ranks, its ring, its longest side, as wide as the
-  fleet shows those hulls long (1.25 and 1.55). The Flagship keeps its
-  manifest hull.
+  fleet shows those hulls long (1.25 and 1.55). Breakwater
+  (`ships/breakwater/model.js`), a drydock with four Petrels parked on its
+  berths, flies the Flagship rank, as wide as the fleet shows that hull long
+  (1.9), its landing decks up and its north berth as its nose. So every rank
+  of the Claude and Codex fleets is a model, and the manifest's hull files
+  load only for a rank a model has not taken.
   - **Container.** The ship is built once per scene and merged into one mesh
     with a sub-mesh per finish, because every mesh of a hull is placed and
-    culled once per ship. From there it goes the way of a hull file's
+    culled once per ship. A part the build instances (the yard builds one
+    quadrant and one Petrel, and instances each three times) becomes a mesh
+    of its own first, since a merge takes no instance. A build stalls the page
+    while it runs, so a scene's models are built one at a time, each in a task
+    of its own with a frame's gap before it. From there it goes the way of a hull file's
     container (the hull entry `inPlaceOf` returns carries the `model`, which
     tells the two apart), so all the ships of one model and palette draw in one
     draw per finish (the bare and the ringed Petrel are two models). Like a file's container it owns the materials and textures it was
@@ -582,16 +591,23 @@ Design tokens (put in `:root`):
     halos its map paints around them (as much dimmer as the art paints them),
     and the glow of both, which takes the hue the trim lights glow in.
     `AUR.shipModels.trimLight` is that light, and the fleet's livery stripes
-    and nozzles are made by it too.
+    and nozzles are made by it too. Breakwater's work lights are lamps in the
+    ship color and its parked Petrels wear the trim they fly in; its windows
+    keep the warm rooms the art lights behind them.
 - A model's `source/` folder is generated: `node scripts/import-ship.mjs <ship>
   <source folder>` converts the ship's ES modules to page scripts that register
   with `AUR.shipModule` (one file per module, run on first use, so page load
   builds nothing), and writes `source.json`: the source commit, each module's
   hash, exports and the hash of the file generated from it, and a fingerprint
-  of the built ship's geometry and of each variant the script names for the
+  of the built ship's geometry (each part's vertices and where the part
+  stands) and of each variant the script names for the
   ship (a call on the built ship: Petrel's `ring` is `setRing(true)`), each of
   which the script first proves equal to what the original modules build.
-  Never edit those files: change the ship at its source and run the script
+  A ship built on another ship's modules borrows them (Breakwater imports the
+  Petrel's from the folder beside its own): they are not converted a second
+  time, each must be the module the lender's `source.json` records, and the
+  borrower's converted files ask for the lender's (`use('petrel/<module>')`),
+  so the lender's scripts and adapter load first. Never edit those files: change the ship at its source and run the script
   again (`--check` reports whether they are current); it prints the script
   tags `index.html` needs. `test/ships-source.test.js` holds the committed
   files to those hashes, rebuilds the ship and each variant from them and
@@ -734,7 +750,8 @@ route logs that and shows the universe instead (`app/route.js`).
   until it loads) + name label (GUI, always visible, like `Claude-1` callouts in
   the mockup) + an exhaust plume from each stern nozzle (the `exhaust` part
   reads them off the hull's `engine_glow` islands, or takes them from
-  `AUR.shipModels.nozzles` for a model; a dart trails from its tail). Modes: `patrol` outside the last orbit and the
+  `AUR.shipModels.nozzles` for a model, and a model that names none, as the
+  Breakwater yard does, trails nothing; a dart trails from its tail). Modes: `patrol` outside the last orbit and the
   belt; on `build` → `flyto` (`AUR.MOTION.flyToSeconds`, arcing over the belt
   and the largest planet) to a standoff beside the `bucket` planet → `hold`
   (~2.4s, a thin emissive beam, planet pulses 1 → 1.15 → 1) → `return` to the
